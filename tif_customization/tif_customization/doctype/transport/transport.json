@@ -1,25 +1,20 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "format:{courier}",
- "creation": "2025-06-13 15:56:48.376306",
+ "autoname": "format:{transport}",
+ "creation": "2025-06-13 16:01:04.206318",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "section_break_hoa0",
-  "courier",
+  "transport",
   "active"
  ],
  "fields": [
   {
-   "fieldname": "section_break_hoa0",
-   "fieldtype": "Section Break"
-  },
-  {
-   "fieldname": "courier",
+   "fieldname": "transport",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Courier",
+   "label": "Transport",
    "reqd": 1
   },
   {
@@ -32,10 +27,10 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-06-13 16:09:43.089568",
+ "modified": "2025-06-13 16:09:17.448525",
  "modified_by": "Administrator",
  "module": "Tif Customization",
- "name": "Courier",
+ "name": "Transport",
  "naming_rule": "Expression",
  "owner": "Administrator",
  "permissions": [

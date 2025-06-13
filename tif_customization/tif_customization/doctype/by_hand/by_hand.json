@@ -1,41 +1,66 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "format:{courier}",
- "creation": "2025-06-13 15:56:48.376306",
+ "autoname": "format:{full_name}-{cnic}",
+ "creation": "2025-06-13 16:02:15.877759",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "section_break_hoa0",
-  "courier",
+  "full_name",
+  "contact",
+  "column_break_yemg",
+  "cnic",
+  "co",
+  "remarks",
   "active"
  ],
  "fields": [
   {
-   "fieldname": "section_break_hoa0",
-   "fieldtype": "Section Break"
-  },
-  {
-   "fieldname": "courier",
+   "fieldname": "full_name",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Courier",
+   "label": "Full Name",
    "reqd": 1
+  },
+  {
+   "fieldname": "contact",
+   "fieldtype": "Data",
+   "label": "Contact"
+  },
+  {
+   "fieldname": "cnic",
+   "fieldtype": "Data",
+   "label": "CNIC",
+   "reqd": 1
+  },
+  {
+   "fieldname": "co",
+   "fieldtype": "Data",
+   "label": "C/O"
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
   },
   {
    "default": "1",
    "fieldname": "active",
    "fieldtype": "Check",
    "label": "Active"
+  },
+  {
+   "fieldname": "column_break_yemg",
+   "fieldtype": "Column Break"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-06-13 16:09:43.089568",
+ "modified": "2025-06-13 16:08:48.549491",
  "modified_by": "Administrator",
  "module": "Tif Customization",
- "name": "Courier",
+ "name": "By Hand",
  "naming_rule": "Expression",
  "owner": "Administrator",
  "permissions": [
