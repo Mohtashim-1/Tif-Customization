@@ -1,7 +1,7 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "format:{courier}-{DD}-{MM}-{YY}",
+ "autoname": "format:{courier}-{courier_service}-{DD}-{MM}-{YY}",
  "creation": "2025-06-13 17:17:06.748575",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -76,7 +76,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2025-06-13 17:21:57.803934",
+ "modified": "2025-06-13 17:46:46.231873",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Courier Rate",
