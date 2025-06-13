@@ -1,0 +1,104 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "format:{courier}-{DD}-{MM}-{YY}",
+ "creation": "2025-06-13 17:17:06.748575",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "posting_date",
+  "column_break_jbrg",
+  "courier",
+  "column_break_nqfx",
+  "courier_service",
+  "section_break_ijwb",
+  "courier_slab",
+  "section_break_tjwo",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_tjwo",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Courier Rate",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "default": "Today",
+   "fieldname": "posting_date",
+   "fieldtype": "Date",
+   "label": "Posting Date"
+  },
+  {
+   "fieldname": "courier",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Courier",
+   "options": "Courier",
+   "reqd": 1
+  },
+  {
+   "fieldname": "courier_service",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Courier Service",
+   "options": "Courier Service",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_ijwb",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "courier_slab",
+   "fieldtype": "Table",
+   "label": "Courier Slab",
+   "options": "Courier Slab"
+  },
+  {
+   "fieldname": "column_break_jbrg",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_nqfx",
+   "fieldtype": "Column Break"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2025-06-13 17:21:57.803934",
+ "modified_by": "Administrator",
+ "module": "Tif Customization",
+ "name": "Courier Rate",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
