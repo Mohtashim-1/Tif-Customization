@@ -8,7 +8,11 @@
  "field_order": [
   "section_break_hoa0",
   "courier",
-  "active"
+  "active",
+  "column_break_wbbq",
+  "supplier",
+  "column_break_odwe",
+  "account"
  ],
  "fields": [
   {
@@ -27,12 +31,33 @@
    "fieldname": "active",
    "fieldtype": "Check",
    "label": "Active"
+  },
+  {
+   "fieldname": "account",
+   "fieldtype": "Link",
+   "label": "Account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "column_break_odwe",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "supplier",
+   "fieldtype": "Link",
+   "label": "Supplier",
+   "options": "Supplier",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_wbbq",
+   "fieldtype": "Column Break"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-06-13 16:09:43.089568",
+ "modified": "2025-06-13 18:26:15.390454",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Courier",
