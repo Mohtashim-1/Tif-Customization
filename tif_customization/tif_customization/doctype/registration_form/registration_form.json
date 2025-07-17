@@ -1,0 +1,235 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-07-17 12:15:13.576109",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "course",
+  "name1",
+  "address",
+  "email",
+  "qualification",
+  "date_of_birth",
+  "school_organization_name",
+  "positiontitle",
+  "column_break_kbpj",
+  "posting_date_and_time",
+  "fathershusband_name",
+  "city",
+  "whatsapp_number",
+  "country",
+  "section_break_onus",
+  "do_you_hold_any_teaching_certifications",
+  "please_specify_your_major_or_area_of_study",
+  "how_many_years_of_teaching_experience_do_you_have",
+  "what_subjects_or_grade_levels_do_you_teach",
+  "what_are_your_primary_goals_for_attending_this_course",
+  "column_break_wgvc",
+  "referred_by",
+  "preferred_language_for_this_course",
+  "would_you_like_to_receive_updates_about_future_workshops",
+  "any_additional_comments_or_questions",
+  "how_did_you_hear_about_this_workshop",
+  "section_break_b5us",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_b5us",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Registration Form",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "course",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Course",
+   "options": "LMS Course",
+   "reqd": 1
+  },
+  {
+   "default": "Now",
+   "fieldname": "posting_date_and_time",
+   "fieldtype": "Datetime",
+   "label": "Posting Date and Time",
+   "read_only": 1
+  },
+  {
+   "fieldname": "name1",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "fathershusband_name",
+   "fieldtype": "Data",
+   "label": "Father's/Husband Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "address",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Address",
+   "reqd": 1
+  },
+  {
+   "fieldname": "city",
+   "fieldtype": "Link",
+   "label": "City",
+   "options": "City",
+   "reqd": 1
+  },
+  {
+   "description": "Please add the country code",
+   "fieldname": "whatsapp_number",
+   "fieldtype": "Data",
+   "label": "Whatsapp Number",
+   "reqd": 1
+  },
+  {
+   "fieldname": "email",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Email",
+   "reqd": 1
+  },
+  {
+   "fieldname": "date_of_birth",
+   "fieldtype": "Date",
+   "label": "Date of Birth",
+   "reqd": 1
+  },
+  {
+   "fieldname": "qualification",
+   "fieldtype": "Link",
+   "label": "Qualification",
+   "options": "Qualification",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_kbpj",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "country",
+   "fieldtype": "Link",
+   "label": "Country",
+   "options": "Country",
+   "reqd": 1
+  },
+  {
+   "fieldname": "school_organization_name",
+   "fieldtype": "Data",
+   "label": "School/ Organization Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "positiontitle",
+   "fieldtype": "Data",
+   "label": "Position/Title",
+   "reqd": 1
+  },
+  {
+   "fieldname": "please_specify_your_major_or_area_of_study",
+   "fieldtype": "Data",
+   "label": "Please specify your major or area of study?"
+  },
+  {
+   "fieldname": "do_you_hold_any_teaching_certifications",
+   "fieldtype": "Data",
+   "label": "Do you hold any teaching certifications?"
+  },
+  {
+   "fieldname": "section_break_onus",
+   "fieldtype": "Section Break",
+   "label": "Education Leadership Program"
+  },
+  {
+   "fieldname": "how_many_years_of_teaching_experience_do_you_have",
+   "fieldtype": "Data",
+   "label": "How many years of teaching experience do you have?"
+  },
+  {
+   "fieldname": "what_subjects_or_grade_levels_do_you_teach",
+   "fieldtype": "Data",
+   "label": "What subjects or grade levels do you teach?"
+  },
+  {
+   "fieldname": "what_are_your_primary_goals_for_attending_this_course",
+   "fieldtype": "Data",
+   "label": "What are your primary goals for attending this course? "
+  },
+  {
+   "fieldname": "referred_by",
+   "fieldtype": "Data",
+   "label": "Referred by"
+  },
+  {
+   "fieldname": "preferred_language_for_this_course",
+   "fieldtype": "Select",
+   "label": "Preferred Language for this Course",
+   "options": "English\nUrdu\nBilingual"
+  },
+  {
+   "fieldname": "would_you_like_to_receive_updates_about_future_workshops",
+   "fieldtype": "Select",
+   "label": "Would you like to receive updates about future workshops?",
+   "options": "Yes\nNo"
+  },
+  {
+   "fieldname": "any_additional_comments_or_questions",
+   "fieldtype": "Data",
+   "label": "Any additional comments or questions? "
+  },
+  {
+   "fieldname": "column_break_wgvc",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "how_did_you_hear_about_this_workshop",
+   "fieldtype": "Data",
+   "label": "How Did you hear About This Workshop? "
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2025-07-17 12:44:00.766327",
+ "modified_by": "Administrator",
+ "module": "Tif Customization",
+ "name": "Registration Form",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
