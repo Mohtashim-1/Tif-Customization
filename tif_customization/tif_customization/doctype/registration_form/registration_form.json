@@ -1,6 +1,7 @@
 {
  "actions": [],
  "allow_rename": 1,
+ "autoname": "format:{email}-{course}",
  "creation": "2025-07-17 12:15:13.576109",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -132,14 +133,12 @@
   {
    "fieldname": "school_organization_name",
    "fieldtype": "Data",
-   "label": "School/ Organization Name",
-   "reqd": 1
+   "label": "School/ Organization Name"
   },
   {
    "fieldname": "positiontitle",
    "fieldtype": "Data",
-   "label": "Position/Title",
-   "reqd": 1
+   "label": "Position/Title"
   },
   {
    "fieldname": "please_specify_your_major_or_area_of_study",
@@ -207,10 +206,11 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2025-07-17 12:44:00.766327",
+ "modified": "2025-07-17 15:20:50.232954",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Registration Form",
+ "naming_rule": "Expression",
  "owner": "Administrator",
  "permissions": [
   {
