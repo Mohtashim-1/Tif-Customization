@@ -22,7 +22,7 @@
  "list_columns": [],
  "login_required": 0,
  "max_attachment_size": 0,
- "modified": "2025-07-17 12:45:21.204920",
+ "modified": "2025-07-18 11:00:06.540747",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "registration-form",
@@ -126,20 +126,6 @@
    "precision": "",
    "read_only": 0,
    "reqd": 0,
-   "show_in_filter": 0
-  },
-  {
-   "allow_read_on_all_link_options": 0,
-   "default": "Now",
-   "fieldname": "posting_date_and_time",
-   "fieldtype": "Datetime",
-   "hidden": 0,
-   "label": "Posting Date and Time",
-   "max_length": 0,
-   "max_value": 0,
-   "precision": "",
-   "read_only": 1,
-   "reqd": 1,
    "show_in_filter": 0
   },
   {
@@ -378,32 +364,6 @@
    "max_value": 0,
    "precision": "",
    "read_only": 0,
-   "reqd": 0,
-   "show_in_filter": 0
-  },
-  {
-   "allow_read_on_all_link_options": 0,
-   "fieldname": "section_break_b5us",
-   "fieldtype": "Section Break",
-   "hidden": 0,
-   "max_length": 0,
-   "max_value": 0,
-   "precision": "",
-   "read_only": 0,
-   "reqd": 0,
-   "show_in_filter": 0
-  },
-  {
-   "allow_read_on_all_link_options": 0,
-   "fieldname": "amended_from",
-   "fieldtype": "Link",
-   "hidden": 0,
-   "label": "Amended From",
-   "max_length": 0,
-   "max_value": 0,
-   "options": "Registration Form",
-   "precision": "",
-   "read_only": 1,
    "reqd": 0,
    "show_in_filter": 0
   }
