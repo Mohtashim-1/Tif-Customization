@@ -12,7 +12,12 @@ def validate_sat_attendance(doc, method):
     frappe.msgprint("Running validate_sat_attendance")
     for row in doc.table1:
         weekday = frappe.utils.getdate(row.date).weekday()
-        if doc.employment_type and doc.employment_type.replace(' ', '') == "FullTime-(Permanent)":
+        if (
+            doc.employment_type and (
+                doc.employment_type.replace(' ', '') == "FullTime-(Permanent)" or
+                doc.employment_type.replace(' ', '') == "FullTime(Probation)"
+            )
+        ):
             frappe.msgprint(f"Checking row with date: {row.date}, day: {row.day}")
             if row.weekly_off == 0:
                 if row.date and weekday == 5:  # Saturday
@@ -41,7 +46,6 @@ def validate_sat_attendance(doc, method):
                     # For non-Saturday, mark half_day=1 if absent or no check_in_1 (keep existing logic)
                     if getattr(row, 'absent', 0) == 1 or not row.check_in_1:
                         row.half_day = 1
-                        # pass
 
     # Custom present_days calculation (Mon-Fri=1, Sat halfday=0.5, Sun=1)
     present_days = 0
