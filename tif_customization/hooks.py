@@ -147,6 +147,9 @@ doc_events = {
     },
     "Leave Application": {
         "validate": "tif_customization.tif_customization.doctype.leave_application.leave_application.leave_apply_on_probabe_base"
+    },
+    "Employee Attendance": {
+        "validate": "tif_customization.tif_customization.doctype.employee_attendance.employee_attendance.validate_sat_attendance"
     }
 }
 
