@@ -144,6 +144,9 @@ doc_events = {
 	},
     "Material Request": {
         "validate": "tif_customization.tif_customization.doctype.material_request.material_request.get_employee"
+    },
+    "Leave Application": {
+        "validate": "tif_customization.tif_customization.doctype.leave_application.leave_application.leave_apply_on_probabe_base"
     }
 }
 
