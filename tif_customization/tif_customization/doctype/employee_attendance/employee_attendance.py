@@ -35,7 +35,7 @@ def validate_sat_attendance(doc, method):
                             frappe.msgprint("Marked as Saturday half day")
                         else:
                             row.sat_halfday = 0
-                            row.half_day = 1
+                            row.half_day = 1 if doc.check_in_1 and doc.check_out_1 else 0
                             frappe.msgprint("Did not meet half-day time conditions, marked as half day")
                     else:
                         frappe.msgprint("Missing check-in or check-out time on Saturday, marking half_day=1 and not absent")
@@ -43,9 +43,12 @@ def validate_sat_attendance(doc, method):
                         row.half_day = 1
                         row.absent = 0
                 else:
-                    # For non-Saturday, mark half_day=1 if absent or no check_in_1 (keep existing logic)
-                    if getattr(row, 'absent', 0) == 1 or not row.check_in_1:
-                        row.half_day = 1
+                    # For non-Saturday (Mon–Fri)
+                    if weekday < 5:
+                        if not row.check_in_1 or not row.check_out_1:
+                            row.absent = 1
+                            row.half_day = 0
+    # If absent is already set elsewhere, you can leave it as is
 
     # Custom present_days calculation (Mon-Fri=1, Sat halfday=0.5, Sun=1)
     present_days = 0
@@ -70,4 +73,12 @@ def validate_sat_attendance(doc, method):
             total_half_days += 1
     doc.total_half_days = total_half_days
     frappe.msgprint(f"Total half days: {doc.total_half_days}")
+
+    # Calculate total absents based on row.absent == 1
+    total_absents = 0
+    for row in doc.table1:
+        if getattr(row, 'absent', 0) == 1:
+            total_absents += 1
+    doc.total_absents = total_absents
+    frappe.msgprint(f"Total absents: {doc.total_absents}")
         
