@@ -1,0 +1,76 @@
+{% extends "templates/web.html" %}
+
+{% block style %}
+{{ super() }}
+<link rel="stylesheet" href="/assets/tif_customization/css/school_registration.css">
+{% endblock %}
+
+{% block page_content %}
+<div class="school-registration-form">
+    <div class="web-form-container">
+        <div class="web-form-header">
+            <h1>School Registration Form</h1>
+            <p>Join The ILM Foundation (TIF) and become part of our educational network</p>
+        </div>
+        
+        {% if web_form.show_sidebar %}
+        <div class="row">
+            <div class="col-md-8">
+                {{ web_form_html }}
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Why Register with TIF?</h5>
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-check text-success"></i> Access to quality educational resources</li>
+                            <li><i class="fas fa-check text-success"></i> Professional development opportunities</li>
+                            <li><i class="fas fa-check text-success"></i> Network with other educational institutions</li>
+                            <li><i class="fas fa-check text-success"></i> Support for curriculum development</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        {{ web_form_html }}
+        {% endif %}
+    </div>
+</div>
+
+<script>
+// Add custom JavaScript for enhanced functionality
+document.addEventListener('DOMContentLoaded', function() {
+    // Add progress indicator
+    const form = document.querySelector('form');
+    if (form) {
+        const progressBar = document.createElement('div');
+        progressBar.className = 'progress-bar';
+        progressBar.style.width = '0%';
+        form.insertBefore(progressBar, form.firstChild);
+        
+        // Update progress as user fills form
+        const inputs = form.querySelectorAll('input, select, textarea');
+        inputs.forEach(input => {
+            input.addEventListener('input', updateProgress);
+            input.addEventListener('change', updateProgress);
+        });
+        
+        function updateProgress() {
+            const filledInputs = Array.from(inputs).filter(input => input.value.trim() !== '');
+            const progress = (filledInputs.length / inputs.length) * 100;
+            progressBar.style.width = progress + '%';
+        }
+    }
+    
+    // Add field validation indicators
+    const requiredFields = document.querySelectorAll('[required]');
+    requiredFields.forEach(field => {
+        const label = field.previousElementSibling;
+        if (label && label.tagName === 'LABEL') {
+            label.classList.add('required-field');
+        }
+    });
+});
+</script>
+{% endblock %} 

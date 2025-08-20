@@ -1,0 +1,334 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "format:SR-{####}",
+ "creation": "2025-08-02 11:00:39.480134",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "school_as",
+  "school_name",
+  "territory",
+  "school_type",
+  "type_of_school",
+  "category",
+  "no_of_school",
+  "section",
+  "posting_date",
+  "column_break_xevd",
+  "no_of_students",
+  "status",
+  "type_of_institution",
+  "school_level",
+  "board_affiliation",
+  "matric_board_code",
+  "inter_board_code",
+  "cambridge_board_code",
+  "trust_private_registration_code",
+  "section_break_shcx",
+  "books",
+  "training_type_allowed",
+  "trainings",
+  "allowed_program",
+  "section_break_contact",
+  "director_principal_contact",
+  "director_principal_email",
+  "director_principal_name",
+  "vice_president",
+  "coordinator",
+  "incharge",
+  "school_landline",
+  "school_email",
+  "column_break_zrav",
+  "school_website",
+  "city",
+  "country",
+  "complete_school_address",
+  "section_break_academic",
+  "total_no_of_quranic_teachers",
+  "column_break_tplq",
+  "academic_session_month",
+  "section_break_books",
+  "books_curriculum_information"
+ ],
+ "fields": [
+  {
+   "fieldname": "school_as",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "School As",
+   "options": "PERSON\nSCHOOL VISIT\nFUNDRAISING",
+   "reqd": 1
+  },
+  {
+   "fieldname": "school_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "School Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "territory",
+   "fieldtype": "Link",
+   "label": "Territory",
+   "options": "Territory"
+  },
+  {
+   "fieldname": "school_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "School Type",
+   "options": "GOVT\nPVT",
+   "reqd": 1
+  },
+  {
+   "description": "School Group",
+   "fieldname": "type_of_school",
+   "fieldtype": "Data",
+   "label": "Type of School"
+  },
+  {
+   "fieldname": "category",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Category",
+   "options": "INDIVIDUAL\nCHAIN OF SCHOOL",
+   "reqd": 1
+  },
+  {
+   "depends_on": "eval:doc.category=='CHAIN OF SCHOOL'",
+   "description": "Open field if chain of school",
+   "fieldname": "no_of_school",
+   "fieldtype": "Int",
+   "label": "No of School"
+  },
+  {
+   "fieldname": "no_of_students",
+   "fieldtype": "Int",
+   "label": "No of Students"
+  },
+  {
+   "default": "ACTIVE",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "ACTIVE\nINACTIVE",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section",
+   "fieldtype": "Select",
+   "label": "Section",
+   "options": "PRIMARY\nSECONDARY"
+  },
+  {
+   "description": "Which books are running in this school",
+   "fieldname": "books",
+   "fieldtype": "Small Text",
+   "label": "Books"
+  },
+  {
+   "description": "Program that are allowed",
+   "fieldname": "allowed_program",
+   "fieldtype": "Small Text",
+   "label": "Allowed Program"
+  },
+  {
+   "description": "TPS/CEE Training allowed",
+   "fieldname": "trainings",
+   "fieldtype": "Small Text",
+   "label": "Trainings"
+  },
+  {
+   "description": "Story telling or etc",
+   "fieldname": "training_type_allowed",
+   "fieldtype": "Small Text",
+   "label": "Training Type Allowed"
+  },
+  {
+   "default": "Today",
+   "fieldname": "posting_date",
+   "fieldtype": "Date",
+   "label": "Posting Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "type_of_institution",
+   "fieldtype": "Select",
+   "label": "Type of Institution",
+   "options": "MATRIC\nINTERBOARD\nCAMBRIDGE"
+  },
+  {
+   "fieldname": "school_level",
+   "fieldtype": "Data",
+   "label": "School Level"
+  },
+  {
+   "fieldname": "board_affiliation",
+   "fieldtype": "Data",
+   "label": "Board Affiliation"
+  },
+  {
+   "fieldname": "matric_board_code",
+   "fieldtype": "Data",
+   "label": "Matric Board Code"
+  },
+  {
+   "fieldname": "inter_board_code",
+   "fieldtype": "Data",
+   "label": "Inter Board Code"
+  },
+  {
+   "fieldname": "cambridge_board_code",
+   "fieldtype": "Data",
+   "label": "Cambridge Board Code"
+  },
+  {
+   "fieldname": "trust_private_registration_code",
+   "fieldtype": "Data",
+   "label": "Trust/Private Registration Code"
+  },
+  {
+   "fieldname": "section_break_contact",
+   "fieldtype": "Section Break",
+   "label": "Contact Details"
+  },
+  {
+   "fieldname": "director_principal_contact",
+   "fieldtype": "Phone",
+   "label": "Director/Principal Contact"
+  },
+  {
+   "fieldname": "director_principal_email",
+   "fieldtype": "Data",
+   "label": "Director/Principal Email"
+  },
+  {
+   "fieldname": "director_principal_name",
+   "fieldtype": "Data",
+   "label": "Director/Principal Name"
+  },
+  {
+   "fieldname": "vice_president",
+   "fieldtype": "Data",
+   "label": "Vice President"
+  },
+  {
+   "fieldname": "coordinator",
+   "fieldtype": "Data",
+   "label": "Coordinator"
+  },
+  {
+   "fieldname": "incharge",
+   "fieldtype": "Data",
+   "label": "Incharge"
+  },
+  {
+   "fieldname": "school_landline",
+   "fieldtype": "Phone",
+   "label": "School Landline"
+  },
+  {
+   "fieldname": "school_email",
+   "fieldtype": "Data",
+   "label": "School Email"
+  },
+  {
+   "fieldname": "school_website",
+   "fieldtype": "Data",
+   "label": "School Website"
+  },
+  {
+   "fieldname": "complete_school_address",
+   "fieldtype": "Text",
+   "label": "Complete School Address"
+  },
+  {
+   "fieldname": "city",
+   "fieldtype": "Link",
+   "label": "City",
+   "options": "City"
+  },
+  {
+   "fieldname": "country",
+   "fieldtype": "Link",
+   "label": "Country",
+   "options": "Country"
+  },
+  {
+   "fieldname": "section_break_academic",
+   "fieldtype": "Section Break",
+   "label": "Academic & Staff Details"
+  },
+  {
+   "fieldname": "total_no_of_quranic_teachers",
+   "fieldtype": "Int",
+   "label": "Total No of Quranic Teachers"
+  },
+  {
+   "fieldname": "academic_session_month",
+   "fieldtype": "Data",
+   "label": "Academic Session Month"
+  },
+  {
+   "fieldname": "section_break_books",
+   "fieldtype": "Section Break",
+   "label": "Books & Curriculum Information"
+  },
+  {
+   "fieldname": "books_curriculum_information",
+   "fieldtype": "Table",
+   "label": "Books & Curriculum Information",
+   "options": "School Books Curriculum"
+  },
+  {
+   "fieldname": "column_break_zrav",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_tplq",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_xevd",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_shcx",
+   "fieldtype": "Section Break"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2025-08-21 03:48:15.432887",
+ "modified_by": "shoaibmohtashim973@gmail.com",
+ "module": "Tif Customization",
+ "name": "School",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "print": 1,
+   "read": 1,
+   "role": "All"
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

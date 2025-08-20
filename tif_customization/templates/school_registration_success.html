@@ -1,0 +1,53 @@
+{% extends "templates/web.html" %}
+
+{% block page_content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-body text-center">
+                    <div class="mb-4">
+                        <i class="fas fa-check-circle text-success" style="font-size: 4rem;"></i>
+                    </div>
+                    <h2 class="card-title text-success mb-3">Registration Successful!</h2>
+                    <p class="card-text lead">
+                        Thank you for registering your school with The ILM Foundation (TIF).
+                    </p>
+                    <p class="card-text">
+                        We have received your school registration form and will review the information provided. 
+                        Our team will contact you soon with further details and next steps.
+                    </p>
+                    <div class="alert alert-info mt-4">
+                        <strong>What happens next?</strong><br>
+                        • We will review your registration within 2-3 business days<br>
+                        • You will receive a confirmation email with your registration details<br>
+                        • Our team will contact you to discuss partnership opportunities
+                    </div>
+                    <div class="mt-4">
+                        <a href="/" class="btn btn-primary">Return to Home</a>
+                        <a href="/school-registration" class="btn btn-outline-secondary">Register Another School</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.card {
+    border: none;
+    border-radius: 15px;
+}
+.card-body {
+    padding: 3rem;
+}
+.text-success {
+    color: #28a745 !important;
+}
+.alert-info {
+    background-color: #d1ecf1;
+    border-color: #bee5eb;
+    color: #0c5460;
+}
+</style>
+{% endblock %} 
