@@ -4,6 +4,13 @@ from datetime import date
 
 @frappe.whitelist()
 def leave_apply_on_probabe_base(doc, method):
+    # Check if current user has HR or System Manager roles - skip restriction for these roles
+    current_user_roles = frappe.get_roles(frappe.session.user)
+    exempt_roles = ["HR Manager", "HR User", "System Manager"]
+    
+    if any(role in current_user_roles for role in exempt_roles):
+        return  # Skip the restriction for exempt roles
+    
     employee = frappe.get_doc("Employee", doc.employee)
     if employee.employment_type == "Full Time -  (Permanent)" or employee.employment_type == "Full Time (Probation)":
 
