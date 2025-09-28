@@ -1,6 +1,7 @@
 import frappe
 from frappe.model.document import Document
 from frappe.utils import getdate, nowdate
+from frappe.utils.data import flt
 
 @frappe.whitelist()
 def get_rate_from_courier(doc, method):
@@ -31,7 +32,7 @@ def get_rate_from_courier(doc, method):
                     doc.append("custom_courier_charges", {
                         "courier": courier_rate.courier,
                         "courier_service": courier_rate.courier_service,
-                        "rate": slab.rate,
+                        "rate": flt(slab.rate) * flt(doc.custom_total_delivery_weightage),
                         "select": is_selected
                     })
                     break
@@ -45,7 +46,7 @@ def get_rate_from_courier(doc, method):
             if courier_rate:
                 for slab in courier_rate.courier_slab:
                     if doc.custom_total_delivery_weightage > slab.from_weight and doc.custom_total_delivery_weightage <= slab.to_weight:
-                        doc.custom_delivery_rate = slab.rate
+                        doc.custom_delivery_rate = flt(slab.rate) * flt(doc.custom_total_delivery_weightage)
                         frappe.msgprint(f"Courier Charges Select Values: {[(c.courier, c.courier_service, c.rate, c.select) for c in doc.custom_courier_charges]}")
 
                         break
@@ -104,6 +105,7 @@ def create_journal_entry(doc, selected_charge):
             "account": courier_account,
             "debit_in_account_currency": doc.custom_delivery_rate,
             "credit_in_account_currency": 0,
+            "cost_center":doc.custom_supply_chain_cost_center
             # "party_type": "Customer",
             # "party": doc.customer
         })
@@ -112,7 +114,8 @@ def create_journal_entry(doc, selected_charge):
         je.append("accounts", {
             "account": cash_account,
             "debit_in_account_currency": 0,
-            "credit_in_account_currency": doc.custom_delivery_rate
+            "credit_in_account_currency": doc.custom_delivery_rate,
+            "cost_center":doc.custom_supply_chain_cost_center
         })
         
         je.insert()

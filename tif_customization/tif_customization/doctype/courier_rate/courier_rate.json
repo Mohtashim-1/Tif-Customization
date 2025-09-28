@@ -11,6 +11,8 @@
   "courier",
   "column_break_nqfx",
   "courier_service",
+  "column_break_pgae",
+  "zone",
   "section_break_ijwb",
   "courier_slab",
   "section_break_tjwo",
@@ -70,13 +72,23 @@
   {
    "fieldname": "column_break_nqfx",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_pgae",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "zone",
+   "fieldtype": "Link",
+   "label": "Zone",
+   "options": "Zone"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2025-06-13 17:46:46.231873",
+ "modified": "2025-09-29 01:55:27.302311",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Courier Rate",
