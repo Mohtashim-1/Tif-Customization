@@ -1,6 +1,7 @@
 {
  "actions": [],
  "allow_rename": 1,
+ "autoname": "field:zone",
  "creation": "2025-09-29 01:55:03.963077",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -11,16 +12,18 @@
   {
    "fieldname": "zone",
    "fieldtype": "Data",
-   "label": "Zone"
+   "label": "Zone",
+   "unique": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-09-29 01:55:11.909332",
+ "modified": "2025-09-29 02:19:43.946591",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Zone",
+ "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
   {

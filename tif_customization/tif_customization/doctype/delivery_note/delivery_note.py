@@ -17,7 +17,7 @@ def get_rate_from_courier(doc, method):
         doc.custom_courier_charges = []
         
         # Get all Courier Rate documents
-        courier_rates = frappe.get_all("Courier Rate", fields=["name", "courier", "courier_service"])
+        courier_rates = frappe.get_all("Courier Rate", fields=["name", "courier", "courier_service","zone"])
         
         for courier_rate in courier_rates:
             courier_doc = frappe.get_doc("Courier Rate", courier_rate.name)
@@ -60,13 +60,31 @@ def on_update(doc, method):
     # Debug print: show all select values in child table
     frappe.msgprint(f"Courier Charges Select Values: {[(c.courier, c.courier_service, c.rate, c.select) for c in doc.custom_courier_charges]}")
     if doc.custom_delivery_mode == "Courier" and doc.custom_courier_charges:
-        selected_charge = None
+        # Find all selected charges
+        selected_charges = []
         for charge in doc.custom_courier_charges:
             # Accepts True, 1, "1", "Yes", etc.
             if str(charge.select) in ("1", "Yes", "true", "True", "on", "checked") or charge.select is True or charge.select == 1:
-                selected_charge = charge
-                frappe.msgprint(f"Selected Charge: {charge.courier} - {charge.courier_service} - {charge.rate}")
-                break
+                selected_charges.append(charge)
+        
+        # If multiple charges are selected, keep only the last one and unselect others
+        if len(selected_charges) > 1:
+            frappe.msgprint(f"Multiple charges selected. Keeping only the last selected charge.")
+            # Unselect all charges first
+            for charge in doc.custom_courier_charges:
+                charge.select = 0
+            
+            # Select only the last selected charge
+            selected_charges[-1].select = 1
+            selected_charge = selected_charges[-1]
+            frappe.msgprint(f"Selected Charge: {selected_charge.courier} - {selected_charge.courier_service} - {selected_charge.rate}")
+        elif len(selected_charges) == 1:
+            selected_charge = selected_charges[0]
+            frappe.msgprint(f"Selected Charge: {selected_charge.courier} - {selected_charge.courier_service} - {selected_charge.rate}")
+        else:
+            selected_charge = None
+            frappe.msgprint("No courier charge selected.")
+        
         if selected_charge:
             doc.custom_delivery_rate = selected_charge.rate
             if doc.custom_courier_mode_of_payment:
@@ -98,7 +116,7 @@ def create_journal_entry(doc, selected_charge):
         je.company = doc.company
         je.cheque_no = doc.name
         je.cheque_date = getdate(nowdate())
-        je.user_remark = f"Courier charges for {doc.name}"
+        je.user_remark = f"Courier charges for   {doc.name}"
         
         # Add debit entry
         je.append("accounts", {
