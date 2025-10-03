@@ -47,7 +47,7 @@ def get_rate_from_courier(doc, method):
                 for slab in courier_rate.courier_slab:
                     if doc.custom_total_delivery_weightage > slab.from_weight and doc.custom_total_delivery_weightage <= slab.to_weight:
                         doc.custom_delivery_rate = flt(slab.rate) * flt(doc.custom_total_delivery_weightage)
-                        frappe.msgprint(f"Courier Charges Select Values: {[(c.courier, c.courier_service, c.rate, c.select) for c in doc.custom_courier_charges]}")
+                        # frappe.msgprint(f"Courier Charges Select Values: {[(c.courier, c.courier_service, c.rate, c.select) for c in doc.custom_courier_charges]}")
 
                         break
         else:
@@ -58,7 +58,7 @@ def get_rate_from_courier(doc, method):
 
 def on_update(doc, method):
     # Debug print: show all select values in child table
-    frappe.msgprint(f"Courier Charges Select Values: {[(c.courier, c.courier_service, c.rate, c.select) for c in doc.custom_courier_charges]}")
+    # frappe.msgprint(f"Courier Charges Select Values: {[(c.courier, c.courier_service, c.rate, c.select) for c in doc.custom_courier_charges]}")
     if doc.custom_delivery_mode == "Courier" and doc.custom_courier_charges:
         # Find all selected charges
         selected_charges = []
@@ -188,4 +188,10 @@ def create_journal_entry(doc, selected_charge):
         je.insert()
         je.submit()
 
-    
+@frappe.whitelist()
+def sum_of_cartons(doc, method):
+    total_cartons = 0
+    for item in doc.items:
+        total_cartons += item.custom_cartons
+    doc.custom_total_cartons = total_cartons
+    # doc.save()

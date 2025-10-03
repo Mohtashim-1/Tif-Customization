@@ -140,7 +140,8 @@ app_license = "mit"
 doc_events = {
 	"Delivery Note": {
 		"on_update": "tif_customization.tif_customization.doctype.delivery_note.delivery_note.get_rate_from_courier",
-        "on_submit": "tif_customization.tif_customization.doctype.delivery_note.delivery_note.on_update"
+        "on_submit": "tif_customization.tif_customization.doctype.delivery_note.delivery_note.on_update",
+        "validate": "tif_customization.tif_customization.doctype.delivery_note.delivery_note.sum_of_cartons"
 	},
     "Material Request": {
         "validate": "tif_customization.tif_customization.doctype.material_request.material_request.get_employee"
