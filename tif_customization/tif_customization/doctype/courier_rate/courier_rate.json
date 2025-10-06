@@ -7,6 +7,7 @@
  "engine": "InnoDB",
  "field_order": [
   "posting_date",
+  "rate_type",
   "column_break_jbrg",
   "courier",
   "column_break_nqfx",
@@ -82,13 +83,20 @@
    "fieldtype": "Link",
    "label": "Zone",
    "options": "Zone"
+  },
+  {
+   "default": "Flat",
+   "fieldname": "rate_type",
+   "fieldtype": "Select",
+   "label": "Rate Type",
+   "options": "Flat\nKg"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2025-10-02 12:25:45.405081",
+ "modified": "2025-10-06 11:59:04.004015",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Courier Rate",

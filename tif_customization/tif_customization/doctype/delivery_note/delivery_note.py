@@ -17,7 +17,7 @@ def get_rate_from_courier(doc, method):
         doc.custom_courier_charges = []
         
         # Get all Courier Rate documents
-        courier_rates = frappe.get_all("Courier Rate", fields=["name", "courier", "courier_service","zone"])
+        courier_rates = frappe.get_all("Courier Rate", fields=["name", "courier", "courier_service","zone", "rate_type"])
         
         for courier_rate in courier_rates:
             courier_doc = frappe.get_doc("Courier Rate", courier_rate.name)
@@ -28,11 +28,17 @@ def get_rate_from_courier(doc, method):
                     key = f"{courier_rate.courier}-{courier_rate.courier_service}"
                     is_selected = existing_selections.get(key, False)
                     
+                    # Calculate rate based on rate_type
+                    if courier_doc.rate_type == "Flat":
+                        calculated_rate = flt(slab.rate)
+                    else:  # rate_type == "Kg"
+                        calculated_rate = flt(slab.rate) * flt(doc.custom_total_delivery_weightage)
+                    
                     # Add entry to child table
                     doc.append("custom_courier_charges", {
                         "courier": courier_rate.courier,
                         "courier_service": courier_rate.courier_service,
-                        "rate": flt(slab.rate) * flt(doc.custom_total_delivery_weightage),
+                        "rate": calculated_rate,
                         "select": is_selected
                     })
                     break
@@ -46,7 +52,11 @@ def get_rate_from_courier(doc, method):
             if courier_rate:
                 for slab in courier_rate.courier_slab:
                     if doc.custom_total_delivery_weightage > slab.from_weight and doc.custom_total_delivery_weightage <= slab.to_weight:
-                        doc.custom_delivery_rate = flt(slab.rate) * flt(doc.custom_total_delivery_weightage)
+                        # Calculate rate based on rate_type
+                        if courier_rate.rate_type == "Flat":
+                            doc.custom_delivery_rate = flt(slab.rate)
+                        else:  # rate_type == "Kg"
+                            doc.custom_delivery_rate = flt(slab.rate) * flt(doc.custom_total_delivery_weightage)
                         # frappe.msgprint(f"Courier Charges Select Values: {[(c.courier, c.courier_service, c.rate, c.select) for c in doc.custom_courier_charges]}")
 
                         break
