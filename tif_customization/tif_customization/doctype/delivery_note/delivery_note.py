@@ -5,6 +5,7 @@ from frappe.utils.data import flt
 
 @frappe.whitelist()
 def get_rate_from_courier(doc, method):
+    """Function to fetch courier rates - can be called manually via button or automatically"""
     if doc.custom_delivery_mode=="Courier":
         # Store existing selections
         existing_selections = {}
@@ -65,6 +66,28 @@ def get_rate_from_courier(doc, method):
     else:
         doc.custom_delivery_rate = 0
         doc.custom_courier_charges = []
+
+@frappe.whitelist()
+def fetch_courier_rates(docname):
+    """Custom function to fetch courier rates via button click"""
+    doc = frappe.get_doc("Delivery Note", docname)
+    
+    if not doc.custom_delivery_mode == "Courier":
+        frappe.msgprint("Please select 'Courier' as delivery mode first.")
+        return
+    
+    if not doc.custom_total_delivery_weightage:
+        frappe.msgprint("Please enter the total delivery weightage first.")
+        return
+    
+    # Call the existing function
+    get_rate_from_courier(doc, None)
+    
+    # Save the document
+    doc.save()
+    
+    frappe.msgprint("Courier rates fetched successfully!")
+    return doc
 
 def on_update(doc, method):
     # Debug print: show all select values in child table
