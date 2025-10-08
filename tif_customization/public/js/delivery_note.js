@@ -41,3 +41,16 @@ frappe.ui.form.on('Delivery Note', {
         }
     }
 });
+
+// Handle selection changes in Courier Charges table
+frappe.ui.form.on('Courier Charges', {
+    select: function(frm, cdt, cdn) {
+        // Get the selected row
+        let row = locals[cdt][cdn];
+        
+        // If this row is selected, update the delivery rate
+        if (row.select) {
+            frm.set_value('custom_delivery_rate', row.rate);
+        }
+    }
+});
