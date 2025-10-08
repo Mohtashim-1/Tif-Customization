@@ -48,9 +48,33 @@ frappe.ui.form.on('Courier Charges', {
         // Get the selected row
         let row = locals[cdt][cdn];
         
-        // If this row is selected, update the delivery rate
+        // If this row is selected, unselect all other rows and update delivery rate
         if (row.select) {
+            // Unselect all other rows first
+            frm.doc.custom_courier_charges.forEach(function(charge_row) {
+                if (charge_row.name !== row.name) {
+                    frappe.model.set_value(charge_row.doctype, charge_row.name, 'select', 0);
+                }
+            });
+            
+            // Update the delivery rate with selected row's rate
             frm.set_value('custom_delivery_rate', row.rate);
+            
+            // Refresh the table to show updated selections
+            frm.refresh_field('custom_courier_charges');
+        } else {
+            // If this row is unselected, check if any other row is selected
+            let selected_row = frm.doc.custom_courier_charges.find(function(charge_row) {
+                return charge_row.select === 1;
+            });
+            
+            if (selected_row) {
+                // If another row is selected, update delivery rate to that row's rate
+                frm.set_value('custom_delivery_rate', selected_row.rate);
+            } else {
+                // If no row is selected, clear the delivery rate
+                frm.set_value('custom_delivery_rate', 0);
+            }
         }
     }
 });
