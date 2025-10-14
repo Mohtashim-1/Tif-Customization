@@ -139,7 +139,7 @@ doctype_js = {"Delivery Note" : "public/js/delivery_note.js"}
 
 doc_events = {
 	"Delivery Note": {
-        "on_submit": "tif_customization.tif_customization.doctype.delivery_note.delivery_note.on_update",
+        "on_submit": "tif_customization.tif_customization.doctype.delivery_note.delivery_note.on_submit",
         "validate": "tif_customization.tif_customization.doctype.delivery_note.delivery_note.sum_of_cartons"
 	},
     "Material Request": {

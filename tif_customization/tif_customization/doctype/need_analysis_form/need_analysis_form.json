@@ -1,207 +1,487 @@
 {
  "actions": [],
  "allow_rename": 1,
+ "autoname": "format:AF-{##}",
  "creation": "2025-10-09 04:42:31.812770",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "form_id",
   "section_break_school_info",
+  "type_of_institution",
   "school_name",
-  "representative",
-  "column_break_1",
-  "category",
-  "type",
   "system",
   "no_of_students",
+  "column_break_1",
+  "representative",
+  "category",
+  "type",
+  "no_campuses",
   "section_break_program_info",
   "academic_session",
-  "school_interested",
+  "shift",
   "column_break_2",
   "school_running",
-  "v_card_m_pic",
+  "school_interested",
+  "school_interested_section",
+  "tps_services",
+  "workshop",
+  "trainings",
+  "qaida",
+  "workbook",
+  "teacher_guide",
+  "column_break_hjpy",
+  "qps_service",
+  "mqh",
+  "workshop1",
+  "column_break_ltpt",
+  "cee_services",
+  "courseprogram",
+  "workshop_cee",
+  "section_break_xyfw",
+  "school_running_already_tif_services",
+  "column_break_khpp",
+  "school_running_1",
+  "section_break_aevj",
+  "visiting_card",
+  "column_break_vzrx",
+  "school_image",
+  "section_break_eeaw",
+  "meeting_picture",
+  "column_break_jcjh",
   "fees_structure",
+  "section_break_exqe",
+  "website",
+  "facebook",
+  "column_break_wktc",
+  "instagram",
+  "linkedin",
   "section_break_location",
   "address",
+  "column_break_fmam",
   "area",
-  "ptcl",
+  "province",
+  "city",
+  "marketing_samples_provided",
   "section_break_contact_persons",
   "contact_persons",
+  "section_break_prvg",
+  "ptcl",
+  "school_mobile_number",
+  "date_of_visit",
+  "column_break_apig",
+  "school_whatsapp",
+  "school_email",
   "section_break_notes",
   "notes",
+  "column_break_xwvj",
   "follow_ups"
  ],
  "fields": [
   {
-   "fieldname": "form_id",
-   "fieldtype": "Data",
-   "label": "Form ID",
-   "default": "SC-1.2",
-   "read_only": 1,
-   "idx": 1
-  },
-  {
    "fieldname": "section_break_school_info",
    "fieldtype": "Section Break",
-   "label": "School Information",
-   "idx": 2
+   "label": "School Information"
   },
   {
    "fieldname": "school_name",
    "fieldtype": "Data",
+   "in_list_view": 1,
    "label": "Name of School",
-   "reqd": 1,
-   "idx": 3
+   "reqd": 1
   },
   {
+   "default": "TPS HAMMAD",
    "fieldname": "representative",
    "fieldtype": "Data",
-   "label": "Representative",
-   "default": "TPS HAMMAD",
-   "idx": 4
+   "label": "Representative"
   },
   {
    "fieldname": "column_break_1",
-   "fieldtype": "Column Break",
-   "idx": 5
+   "fieldtype": "Column Break"
   },
   {
    "fieldname": "category",
    "fieldtype": "Select",
+   "in_list_view": 1,
    "label": "Category",
    "options": "Provincial Govt.\nPrivate",
-   "reqd": 1,
-   "idx": 6
+   "reqd": 1
   },
   {
    "fieldname": "type",
    "fieldtype": "Select",
+   "in_list_view": 1,
    "label": "Type",
-   "options": "Single\nChain\nNo. Campuses",
-   "reqd": 1,
-   "idx": 7
+   "options": "Single\nChain",
+   "reqd": 1
   },
   {
    "fieldname": "system",
    "fieldtype": "Select",
+   "in_list_view": 1,
    "label": "System",
-   "options": "Primary\nMatric\nCambridge",
-   "reqd": 1,
-   "idx": 8
+   "options": "Pri-Primary\nPrimary\nMatric\nIntermediate Hifz-o-Nazra\nCambridge\nO/A Levels",
+   "reqd": 1
   },
   {
    "fieldname": "no_of_students",
    "fieldtype": "Int",
-   "label": "No. of Students",
-   "idx": 9
+   "label": "No. of Students"
   },
   {
+   "collapsible": 1,
    "fieldname": "section_break_program_info",
    "fieldtype": "Section Break",
-   "label": "Program Interest & Operation",
-   "idx": 10
+   "label": "Program Interest & Operation"
   },
   {
    "fieldname": "academic_session",
    "fieldtype": "Data",
-   "label": "Academic Session",
-   "idx": 11
+   "label": "Academic Session"
   },
   {
    "fieldname": "school_interested",
    "fieldtype": "Select",
+   "hidden": 1,
    "label": "School Interested",
-   "options": "Workshop\nNoorani Qaida\nNQ Workbook\nNQ T.G\nMQH Sample\nMQH P-1 + T.G-1\nC.E.E",
-   "idx": 12
+   "options": "Workshop\nNoorani Qaida\nNQ Workbook\nNQ T.G\nMQH Sample\nMQH P-1 + T.G-1\nC.E.E"
   },
   {
    "fieldname": "column_break_2",
-   "fieldtype": "Column Break",
-   "idx": 13
+   "fieldtype": "Column Break"
   },
   {
    "fieldname": "school_running",
    "fieldtype": "Select",
    "label": "School Running",
-   "options": "Oral Nazra\nQaida\nQuranic Education\nIslamic Values",
-   "idx": 14
-  },
-  {
-   "fieldname": "v_card_m_pic",
-   "fieldtype": "Data",
-   "label": "V. Card + M. Pic",
-   "idx": 15
+   "options": "Oral Nazra\nQaida\nQuranic Education\nIslamic Values"
   },
   {
    "fieldname": "fees_structure",
    "fieldtype": "Select",
    "label": "Fees Structure",
-   "options": "Above 15K\nB/W 5K to 15K\nBelow 5K",
-   "idx": 16
+   "options": "Above 15K\nB/W 5K to 15K\nBelow 5K"
   },
   {
+   "collapsible": 1,
    "fieldname": "section_break_location",
    "fieldtype": "Section Break",
-   "label": "Location & Contact Details",
-   "idx": 17
+   "label": "Location & Contact Details"
   },
   {
    "fieldname": "address",
    "fieldtype": "Text",
-   "label": "Address",
-   "idx": 18
+   "label": "Address"
   },
   {
    "fieldname": "area",
    "fieldtype": "Data",
-   "label": "Area",
-   "idx": 19
+   "label": "Area"
   },
   {
    "fieldname": "ptcl",
    "fieldtype": "Data",
-   "label": "PTCL",
-   "idx": 20
+   "label": "PTCL"
   },
   {
+   "collapsible": 1,
    "fieldname": "section_break_contact_persons",
    "fieldtype": "Section Break",
-   "label": "Contact Persons",
-   "idx": 21
+   "label": "Contact Persons"
   },
   {
    "fieldname": "contact_persons",
    "fieldtype": "Table",
    "label": "Contact Persons",
-   "options": "Contact Person",
-   "idx": 22
+   "options": "Contact Person"
   },
   {
+   "collapsible": 1,
    "fieldname": "section_break_notes",
    "fieldtype": "Section Break",
-   "label": "Notes & Follow-Ups",
-   "idx": 23
+   "label": "Notes & Follow-Ups"
   },
   {
    "fieldname": "notes",
    "fieldtype": "Text",
-   "label": "Notes",
-   "idx": 24
+   "label": "Notes"
   },
   {
    "fieldname": "follow_ups",
-   "fieldtype": "Text",
+   "fieldtype": "Table",
    "label": "Follow-Ups",
-   "idx": 25
+   "options": "Follow Up"
+  },
+  {
+   "fieldname": "type_of_institution",
+   "fieldtype": "Select",
+   "label": "Type Of Institution ",
+   "options": "School\nCollege\nUniversity\nMadaris\nLibrary\nSpecial Schools"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.type==\"Chain\"",
+   "fieldname": "no_campuses",
+   "fieldtype": "Float",
+   "label": "No. Campuses"
+  },
+  {
+   "fieldname": "shift",
+   "fieldtype": "Select",
+   "label": "Shift",
+   "options": "Morning\nEvening\nBoth"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "section_break_aevj",
+   "fieldtype": "Section Break",
+   "label": "Visiting Cards"
+  },
+  {
+   "fieldname": "column_break_fmam",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_xwvj",
+   "fieldtype": "Column Break"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "school_interested_section",
+   "fieldtype": "Section Break",
+   "label": "School Interested"
+  },
+  {
+   "default": "0",
+   "fieldname": "tps_services",
+   "fieldtype": "Check",
+   "label": "TPS Services"
+  },
+  {
+   "default": "0",
+   "fieldname": "qps_service",
+   "fieldtype": "Check",
+   "label": "QPS Service"
+  },
+  {
+   "default": "0",
+   "fieldname": "cee_services",
+   "fieldtype": "Check",
+   "label": "C.E.E Services"
+  },
+  {
+   "depends_on": "eval:doc.tps_services==1",
+   "fieldname": "workshop",
+   "fieldtype": "Table MultiSelect",
+   "label": "Workshop",
+   "options": "Workshop"
+  },
+  {
+   "depends_on": "eval:doc.tps_services==1",
+   "fieldname": "trainings",
+   "fieldtype": "Table MultiSelect",
+   "label": "Trainings",
+   "options": "Training"
+  },
+  {
+   "depends_on": "eval:doc.tps_services==1",
+   "fieldname": "qaida",
+   "fieldtype": "Table MultiSelect",
+   "label": "Qaida",
+   "options": "Qaida"
+  },
+  {
+   "depends_on": "eval:doc.tps_services==1",
+   "fieldname": "workbook",
+   "fieldtype": "Table MultiSelect",
+   "label": "Workbook",
+   "options": "Workbook"
+  },
+  {
+   "depends_on": "eval:doc.tps_services==1",
+   "fieldname": "teacher_guide",
+   "fieldtype": "Table MultiSelect",
+   "label": "Teacher Guide",
+   "options": "Teacher Guide"
+  },
+  {
+   "depends_on": "eval:doc.qps_service==1",
+   "fieldname": "mqh",
+   "fieldtype": "Table MultiSelect",
+   "label": "MQH",
+   "options": "MQH"
+  },
+  {
+   "depends_on": "eval:doc.qps_service==1",
+   "fieldname": "workshop1",
+   "fieldtype": "Table MultiSelect",
+   "label": "Workshop",
+   "options": "Workshop"
+  },
+  {
+   "depends_on": "eval:doc.cee_services==1",
+   "fieldname": "workshop_cee",
+   "fieldtype": "Table MultiSelect",
+   "label": "Workshop",
+   "options": "Workshop"
+  },
+  {
+   "depends_on": "eval:doc.cee_services==1",
+   "fieldname": "courseprogram",
+   "fieldtype": "Table MultiSelect",
+   "label": "Course/Program",
+   "options": "Workshop"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "section_break_xyfw",
+   "fieldtype": "Section Break",
+   "label": "School Running Service"
+  },
+  {
+   "fieldname": "school_running_already_tif_services",
+   "fieldtype": "Select",
+   "label": "School Running Already TIF Services ",
+   "options": "QPS\nTPS\nCEE"
+  },
+  {
+   "fieldname": "school_running_1",
+   "fieldtype": "Select",
+   "label": "School Running",
+   "options": "-Oral Nazra\n-Qaida\nNoorani Qaida (Not TPS)\nIqra Qaida\nRehmani Qaida\nMadni Qaida\nJamiat Qaida\nQurani Qaida\nIslamic Values"
+  },
+  {
+   "fieldname": "visiting_card",
+   "fieldtype": "Attach Image",
+   "label": "Visiting Card"
+  },
+  {
+   "fieldname": "school_image",
+   "fieldtype": "Attach Image",
+   "label": "School Image"
+  },
+  {
+   "fieldname": "column_break_vzrx",
+   "fieldtype": "Column Break"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "section_break_eeaw",
+   "fieldtype": "Section Break",
+   "label": "Images"
+  },
+  {
+   "fieldname": "meeting_picture",
+   "fieldtype": "Attach Image",
+   "label": "Meeting Picture"
+  },
+  {
+   "fieldname": "column_break_jcjh",
+   "fieldtype": "Column Break"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "section_break_exqe",
+   "fieldtype": "Section Break",
+   "label": "Social Link"
+  },
+  {
+   "fieldname": "website",
+   "fieldtype": "Data",
+   "label": "Website"
+  },
+  {
+   "fieldname": "facebook",
+   "fieldtype": "Data",
+   "label": "Facebook"
+  },
+  {
+   "fieldname": "instagram",
+   "fieldtype": "Data",
+   "label": "Instagram"
+  },
+  {
+   "fieldname": "linkedin",
+   "fieldtype": "Data",
+   "label": "Linkedin"
+  },
+  {
+   "fieldname": "column_break_wktc",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Sindh",
+   "fieldname": "province",
+   "fieldtype": "Select",
+   "label": "Province",
+   "options": "Punjab\nKPK\nBalochistan\nGilgit\nAzad Jammu & Kashmir\nSindh"
+  },
+  {
+   "default": "Karachi",
+   "fieldname": "city",
+   "fieldtype": "Link",
+   "label": "City",
+   "options": "City"
+  },
+  {
+   "default": "No",
+   "fieldname": "marketing_samples_provided",
+   "fieldtype": "Select",
+   "label": "Marketing Samples Provided",
+   "options": "Yes\nNo"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "section_break_prvg",
+   "fieldtype": "Section Break",
+   "label": "School Contact"
+  },
+  {
+   "fieldname": "school_mobile_number",
+   "fieldtype": "Data",
+   "label": "School Mobile Number",
+   "reqd": 1
+  },
+  {
+   "fieldname": "school_whatsapp",
+   "fieldtype": "Data",
+   "label": "School WhatsApp"
+  },
+  {
+   "fieldname": "school_email",
+   "fieldtype": "Data",
+   "label": "School Email"
+  },
+  {
+   "fieldname": "date_of_visit",
+   "fieldtype": "Date",
+   "label": "Date Of Visit"
+  },
+  {
+   "fieldname": "column_break_apig",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_hjpy",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_ltpt",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_khpp",
+   "fieldtype": "Column Break"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-10-09 04:42:42.538105",
+ "modified": "2025-10-14 14:31:08.405926",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Need Analysis Form",
+ "naming_rule": "Expression",
  "owner": "Administrator",
  "permissions": [
   {

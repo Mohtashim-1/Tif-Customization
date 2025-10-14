@@ -6,11 +6,13 @@
  "engine": "InnoDB",
  "field_order": [
   "role",
+  "name1",
   "column_break_1",
   "cell_no",
   "whatsapp",
   "email",
-  "date_of_visit"
+  "date_of_visit",
+  "mobile_no"
  ],
  "fields": [
   {
@@ -18,7 +20,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Role",
-   "options": "Administrator\nPrincipal\nCoordinator",
+   "options": "Director\nAdministrator\nPrincipal\nVice Principal\nAcademic Manager\nAcademic Coordinator\nAdmin Person\nReceptionist\nCoordinator",
    "reqd": 1
   },
   {
@@ -48,13 +50,26 @@
    "fieldtype": "Date",
    "in_list_view": 1,
    "label": "Date Of Visit"
+  },
+  {
+   "fieldname": "name1",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Name"
+  },
+  {
+   "fieldname": "mobile_no",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Mobile No"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2025-10-09 04:53:32.765028",
+ "modified": "2025-10-14 14:22:14.940117",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Contact Person",
