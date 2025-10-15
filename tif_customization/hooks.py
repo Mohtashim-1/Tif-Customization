@@ -134,7 +134,7 @@ doctype_js = {"Delivery Note" : "public/js/delivery_note.js"}
 # }
 
 # Document Events
-# ---------------
+# ---------------   
 # Hook on document methods and events
 
 doc_events = {

@@ -128,6 +128,20 @@ def on_update(doc, method):
         else:
             frappe.msgprint("No courier charge selected.")
 
+def on_submit(doc, method):
+    """Handle delivery note submission - process courier charges if applicable"""
+    if doc.custom_delivery_mode == "Courier" and doc.custom_courier_charges:
+        # Find the selected charge
+        selected_charge = None
+        for charge in doc.custom_courier_charges:
+            if str(charge.select) in ("1", "Yes", "true", "True", "on", "checked") or charge.select is True or charge.select == 1:
+                selected_charge = charge
+                break
+        
+        if selected_charge and doc.custom_courier_mode_of_payment:
+            frappe.msgprint(f"Creating Journal Entry for courier charges on submission")
+            create_journal_entry(doc, selected_charge)
+
 def create_journal_entry(doc, selected_charge):
     if doc.custom_courier_mode_of_payment == "Cash":
         # Get company settings for cash account
