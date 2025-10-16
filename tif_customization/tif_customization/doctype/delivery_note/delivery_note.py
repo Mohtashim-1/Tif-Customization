@@ -17,8 +17,10 @@ def get_rate_from_courier(doc, method):
         # Clear existing child table entries
         doc.custom_courier_charges = []
         
-        # Get all Courier Rate documents
-        courier_rates = frappe.get_all("Courier Rate", fields=["name", "courier", "courier_service","zone", "rate_type"])
+        # Get all submitted Courier Rate documents
+        courier_rates = frappe.get_all("Courier Rate", 
+            filters={"docstatus": 1}, 
+            fields=["name", "courier", "courier_service","zone", "rate_type"])
         
         for courier_rate in courier_rates:
             courier_doc = frappe.get_doc("Courier Rate", courier_rate.name)
@@ -46,11 +48,13 @@ def get_rate_from_courier(doc, method):
         
         # Set the selected courier's rate if specified
         if doc.custom_courier and doc.custom_courier_service:
-            courier_rate = frappe.get_doc("Courier Rate", {
-                "courier": doc.custom_courier,
-                "courier_service": doc.custom_courier_service
-            })
-            if courier_rate:
+            # Find the submitted Courier Rate document by courier and courier_service
+            courier_rate_name = frappe.db.get_value("Courier Rate", 
+                {"courier": doc.custom_courier, "courier_service": doc.custom_courier_service, "docstatus": 1}, 
+                "name")
+            
+            if courier_rate_name:
+                courier_rate = frappe.get_doc("Courier Rate", courier_rate_name)
                 for slab in courier_rate.courier_slab:
                     if doc.custom_total_delivery_weightage > slab.from_weight and doc.custom_total_delivery_weightage <= slab.to_weight:
                         # Calculate rate based on rate_type
