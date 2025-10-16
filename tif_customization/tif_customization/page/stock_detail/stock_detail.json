@@ -1,0 +1,23 @@
+{
+ "content": null,
+ "creation": "2025-10-16 10:51:22.153721",
+ "docstatus": 0,
+ "doctype": "Page",
+ "idx": 0,
+ "modified": "2025-10-16 10:51:22.153721",
+ "modified_by": "Administrator",
+ "module": "Tif Customization",
+ "name": "stock-detail",
+ "owner": "Administrator",
+ "page_name": "stock-detail",
+ "roles": [
+  {
+   "role": "System Manager"
+  }
+ ],
+ "script": null,
+ "standard": "Yes",
+ "style": null,
+ "system_page": 0,
+ "title": "Stock Detail"
+}
