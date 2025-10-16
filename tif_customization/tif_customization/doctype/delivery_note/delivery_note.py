@@ -26,7 +26,7 @@ def get_rate_from_courier(doc, method):
             courier_doc = frappe.get_doc("Courier Rate", courier_rate.name)
             # Find matching rate for the weight
             for slab in courier_doc.courier_slab:
-                if doc.custom_total_delivery_weightage > slab.from_weight and doc.custom_total_delivery_weightage <= slab.to_weight:
+                if doc.custom_total_delivery_weightage >= slab.from_weight and doc.custom_total_delivery_weightage <= slab.to_weight:
                     # Check if this courier was previously selected
                     key = f"{courier_rate.courier}-{courier_rate.courier_service}"
                     is_selected = existing_selections.get(key, False)
@@ -56,7 +56,7 @@ def get_rate_from_courier(doc, method):
             if courier_rate_name:
                 courier_rate = frappe.get_doc("Courier Rate", courier_rate_name)
                 for slab in courier_rate.courier_slab:
-                    if doc.custom_total_delivery_weightage > slab.from_weight and doc.custom_total_delivery_weightage <= slab.to_weight:
+                    if doc.custom_total_delivery_weightage >= slab.from_weight and doc.custom_total_delivery_weightage <= slab.to_weight:
                         # Calculate rate based on rate_type
                         if courier_rate.rate_type == "Flat":
                             doc.custom_delivery_rate = flt(slab.rate)
