@@ -7,6 +7,8 @@
  "engine": "InnoDB",
  "field_order": [
   "transport",
+  "column_break_sjnj",
+  "account",
   "active"
  ],
  "fields": [
@@ -22,12 +24,22 @@
    "fieldname": "active",
    "fieldtype": "Check",
    "label": "Active"
+  },
+  {
+   "fieldname": "account",
+   "fieldtype": "Link",
+   "label": "Account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "column_break_sjnj",
+   "fieldtype": "Column Break"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-06-13 16:09:17.448525",
+ "modified": "2025-10-23 11:40:27.205670",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Transport",

@@ -145,6 +145,11 @@ def on_submit(doc, method):
         if selected_charge and doc.custom_courier_mode_of_payment:
             frappe.msgprint(f"Creating Journal Entry for courier charges on submission")
             create_journal_entry(doc, selected_charge)
+    
+    # Handle transport charges if delivery mode is Transport
+    elif doc.custom_delivery_mode == "Transport" and doc.custom_transport_charges:
+        frappe.msgprint(f"Creating Journal Entry for transport charges on submission")
+        create_transport_journal_entry(doc)
 
 def create_journal_entry(doc, selected_charge):
     if doc.custom_courier_mode_of_payment == "Cash":
@@ -239,6 +244,65 @@ def create_journal_entry(doc, selected_charge):
         je.insert()
         je.submit()
 
+def create_transport_journal_entry(doc):
+    """Create Journal Entry for transport charges - cash payment to transport expense account"""
+    
+    # Calculate total amount from custom_transport_charges table
+    total_amount = 0
+    for charge in doc.custom_transport_charges:
+        if charge.amount:
+            total_amount += flt(charge.amount)
+    
+    if total_amount <= 0:
+        frappe.msgprint("No transport charges found or total amount is zero.")
+        return
+    
+    # Get company settings for cash account
+    company_settings = frappe.get_doc("Company", doc.company)
+    cash_account = company_settings.default_cash_account
+    
+    # Get transport account from Transport doctype
+    if not doc.custom_transport:
+        frappe.throw("Please select a Transport first.")
+    
+    transport_doc = frappe.get_doc("Transport", doc.custom_transport)
+    transport_account = transport_doc.account
+    
+    if not cash_account:
+        frappe.throw("Please set Cash Account in Company Settings.")
+    if not transport_account:
+        frappe.throw("Please set Account in Transport doctype.")
+    
+    # Create Journal Entry
+    je = frappe.new_doc("Journal Entry")
+    je.voucher_type = "Journal Entry"
+    je.posting_date = getdate(nowdate())
+    je.company = doc.company
+    je.cheque_no = doc.name
+    je.cheque_date = getdate(nowdate())
+    je.user_remark = f"Transport charges for {doc.name}"
+    
+    # Add debit entry (Transport Expense Account)
+    je.append("accounts", {
+        "account": transport_account,
+        "debit_in_account_currency": total_amount,
+        "credit_in_account_currency": 0,
+        "cost_center": doc.custom_supply_chain_cost_center if hasattr(doc, 'custom_supply_chain_cost_center') else None
+    })
+    
+    # Add credit entry (Cash Account)
+    je.append("accounts", {
+        "account": cash_account,
+        "debit_in_account_currency": 0,
+        "credit_in_account_currency": total_amount,
+        "cost_center": doc.custom_supply_chain_cost_center if hasattr(doc, 'custom_supply_chain_cost_center') else None
+    })
+    
+    je.insert()
+    je.submit()
+    
+    frappe.msgprint(f"Journal Entry {je.name} created successfully for transport charges of {total_amount}")
+
 @frappe.whitelist()
 def sum_of_cartons(doc, method):
     total_cartons = 0
@@ -246,3 +310,6 @@ def sum_of_cartons(doc, method):
         total_cartons += item.custom_cartons
     doc.custom_total_cartons = total_cartons
     # doc.save()
+
+
+# want to create jv for table custom_transport_charges if there is a row there with total of amount cash se payment hogi aur transport expense mai payment hojaye gi if custom_delivery_mode = Transport

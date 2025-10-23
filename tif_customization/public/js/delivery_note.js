@@ -78,3 +78,17 @@ frappe.ui.form.on('Courier Charges', {
         }
     }
 });
+
+// Handle custom_delivery_mode field changes to show/hide related fields
+frappe.ui.form.on('Delivery Note', {
+    custom_delivery_mode: function(frm) {
+        // Show/hide custom_courier_charges based on delivery mode
+        if (frm.doc.custom_delivery_mode === 'Courier') {
+            frm.set_df_property('custom_courier_charges', 'hidden', 0);
+            frm.set_df_property('custom_section_break_qpinp', 'hidden', 1);
+        } else {
+            frm.set_df_property('custom_courier_charges', 'hidden', 1);
+            frm.set_df_property('custom_section_break_qpinp', 'hidden', 0);
+        }
+    }
+}); 
