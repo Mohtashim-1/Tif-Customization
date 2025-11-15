@@ -9,6 +9,7 @@
   "section_break_hoa0",
   "courier",
   "active",
+  "user_entered",
   "column_break_wbbq",
   "supplier",
   "column_break_odwe",
@@ -52,12 +53,18 @@
   {
    "fieldname": "column_break_wbbq",
    "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "user_entered",
+   "fieldtype": "Check",
+   "label": "User Entered?"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-06-13 18:26:15.390454",
+ "modified": "2025-11-15 10:07:50.478215",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Courier",

@@ -35,7 +35,7 @@ def validate_sat_attendance(doc, method):
                             frappe.msgprint("Marked as Saturday half day")
                         else:
                             row.sat_halfday = 0
-                            row.half_day = 1 if doc.check_in_1 and doc.check_out_1 else 0
+                            row.half_day = 1 if row.check_in_1 and row.check_out_1 else 0
                             frappe.msgprint("Did not meet half-day time conditions, marked as half day")
                     else:
                         frappe.msgprint("Missing check-in or check-out time on Saturday, marking half_day=1 and not absent")
