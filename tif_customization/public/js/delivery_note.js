@@ -1,5 +1,17 @@
 frappe.ui.form.on('Delivery Note', {
     refresh: function(frm) {
+        // Always hide custom_courier_charges table
+        frm.set_df_property('custom_courier_charges', 'hidden', 1);
+        
+        // Set field visibility on form load
+        if (frm.doc.custom_courier == 'Leopard') {
+            frm.set_df_property('custom_delivery_mode', 'hidden', 0);
+            frm.set_df_property('custom_transport_charges', 'hidden', 0);
+        } else {
+            frm.set_df_property('custom_delivery_mode', 'hidden', 1);
+            frm.set_df_property('custom_transport_charges', 'hidden', 1);
+        }
+        
         // Add custom button for fetching courier rates
         if (frm.doc.custom_delivery_mode === 'Courier' && frm.doc.docstatus === 0) {
             frm.add_custom_button(__('Fetch Courier Rates'), function() {
@@ -82,13 +94,53 @@ frappe.ui.form.on('Courier Charges', {
 // Handle custom_delivery_mode field changes to show/hide related fields
 frappe.ui.form.on('Delivery Note', {
     custom_delivery_mode: function(frm) {
-        // Show/hide custom_courier_charges based on delivery mode
+        // Always hide custom_courier_charges table
+        frm.set_df_property('custom_courier_charges', 'hidden', 1);
+        
+        // Handle other field visibility
         if (frm.doc.custom_delivery_mode === 'Courier') {
-            frm.set_df_property('custom_courier_charges', 'hidden', 0);
             frm.set_df_property('custom_section_break_qpinp', 'hidden', 1);
         } else {
-            frm.set_df_property('custom_courier_charges', 'hidden', 1);
             frm.set_df_property('custom_section_break_qpinp', 'hidden', 0);
         }
+    },
+    
+    custom_courier: function(frm) {
+        // Always hide custom_courier_charges table
+        frm.set_df_property('custom_courier_charges', 'hidden', 1);
+        
+        // Handle other field visibility
+        if (frm.doc.custom_courier == 'Leopard') {
+            frm.set_df_property('custom_delivery_mode', 'hidden', 0);
+            frm.set_df_property('custom_transport_charges', 'hidden', 0);
+        } else {
+            frm.set_df_property('custom_delivery_mode', 'hidden', 1);
+            frm.set_df_property('custom_transport_charges', 'hidden', 1);
+        }
     }
-}); 
+});
+
+// Calculate amount = quantity * rate for Delivery Rate Entry table
+frappe.ui.form.on('Delivery Rate Entry', {
+    quantity: function(frm, cdt, cdn) {
+        calculate_amount(frm, cdt, cdn);
+    },
+    
+    rate: function(frm, cdt, cdn) {
+        calculate_amount(frm, cdt, cdn);
+    },
+    
+    amount: function(frm, cdt, cdn) {
+        // If amount is manually changed, we can optionally recalculate rate
+        // For now, we'll just ensure calculation happens on quantity/rate change
+    }
+});
+
+function calculate_amount(frm, cdt, cdn) {
+    let row = locals[cdt][cdn];
+    let quantity = flt(row.quantity) || 0;
+    let rate = flt(row.rate) || 0;
+    let amount = quantity * rate;
+    
+    frappe.model.set_value(cdt, cdn, 'amount', amount);
+} 

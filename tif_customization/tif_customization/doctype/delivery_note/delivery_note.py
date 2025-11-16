@@ -145,104 +145,126 @@ def on_submit(doc, method):
         if selected_charge and doc.custom_courier_mode_of_payment:
             frappe.msgprint(f"Creating Journal Entry for courier charges on submission")
             create_journal_entry(doc, selected_charge)
+    elif doc.custom_delivery_mode == "Courier" and doc.custom_delivery_rate and doc.custom_delivery_rate > 0 and doc.custom_courier_mode_of_payment:
+        # Handle custom_delivery_rate when set directly (without courier_charges table)
+        frappe.msgprint(f"Creating Journal Entry for delivery rate on submission")
+        create_journal_entry(doc)
     
     # Handle transport charges if delivery mode is Transport
     elif doc.custom_delivery_mode == "Transport" and doc.custom_transport_charges:
         frappe.msgprint(f"Creating Journal Entry for transport charges on submission")
         create_transport_journal_entry(doc)
+    
+    # Handle delivery rate entry table
+    if doc.custom_delivery_rate_entry and len(doc.custom_delivery_rate_entry) > 0:
+        frappe.msgprint(f"Creating Journal Entry for delivery rate entry on submission")
+        create_delivery_rate_entry_journal_entry(doc)
 
-def create_journal_entry(doc, selected_charge):
+def create_journal_entry(doc, selected_charge=None):
+    """Create Journal Entry for custom_delivery_rate based on payment mode"""
+    
+    # Check if delivery rate is set
+    if not doc.custom_delivery_rate or doc.custom_delivery_rate <= 0:
+        frappe.msgprint("No delivery rate found or amount is zero.")
+        return
+    
+    # Check if courier is set
+    if not doc.custom_courier:
+        frappe.throw("Please select a Courier first.")
+    
+    # Get courier account from Courier doctype
+    courier_doc = frappe.get_doc("Courier", doc.custom_courier)
+    courier_account = courier_doc.account
+    courier_party = courier_doc.supplier
+    
+    if not courier_account:
+        frappe.throw("Please set Account in Courier doctype.")
+    
+    # Get company settings
+    company_settings = frappe.get_doc("Company", doc.company)
+    
+    # Create Journal Entry
+    je = frappe.new_doc("Journal Entry")
+    je.voucher_type = "Journal Entry"
+    je.posting_date = getdate(nowdate())
+    je.company = doc.company
+    je.cheque_no = doc.name
+    je.cheque_date = getdate(nowdate())
+    je.user_remark = f"Courier charges for {doc.name}"
+    
+    # Check payment mode
     if doc.custom_courier_mode_of_payment == "Cash":
-        # Get company settings for cash account
-        company_settings = frappe.get_doc("Company", doc.company)
+        # Cash payment: Credit Cash, Debit Courier Account
         cash_account = company_settings.default_cash_account
         
-        # Get courier account from Courier doctype
-        courier_doc = frappe.get_doc("Courier", selected_charge.courier)
-        courier_account = courier_doc.account
-        courier_party = courier_doc.supplier
+        if not cash_account:
+            frappe.throw("Please set Cash Account in Company Settings.")
         
-        if not (cash_account and courier_account):
-            frappe.throw("Please set Cash Account in Company Settings and Account in Courier doctype")
-        
-        # Create Journal Entry
-        je = frappe.new_doc("Journal Entry")
-        je.voucher_type = "Journal Entry"
-        je.posting_date = getdate(nowdate())
-        je.company = doc.company
-        je.cheque_no = doc.name
-        je.cheque_date = getdate(nowdate())
-        je.user_remark = f"Courier charges for   {doc.name}"
-        
-        # Add debit entry
+        # Add debit entry (Courier Account)
         je.append("accounts", {
             "account": courier_account,
             "debit_in_account_currency": doc.custom_delivery_rate,
             "credit_in_account_currency": 0,
-            "cost_center":doc.custom_supply_chain_cost_center
-            # "party_type": "Customer",
-            # "party": doc.customer
+            "cost_center": doc.custom_supply_chain_cost_center if hasattr(doc, 'custom_supply_chain_cost_center') and doc.custom_supply_chain_cost_center else None,
+            "reference_type": "Delivery Note",
+            "reference_name": doc.name
         })
         
-        # Add credit entry
+        # Add credit entry (Cash Account)
         je.append("accounts", {
             "account": cash_account,
             "debit_in_account_currency": 0,
             "credit_in_account_currency": doc.custom_delivery_rate,
-            "cost_center":doc.custom_supply_chain_cost_center
+            "cost_center": doc.custom_supply_chain_cost_center if hasattr(doc, 'custom_supply_chain_cost_center') and doc.custom_supply_chain_cost_center else None,
+            "reference_type": "Delivery Note",
+            "reference_name": doc.name
         })
-        
-        je.insert()
-        je.submit()
     else:
-        # Get company settings for payable account
-        company_settings = frappe.get_doc("Company", doc.company)
+        # Non-cash payment: Debit Courier Account (expense), Credit Payable Account (liability)
         payable_account = company_settings.default_payable_account
-        
-        # Get courier account from Courier doctype
-        courier_doc = frappe.get_doc("Courier", selected_charge.courier)
-        courier_account = courier_doc.account
-        courier_party = courier_doc.supplier
-        
-        # Debug print for payable account and party
-        frappe.msgprint(f"Payable Account: {payable_account}, Party Type: Supplier, Party: {courier_party}")
         
         if not payable_account:
             frappe.throw("Please set Payable Account in Company Settings.")
-        if not courier_account:
-            frappe.throw("Please set Account in Courier doctype.")
         if not courier_party:
             frappe.throw("Supplier is not set for the selected Courier. Please set it in the Courier doctype.")
         
-        # Create Journal Entry
-        je = frappe.new_doc("Journal Entry")
-        je.voucher_type = "Journal Entry"
-        je.posting_date = getdate(nowdate())
-        je.company = doc.company
-        je.cheque_no = doc.name
-        je.cheque_date = getdate(nowdate())
-        je.user_remark = f"Courier charges for {doc.name}"
-        
-        # Add debit entry
+        # Add debit entry (Courier Account - Expense)
         je.append("accounts", {
             "account": courier_account,
             "debit_in_account_currency": doc.custom_delivery_rate,
             "credit_in_account_currency": 0,
-            # "party_type": "Customer",
-            # "party": doc.customer
+            "cost_center": doc.custom_supply_chain_cost_center if hasattr(doc, 'custom_supply_chain_cost_center') and doc.custom_supply_chain_cost_center else None,
+            "reference_type": "Delivery Note",
+            "reference_name": doc.name
         })
         
-        # Add credit entry (with party_type and party)
+        # Add credit entry (Payable Account - Liability with party)
         je.append("accounts", {
             "account": payable_account,
             "debit_in_account_currency": 0,
             "credit_in_account_currency": doc.custom_delivery_rate,
             "party_type": "Supplier",
-            "party": courier_party
+            "party": courier_party,
+            "cost_center": doc.custom_supply_chain_cost_center if hasattr(doc, 'custom_supply_chain_cost_center') and doc.custom_supply_chain_cost_center else None,
+            "reference_type": "Delivery Note",
+            "reference_name": doc.name
         })
-        
-        je.insert()
-        je.submit()
+    
+    je.insert()
+    je.submit()
+    
+    # Store Journal Entry name in custom field (if field exists)
+    try:
+        frappe.db.set_value("Delivery Note", doc.name, "custom_courier_journal_entry", je.name, update_modified=False)
+    except Exception:
+        # Field doesn't exist yet, will be created manually
+        pass
+    
+    # Add connection from Delivery Note to Journal Entry
+    delivery_note_doc = frappe.get_doc("Delivery Note", doc.name)
+    delivery_note_doc.add_comment("Info", f"Journal Entry <a href='/app/journal-entry/{je.name}'>{je.name}</a> created for courier charges")
+    
+    frappe.msgprint(f"Journal Entry {je.name} created successfully for delivery rate of {doc.custom_delivery_rate}")
 
 def create_transport_journal_entry(doc):
     """Create Journal Entry for transport charges - cash payment to transport expense account"""
@@ -287,7 +309,9 @@ def create_transport_journal_entry(doc):
         "account": transport_account,
         "debit_in_account_currency": total_amount,
         "credit_in_account_currency": 0,
-        "cost_center": doc.custom_supply_chain_cost_center if hasattr(doc, 'custom_supply_chain_cost_center') else None
+        "cost_center": doc.custom_supply_chain_cost_center if hasattr(doc, 'custom_supply_chain_cost_center') else None,
+        "reference_type": "Delivery Note",
+        "reference_name": doc.name
     })
     
     # Add credit entry (Cash Account)
@@ -295,13 +319,123 @@ def create_transport_journal_entry(doc):
         "account": cash_account,
         "debit_in_account_currency": 0,
         "credit_in_account_currency": total_amount,
-        "cost_center": doc.custom_supply_chain_cost_center if hasattr(doc, 'custom_supply_chain_cost_center') else None
+        "cost_center": doc.custom_supply_chain_cost_center if hasattr(doc, 'custom_supply_chain_cost_center') else None,
+        "reference_type": "Delivery Note",
+        "reference_name": doc.name
     })
     
     je.insert()
     je.submit()
     
+    # Add connection from Delivery Note to Journal Entry
+    delivery_note_doc = frappe.get_doc("Delivery Note", doc.name)
+    delivery_note_doc.add_comment("Info", f"Journal Entry <a href='/app/journal-entry/{je.name}'>{je.name}</a> created for transport charges")
+    
     frappe.msgprint(f"Journal Entry {je.name} created successfully for transport charges of {total_amount}")
+
+def create_delivery_rate_entry_journal_entry(doc):
+    """Create Journal Entry for delivery rate entry table based on payment mode"""
+    
+    # Calculate total amount from custom_delivery_rate_entry table
+    total_amount = 0
+    for entry in doc.custom_delivery_rate_entry:
+        if entry.amount:
+            total_amount += flt(entry.amount)
+    
+    if total_amount <= 0:
+        frappe.msgprint("No delivery rate entry found or total amount is zero.")
+        return
+    
+    # Check if courier is set
+    if not doc.custom_courier:
+        frappe.throw("Please select a Courier first.")
+    
+    # Get courier account from Courier doctype
+    courier_doc = frappe.get_doc("Courier", doc.custom_courier)
+    courier_account = courier_doc.account
+    courier_party = courier_doc.supplier
+    
+    if not courier_account:
+        frappe.throw("Please set Account in Courier doctype.")
+    
+    # Get company settings
+    company_settings = frappe.get_doc("Company", doc.company)
+    
+    # Create Journal Entry
+    je = frappe.new_doc("Journal Entry")
+    je.voucher_type = "Journal Entry"
+    je.posting_date = getdate(nowdate())
+    je.company = doc.company
+    je.cheque_no = doc.name
+    je.cheque_date = getdate(nowdate())
+    je.user_remark = f"Delivery rate entry charges for {doc.name}"
+    
+    # Check payment mode
+    if doc.custom_courier_mode_of_payment == "Cash":
+        # Cash payment: Credit Cash, Debit Courier Account
+        cash_account = company_settings.default_cash_account
+        
+        if not cash_account:
+            frappe.throw("Please set Cash Account in Company Settings.")
+        
+        # Add debit entry (Courier Account)
+        je.append("accounts", {
+            "account": courier_account,
+            "debit_in_account_currency": total_amount,
+            "credit_in_account_currency": 0,
+            "cost_center": doc.custom_supply_chain_cost_center if hasattr(doc, 'custom_supply_chain_cost_center') and doc.custom_supply_chain_cost_center else None,
+            "reference_type": "Delivery Note",
+            "reference_name": doc.name
+        })
+        
+        # Add credit entry (Cash Account)
+        je.append("accounts", {
+            "account": cash_account,
+            "debit_in_account_currency": 0,
+            "credit_in_account_currency": total_amount,
+            "cost_center": doc.custom_supply_chain_cost_center if hasattr(doc, 'custom_supply_chain_cost_center') and doc.custom_supply_chain_cost_center else None,
+            "reference_type": "Delivery Note",
+            "reference_name": doc.name
+        })
+    else:
+        # Non-cash payment: Debit Courier Account (expense), Credit Payable Account (liability)
+        payable_account = company_settings.default_payable_account
+        
+        if not payable_account:
+            frappe.throw("Please set Payable Account in Company Settings.")
+        if not courier_party:
+            frappe.throw("Supplier is not set for the selected Courier. Please set it in the Courier doctype.")
+        
+        # Add debit entry (Courier Account - Expense)
+        je.append("accounts", {
+            "account": courier_account,
+            "debit_in_account_currency": total_amount,
+            "credit_in_account_currency": 0,
+            "cost_center": doc.custom_supply_chain_cost_center if hasattr(doc, 'custom_supply_chain_cost_center') and doc.custom_supply_chain_cost_center else None,
+            "reference_type": "Delivery Note",
+            "reference_name": doc.name
+        })
+        
+        # Add credit entry (Payable Account - Liability with party)
+        je.append("accounts", {
+            "account": payable_account,
+            "debit_in_account_currency": 0,
+            "credit_in_account_currency": total_amount,
+            "party_type": "Supplier",
+            "party": courier_party,
+            "cost_center": doc.custom_supply_chain_cost_center if hasattr(doc, 'custom_supply_chain_cost_center') and doc.custom_supply_chain_cost_center else None,
+            "reference_type": "Delivery Note",
+            "reference_name": doc.name
+        })
+    
+    je.insert()
+    je.submit()
+    
+    # Add connection from Delivery Note to Journal Entry
+    delivery_note_doc = frappe.get_doc("Delivery Note", doc.name)
+    delivery_note_doc.add_comment("Info", f"Journal Entry <a href='/app/journal-entry/{je.name}'>{je.name}</a> created for delivery rate entry charges")
+    
+    frappe.msgprint(f"Journal Entry {je.name} created successfully for delivery rate entry charges of {total_amount}")
 
 @frappe.whitelist()
 def sum_of_cartons(doc, method):
