@@ -159,6 +159,9 @@ def on_submit(doc, method):
     if doc.custom_delivery_rate_entry and len(doc.custom_delivery_rate_entry) > 0:
         frappe.msgprint(f"Creating Journal Entry for delivery rate entry on submission")
         create_delivery_rate_entry_journal_entry(doc)
+    
+    # Send delivery confirmation email to school
+    send_delivery_confirmation_email(doc)
 
 def create_journal_entry(doc, selected_charge=None):
     """Create Journal Entry for custom_delivery_rate based on payment mode"""
@@ -205,9 +208,7 @@ def create_journal_entry(doc, selected_charge=None):
             "account": courier_account,
             "debit_in_account_currency": doc.custom_delivery_rate,
             "credit_in_account_currency": 0,
-            "cost_center": doc.custom_supply_chain_cost_center if hasattr(doc, 'custom_supply_chain_cost_center') and doc.custom_supply_chain_cost_center else None,
-            "reference_type": "Delivery Note",
-            "reference_name": doc.name
+            "cost_center": doc.custom_supply_chain_cost_center if hasattr(doc, 'custom_supply_chain_cost_center') and doc.custom_supply_chain_cost_center else None
         })
         
         # Add credit entry (Cash Account)
@@ -215,9 +216,7 @@ def create_journal_entry(doc, selected_charge=None):
             "account": cash_account,
             "debit_in_account_currency": 0,
             "credit_in_account_currency": doc.custom_delivery_rate,
-            "cost_center": doc.custom_supply_chain_cost_center if hasattr(doc, 'custom_supply_chain_cost_center') and doc.custom_supply_chain_cost_center else None,
-            "reference_type": "Delivery Note",
-            "reference_name": doc.name
+            "cost_center": doc.custom_supply_chain_cost_center if hasattr(doc, 'custom_supply_chain_cost_center') and doc.custom_supply_chain_cost_center else None
         })
     else:
         # Non-cash payment: Debit Courier Account (expense), Credit Payable Account (liability)
@@ -233,9 +232,7 @@ def create_journal_entry(doc, selected_charge=None):
             "account": courier_account,
             "debit_in_account_currency": doc.custom_delivery_rate,
             "credit_in_account_currency": 0,
-            "cost_center": doc.custom_supply_chain_cost_center if hasattr(doc, 'custom_supply_chain_cost_center') and doc.custom_supply_chain_cost_center else None,
-            "reference_type": "Delivery Note",
-            "reference_name": doc.name
+            "cost_center": doc.custom_supply_chain_cost_center if hasattr(doc, 'custom_supply_chain_cost_center') and doc.custom_supply_chain_cost_center else None
         })
         
         # Add credit entry (Payable Account - Liability with party)
@@ -245,9 +242,7 @@ def create_journal_entry(doc, selected_charge=None):
             "credit_in_account_currency": doc.custom_delivery_rate,
             "party_type": "Supplier",
             "party": courier_party,
-            "cost_center": doc.custom_supply_chain_cost_center if hasattr(doc, 'custom_supply_chain_cost_center') and doc.custom_supply_chain_cost_center else None,
-            "reference_type": "Delivery Note",
-            "reference_name": doc.name
+            "cost_center": doc.custom_supply_chain_cost_center if hasattr(doc, 'custom_supply_chain_cost_center') and doc.custom_supply_chain_cost_center else None
         })
     
     je.insert()
@@ -309,9 +304,7 @@ def create_transport_journal_entry(doc):
         "account": transport_account,
         "debit_in_account_currency": total_amount,
         "credit_in_account_currency": 0,
-        "cost_center": doc.custom_supply_chain_cost_center if hasattr(doc, 'custom_supply_chain_cost_center') else None,
-        "reference_type": "Delivery Note",
-        "reference_name": doc.name
+        "cost_center": doc.custom_supply_chain_cost_center if hasattr(doc, 'custom_supply_chain_cost_center') else None
     })
     
     # Add credit entry (Cash Account)
@@ -319,9 +312,7 @@ def create_transport_journal_entry(doc):
         "account": cash_account,
         "debit_in_account_currency": 0,
         "credit_in_account_currency": total_amount,
-        "cost_center": doc.custom_supply_chain_cost_center if hasattr(doc, 'custom_supply_chain_cost_center') else None,
-        "reference_type": "Delivery Note",
-        "reference_name": doc.name
+        "cost_center": doc.custom_supply_chain_cost_center if hasattr(doc, 'custom_supply_chain_cost_center') else None
     })
     
     je.insert()
@@ -383,9 +374,7 @@ def create_delivery_rate_entry_journal_entry(doc):
             "account": courier_account,
             "debit_in_account_currency": total_amount,
             "credit_in_account_currency": 0,
-            "cost_center": doc.custom_supply_chain_cost_center if hasattr(doc, 'custom_supply_chain_cost_center') and doc.custom_supply_chain_cost_center else None,
-            "reference_type": "Delivery Note",
-            "reference_name": doc.name
+            "cost_center": doc.custom_supply_chain_cost_center if hasattr(doc, 'custom_supply_chain_cost_center') and doc.custom_supply_chain_cost_center else None
         })
         
         # Add credit entry (Cash Account)
@@ -393,9 +382,7 @@ def create_delivery_rate_entry_journal_entry(doc):
             "account": cash_account,
             "debit_in_account_currency": 0,
             "credit_in_account_currency": total_amount,
-            "cost_center": doc.custom_supply_chain_cost_center if hasattr(doc, 'custom_supply_chain_cost_center') and doc.custom_supply_chain_cost_center else None,
-            "reference_type": "Delivery Note",
-            "reference_name": doc.name
+            "cost_center": doc.custom_supply_chain_cost_center if hasattr(doc, 'custom_supply_chain_cost_center') and doc.custom_supply_chain_cost_center else None
         })
     else:
         # Non-cash payment: Debit Courier Account (expense), Credit Payable Account (liability)
@@ -411,9 +398,7 @@ def create_delivery_rate_entry_journal_entry(doc):
             "account": courier_account,
             "debit_in_account_currency": total_amount,
             "credit_in_account_currency": 0,
-            "cost_center": doc.custom_supply_chain_cost_center if hasattr(doc, 'custom_supply_chain_cost_center') and doc.custom_supply_chain_cost_center else None,
-            "reference_type": "Delivery Note",
-            "reference_name": doc.name
+            "cost_center": doc.custom_supply_chain_cost_center if hasattr(doc, 'custom_supply_chain_cost_center') and doc.custom_supply_chain_cost_center else None
         })
         
         # Add credit entry (Payable Account - Liability with party)
@@ -423,9 +408,7 @@ def create_delivery_rate_entry_journal_entry(doc):
             "credit_in_account_currency": total_amount,
             "party_type": "Supplier",
             "party": courier_party,
-            "cost_center": doc.custom_supply_chain_cost_center if hasattr(doc, 'custom_supply_chain_cost_center') and doc.custom_supply_chain_cost_center else None,
-            "reference_type": "Delivery Note",
-            "reference_name": doc.name
+            "cost_center": doc.custom_supply_chain_cost_center if hasattr(doc, 'custom_supply_chain_cost_center') and doc.custom_supply_chain_cost_center else None
         })
     
     je.insert()
@@ -436,6 +419,158 @@ def create_delivery_rate_entry_journal_entry(doc):
     delivery_note_doc.add_comment("Info", f"Journal Entry <a href='/app/journal-entry/{je.name}'>{je.name}</a> created for delivery rate entry charges")
     
     frappe.msgprint(f"Journal Entry {je.name} created successfully for delivery rate entry charges of {total_amount}")
+
+def send_delivery_confirmation_email(doc):
+    """Send delivery confirmation email to school (customer)"""
+    try:
+        if not doc.customer:
+            return
+        
+        # Get customer details
+        customer_name = doc.customer_name or doc.customer
+        
+        # Get contacts linked to this customer
+        contacts = frappe.get_all(
+            "Dynamic Link",
+            filters={
+                "link_doctype": "Customer",
+                "link_name": doc.customer,
+                "parenttype": "Contact"
+            },
+            fields=["parent"]
+        )
+        
+        if not contacts:
+            frappe.log_error(f"No contacts found for customer {doc.customer}", "Delivery Confirmation Email")
+            return
+        
+        # Collect all email addresses from contacts
+        email_list = []
+        for contact_link in contacts:
+            contact_name = contact_link.parent
+            contact_doc = frappe.get_doc("Contact", contact_name)
+            
+            # Get emails from email_ids child table
+            if contact_doc.email_ids:
+                for email_row in contact_doc.email_ids:
+                    if email_row.email_id and email_row.email_id not in email_list:
+                        email_list.append(email_row.email_id)
+        
+        if not email_list:
+            frappe.log_error(f"No email addresses found for customer {doc.customer}", "Delivery Confirmation Email")
+            return
+        
+        # Prepare email content
+        subject = f"Delivery Confirmation - Delivery Note {doc.name}"
+        
+        # Get delivery details
+        delivery_date = doc.posting_date.strftime("%d-%m-%Y") if doc.posting_date else "N/A"
+        delivery_mode = doc.custom_delivery_mode or "N/A"
+        courier = doc.custom_courier or "N/A"
+        tracking_no = doc.custom_shipment_tracking_no or "N/A"
+        city = doc.custom_city or "N/A"
+        
+        # Build items list
+        items_html = ""
+        if doc.items:
+            items_html = "<table style='width: 100%; border-collapse: collapse; margin: 15px 0;'>"
+            items_html += "<thead><tr style='background-color: #f0f0f0;'>"
+            items_html += "<th style='padding: 10px; text-align: left; border: 1px solid #ddd;'>Item Code</th>"
+            items_html += "<th style='padding: 10px; text-align: left; border: 1px solid #ddd;'>Item Name</th>"
+            items_html += "<th style='padding: 10px; text-align: right; border: 1px solid #ddd;'>Quantity</th>"
+            items_html += "</tr></thead><tbody>"
+            
+            for item in doc.items:
+                items_html += "<tr>"
+                items_html += f"<td style='padding: 8px; border: 1px solid #ddd;'>{item.item_code or ''}</td>"
+                items_html += f"<td style='padding: 8px; border: 1px solid #ddd;'>{item.item_name or ''}</td>"
+                items_html += f"<td style='padding: 8px; text-align: right; border: 1px solid #ddd;'>{item.qty or 0}</td>"
+                items_html += "</tr>"
+            
+            items_html += "</tbody></table>"
+        
+        # Build message
+        message = f"""
+        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+            <h2 style="color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px;">
+                Delivery Confirmation
+            </h2>
+            
+            <p>Dear {customer_name},</p>
+            
+            <p>We are pleased to inform you that your delivery has been successfully completed.</p>
+            
+            <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                <h3 style="color: #2c3e50; margin-top: 0;">Delivery Details:</h3>
+                <table style="width: 100%;">
+                    <tr>
+                        <td style="padding: 5px 0; font-weight: bold; width: 200px;">Delivery Note Number:</td>
+                        <td style="padding: 5px 0;">{doc.name}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 5px 0; font-weight: bold;">Delivery Date:</td>
+                        <td style="padding: 5px 0;">{delivery_date}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 5px 0; font-weight: bold;">Delivery Mode:</td>
+                        <td style="padding: 5px 0;">{delivery_mode}</td>
+                    </tr>"""
+        
+        if courier != 'N/A':
+            message += f"""                    <tr>
+                        <td style="padding: 5px 0; font-weight: bold;">Courier:</td>
+                        <td style="padding: 5px 0;">{courier}</td>
+                    </tr>"""
+        
+        if tracking_no != 'N/A':
+            message += f"""                    <tr>
+                        <td style="padding: 5px 0; font-weight: bold;">Tracking Number:</td>
+                        <td style="padding: 5px 0;">{tracking_no}</td>
+                    </tr>"""
+        
+        message += f"""                    <tr>
+                        <td style="padding: 5px 0; font-weight: bold;">City:</td>
+                        <td style="padding: 5px 0;">{city}</td>
+                    </tr>
+                </table>
+            </div>"""
+        
+        if items_html:
+            message += f"""
+            <h3 style="color: #2c3e50;">Items Delivered:</h3>
+            {items_html}"""
+        
+        message += """
+            <p style="margin-top: 30px;">If you have any questions or concerns regarding this delivery, please do not hesitate to contact us.</p>
+            
+            <p style="margin-top: 20px;">
+                Best regards,<br>
+                <strong>ILM Foundation</strong><br>
+                Supply Chain Team
+            </p>
+            
+            <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
+            <p style="font-size: 12px; color: #666;">
+                This is an automated confirmation email. Please do not reply to this email.
+            </p>
+        </div>
+        """
+        
+        # Send email
+        frappe.sendmail(
+            recipients=email_list,
+            subject=subject,
+            message=message,
+            reference_doctype="Delivery Note",
+            reference_name=doc.name,
+            now=True
+        )
+        
+        frappe.msgprint(f"Delivery confirmation email sent to {customer_name}")
+        
+    except Exception as e:
+        frappe.log_error(f"Error sending delivery confirmation email: {str(e)}\n{frappe.get_traceback()}", "Delivery Confirmation Email")
+        # Don't throw error, just log it so delivery note submission doesn't fail
 
 @frappe.whitelist()
 def sum_of_cartons(doc, method):

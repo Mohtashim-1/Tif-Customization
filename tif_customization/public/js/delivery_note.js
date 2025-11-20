@@ -1,7 +1,7 @@
 frappe.ui.form.on('Delivery Note', {
     refresh: function(frm) {
         // Always hide custom_courier_charges table
-        frm.set_df_property('custom_courier_charges', 'hidden', 1);
+        // frm.set_df_property('custom_courier_charges', 'hidden', 1);
         
         // Set field visibility on form load
         if (frm.doc.custom_courier == 'Leopard') {
@@ -92,33 +92,33 @@ frappe.ui.form.on('Courier Charges', {
 });
 
 // Handle custom_delivery_mode field changes to show/hide related fields
-frappe.ui.form.on('Delivery Note', {
-    custom_delivery_mode: function(frm) {
-        // Always hide custom_courier_charges table
-        frm.set_df_property('custom_courier_charges', 'hidden', 1);
+// frappe.ui.form.on('Delivery Note', {
+//     custom_delivery_mode: function(frm) {
+//         // Always hide custom_courier_charges table
+//         frm.set_df_property('custom_courier_charges', 'hidden', 1);
         
-        // Handle other field visibility
-        if (frm.doc.custom_delivery_mode === 'Courier') {
-            frm.set_df_property('custom_section_break_qpinp', 'hidden', 1);
-        } else {
-            frm.set_df_property('custom_section_break_qpinp', 'hidden', 0);
-        }
-    },
+//         // Handle other field visibility
+//         if (frm.doc.custom_delivery_mode === 'Courier') {
+//             frm.set_df_property('custom_section_break_qpinp', 'hidden', 1);
+//         } else {
+//             frm.set_df_property('custom_section_break_qpinp', 'hidden', 0);
+//         }
+//     },
     
-    custom_courier: function(frm) {
-        // Always hide custom_courier_charges table
-        frm.set_df_property('custom_courier_charges', 'hidden', 1);
+//     custom_courier: function(frm) {
+//         // Always hide custom_courier_charges table
+//         frm.set_df_property('custom_courier_charges', 'hidden', 1);
         
-        // Handle other field visibility
-        if (frm.doc.custom_courier == 'Leopard') {
-            frm.set_df_property('custom_delivery_mode', 'hidden', 0);
-            frm.set_df_property('custom_transport_charges', 'hidden', 0);
-        } else {
-            frm.set_df_property('custom_delivery_mode', 'hidden', 1);
-            frm.set_df_property('custom_transport_charges', 'hidden', 1);
-        }
-    }
-});
+//         // Handle other field visibility
+//         if (frm.doc.custom_courier == 'Leopard') {
+//             frm.set_df_property('custom_delivery_mode', 'hidden', 0);
+//             frm.set_df_property('custom_transport_charges', 'hidden', 0);
+//         } else {
+//             frm.set_df_property('custom_delivery_mode', 'hidden', 1);
+//             frm.set_df_property('custom_transport_charges', 'hidden', 1);
+//         }
+//     }
+// });
 
 // Calculate amount = quantity * rate for Delivery Rate Entry table
 frappe.ui.form.on('Delivery Rate Entry', {
