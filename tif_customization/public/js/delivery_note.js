@@ -4,13 +4,13 @@ frappe.ui.form.on('Delivery Note', {
         // frm.set_df_property('custom_courier_charges', 'hidden', 1);
         
         // Set field visibility on form load
-        if (frm.doc.custom_courier == 'Leopard') {
-            frm.set_df_property('custom_delivery_mode', 'hidden', 0);
-            frm.set_df_property('custom_transport_charges', 'hidden', 0);
-        } else {
-            frm.set_df_property('custom_delivery_mode', 'hidden', 1);
-            frm.set_df_property('custom_transport_charges', 'hidden', 1);
-        }
+        // if (frm.doc.custom_courier == 'Leopard') {
+        //     frm.set_df_property('custom_delivery_mode', 'hidden', 0);
+        //     frm.set_df_property('custom_transport_charges', 'hidden', 0);
+        // } else {
+        //     frm.set_df_property('custom_delivery_mode', 'hidden', 1);
+        //     frm.set_df_property('custom_transport_charges', 'hidden', 1);
+        // }
         
         // Add custom button for fetching courier rates
         if (frm.doc.custom_delivery_mode === 'Courier' && frm.doc.docstatus === 0) {
