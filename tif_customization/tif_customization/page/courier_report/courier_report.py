@@ -1,0 +1,709 @@
+import frappe
+from frappe import _
+from frappe.utils import flt, getdate, today, add_days, date_diff
+from datetime import datetime, timedelta
+
+@frappe.whitelist()
+def get_courier_report_data(filters=None):
+	"""Main API endpoint to get all courier report data"""
+	try:
+		if isinstance(filters, str):
+			import json
+			filters = json.loads(filters)
+		elif not filters:
+			filters = {}
+		
+		# Set default date range if not provided
+		if not filters.get('from_date'):
+			filters['from_date'] = add_days(today(), -30)
+		if not filters.get('to_date'):
+			filters['to_date'] = today()
+		
+		# If cost_centers filter contains numbers like "8121" or "8122", 
+		# find actual cost center names that match these numbers
+		if filters.get('cost_centers'):
+			cost_center_numbers = filters.get('cost_centers', [])
+			# Check if any filter value is just a number (like "8121" or "8122")
+			actual_cost_centers = []
+			for cc_filter in cost_center_numbers:
+				if cc_filter.isdigit():
+					# Find cost centers with this number
+					matching_ccs = frappe.db.sql("""
+						SELECT name FROM `tabCost Center`
+						WHERE cost_center_number = %s
+						AND disabled = 0
+					""", (cc_filter,), as_dict=True)
+					actual_cost_centers.extend([cc['name'] for cc in matching_ccs])
+				else:
+					# Already a cost center name, use as is
+					actual_cost_centers.append(cc_filter)
+			filters['cost_centers'] = list(set(actual_cost_centers))  # Remove duplicates
+		
+		# Get all data
+		kpi_data = get_kpi_data(filters)
+		cost_center_summary = get_cost_center_summary(filters)
+		journal_entries = get_journal_entries(filters)
+		delivery_notes = get_delivery_notes(filters)
+		top_customers = get_top_customers(filters)
+		top_items = get_top_items(filters)
+		books_by_cost_center = get_books_by_cost_center(filters)
+		daily_trend = get_daily_trend(filters)
+		expense_by_cost_center = get_expense_by_cost_center(filters)
+		
+		return {
+			'kpi_data': kpi_data,
+			'cost_center_summary': cost_center_summary,
+			'journal_entries': journal_entries,
+			'delivery_notes': delivery_notes,
+			'top_customers': top_customers,
+			'top_items': top_items,
+			'books_by_cost_center': books_by_cost_center,
+			'daily_trend': daily_trend,
+			'expense_by_cost_center': expense_by_cost_center
+		}
+	except Exception as e:
+		frappe.log_error(f"Error in get_courier_report_data: {str(e)}", "Courier Report Error")
+		return {'error': str(e)}
+
+def get_kpi_data(filters):
+	"""Get KPI summary data"""
+	try:
+		from_date = filters.get('from_date')
+		to_date = filters.get('to_date')
+		cost_centers = filters.get('cost_centers', [])
+		
+		# Build cost center filter
+		cost_center_filter = ""
+		if cost_centers:
+			cost_center_list = "', '".join(cost_centers)
+			cost_center_filter = f"AND jea.cost_center IN ('{cost_center_list}')"
+		
+		# Total Courier Expense from JV
+		courier_expense_query = f"""
+			SELECT COALESCE(SUM(jea.debit - jea.credit), 0) AS total_expense
+			FROM `tabJournal Entry Account` jea
+			JOIN `tabJournal Entry` je ON je.name = jea.parent
+			WHERE je.docstatus = 1
+			AND je.posting_date BETWEEN %(from_date)s AND %(to_date)s
+			AND (jea.account LIKE '%%Courier%%' OR jea.account LIKE '%%Courier Expense%%')
+			{cost_center_filter}
+		"""
+		
+		total_expense = frappe.db.sql(courier_expense_query, {
+			'from_date': from_date,
+			'to_date': to_date
+		}, as_dict=True)
+		total_courier_expense = flt(total_expense[0].total_expense) if total_expense else 0
+		
+		# Total No. of JVs Created for Courier
+		jv_count_query = f"""
+			SELECT COUNT(DISTINCT je.name) AS jv_count
+			FROM `tabJournal Entry` je
+			JOIN `tabJournal Entry Account` jea ON jea.parent = je.name
+			WHERE je.docstatus = 1
+			AND je.posting_date BETWEEN %(from_date)s AND %(to_date)s
+			AND (jea.account LIKE '%%Courier%%' OR jea.account LIKE '%%Courier Expense%%')
+			{cost_center_filter}
+		"""
+		
+		jv_count = frappe.db.sql(jv_count_query, {
+			'from_date': from_date,
+			'to_date': to_date
+		}, as_dict=True)
+		total_jvs = flt(jv_count[0].jv_count) if jv_count else 0
+		
+		# Build cost center filter for Delivery Notes
+		# Show DNs with specified cost centers OR DNs without cost center
+		dn_cost_center_filter = ""
+		if cost_centers:
+			cost_center_list = "', '".join(cost_centers)
+			dn_cost_center_filter = f"AND (dn.cost_center IN ('{cost_center_list}') OR dn.cost_center IS NULL OR dn.cost_center = '')"
+		
+		# Total No. of Delivery Notes
+		# Show all DNs in date range, even if cost center is not set
+		# If cost centers are specified, filter by them. Otherwise, get all DNs
+		dn_count_query = f"""
+			SELECT COUNT(DISTINCT dn.name) AS dn_count
+			FROM `tabDelivery Note` dn
+			WHERE dn.docstatus = 1
+			AND dn.posting_date BETWEEN %(from_date)s AND %(to_date)s
+			{dn_cost_center_filter if cost_centers else ''}
+		"""
+		
+		dn_count = frappe.db.sql(dn_count_query, {
+			'from_date': from_date,
+			'to_date': to_date
+		}, as_dict=True)
+		total_dns = flt(dn_count[0].dn_count) if dn_count else 0
+		
+		# Total Books Sent
+		# Show all books from DNs in date range, even if cost center is not set
+		books_query = f"""
+			SELECT COALESCE(SUM(dni.qty), 0) AS total_books
+			FROM `tabDelivery Note` dn
+			JOIN `tabDelivery Note Item` dni ON dni.parent = dn.name
+			WHERE dn.docstatus = 1
+			AND dn.posting_date BETWEEN %(from_date)s AND %(to_date)s
+			{dn_cost_center_filter if cost_centers else ''}
+		"""
+		
+		books = frappe.db.sql(books_query, {
+			'from_date': from_date,
+			'to_date': to_date
+		}, as_dict=True)
+		total_books = flt(books[0].total_books) if books else 0
+		
+		# Average Cost Per Book
+		avg_cost_per_book = total_courier_expense / total_books if total_books > 0 else 0
+		
+		# No. of Customers Served
+		# Count all customers from DNs in date range, even if cost center is not set
+		customers_query = f"""
+			SELECT COUNT(DISTINCT dn.customer) AS customer_count
+			FROM `tabDelivery Note` dn
+			WHERE dn.docstatus = 1
+			AND dn.posting_date BETWEEN %(from_date)s AND %(to_date)s
+			AND dn.customer IS NOT NULL
+			AND dn.customer != ''
+			{dn_cost_center_filter if cost_centers else ''}
+		"""
+		
+		customers = frappe.db.sql(customers_query, {
+			'from_date': from_date,
+			'to_date': to_date
+		}, as_dict=True)
+		total_customers = flt(customers[0].customer_count) if customers else 0
+		
+		# Cost Center Wise Allocation %
+		cost_center_allocation = get_cost_center_allocation(filters, total_courier_expense)
+		
+		return {
+			'total_courier_expense': total_courier_expense,
+			'total_delivery_notes': total_dns,
+			'total_books_sent': total_books,
+			'total_jvs_created': total_jvs,
+			'avg_cost_per_book': avg_cost_per_book,
+			'total_customers_served': total_customers,
+			'cost_center_allocation': cost_center_allocation
+		}
+	except Exception as e:
+		frappe.log_error(f"Error in get_kpi_data: {str(e)}", "Courier Report Error")
+		return {}
+
+def get_cost_center_allocation(filters, total_expense):
+	"""Get cost center wise allocation percentage"""
+	try:
+		from_date = filters.get('from_date')
+		to_date = filters.get('to_date')
+		cost_centers = filters.get('cost_centers', [])
+		
+		cost_center_filter = ""
+		if cost_centers:
+			cost_center_list = "', '".join(cost_centers)
+			cost_center_filter = f"AND jea.cost_center IN ('{cost_center_list}')"
+		
+		query = f"""
+			SELECT 
+				jea.cost_center,
+				COALESCE(SUM(jea.debit - jea.credit), 0) AS expense
+			FROM `tabJournal Entry Account` jea
+			JOIN `tabJournal Entry` je ON je.name = jea.parent
+			WHERE je.docstatus = 1
+			AND je.posting_date BETWEEN %(from_date)s AND %(to_date)s
+			AND (jea.account LIKE '%%Courier%%' OR jea.account LIKE '%%Courier Expense%%')
+			AND jea.cost_center IS NOT NULL
+			AND jea.cost_center != ''
+			{cost_center_filter}
+			GROUP BY jea.cost_center
+		"""
+		
+		results = frappe.db.sql(query, {
+			'from_date': from_date,
+			'to_date': to_date
+		}, as_dict=True)
+		
+		allocation = {}
+		for row in results:
+			percentage = (flt(row.expense) / total_expense * 100) if total_expense > 0 else 0
+			allocation[row.cost_center] = {
+				'expense': flt(row.expense),
+				'percentage': percentage
+			}
+		
+		return allocation
+	except Exception as e:
+		frappe.log_error(f"Error in get_cost_center_allocation: {str(e)}", "Courier Report Error")
+		return {}
+
+def get_cost_center_summary(filters):
+	"""Get cost center wise summary table data"""
+	try:
+		from_date = filters.get('from_date')
+		to_date = filters.get('to_date')
+		cost_centers = filters.get('cost_centers', [])
+		
+		cost_center_filter = ""
+		dn_cost_center_filter = ""
+		if cost_centers:
+			cost_center_list = "', '".join(cost_centers)
+			cost_center_filter = f"AND jea.cost_center IN ('{cost_center_list}')"
+			# For DNs: show specified cost centers OR DNs without cost center
+			dn_cost_center_filter = f"AND (dn.cost_center IN ('{cost_center_list}') OR dn.cost_center IS NULL OR dn.cost_center = '')"
+		
+		# Get expense by cost center
+		expense_query = f"""
+			SELECT 
+				jea.cost_center,
+				COALESCE(SUM(jea.debit - jea.credit), 0) AS total_expense,
+				COUNT(DISTINCT je.name) AS jv_count
+			FROM `tabJournal Entry Account` jea
+			JOIN `tabJournal Entry` je ON je.name = jea.parent
+			WHERE je.docstatus = 1
+			AND je.posting_date BETWEEN %(from_date)s AND %(to_date)s
+			AND (jea.account LIKE '%%Courier%%' OR jea.account LIKE '%%Courier Expense%%')
+			AND jea.cost_center IS NOT NULL
+			AND jea.cost_center != ''
+			{cost_center_filter}
+			GROUP BY jea.cost_center
+		"""
+		
+		expense_data = frappe.db.sql(expense_query, {
+			'from_date': from_date,
+			'to_date': to_date
+		}, as_dict=True)
+		
+		# Get delivery note data by cost center
+		# Show all DNs, including those without cost center (grouped as 'Not Set')
+		dn_query = f"""
+			SELECT 
+				COALESCE(dn.cost_center, 'Not Set') AS cost_center,
+				COUNT(DISTINCT dn.name) AS dn_count,
+				COALESCE(SUM(dni.qty), 0) AS books_sent
+			FROM `tabDelivery Note` dn
+			JOIN `tabDelivery Note Item` dni ON dni.parent = dn.name
+			WHERE dn.docstatus = 1
+			AND dn.posting_date BETWEEN %(from_date)s AND %(to_date)s
+			{dn_cost_center_filter if cost_centers else ''}
+			GROUP BY COALESCE(dn.cost_center, 'Not Set')
+		"""
+		
+		dn_data = frappe.db.sql(dn_query, {
+			'from_date': from_date,
+			'to_date': to_date
+		}, as_dict=True)
+		
+		# Combine data
+		summary = {}
+		
+		# Add expense data
+		for row in expense_data:
+			if row.cost_center not in summary:
+				summary[row.cost_center] = {
+					'cost_center': row.cost_center,
+					'total_expense': flt(row.total_expense),
+					'jv_count': flt(row.jv_count),
+					'dn_count': 0,
+					'books_sent': 0,
+					'avg_cost_per_book': 0
+				}
+			else:
+				summary[row.cost_center]['total_expense'] = flt(row.total_expense)
+				summary[row.cost_center]['jv_count'] = flt(row.jv_count)
+		
+		# Add DN data
+		for row in dn_data:
+			if row.cost_center not in summary:
+				summary[row.cost_center] = {
+					'cost_center': row.cost_center,
+					'total_expense': 0,
+					'jv_count': 0,
+					'dn_count': flt(row.dn_count),
+					'books_sent': flt(row.books_sent),
+					'avg_cost_per_book': 0
+				}
+			else:
+				summary[row.cost_center]['dn_count'] = flt(row.dn_count)
+				summary[row.cost_center]['books_sent'] = flt(row.books_sent)
+		
+		# Calculate avg cost per book
+		for cost_center in summary:
+			if summary[cost_center]['books_sent'] > 0:
+				summary[cost_center]['avg_cost_per_book'] = (
+					summary[cost_center]['total_expense'] / summary[cost_center]['books_sent']
+				)
+		
+		return list(summary.values())
+	except Exception as e:
+		frappe.log_error(f"Error in get_cost_center_summary: {str(e)}", "Courier Report Error")
+		return []
+
+def get_journal_entries(filters):
+	"""Get detailed journal entries for courier expense"""
+	try:
+		from_date = filters.get('from_date')
+		to_date = filters.get('to_date')
+		cost_centers = filters.get('cost_centers', [])
+		customer = filters.get('customer')
+		
+		cost_center_filter = ""
+		if cost_centers:
+			cost_center_list = "', '".join(cost_centers)
+			cost_center_filter = f"AND jea.cost_center IN ('{cost_center_list}')"
+		
+		customer_filter = ""
+		if customer:
+			customer_filter = "AND jea.party = %(customer)s"
+		
+		query = f"""
+			SELECT 
+				je.posting_date,
+				je.name AS jv_number,
+				jea.cost_center,
+				(jea.debit - jea.credit) AS expense_amount,
+				je.remark AS remarks,
+				je.owner AS created_by
+			FROM `tabJournal Entry Account` jea
+			JOIN `tabJournal Entry` je ON je.name = jea.parent
+			WHERE je.docstatus = 1
+			AND je.posting_date BETWEEN %(from_date)s AND %(to_date)s
+			AND (jea.account LIKE '%%Courier%%' OR jea.account LIKE '%%Courier Expense%%')
+			AND jea.cost_center IS NOT NULL
+			AND jea.cost_center != ''
+			{cost_center_filter}
+			{customer_filter}
+			ORDER BY je.posting_date DESC, je.name DESC
+		"""
+		
+		params = {
+			'from_date': from_date,
+			'to_date': to_date
+		}
+		if customer:
+			params['customer'] = customer
+		
+		results = frappe.db.sql(query, params, as_dict=True)
+		
+		# Format created_by to show user name
+		for row in results:
+			row['expense_amount'] = flt(row['expense_amount'])
+			row['created_by_name'] = frappe.db.get_value('User', row['created_by'], 'full_name') or row['created_by']
+		
+		return results
+	except Exception as e:
+		frappe.log_error(f"Error in get_journal_entries: {str(e)}", "Courier Report Error")
+		return []
+
+def get_delivery_notes(filters):
+	"""Get detailed delivery notes"""
+	try:
+		from_date = filters.get('from_date')
+		to_date = filters.get('to_date')
+		cost_centers = filters.get('cost_centers', [])
+		customer = filters.get('customer')
+		
+		cost_center_filter = ""
+		if cost_centers:
+			cost_center_list = "', '".join(cost_centers)
+			# Show DNs with specified cost centers OR DNs without cost center (NULL)
+			cost_center_filter = f"AND (dn.cost_center IN ('{cost_center_list}') OR dn.cost_center IS NULL OR dn.cost_center = '')"
+		
+		customer_filter = ""
+		if customer:
+			customer_filter = "AND dn.customer = %(customer)s"
+		
+		query = f"""
+			SELECT 
+				dn.posting_date,
+				dn.name AS delivery_note_no,
+				dn.customer,
+				COALESCE(dn.cost_center, 'Not Set') AS cost_center,
+				COALESCE(SUM(dni.qty), 0) AS total_books,
+				dn.owner AS created_by
+			FROM `tabDelivery Note` dn
+			JOIN `tabDelivery Note Item` dni ON dni.parent = dn.name
+			WHERE dn.docstatus = 1
+			AND dn.posting_date BETWEEN %(from_date)s AND %(to_date)s
+			{cost_center_filter}
+			{customer_filter}
+			GROUP BY dn.name
+			ORDER BY dn.posting_date DESC, dn.name DESC
+		"""
+		
+		params = {
+			'from_date': from_date,
+			'to_date': to_date
+		}
+		if customer:
+			params['customer'] = customer
+		
+		results = frappe.db.sql(query, params, as_dict=True)
+		
+		# Format created_by to show user name
+		for row in results:
+			row['total_books'] = flt(row['total_books'])
+			row['created_by_name'] = frappe.db.get_value('User', row['created_by'], 'full_name') or row['created_by']
+			row['customer_name'] = frappe.db.get_value('Customer', row['customer'], 'customer_name') or row['customer']
+		
+		return results
+	except Exception as e:
+		frappe.log_error(f"Error in get_delivery_notes: {str(e)}", "Courier Report Error")
+		return []
+
+def get_top_customers(filters, limit=10):
+	"""Get top 10 customers by books sent"""
+	try:
+		from_date = filters.get('from_date')
+		to_date = filters.get('to_date')
+		cost_centers = filters.get('cost_centers', [])
+		
+		cost_center_filter = ""
+		if cost_centers:
+			cost_center_list = "', '".join(cost_centers)
+			# Show customers from DNs with specified cost centers OR DNs without cost center
+			cost_center_filter = f"AND (dn.cost_center IN ('{cost_center_list}') OR dn.cost_center IS NULL OR dn.cost_center = '')"
+		
+		query = f"""
+			SELECT 
+				dn.customer,
+				COALESCE(SUM(dni.qty), 0) AS books_sent
+			FROM `tabDelivery Note` dn
+			JOIN `tabDelivery Note Item` dni ON dni.parent = dn.name
+			WHERE dn.docstatus = 1
+			AND dn.posting_date BETWEEN %(from_date)s AND %(to_date)s
+			AND dn.customer IS NOT NULL
+			AND dn.customer != ''
+			{cost_center_filter}
+			GROUP BY dn.customer
+			ORDER BY books_sent DESC
+			LIMIT {limit}
+		"""
+		
+		results = frappe.db.sql(query, {
+			'from_date': from_date,
+			'to_date': to_date
+		}, as_dict=True)
+		
+		# Add customer names
+		for row in results:
+			row['books_sent'] = flt(row['books_sent'])
+			row['customer_name'] = frappe.db.get_value('Customer', row['customer'], 'customer_name') or row['customer']
+		
+		return results
+	except Exception as e:
+		frappe.log_error(f"Error in get_top_customers: {str(e)}", "Courier Report Error")
+		return []
+
+def get_top_items(filters, limit=10):
+	"""Get top 10 items sent by quantity"""
+	try:
+		from_date = filters.get('from_date')
+		to_date = filters.get('to_date')
+		cost_centers = filters.get('cost_centers', [])
+		
+		cost_center_filter = ""
+		if cost_centers:
+			cost_center_list = "', '".join(cost_centers)
+			# Show items from DNs with specified cost centers OR DNs without cost center
+			cost_center_filter = f"AND (dn.cost_center IN ('{cost_center_list}') OR dn.cost_center IS NULL OR dn.cost_center = '')"
+		
+		query = f"""
+			SELECT 
+				dni.item_code,
+				COALESCE(SUM(dni.qty), 0) AS qty
+			FROM `tabDelivery Note Item` dni
+			JOIN `tabDelivery Note` dn ON dn.name = dni.parent
+			WHERE dn.docstatus = 1
+			AND dn.posting_date BETWEEN %(from_date)s AND %(to_date)s
+			AND dni.item_code IS NOT NULL
+			AND dni.item_code != ''
+			{cost_center_filter}
+			GROUP BY dni.item_code
+			ORDER BY qty DESC
+			LIMIT {limit}
+		"""
+		
+		results = frappe.db.sql(query, {
+			'from_date': from_date,
+			'to_date': to_date
+		}, as_dict=True)
+		
+		# Add item names
+		for row in results:
+			row['qty'] = flt(row['qty'])
+			row['item_name'] = frappe.db.get_value('Item', row['item_code'], 'item_name') or row['item_code']
+		
+		return results
+	except Exception as e:
+		frappe.log_error(f"Error in get_top_items: {str(e)}", "Courier Report Error")
+		return []
+
+def get_books_by_cost_center(filters):
+	"""Get books sent by cost center for chart"""
+	try:
+		from_date = filters.get('from_date')
+		to_date = filters.get('to_date')
+		cost_centers = filters.get('cost_centers', [])
+		
+		cost_center_filter = ""
+		if cost_centers:
+			cost_center_list = "', '".join(cost_centers)
+			# Show books from DNs with specified cost centers OR DNs without cost center
+			cost_center_filter = f"AND (dn.cost_center IN ('{cost_center_list}') OR dn.cost_center IS NULL OR dn.cost_center = '')"
+		
+		query = f"""
+			SELECT 
+				COALESCE(dn.cost_center, 'Not Set') AS cost_center,
+				COALESCE(SUM(dni.qty), 0) AS books_sent
+			FROM `tabDelivery Note` dn
+			JOIN `tabDelivery Note Item` dni ON dni.parent = dn.name
+			WHERE dn.docstatus = 1
+			AND dn.posting_date BETWEEN %(from_date)s AND %(to_date)s
+			{cost_center_filter}
+			GROUP BY COALESCE(dn.cost_center, 'Not Set')
+			ORDER BY books_sent DESC
+		"""
+		
+		results = frappe.db.sql(query, {
+			'from_date': from_date,
+			'to_date': to_date
+		}, as_dict=True)
+		
+		for row in results:
+			row['books_sent'] = flt(row['books_sent'])
+		
+		return results
+	except Exception as e:
+		frappe.log_error(f"Error in get_books_by_cost_center: {str(e)}", "Courier Report Error")
+		return []
+
+def get_daily_trend(filters):
+	"""Get daily courier expense trend"""
+	try:
+		from_date = filters.get('from_date')
+		to_date = filters.get('to_date')
+		cost_centers = filters.get('cost_centers', [])
+		
+		cost_center_filter = ""
+		if cost_centers:
+			cost_center_list = "', '".join(cost_centers)
+			cost_center_filter = f"AND jea.cost_center IN ('{cost_center_list}')"
+		
+		query = f"""
+			SELECT 
+				je.posting_date AS date,
+				COALESCE(SUM(jea.debit - jea.credit), 0) AS expense
+			FROM `tabJournal Entry Account` jea
+			JOIN `tabJournal Entry` je ON je.name = jea.parent
+			WHERE je.docstatus = 1
+			AND je.posting_date BETWEEN %(from_date)s AND %(to_date)s
+			AND (jea.account LIKE '%%Courier%%' OR jea.account LIKE '%%Courier Expense%%')
+			{cost_center_filter}
+			GROUP BY je.posting_date
+			ORDER BY je.posting_date ASC
+		"""
+		
+		results = frappe.db.sql(query, {
+			'from_date': from_date,
+			'to_date': to_date
+		}, as_dict=True)
+		
+		for row in results:
+			# Format date as string and ensure expense is a valid number
+			if row.get('date'):
+				# Convert date to ISO format string (YYYY-MM-DD)
+				row['date'] = str(row['date'])
+			else:
+				row['date'] = ''
+			row['expense'] = flt(row['expense']) or 0
+		
+		return results
+	except Exception as e:
+		frappe.log_error(f"Error in get_daily_trend: {str(e)}", "Courier Report Error")
+		return []
+
+def get_expense_by_cost_center(filters):
+	"""Get expense by cost center for bar chart"""
+	try:
+		from_date = filters.get('from_date')
+		to_date = filters.get('to_date')
+		cost_centers = filters.get('cost_centers', [])
+		
+		cost_center_filter = ""
+		if cost_centers:
+			cost_center_list = "', '".join(cost_centers)
+			cost_center_filter = f"AND jea.cost_center IN ('{cost_center_list}')"
+		
+		query = f"""
+			SELECT 
+				jea.cost_center,
+				COALESCE(SUM(jea.debit - jea.credit), 0) AS expense
+			FROM `tabJournal Entry Account` jea
+			JOIN `tabJournal Entry` je ON je.name = jea.parent
+			WHERE je.docstatus = 1
+			AND je.posting_date BETWEEN %(from_date)s AND %(to_date)s
+			AND (jea.account LIKE '%%Courier%%' OR jea.account LIKE '%%Courier Expense%%')
+			AND jea.cost_center IS NOT NULL
+			AND jea.cost_center != ''
+			{cost_center_filter}
+			GROUP BY jea.cost_center
+			ORDER BY expense DESC
+		"""
+		
+		results = frappe.db.sql(query, {
+			'from_date': from_date,
+			'to_date': to_date
+		}, as_dict=True)
+		
+		for row in results:
+			row['expense'] = flt(row['expense'])
+		
+		return results
+	except Exception as e:
+		frappe.log_error(f"Error in get_expense_by_cost_center: {str(e)}", "Courier Report Error")
+		return []
+
+@frappe.whitelist()
+def get_cost_centers():
+	"""Get list of cost centers for filter"""
+	try:
+		# Get cost centers that have courier expenses or delivery notes
+		# Include cost center number for matching
+		cost_centers = frappe.db.sql("""
+			SELECT DISTINCT 
+				cc.name AS cost_center,
+				cc.cost_center_number,
+				cc.cost_center_name
+			FROM (
+				SELECT DISTINCT cost_center FROM `tabJournal Entry Account`
+				WHERE cost_center IS NOT NULL AND cost_center != ''
+				UNION
+				SELECT DISTINCT cost_center FROM `tabDelivery Note`
+				WHERE cost_center IS NOT NULL AND cost_center != ''
+			) AS combined
+			JOIN `tabCost Center` cc ON cc.name = combined.cost_center
+			WHERE cc.name IS NOT NULL
+			ORDER BY cc.cost_center_number, cc.name
+		""", as_dict=True)
+		
+		# Return list of cost center names
+		return [cc['cost_center'] for cc in cost_centers]
+	except Exception as e:
+		frappe.log_error(f"Error in get_cost_centers: {str(e)}", "Courier Report Error")
+		return []
+
+@frappe.whitelist()
+def get_customers():
+	"""Get list of customers for filter"""
+	try:
+		customers = frappe.db.sql("""
+			SELECT DISTINCT name, customer_name
+			FROM `tabCustomer`
+			WHERE disabled = 0
+			ORDER BY customer_name
+		""", as_dict=True)
+		
+		return customers
+	except Exception as e:
+		frappe.log_error(f"Error in get_customers: {str(e)}", "Courier Report Error")
+		return []
+
