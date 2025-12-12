@@ -158,6 +158,9 @@ doc_events = {
     },
     "Employee Attendance": {
         "validate": "tif_customization.tif_customization.doctype.employee_attendance.employee_attendance.validate_sat_attendance"
+    },
+    "Purchase Receipt": {
+        "on_submit": "tif_customization.tif_customization.doctype.purchase_receipt.purchase_receipt.on_submit"
     }
 }
 

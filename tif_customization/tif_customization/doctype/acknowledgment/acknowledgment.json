@@ -29,6 +29,7 @@
   {
    "fieldname": "purchase_receipt",
    "fieldtype": "Link",
+   "in_list_view": 1,
    "label": "Purchase Receipt",
    "options": "Purchase Receipt",
    "read_only": 1,
@@ -60,11 +61,11 @@
    "read_only": 1
   },
   {
+   "default": "Pending",
    "fieldname": "status",
    "fieldtype": "Select",
    "label": "Status",
    "options": "Pending\nAcknowledged\nRejected",
-   "default": "Pending",
    "read_only": 1
   },
   {
@@ -76,7 +77,7 @@
    "fieldname": "items",
    "fieldtype": "Table",
    "label": "Items",
-   "options": "Acknowledgment Item",
+   "options": "Acknowledgment Items",
    "read_only": 1
   },
   {
@@ -117,7 +118,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2025-12-12 13:43:15.778136",
+ "modified": "2025-12-12 19:02:56.445653",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Acknowledgment",
