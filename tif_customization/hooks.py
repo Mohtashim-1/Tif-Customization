@@ -49,7 +49,8 @@ doctype_js = {"Delivery Note" : "public/js/delivery_note.js"}
 page_js = {
 	"stock-detail" : "tif_customization/page/stock_detail/stock_detail.js",
 	"courier-report" : "tif_customization/page/courier_report/courier_report.js",
-	"dispatch-report" : "tif_customization/page/dispatch_report/dispatch_report.js"
+	"dispatch-report" : "tif_customization/page/dispatch_report/dispatch_report.js",
+	"procurement-expense" : "tif_customization/page/procurement_expense/procurement_expense.js"
 }
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
