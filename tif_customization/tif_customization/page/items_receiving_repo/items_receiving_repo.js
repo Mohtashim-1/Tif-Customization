@@ -5,25 +5,26 @@ frappe.pages['items-receiving-repo'].on_page_load = function(wrapper) {
 		single_column: true
 	});
 
-	let me = this;
-	
-	// Initialize page
-	me.page = page;
-	me.wrapper = wrapper;
-	me.filters = {};
-	me.data = [];
-	
-	// Build filters
-	me.make_filters();
-	
-	// Build data table
-	me.make_datatable();
-	
-	// Load initial data
-	me.refresh();
+	// Create page instance
+	let page_instance = new ItemsReceivingRepoPage(page, wrapper);
+	page_instance.init();
 }
 
-frappe.pages['items-receiving-repo'].prototype.make_filters = function() {
+// Page class
+function ItemsReceivingRepoPage(page, wrapper) {
+	this.page = page;
+	this.wrapper = wrapper;
+	this.filters = {};
+	this.data = [];
+}
+
+ItemsReceivingRepoPage.prototype.init = function() {
+	this.make_filters();
+	this.make_datatable();
+	this.refresh();
+}
+
+ItemsReceivingRepoPage.prototype.make_filters = function() {
 	let me = this;
 	
 	me.filter_area = $('<div class="filter-area" style="padding: 15px; background: #f8f9fa; border-radius: 4px; margin-bottom: 20px;"></div>').appendTo(me.page.main);
@@ -102,24 +103,24 @@ frappe.pages['items-receiving-repo'].prototype.make_filters = function() {
 		</div>
 	`).appendTo(summary_row);
 	
-	// Bind filter events
-	$('.apply-filters').on('click', function() {
+	// Bind filter events - use me.filter_area to scope events
+	me.filter_area.on('click', '.apply-filters', function() {
 		me.apply_filters();
 	});
 	
-	$('.clear-filters').on('click', function() {
+	me.filter_area.on('click', '.clear-filters', function() {
 		me.clear_filters();
 	});
 	
 	// Enter key on filters
-	$('.material-request-filter, .item-code-filter').on('keypress', function(e) {
+	me.filter_area.on('keypress', '.material-request-filter, .item-code-filter', function(e) {
 		if (e.which === 13) {
 			me.apply_filters();
 		}
 	});
 }
 
-frappe.pages['items-receiving-repo'].prototype.apply_filters = function() {
+ItemsReceivingRepoPage.prototype.apply_filters = function() {
 	let me = this;
 	
 	me.filters = {
@@ -140,7 +141,7 @@ frappe.pages['items-receiving-repo'].prototype.apply_filters = function() {
 	me.refresh();
 }
 
-frappe.pages['items-receiving-repo'].prototype.clear_filters = function() {
+ItemsReceivingRepoPage.prototype.clear_filters = function() {
 	let me = this;
 	
 	$('.material-request-filter').val('');
@@ -153,130 +154,106 @@ frappe.pages['items-receiving-repo'].prototype.clear_filters = function() {
 	me.refresh();
 }
 
-frappe.pages['items-receiving-repo'].prototype.make_datatable = function() {
+ItemsReceivingRepoPage.prototype.make_datatable = function() {
 	let me = this;
 	
-	me.datatable_area = $('<div class="datatable-area"></div>').appendTo(me.page.main);
+	me.datatable_area = $('<div class="datatable-area" style="overflow-x: auto; margin-top: 20px;"></div>').appendTo(me.page.main);
 	
-	me.datatable = new frappe.ui.DataTable(me.datatable_area[0], {
-		columns: [
-			{
-				name: 'material_request',
-				label: __('Material Request'),
-				width: 150,
-				format: (value, row) => {
-					return `<a href="/app/material-request/${value}" target="_blank">${value}</a>`;
-				}
-			},
-			{
-				name: 'mr_date',
-				label: __('MR Date'),
-				width: 100,
-				format: (value) => {
-					return value ? frappe.datetime.str_to_user(value) : '';
-				}
-			},
-			{
-				name: 'item_code',
-				label: __('Item Code'),
-				width: 150
-			},
-			{
-				name: 'item_name',
-				label: __('Item Name'),
-				width: 200
-			},
-			{
-				name: 'requested_qty',
-				label: __('Requested Qty'),
-				width: 120,
-				format: (value, row) => {
-					return `${flt(value).toFixed(2)} ${row.uom || ''}`;
-				}
-			},
-			{
-				name: 'received_qty',
-				label: __('Received Qty'),
-				width: 120,
-				format: (value, row) => {
-					return `${flt(value).toFixed(2)} ${row.uom || ''}`;
-				}
-			},
-			{
-				name: 'pending_qty',
-				label: __('Pending Qty'),
-				width: 120,
-				format: (value, row) => {
-					const pending = flt(value);
-					const color = pending > 0 ? '#f57c00' : '#388e3c';
-					return `<span style="color: ${color}; font-weight: bold;">${pending.toFixed(2)} ${row.uom || ''}</span>`;
-				}
-			},
-			{
-				name: 'acknowledgment_status',
-				label: __('Status'),
-				width: 130,
-				format: (value) => {
-					if (value === 'Acknowledged') {
-						return `<span class="badge badge-success">Acknowledged</span>`;
-					} else {
-						return `<span class="badge badge-warning">Pending</span>`;
-					}
-				}
-			},
-			{
-				name: 'acknowledgment_date',
-				label: __('Acknowledgment Date'),
-				width: 180,
-				format: (value) => {
-					if (value) {
-						return frappe.datetime.str_to_user(value);
-					}
-					return '<span style="color: #999;">-</span>';
-				}
-			},
-			{
-				name: 'acknowledged_by',
-				label: __('Acknowledged By'),
-				width: 150,
-				format: (value) => {
-					return value || '<span style="color: #999;">-</span>';
-				}
-			},
-			{
-				name: 'action',
-				label: __('Action'),
-				width: 150,
-				format: (value, row) => {
-					if (row.acknowledgment_status === 'Pending') {
-						return `<button class="btn btn-sm btn-primary acknowledge-btn" data-item="${row.material_request_item}">
-							<i class="fa fa-check"></i> Acknowledge
-						</button>`;
-					} else {
-						return `<span class="text-success"><i class="fa fa-check-circle"></i> Done</span>`;
-					}
-				}
-			}
-		],
-		data: [],
-		no_result_message: __('No MR Items found'),
-		cell_format: {
-			number: (value) => flt(value).toFixed(2)
-		}
-	});
+	// Create table structure
+	me.table = $(`
+		<table class="table table-bordered table-hover" style="width: 100%; min-width: 1200px;">
+			<thead style="background-color: #f8f9fa;">
+				<tr>
+					<th style="min-width: 120px;">Material Request</th>
+					<th style="min-width: 100px;">MR Date</th>
+					<th style="min-width: 120px;">Item Code</th>
+					<th style="min-width: 150px;">Item Name</th>
+					<th style="min-width: 110px;">Requested Qty</th>
+					<th style="min-width: 110px;">Received Qty</th>
+					<th style="min-width: 110px;">Pending Qty</th>
+					<th style="min-width: 100px;">Status</th>
+					<th style="min-width: 150px;">Acknowledgment Date</th>
+					<th style="min-width: 120px;">Acknowledged By</th>
+				</tr>
+			</thead>
+			<tbody class="table-body">
+			</tbody>
+		</table>
+	`).appendTo(me.datatable_area);
+	
+	me.table_body = me.table.find('.table-body');
 	
 	// Bind acknowledge button click
-	$(me.datatable_area).on('click', '.acknowledge-btn', function() {
+	me.datatable_area.on('click', '.acknowledge-btn', function() {
 		const material_request_item = $(this).data('item');
 		me.acknowledge_item(material_request_item);
 	});
 }
 
-frappe.pages['items-receiving-repo'].prototype.refresh = function() {
+ItemsReceivingRepoPage.prototype.render_table = function(data) {
 	let me = this;
 	
-	// Show loading
-	me.page.add_indicator(__('Loading...'), 'blue');
+	me.table_body.empty();
+	
+	if (!data || data.length === 0) {
+		me.table_body.append(`
+			<tr>
+				<td colspan="10" class="text-center" style="padding: 40px; color: #999;">
+					${__('No MR Items found')}
+				</td>
+			</tr>
+		`);
+		return;
+	}
+	
+	data.forEach(function(row) {
+		const mr_link = `<a href="/app/material-request/${row.material_request}" target="_blank">${row.material_request}</a>`;
+		const mr_date = row.mr_date ? frappe.datetime.str_to_user(row.mr_date) : '-';
+		const requested_qty = `${flt(row.requested_qty).toFixed(2)} ${row.uom || ''}`;
+		const received_qty = `${flt(row.received_qty).toFixed(2)} ${row.uom || ''}`;
+		const pending_qty = flt(row.pending_qty);
+		const pending_qty_html = `<span style="color: ${pending_qty > 0 ? '#f57c00' : '#388e3c'}; font-weight: bold;">${pending_qty.toFixed(2)} ${row.uom || ''}</span>`;
+		
+		let status_badge = '';
+		if (row.acknowledgment_status === 'Acknowledged') {
+			status_badge = '<span class="badge badge-success">Acknowledged</span>';
+		} else {
+			status_badge = '<span class="badge badge-warning">Pending</span>';
+		}
+		
+		const ack_date = row.acknowledgment_date ? frappe.datetime.str_to_user(row.acknowledgment_date) : '<span style="color: #999;">-</span>';
+		const ack_by = row.acknowledged_by || '<span style="color: #999;">-</span>';
+		
+		const tr = $(`
+			<tr>
+				<td>${mr_link}</td>
+				<td>${mr_date}</td>
+				<td>${row.item_code || ''}</td>
+				<td>${row.item_name || ''}</td>
+				<td>${requested_qty}</td>
+				<td>${received_qty}</td>
+				<td>${pending_qty_html}</td>
+				<td>${status_badge}</td>
+				<td>${ack_date}</td>
+				<td>${ack_by}</td>
+			</tr>
+		`);
+		
+		me.table_body.append(tr);
+	});
+}
+
+ItemsReceivingRepoPage.prototype.refresh = function() {
+	let me = this;
+	
+	// Show loading in table
+		me.table_body.html(`
+			<tr>
+				<td colspan="10" class="text-center" style="padding: 40px; color: #999;">
+					<i class="fa fa-spinner fa-spin"></i> ${__('Loading...')}
+				</td>
+			</tr>
+		`);
 	
 	frappe.call({
 		method: 'tif_customization.tif_customization.page.items_receiving_repo.items_receiving_repo.get_mr_items_receiving_data',
@@ -284,9 +261,14 @@ frappe.pages['items-receiving-repo'].prototype.refresh = function() {
 			filters: me.filters
 		},
 		callback: function(r) {
-			me.page.remove_indicator();
-			
 			if (r.message && r.message.error) {
+				me.table_body.html(`
+					<tr>
+						<td colspan="10" class="text-center text-danger" style="padding: 40px;">
+							${__('Error loading data: {0}', [r.message.error])}
+						</td>
+					</tr>
+				`);
 				frappe.show_alert({
 					message: __('Error loading data: {0}', [r.message.error]),
 					indicator: 'red'
@@ -296,7 +278,7 @@ frappe.pages['items-receiving-repo'].prototype.refresh = function() {
 			
 			if (r.message && r.message.data) {
 				me.data = r.message.data;
-				me.datatable.refresh(me.data);
+				me.render_table(me.data);
 				
 				// Update summary
 				$('.summary-total-count').text(r.message.total_count || 0);
@@ -307,7 +289,7 @@ frappe.pages['items-receiving-repo'].prototype.refresh = function() {
 	});
 }
 
-frappe.pages['items-receiving-repo'].prototype.acknowledge_item = function(material_request_item) {
+ItemsReceivingRepoPage.prototype.acknowledge_item = function(material_request_item) {
 	let me = this;
 	
 	// Show dialog for remarks
@@ -331,11 +313,14 @@ frappe.pages['items-receiving-repo'].prototype.acknowledge_item = function(mater
 	d.show();
 }
 
-frappe.pages['items-receiving-repo'].prototype.submit_acknowledgment = function(material_request_item, remarks) {
+ItemsReceivingRepoPage.prototype.submit_acknowledgment = function(material_request_item, remarks) {
 	let me = this;
 	
-	// Show loading
-	me.page.add_indicator(__('Acknowledging...'), 'blue');
+	// Show loading alert
+	frappe.show_alert({
+		message: __('Acknowledging...'),
+		indicator: 'blue'
+	}, 2);
 	
 	frappe.call({
 		method: 'tif_customization.tif_customization.page.items_receiving_repo.items_receiving_repo.acknowledge_mr_item',
@@ -344,8 +329,6 @@ frappe.pages['items-receiving-repo'].prototype.submit_acknowledgment = function(
 			remarks: remarks
 		},
 		callback: function(r) {
-			me.page.remove_indicator();
-			
 			if (r.message && r.message.status === 'success') {
 				frappe.show_alert({
 					message: __('Item acknowledged successfully'),
