@@ -304,6 +304,13 @@ if (typeof window.ProcurementExpense === 'undefined') {
 					filters: me.filters
 				},
 				callback: function(r) {
+					if (r.exc) {
+						console.error('Error loading procurement expense data:', r.exc);
+						$('#summary-tbody').html(`<tr><td colspan="6" class="text-center text-danger">Error loading data. Please check console for details.</td></tr>`);
+						$('#detail-tbody').html(`<tr><td colspan="7" class="text-center text-danger">Error loading data. Please check console for details.</td></tr>`);
+						return;
+					}
+					
 					if (r.message && !r.message.error) {
 						me.data = r.message;
 						me.render_kpis();
@@ -311,9 +318,16 @@ if (typeof window.ProcurementExpense === 'undefined') {
 						me.render_detail_table();
 						me.render_charts();
 					} else {
-						$('#summary-tbody').html(`<tr><td colspan="6" class="text-center text-danger">Error: ${r.message?.error || 'Unknown error'}</td></tr>`);
-						$('#detail-tbody').html(`<tr><td colspan="7" class="text-center text-danger">Error: ${r.message?.error || 'Unknown error'}</td></tr>`);
+						let errorMsg = r.message?.error || r.message || 'Unknown error';
+						console.error('Procurement expense error:', errorMsg);
+						$('#summary-tbody').html(`<tr><td colspan="6" class="text-center text-danger">Error: ${errorMsg}</td></tr>`);
+						$('#detail-tbody').html(`<tr><td colspan="7" class="text-center text-danger">Error: ${errorMsg}</td></tr>`);
 					}
+				},
+				error: function(r) {
+					console.error('API call failed:', r);
+					$('#summary-tbody').html(`<tr><td colspan="6" class="text-center text-danger">Failed to load data. Please refresh and try again.</td></tr>`);
+					$('#detail-tbody').html(`<tr><td colspan="7" class="text-center text-danger">Failed to load data. Please refresh and try again.</td></tr>`);
 				}
 			});
 		}

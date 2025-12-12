@@ -5,13 +5,102 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "section_break_7fho",
+  "section_break_references",
+  "purchase_receipt",
+  "purchase_order",
+  "material_request",
+  "column_break_1",
+  "requested_by",
+  "status",
+  "section_break_items",
+  "items",
+  "section_break_acknowledgment",
+  "acknowledged_by",
+  "acknowledged_date",
+  "acknowledgment_remarks",
   "amended_from"
  ],
  "fields": [
   {
-   "fieldname": "section_break_7fho",
-   "fieldtype": "Section Break"
+   "fieldname": "section_break_references",
+   "fieldtype": "Section Break",
+   "label": "References"
+  },
+  {
+   "fieldname": "purchase_receipt",
+   "fieldtype": "Link",
+   "label": "Purchase Receipt",
+   "options": "Purchase Receipt",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "purchase_order",
+   "fieldtype": "Link",
+   "label": "Purchase Order",
+   "options": "Purchase Order",
+   "read_only": 1
+  },
+  {
+   "fieldname": "material_request",
+   "fieldtype": "Link",
+   "label": "Material Request",
+   "options": "Material Request",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "requested_by",
+   "fieldtype": "Link",
+   "label": "Requested By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Pending\nAcknowledged\nRejected",
+   "default": "Pending",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_items",
+   "fieldtype": "Section Break",
+   "label": "Items"
+  },
+  {
+   "fieldname": "items",
+   "fieldtype": "Table",
+   "label": "Items",
+   "options": "Acknowledgment Item",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_acknowledgment",
+   "fieldtype": "Section Break",
+   "label": "Acknowledgment Details"
+  },
+  {
+   "fieldname": "acknowledged_by",
+   "fieldtype": "Link",
+   "label": "Acknowledged By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "acknowledged_date",
+   "fieldtype": "Datetime",
+   "label": "Acknowledged Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "acknowledgment_remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
   },
   {
    "fieldname": "amended_from",
@@ -45,6 +134,17 @@
    "role": "System Manager",
    "share": 1,
    "submit": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "All",
+   "share": 1,
    "write": 1
   }
  ],
