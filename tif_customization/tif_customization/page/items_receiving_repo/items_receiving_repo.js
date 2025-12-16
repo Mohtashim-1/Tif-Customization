@@ -82,24 +82,27 @@ ItemsReceivingRepoPage.prototype.make_filters = function() {
 	// Summary cards
 	let summary_row = $('<div class="row" style="margin-top: 15px;"></div>').appendTo(me.filter_area);
 	
-	me.summary_total = $('<div class="col-md-4" style="padding: 5px;"></div>').html(`
+	// Total Documents card
+	me.summary_total_docs = $('<div class="col-md-4" style="padding: 5px;"></div>').html(`
 		<div class="card" style="background: #e3f2fd; padding: 15px; border-radius: 4px;">
-			<h5 style="margin: 0; color: #1976d2;">Total Items</h5>
-			<h3 style="margin: 5px 0 0 0; color: #1976d2;" class="summary-total-count">0</h3>
+			<h5 style="margin: 0; color: #1976d2;">Total Documents</h5>
+			<h3 style="margin: 5px 0 0 0; color: #1976d2;" class="summary-total-documents">0</h3>
 		</div>
 	`).appendTo(summary_row);
 	
-	me.summary_pending = $('<div class="col-md-4" style="padding: 5px;"></div>').html(`
+	// MR Count card
+	me.summary_mr_count = $('<div class="col-md-4" style="padding: 5px;"></div>').html(`
 		<div class="card" style="background: #fff3e0; padding: 15px; border-radius: 4px;">
-			<h5 style="margin: 0; color: #f57c00;">Pending</h5>
-			<h3 style="margin: 5px 0 0 0; color: #f57c00;" class="summary-pending-count">0</h3>
+			<h5 style="margin: 0; color: #f57c00;">MR Count</h5>
+			<h3 style="margin: 5px 0 0 0; color: #f57c00;" class="summary-mr-count">0</h3>
 		</div>
 	`).appendTo(summary_row);
 	
-	me.summary_acknowledged = $('<div class="col-md-4" style="padding: 5px;"></div>').html(`
+	// PO Count card
+	me.summary_po_count = $('<div class="col-md-4" style="padding: 5px;"></div>').html(`
 		<div class="card" style="background: #e8f5e9; padding: 15px; border-radius: 4px;">
-			<h5 style="margin: 0; color: #388e3c;">Acknowledged</h5>
-			<h3 style="margin: 5px 0 0 0; color: #388e3c;" class="summary-acknowledged-count">0</h3>
+			<h5 style="margin: 0; color: #388e3c;">PO Count</h5>
+			<h3 style="margin: 5px 0 0 0; color: #388e3c;" class="summary-po-count">0</h3>
 		</div>
 	`).appendTo(summary_row);
 	
@@ -280,10 +283,10 @@ ItemsReceivingRepoPage.prototype.refresh = function() {
 				me.data = r.message.data;
 				me.render_table(me.data);
 				
-				// Update summary
-				$('.summary-total-count').text(r.message.total_count || 0);
-				$('.summary-pending-count').text(r.message.pending_count || 0);
-				$('.summary-acknowledged-count').text(r.message.acknowledged_count || 0);
+				// Update summary cards
+				$('.summary-total-documents').text(r.message.total_documents || 0);
+				$('.summary-mr-count').text(r.message.mr_count || 0);
+				$('.summary-po-count').text(r.message.po_count || 0);
 			}
 		}
 	});

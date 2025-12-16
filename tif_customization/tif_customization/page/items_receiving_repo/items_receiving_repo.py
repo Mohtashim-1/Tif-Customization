@@ -58,25 +58,26 @@ def get_mr_items_receiving_data(filters=None):
 				mri.stock_uom,
 				COALESCE(SUM(pr_item.qty), 0) AS received_qty,
 				COALESCE(SUM(pr_item.stock_qty), 0) AS received_stock_qty,
+				poi.parent AS purchase_order,
 				CASE 
-					WHEN MAX(ack.name) IS NOT NULL THEN 'Acknowledged'
+					WHEN ack.status = 'Acknowledged' THEN 'Acknowledged'
 					ELSE 'Pending'
 				END AS acknowledgment_status,
-				MAX(ack.acknowledged_date) AS acknowledgment_date,
-				MAX(ack.acknowledged_by) AS acknowledged_by,
-				MAX(ack.name) AS acknowledgment_name
+				ack.acknowledged_date AS acknowledgment_date,
+				ack.acknowledged_by AS acknowledged_by,
+				ack.name AS acknowledgment_name
 			FROM `tabMaterial Request` mr
 			INNER JOIN `tabMaterial Request Item` mri ON mri.parent = mr.name
+			INNER JOIN `tabAcknowledgment` ack ON ack.material_request = mr.name 
+				AND ack.docstatus != 2
 			LEFT JOIN `tabPurchase Order Item` poi ON poi.material_request_item = mri.name
 			LEFT JOIN `tabPurchase Receipt Item` pr_item ON pr_item.purchase_order_item = poi.name 
 				AND pr_item.docstatus = 1
 			LEFT JOIN `tabPurchase Receipt` pr ON pr.name = pr_item.parent AND pr.docstatus = 1
-			LEFT JOIN `tabAcknowledgment` ack ON ack.material_request = mr.name 
-				AND ack.docstatus = 1
-				AND ack.status = 'Acknowledged'
 			WHERE {' AND '.join(conditions)} {ack_status_condition}
 			GROUP BY mr.name, mri.name, mri.item_code, mri.item_name, mri.qty, mri.stock_qty, 
-				mri.uom, mri.stock_uom, mr.transaction_date
+				mri.uom, mri.stock_uom, mr.transaction_date, poi.parent, ack.status, 
+				ack.acknowledged_date, ack.acknowledged_by, ack.name
 			ORDER BY mr.transaction_date DESC, mr.name DESC, mri.item_code
 		"""
 		
@@ -96,11 +97,24 @@ def get_mr_items_receiving_data(filters=None):
 			if row.get('mr_date'):
 				row['mr_date'] = str(row['mr_date'])
 		
+		# Get unique MR and PO counts
+		unique_mrs = set()
+		unique_pos = set()
+		
+		for row in results:
+			if row.get('material_request'):
+				unique_mrs.add(row['material_request'])
+			if row.get('purchase_order'):
+				unique_pos.add(row['purchase_order'])
+		
 		return {
 			'data': results,
 			'total_count': len(results),
 			'pending_count': len([r for r in results if r['acknowledgment_status'] == 'Pending']),
-			'acknowledged_count': len([r for r in results if r['acknowledgment_status'] == 'Acknowledged'])
+			'acknowledged_count': len([r for r in results if r['acknowledgment_status'] == 'Acknowledged']),
+			'mr_count': len(unique_mrs),
+			'po_count': len(unique_pos),
+			'total_documents': len(unique_mrs) + len(unique_pos)
 		}
 	
 	except Exception as e:
