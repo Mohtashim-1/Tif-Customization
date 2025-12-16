@@ -15,21 +15,27 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 		<!-- Filter Section -->
 		<div class="filter-section">
 			<div class="row">
-				<div class="col-md-3">
+				<div class="col-md-2">
 					<label>From Date:</label>
 					<input type="date" id="from-date" class="form-control" value="2025-09-01">
 				</div>
-				<div class="col-md-3">
+				<div class="col-md-2">
 					<label>To Date:</label>
 					<input type="date" id="to-date" class="form-control" value="2025-09-30">
 				</div>
-				<div class="col-md-3">
+				<div class="col-md-2">
+					<label>Item:</label>
+					<select id="item-filter" class="form-control">
+						<option value="">All Items</option>
+					</select>
+				</div>
+				<div class="col-md-2">
 					<label>Warehouse:</label>
 					<select id="warehouse-filter" class="form-control">
 						<option value="">All Warehouses</option>
 					</select>
 				</div>
-				<div class="col-md-3">
+				<div class="col-md-2">
 					<label>Item Group:</label>
 					<select id="item-group-filter" class="form-control">
 						<option value="">All Item Groups</option>
@@ -411,19 +417,68 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 				console.log('Error loading item groups:', err);
 			}
 		});
+		
+		// Load items
+		frappe.call({
+			method: 'tif_customization.tif_customization.page.stock_detail.stock_detail.get_items',
+			args: {},
+			callback: function(r) {
+				console.log('Items response:', r);
+				console.log('Items response message:', r.message);
+				console.log('Items count:', r.message ? r.message.length : 0);
+				if (r.message && r.message.length > 0) {
+					const itemSelect = $('#item-filter');
+					console.log('Item select element found:', itemSelect.length > 0);
+					if (itemSelect.length) {
+						itemSelect.empty().append('<option value="">All Items</option>');
+						r.message.forEach(function(item, index) {
+							const optionValue = item.item_code || '';
+							const optionText = `${item.item_code || ''} - ${item.item_name || ''}`;
+							console.log(`Adding item ${index + 1}: value="${optionValue}", text="${optionText}"`);
+							itemSelect.append(`<option value="${optionValue}">${optionText}</option>`);
+						});
+						console.log('Items loaded:', r.message.length);
+						console.log('Total options in dropdown:', itemSelect.find('option').length);
+						console.log('First few options:', itemSelect.find('option').slice(0, 5).map(function() { return $(this).val() + ':' + $(this).text(); }).get());
+					} else {
+						console.log('Item select not found');
+					}
+				} else {
+					console.log('No items returned from backend');
+				}
+			},
+			error: function(err) {
+				console.log('Error loading items:', err);
+				console.error('Error details:', err);
+			}
+		});
 	}
 	
 	// Apply filters
 	function applyFilters() {
 		console.log('Apply filters clicked');
+		const itemSelect = $('#item-filter');
+		const itemFilterValue = itemSelect.val();
+		const selectedOption = itemSelect.find('option:selected');
+		console.log('Item filter element:', itemSelect);
+		console.log('Item filter value:', itemFilterValue);
+		console.log('Item filter value type:', typeof itemFilterValue);
+		console.log('Item filter is empty string?', itemFilterValue === '');
+		console.log('Item filter selected option text:', selectedOption.text());
+		console.log('Item filter selected option value:', selectedOption.val());
+		console.log('All options in dropdown:', itemSelect.find('option').map(function() { return $(this).val() + ':' + $(this).text(); }).get());
+		
 		const filters = {
 			from_date: $('#from-date').val(),
 			to_date: $('#to-date').val(),
+			item: itemFilterValue && itemFilterValue !== '' ? itemFilterValue : null, // Convert empty string to null
 			warehouse: $('#warehouse-filter').val(),
 			item_group: $('#item-group-filter').val()
 		};
 		
-		console.log('Filters:', filters);
+		console.log('Filters object:', filters);
+		console.log('Filters JSON:', JSON.stringify(filters));
+		console.log('Item filter in filters object:', filters.item);
 		
 		// Update table headers with selected date range
 		updateTableHeaders(filters.from_date, filters.to_date);
@@ -436,6 +491,11 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 			args: filters,
 			callback: function(r) {
 				console.log('Filter response:', r);
+				console.log('MQH Books Data Count:', r.message?.mqh_books_data?.length || 0);
+				console.log('MQH Books Data:', r.message?.mqh_books_data);
+				console.log('Head Office Data Count:', r.message?.head_office_data?.length || 0);
+				console.log('Head Office Data:', r.message?.head_office_data);
+				
 				if (r.message && !r.message.error) {
 					// Populate tables with filtered data
 					populateMQHBooksTable(r.message.mqh_books_data || []);
@@ -577,6 +637,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 	function resetFilters() {
 		$('#from-date').val('2025-09-01');
 		$('#to-date').val('2025-09-30');
+		$('#item-filter').val('');
 		$('#warehouse-filter').val('');
 		$('#item-group-filter').val('');
 		
@@ -618,6 +679,17 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 		console.log('Apply button found:', $('#apply-filters').length);
 		console.log('Reset button found:', $('#reset-filters').length);
 		console.log('Export button found:', $('#export-excel').length);
+		console.log('Item filter found:', $('#item-filter').length);
+		
+		// Add change event listener for item filter to debug selection
+		$('#item-filter').on('change', function() {
+			const selectedValue = $(this).val();
+			const selectedText = $(this).find('option:selected').text();
+			console.log('=== Item filter changed ===');
+			console.log('Selected value:', selectedValue);
+			console.log('Selected text:', selectedText);
+			console.log('All options:', $(this).find('option').map(function() { return $(this).val() + ':' + $(this).text(); }).get());
+		});
 		
 		$('#apply-filters').click(function(e) {
 			e.preventDefault();
@@ -787,31 +859,62 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 	}
 	
 	function populateMQHBooksTable(data) {
+		console.log('populateMQHBooksTable called with data:', data);
+		console.log('populateMQHBooksTable - Data length:', data ? data.length : 0);
+		
 		const tbody = $('#mqh-books-tbody');
 		const tfoot = $('#mqh-books-tfoot');
+		
+		// Check if elements exist
+		if (tbody.length === 0) {
+			console.error('populateMQHBooksTable - tbody element not found!');
+			return;
+		}
+		if (tfoot.length === 0) {
+			console.error('populateMQHBooksTable - tfoot element not found!');
+			return;
+		}
+		
+		console.log('populateMQHBooksTable - tbody found:', tbody.length, 'tfoot found:', tfoot.length);
 		
 		// Clear existing content
 		tbody.empty();
 		tfoot.empty();
 		
+		if (!data || data.length === 0) {
+			console.warn('populateMQHBooksTable - No data provided, showing empty table');
+			return;
+		}
+		
 		// Add data rows
-		data.forEach(item => {
-			const row = $(`
-				<tr>
-					<td style="text-align: center;">${item.s_no}</td>
-					<td class="particulars-cell">${item.particulars}</td>
-					<td class="number-cell">${formatNumber(item.opening_stock)}</td>
-					<td class="number-cell">${formatNumber(item.received_vendor)}</td>
-					<td class="number-cell">${formatNumber(item.book_return)}</td>
-					<td class="number-cell">${formatNumber(item.delivered)}</td>
-					<td class="number-cell">${formatNumber(item.available_stock)}</td>
-					<td class="number-cell">${formatNumber(item.demand_received)}</td>
-					<td class="number-cell">${formatNumber(item.books_sale)}</td>
-					<td class="number-cell">${formatNumber(item.total_amount)}</td>
-				</tr>
-			`);
-			tbody.append(row);
+		let rowsAdded = 0;
+		data.forEach((item, index) => {
+			try {
+				const row = $(`
+					<tr>
+						<td style="text-align: center;">${item.s_no || ''}</td>
+						<td class="particulars-cell">${item.particulars || ''}</td>
+						<td class="number-cell">${formatNumber(item.opening_stock || 0)}</td>
+						<td class="number-cell">${formatNumber(item.received_vendor || 0)}</td>
+						<td class="number-cell">${formatNumber(item.book_return || 0)}</td>
+						<td class="number-cell">${formatNumber(item.delivered || 0)}</td>
+						<td class="number-cell">${formatNumber(item.available_stock || 0)}</td>
+						<td class="number-cell">${formatNumber(item.demand_received || 0)}</td>
+						<td class="number-cell">${formatNumber(item.books_sale || 0)}</td>
+						<td class="number-cell">${formatNumber(item.total_amount || 0)}</td>
+					</tr>
+				`);
+				tbody.append(row);
+				rowsAdded++;
+				if (index < 3) {
+					console.log('populateMQHBooksTable - Added row:', index, item.particulars);
+				}
+			} catch (error) {
+				console.error('populateMQHBooksTable - Error adding row:', index, error);
+			}
 		});
+		
+		console.log('populateMQHBooksTable - Total rows added:', rowsAdded);
 		
 		// Calculate and add totals
 		const totals = {
@@ -897,40 +1000,68 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 	}
 	
 	function populateHeadOfficeTable(data) {
+		console.log('populateHeadOfficeTable called with data:', data);
+		console.log('populateHeadOfficeTable - Data length:', data.length);
+		
+		// Ensure the section is visible
+		$('.head-office-section').show();
+		
 		const tbody = $('#head-office-tbody');
 		const tfoot = $('#head-office-tfoot');
+		
+		// Check if elements exist
+		if (tbody.length === 0) {
+			console.error('populateHeadOfficeTable - tbody element not found!');
+			return;
+		}
+		if (tfoot.length === 0) {
+			console.error('populateHeadOfficeTable - tfoot element not found!');
+			return;
+		}
+		
+		console.log('populateHeadOfficeTable - tbody found:', tbody.length, 'tfoot found:', tfoot.length);
 		
 		// Clear existing content
 		tbody.empty();
 		tfoot.empty();
 		
 		// Add data rows
-		data.forEach(item => {
-			const row = $(`
-				<tr>
-					<td style="text-align: center;">${item.s_no}</td>
-					<td class="particulars-cell">${item.particulars}</td>
-					<td class="number-cell">${formatNumber(item.opening_balance)}</td>
-					<td class="number-cell">${formatNumber(item.received_vendor)}</td>
-					<td class="number-cell">${formatNumber(item.courier_returned)}</td>
-					<td class="number-cell">${formatNumber(item.transferred_in)}</td>
-					<td class="number-cell">${formatNumber(item.transferred_out)}</td>
-					<td class="number-cell">${formatNumber(item.delivered)}</td>
-					<td class="number-cell">${formatNumber(item.ending_balance)}</td>
-				</tr>
-			`);
-			tbody.append(row);
+		let rowsAdded = 0;
+		data.forEach((item, index) => {
+			try {
+				console.log('populateHeadOfficeTable - Adding item:', index, item);
+				const row = $(`
+					<tr>
+						<td style="text-align: center;">${item.s_no || ''}</td>
+						<td class="particulars-cell">${item.particulars || ''}</td>
+						<td class="number-cell">${formatNumber(item.opening_balance || 0)}</td>
+						<td class="number-cell">${formatNumber(item.received_vendor || 0)}</td>
+						<td class="number-cell">${formatNumber(item.courier_returned || 0)}</td>
+						<td class="number-cell">${formatNumber(item.transferred_in || 0)}</td>
+						<td class="number-cell">${formatNumber(item.transferred_out || 0)}</td>
+						<td class="number-cell">${formatNumber(item.delivered || 0)}</td>
+						<td class="number-cell">${formatNumber(item.ending_balance || 0)}</td>
+					</tr>
+				`);
+				tbody.append(row);
+				rowsAdded++;
+				console.log('populateHeadOfficeTable - Row appended:', index, 'Total rows:', rowsAdded);
+			} catch (error) {
+				console.error('populateHeadOfficeTable - Error adding row:', index, error);
+			}
 		});
+		
+		console.log('populateHeadOfficeTable - Total rows added:', rowsAdded, 'tbody children:', tbody.children().length);
 		
 		// Calculate and add totals
 		const totals = {
-			opening_balance: data.reduce((sum, item) => sum + item.opening_balance, 0),
-			received_vendor: data.reduce((sum, item) => sum + item.received_vendor, 0),
-			courier_returned: data.reduce((sum, item) => sum + item.courier_returned, 0),
-			transferred_in: data.reduce((sum, item) => sum + item.transferred_in, 0),
-			transferred_out: data.reduce((sum, item) => sum + item.transferred_out, 0),
-			delivered: data.reduce((sum, item) => sum + item.delivered, 0),
-			ending_balance: data.reduce((sum, item) => sum + item.ending_balance, 0)
+			opening_balance: data.reduce((sum, item) => sum + (item.opening_balance || 0), 0),
+			received_vendor: data.reduce((sum, item) => sum + (item.received_vendor || 0), 0),
+			courier_returned: data.reduce((sum, item) => sum + (item.courier_returned || 0), 0),
+			transferred_in: data.reduce((sum, item) => sum + (item.transferred_in || 0), 0),
+			transferred_out: data.reduce((sum, item) => sum + (item.transferred_out || 0), 0),
+			delivered: data.reduce((sum, item) => sum + (item.delivered || 0), 0),
+			ending_balance: data.reduce((sum, item) => sum + (item.ending_balance || 0), 0)
 		};
 		
 		const totalRow = $(`
@@ -946,6 +1077,8 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 			</tr>
 		`);
 		tfoot.append(totalRow);
+		console.log('populateHeadOfficeTable - Totals row added. Final tbody rows:', tbody.children().length, 'tfoot rows:', tfoot.children().length);
+		console.log('populateHeadOfficeTable - Table HTML length:', tbody.html() ? tbody.html().length : 0);
 	}
 	
 	function populateOldOfficeTable(data) {

@@ -27,13 +27,22 @@ def get_courier_report_data(filters=None):
 			actual_cost_centers = []
 			for cc_filter in cost_center_numbers:
 				if cc_filter.isdigit():
-					# Find cost centers with this number
+					# Find cost centers with this number - try exact match first
 					matching_ccs = frappe.db.sql("""
 						SELECT name FROM `tabCost Center`
 						WHERE cost_center_number = %s
 						AND disabled = 0
 					""", (cc_filter,), as_dict=True)
-					actual_cost_centers.extend([cc['name'] for cc in matching_ccs])
+					if matching_ccs:
+						actual_cost_centers.extend([cc['name'] for cc in matching_ccs])
+					else:
+						# If not found by number, try to find by name containing the number
+						matching_ccs = frappe.db.sql("""
+							SELECT name FROM `tabCost Center`
+							WHERE (name LIKE %s OR cost_center_name LIKE %s)
+							AND disabled = 0
+						""", (f'%{cc_filter}%', f'%{cc_filter}%'), as_dict=True)
+						actual_cost_centers.extend([cc['name'] for cc in matching_ccs])
 				else:
 					# Already a cost center name, use as is
 					actual_cost_centers.append(cc_filter)
@@ -295,6 +304,19 @@ def get_cost_center_summary(filters):
 		# Combine data
 		summary = {}
 		
+		# Initialize all filtered cost centers with zero values (so they appear even if no data)
+		if cost_centers:
+			for cc in cost_centers:
+				if cc not in summary:
+					summary[cc] = {
+						'cost_center': cc,
+						'total_expense': 0,
+						'jv_count': 0,
+						'dn_count': 0,
+						'books_sent': 0,
+						'avg_cost_per_book': 0
+					}
+		
 		# Add expense data
 		for row in expense_data:
 			if row.cost_center not in summary:
@@ -312,6 +334,9 @@ def get_cost_center_summary(filters):
 		
 		# Add DN data
 		for row in dn_data:
+			# Skip "Not Set" cost centers
+			if row.cost_center == 'Not Set':
+				continue
 			if row.cost_center not in summary:
 				summary[row.cost_center] = {
 					'cost_center': row.cost_center,
@@ -332,7 +357,9 @@ def get_cost_center_summary(filters):
 					summary[cost_center]['total_expense'] / summary[cost_center]['books_sent']
 				)
 		
-		return list(summary.values())
+		# Filter out "Not Set" from final results
+		result = [row for row in summary.values() if row.get('cost_center') != 'Not Set']
+		return result
 	except Exception as e:
 		frappe.log_error(f"Error in get_cost_center_summary: {str(e)}", "Courier Report Error")
 		return []
@@ -438,13 +465,18 @@ def get_delivery_notes(filters):
 		
 		results = frappe.db.sql(query, params, as_dict=True)
 		
-		# Format created_by to show user name
+		# Format created_by to show user name and filter out "Not Set"
+		filtered_results = []
 		for row in results:
+			# Skip "Not Set" cost centers
+			if row.get('cost_center') == 'Not Set':
+				continue
 			row['total_books'] = flt(row['total_books'])
 			row['created_by_name'] = frappe.db.get_value('User', row['created_by'], 'full_name') or row['created_by']
 			row['customer_name'] = frappe.db.get_value('Customer', row['customer'], 'customer_name') or row['customer']
+			filtered_results.append(row)
 		
-		return results
+		return filtered_results
 	except Exception as e:
 		frappe.log_error(f"Error in get_delivery_notes: {str(e)}", "Courier Report Error")
 		return []
@@ -568,10 +600,15 @@ def get_books_by_cost_center(filters):
 			'to_date': to_date
 		}, as_dict=True)
 		
+		# Filter out "Not Set" cost centers
+		filtered_results = []
 		for row in results:
+			if row.get('cost_center') == 'Not Set':
+				continue
 			row['books_sent'] = flt(row['books_sent'])
+			filtered_results.append(row)
 		
-		return results
+		return filtered_results
 	except Exception as e:
 		frappe.log_error(f"Error in get_books_by_cost_center: {str(e)}", "Courier Report Error")
 		return []

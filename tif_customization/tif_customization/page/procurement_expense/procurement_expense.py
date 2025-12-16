@@ -25,10 +25,14 @@ def get_procurement_expense_data(filters=None):
 		# Get expense data
 		expense_data = get_expense_by_period(filters, period_type)
 		summary_data = get_summary_data(filters)
+		item_data = get_item_wise_data(filters)
+		department_data = get_department_wise_data(filters)
 		
 		return {
 			'expense_data': expense_data,
 			'summary_data': summary_data,
+			'item_data': item_data,
+			'department_data': department_data,
 			'period_type': period_type
 		}
 	except Exception as e:
@@ -36,7 +40,7 @@ def get_procurement_expense_data(filters=None):
 		return {'error': str(e)}
 
 def get_expense_by_period(filters, period_type='monthly'):
-	"""Get expense data grouped by period and department/cost center"""
+	"""Get expense data grouped by period and department/cost center - PO only, no MR"""
 	try:
 		from_date = filters.get('from_date')
 		to_date = filters.get('to_date')
@@ -46,41 +50,10 @@ def get_expense_by_period(filters, period_type='monthly'):
 		frappe.log_error(f"Procurement Expense Query - From: {from_date}, To: {to_date}, Period: {period_type}", "Procurement Expense Debug")
 		
 		# Build cost center expressions using helper functions
-		mr_cc_expr = _build_mr_cc_expr()
 		po_cc_expr = _build_po_cc_expr()
 		
 		# Build cost center/department filter using parameterized queries
-		mr_filter_sql, mr_filter_params = _build_in_filter_sql(mr_cc_expr, cost_centers)
 		po_filter_sql, po_filter_params = _build_in_filter_sql(po_cc_expr, cost_centers)
-		
-		# Get MR amount expression - check if base_amount exists
-		mr_amt_expr = _get_mr_amount_expr()
-		
-		# Get Material Request expenses - use custom_department if available, else cost_center
-		# Use transaction_date if available, else use creation date (cast to date)
-		mr_query = f"""
-			SELECT 
-				COALESCE(mr.transaction_date, DATE(mr.creation)) AS transaction_date,
-				{mr_cc_expr} AS cost_center,
-				SUM({mr_amt_expr}) AS base_amount,
-				COUNT(DISTINCT mr.name) AS mr_count
-			FROM `tabMaterial Request` mr
-			JOIN `tabMaterial Request Item` mri ON mri.parent = mr.name
-			WHERE mr.docstatus = 1
-			AND COALESCE(mr.transaction_date, DATE(mr.creation)) BETWEEN %(from_date)s AND %(to_date)s
-			AND mr.material_request_type = 'Purchase'
-			{mr_filter_sql}
-			GROUP BY COALESCE(mr.transaction_date, DATE(mr.creation)), {mr_cc_expr}
-		"""
-		
-		mr_results = frappe.db.sql(mr_query, {
-			'from_date': from_date,
-			'to_date': to_date,
-			**mr_filter_params
-		}, as_dict=True)
-		
-		# Debug: Log MR results count and sample data
-		frappe.log_error(f"MR Query - From: {from_date}, To: {to_date}\nMR Results Count: {len(mr_results)}\nSample: {mr_results[:2] if mr_results else 'No results'}", "Procurement Expense Debug")
 		
 		# Get PO amount expression - check if base_amount exists
 		po_amt_expr = _get_po_amount_expr()
@@ -110,31 +83,10 @@ def get_expense_by_period(filters, period_type='monthly'):
 		has_custom_dept = frappe.db.has_column('Purchase Order', 'custom_department')
 		frappe.log_error(f"PO Query - From: {from_date}, To: {to_date}\nPO Results Count: {len(po_results)}, Has custom_department: {has_custom_dept}\nSample: {po_results[:2] if po_results else 'No results'}", "Procurement Expense Debug")
 		
-		# Combine and group by period
+		# Group by period
 		combined_data = {}
 		
-		# Process MR data
-		for row in mr_results:
-			period_key = get_period_key(row.get('transaction_date'), period_type)
-			cost_center = row.get('cost_center') or 'Not Set'
-			key = f"{period_key}_{cost_center}"
-			
-			if key not in combined_data:
-				combined_data[key] = {
-					'period': period_key,
-					'cost_center': cost_center,
-					'mr_amount': 0,
-					'po_amount': 0,
-					'total_amount': 0,
-					'mr_count': 0,
-					'po_count': 0
-				}
-			
-			combined_data[key]['mr_amount'] += flt(row.get('base_amount') or 0)
-			combined_data[key]['total_amount'] += flt(row.get('base_amount') or 0)
-			combined_data[key]['mr_count'] += row.get('mr_count') or 0
-		
-		# Process PO data
+		# Process PO data only
 		for row in po_results:
 			period_key = get_period_key(row.get('transaction_date'), period_type)
 			cost_center = row.get('cost_center') or 'Not Set'
@@ -144,15 +96,11 @@ def get_expense_by_period(filters, period_type='monthly'):
 				combined_data[key] = {
 					'period': period_key,
 					'cost_center': cost_center,
-					'mr_amount': 0,
 					'po_amount': 0,
-					'total_amount': 0,
-					'mr_count': 0,
 					'po_count': 0
 				}
 			
 			combined_data[key]['po_amount'] += flt(row.get('base_amount') or 0)
-			combined_data[key]['total_amount'] += flt(row.get('base_amount') or 0)
 			combined_data[key]['po_count'] += row.get('po_count') or 0
 		
 		# Convert to list and sort
@@ -384,30 +332,7 @@ def get_summary_data(filters):
 		mr_amt = _mr_amount_expr()
 
 		# -----------------------------
-		# MR Summary
-		# -----------------------------
-		mr_summary_query = f"""
-			SELECT
-				{mr_cc_expr} AS cost_center,
-				SUM({mr_amt}) AS total_amount,
-				COUNT(DISTINCT mr.name) AS mr_count
-			FROM `tabMaterial Request` mr
-			JOIN `tabMaterial Request Item` mri ON mri.parent = mr.name
-			WHERE mr.docstatus = 1
-			  AND mr.transaction_date BETWEEN %(from_date)s AND %(to_date)s
-			  AND mr.material_request_type = 'Purchase'
-			  {mr_filter_sql}
-			GROUP BY {mr_cc_expr}
-		"""
-
-		mr_summary = frappe.db.sql(
-			mr_summary_query,
-			{**{'from_date': from_date, 'to_date': to_date}, **mr_filter_params},
-			as_dict=True
-		)
-
-		# -----------------------------
-		# PO Summary (PO item base_amount usually exists)
+		# PO Summary Only (No MR)
 		# -----------------------------
 		po_amt_expr = "poi.base_amount"
 		try:
@@ -419,7 +344,7 @@ def get_summary_data(filters):
 		po_summary_query = f"""
 			SELECT
 				{po_cc_expr} AS cost_center,
-				SUM({po_amt_expr}) AS total_amount,
+				SUM({po_amt_expr}) AS po_amount,
 				COUNT(DISTINCT po.name) AS po_count
 			FROM `tabPurchase Order` po
 			JOIN `tabPurchase Order Item` poi ON poi.parent = po.name
@@ -436,38 +361,19 @@ def get_summary_data(filters):
 		)
 
 		# -----------------------------
-		# Combine summaries
+		# Build summary dict (PO only)
 		# -----------------------------
 		summary_dict = {}
-
-		for row in mr_summary:
-			cc = row.get("cost_center") or "Not Set"
-			if cc not in summary_dict:
-				summary_dict[cc] = {
-					'cost_center': cc,
-					'mr_amount': 0,
-					'po_amount': 0,
-					'total_amount': 0,
-					'mr_count': 0,
-					'po_count': 0
-				}
-			summary_dict[cc]['mr_amount'] = flt(row.get('total_amount'))
-			summary_dict[cc]['total_amount'] += flt(row.get('total_amount'))
-			summary_dict[cc]['mr_count'] = row.get('mr_count') or 0
 
 		for row in po_summary:
 			cc = row.get("cost_center") or "Not Set"
 			if cc not in summary_dict:
 				summary_dict[cc] = {
 					'cost_center': cc,
-					'mr_amount': 0,
 					'po_amount': 0,
-					'total_amount': 0,
-					'mr_count': 0,
 					'po_count': 0
 				}
-			summary_dict[cc]['po_amount'] = flt(row.get('total_amount'))
-			summary_dict[cc]['total_amount'] += flt(row.get('total_amount'))
+			summary_dict[cc]['po_amount'] = flt(row.get('po_amount'))
 			summary_dict[cc]['po_count'] = row.get('po_count') or 0
 
 		# Convert to list + attach names
@@ -495,10 +401,137 @@ def get_summary_data(filters):
 			else:
 				row["cost_center_name"] = "Not Set"
 
-		result.sort(key=lambda x: x.get('total_amount', 0), reverse=True)
+		result.sort(key=lambda x: x.get('po_amount', 0), reverse=True)
 		return result
 
 	except Exception as e:
 		frappe.log_error(f"Error in get_summary_data: {str(e)}", "Procurement Expense Error")
+		return []
+
+
+@frappe.whitelist()
+def get_item_wise_data(filters=None):
+	"""Get expense data grouped by item"""
+	try:
+		if isinstance(filters, str):
+			import json
+			filters = json.loads(filters)
+		elif not filters:
+			filters = {}
+		
+		from_date = filters.get('from_date')
+		to_date = filters.get('to_date')
+		cost_centers = filters.get('cost_centers', []) or []
+		
+		# Build cost center filter
+		po_cc_expr = _build_po_cc_expr()
+		po_filter_sql, po_filter_params = _build_in_filter_sql(po_cc_expr, cost_centers)
+		
+		# Get PO amount expression
+		po_amt_expr = _get_po_amount_expr()
+		
+		query = f"""
+			SELECT
+				poi.item_code,
+				poi.item_name,
+				SUM({po_amt_expr}) AS po_amount,
+				COUNT(DISTINCT po.name) AS po_count
+			FROM `tabPurchase Order` po
+			JOIN `tabPurchase Order Item` poi ON poi.parent = po.name
+			WHERE po.docstatus = 1
+			  AND COALESCE(po.transaction_date, DATE(po.creation)) BETWEEN %(from_date)s AND %(to_date)s
+			  {po_filter_sql}
+			GROUP BY poi.item_code, poi.item_name
+			ORDER BY SUM({po_amt_expr}) DESC
+			LIMIT 50
+		"""
+		
+		results = frappe.db.sql(query, {
+			'from_date': from_date,
+			'to_date': to_date,
+			**po_filter_params
+		}, as_dict=True)
+		
+		return results
+	
+	except Exception as e:
+		frappe.log_error(f"Error in get_item_wise_data: {str(e)}", "Procurement Expense Error")
+		return []
+
+
+@frappe.whitelist()
+def get_department_wise_data(filters=None):
+	"""Get expense data grouped by department"""
+	try:
+		if isinstance(filters, str):
+			import json
+			filters = json.loads(filters)
+		elif not filters:
+			filters = {}
+		
+		from_date = filters.get('from_date')
+		to_date = filters.get('to_date')
+		cost_centers = filters.get('cost_centers', []) or []
+		
+		# Build department filter - only get departments, not cost centers
+		po_dept_expr = "COALESCE(NULLIF(po.custom_department, ''), 'Not Set')"
+		has_custom_dept = frappe.db.has_column('Purchase Order', 'custom_department')
+		
+		if not has_custom_dept:
+			# If no custom_department, try to get from Cost Center's parent
+			po_dept_expr = """
+				COALESCE(
+					NULLIF((SELECT parent_cost_center FROM `tabCost Center` WHERE name = poi.cost_center), ''),
+					NULLIF((SELECT department FROM `tabCost Center` WHERE name = poi.cost_center), ''),
+					'Not Set'
+				)
+			"""
+		
+		dept_filter_sql = ""
+		dept_filter_params = {}
+		if cost_centers:
+			# Filter by cost centers but group by department
+			po_cc_expr = _build_po_cc_expr()
+			dept_filter_sql, dept_filter_params = _build_in_filter_sql(po_cc_expr, cost_centers)
+		
+		# Get PO amount expression
+		po_amt_expr = _get_po_amount_expr()
+		
+		query = f"""
+			SELECT
+				{po_dept_expr} AS department,
+				SUM({po_amt_expr}) AS po_amount,
+				COUNT(DISTINCT po.name) AS po_count
+			FROM `tabPurchase Order` po
+			JOIN `tabPurchase Order Item` poi ON poi.parent = po.name
+			WHERE po.docstatus = 1
+			  AND COALESCE(po.transaction_date, DATE(po.creation)) BETWEEN %(from_date)s AND %(to_date)s
+			  {dept_filter_sql}
+			GROUP BY {po_dept_expr}
+			HAVING {po_dept_expr} != 'Not Set'
+			ORDER BY SUM({po_amt_expr}) DESC
+		"""
+		
+		results = frappe.db.sql(query, {
+			'from_date': from_date,
+			'to_date': to_date,
+			**dept_filter_params
+		}, as_dict=True)
+		
+		# Get department names
+		for row in results:
+			if row.get('department') and row['department'] != 'Not Set':
+				try:
+					dept_name = frappe.db.get_value('Department', row['department'], 'department_name')
+					row['department_name'] = dept_name or row['department']
+				except:
+					row['department_name'] = row['department']
+			else:
+				row['department_name'] = 'Not Set'
+		
+		return results
+	
+	except Exception as e:
+		frappe.log_error(f"Error in get_department_wise_data: {str(e)}", "Procurement Expense Error")
 		return []
 

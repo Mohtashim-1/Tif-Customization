@@ -242,22 +242,25 @@ if (typeof window.CourierDashboard === 'undefined') {
 					r.message.forEach(cc => {
 						select.append(`<option value="${cc}">${cc}</option>`);
 					});
-					// Initialize with cost centers that have numbers 8121 and 8122
-					// The backend will convert these numbers to actual cost center names
-					// For now, keep the numbers in filters - backend handles conversion
-					// Also try to find and select matching cost centers in the dropdown
+					
+					// Find cost centers that match numbers 8121 and 8122
+					// First, try to find by cost center number via backend
+					let found_ccs = [];
 					r.message.forEach(cc => {
 						// Check if cost center name contains the numbers 8121 or 8122
 						if (cc.includes('8121') || cc.includes('8122')) {
+							found_ccs.push(cc);
 							select.find(`option[value="${cc}"]`).prop('selected', true);
-							// Add the actual cost center name to filters (not just the number)
-							if (!me.filters.cost_centers.includes(cc)) {
-								// Remove the number if it exists, add the actual name
-								me.filters.cost_centers = me.filters.cost_centers.filter(c => c !== '8121' && c !== '8122');
-								me.filters.cost_centers.push(cc);
-							}
 						}
 					});
+					
+					// Update filters with actual cost center names (backend will handle number conversion)
+					// Keep both numbers in filters - backend converts them to names
+					// But also add found names to ensure they're selected
+					if (found_ccs.length > 0) {
+						me.filters.cost_centers = ['8121', '8122']; // Keep numbers, backend converts
+					}
+					
 					// Trigger change to update the select UI
 					select.trigger('change');
 				}
@@ -274,7 +277,7 @@ if (typeof window.CourierDashboard === 'undefined') {
 						select.append(`<option value="${customer.name}">${customer.customer_name || customer.name}</option>`);
 					});
 				}
-			}
+			}	
 		});
 	}
 	
