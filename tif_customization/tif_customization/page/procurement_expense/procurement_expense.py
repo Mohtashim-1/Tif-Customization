@@ -27,12 +27,16 @@ def get_procurement_expense_data(filters=None):
 		summary_data = get_summary_data(filters)
 		item_data = get_item_wise_data(filters)
 		department_data = get_department_wise_data(filters)
+		payment_data = get_payment_entry_details(filters)
+		item_payment_data = get_item_payment_details(filters)
 		
 		return {
 			'expense_data': expense_data,
 			'summary_data': summary_data,
 			'item_data': item_data,
 			'department_data': department_data,
+			'payment_data': payment_data,
+			'item_payment_data': item_payment_data,
 			'period_type': period_type
 		}
 	except Exception as e:
@@ -40,25 +44,22 @@ def get_procurement_expense_data(filters=None):
 		return {'error': str(e)}
 
 def get_expense_by_period(filters, period_type='monthly'):
-	"""Get expense data grouped by period and department/cost center - PO only, no MR"""
+	"""Get Purchase Order expense data grouped by period and department/cost center"""
 	try:
 		from_date = filters.get('from_date')
 		to_date = filters.get('to_date')
 		cost_centers = filters.get('cost_centers', [])
 		
-		# Debug: Log the date range being used
-		frappe.log_error(f"Procurement Expense Query - From: {from_date}, To: {to_date}, Period: {period_type}", "Procurement Expense Debug")
-		
-		# Build cost center expressions using helper functions
+		# Build cost center expressions
 		po_cc_expr = _build_po_cc_expr()
 		
-		# Build cost center/department filter using parameterized queries
+		# Build cost center filter
 		po_filter_sql, po_filter_params = _build_in_filter_sql(po_cc_expr, cost_centers)
 		
-		# Get PO amount expression - check if base_amount exists
+		# Get PO amount expression
 		po_amt_expr = _get_po_amount_expr()
 		
-		# Use transaction_date if available, else use creation date (cast to date)
+		# Query Purchase Orders
 		po_query = f"""
 			SELECT 
 				COALESCE(po.transaction_date, DATE(po.creation)) AS transaction_date,
@@ -73,20 +74,18 @@ def get_expense_by_period(filters, period_type='monthly'):
 			GROUP BY COALESCE(po.transaction_date, DATE(po.creation)), {po_cc_expr}
 		"""
 		
-		po_results = frappe.db.sql(po_query, {
+		params = {
 			'from_date': from_date,
 			'to_date': to_date,
 			**po_filter_params
-		}, as_dict=True)
+		}
 		
-		# Debug: Log PO results count and sample data
-		has_custom_dept = frappe.db.has_column('Purchase Order', 'custom_department')
-		frappe.log_error(f"PO Query - From: {from_date}, To: {to_date}\nPO Results Count: {len(po_results)}, Has custom_department: {has_custom_dept}\nSample: {po_results[:2] if po_results else 'No results'}", "Procurement Expense Debug")
+		po_results = frappe.db.sql(po_query, params, as_dict=True)
 		
 		# Group by period
 		combined_data = {}
 		
-		# Process PO data only
+		# Process PO data
 		for row in po_results:
 			period_key = get_period_key(row.get('transaction_date'), period_type)
 			cost_center = row.get('cost_center') or 'Not Set'
@@ -106,9 +105,6 @@ def get_expense_by_period(filters, period_type='monthly'):
 		# Convert to list and sort
 		result = list(combined_data.values())
 		result.sort(key=lambda x: (x['period'], x['cost_center']))
-		
-		# Debug: Log final result count
-		frappe.log_error(f"Final combined results count: {len(result)}\nSample: {result[:2] if result else 'No results'}", "Procurement Expense Debug")
 		
 		# Get department/cost center names
 		for row in result:
@@ -243,104 +239,20 @@ import frappe
 from frappe.utils import flt
 
 def get_summary_data(filters):
-	"""Get summary data by cost center / department"""
+	"""Get summary data by cost center / department from Purchase Orders"""
 	try:
 		from_date = filters.get('from_date')
 		to_date = filters.get('to_date')
 		cost_centers = filters.get('cost_centers', []) or []
 
-		# -----------------------------
-		# Helpers (local)
-		# -----------------------------
-		def _build_mr_cc_expr():
-			# MR parent generally does NOT have cost_center; item does.
-			parts = ["NULLIF(mr.custom_department, '')", "NULLIF(mri.cost_center, '')"]
-
-			# only include if exists (custom installs)
-			try:
-				if frappe.db.has_column("Material Request", "cost_center"):
-					parts.append("NULLIF(mr.cost_center, '')")
-			except Exception:
-				pass
-
-			parts.append("'Not Set'")
-			return f"COALESCE({', '.join(parts)})"
-
-		def _build_po_cc_expr():
-			parts = []
-
-			# custom_department optional
-			try:
-				if frappe.db.has_column("Purchase Order", "custom_department"):
-					parts.append("NULLIF(po.custom_department, '')")
-			except Exception:
-				pass
-
-			# item cost_center is common
-			parts.append("NULLIF(poi.cost_center, '')")
-
-			# parent cost_center may or may not exist
-			try:
-				if frappe.db.has_column("Purchase Order", "cost_center"):
-					parts.append("NULLIF(po.cost_center, '')")
-			except Exception:
-				pass
-
-			parts.append("'Not Set'")
-			return f"COALESCE({', '.join(parts)})"
-
-		def _mr_amount_expr():
-			# Different ERPNext versions: base_amount may not exist on MR Item
-			try:
-				if frappe.db.has_column("Material Request Item", "base_amount"):
-					return "mri.base_amount"
-			except Exception:
-				pass
-
-			try:
-				if frappe.db.has_column("Material Request Item", "amount"):
-					return "mri.amount"
-			except Exception:
-				pass
-
-			# fallback: qty * rate
-			return "(COALESCE(mri.qty,0) * COALESCE(mri.rate,0))"
-
-		def _build_in_filter_sql(expr, values):
-			# returns (sql_snippet, params_dict)
-			if not values:
-				return "", {}
-
-			placeholders = []
-			params = {}
-			for i, v in enumerate(values):
-				k = f"cc_{i}"
-				placeholders.append(f"%({k})s")
-				params[k] = v
-
-			return f" AND {expr} IN ({', '.join(placeholders)})", params
-
-		# -----------------------------
-		# Build expressions & filters
-		# -----------------------------
-		mr_cc_expr = _build_mr_cc_expr()
+		# Build cost center expressions
 		po_cc_expr = _build_po_cc_expr()
-
-		mr_filter_sql, mr_filter_params = _build_in_filter_sql(mr_cc_expr, cost_centers)
 		po_filter_sql, po_filter_params = _build_in_filter_sql(po_cc_expr, cost_centers)
 
-		mr_amt = _mr_amount_expr()
+		# Get PO amount expression
+		po_amt_expr = _get_po_amount_expr()
 
-		# -----------------------------
-		# PO Summary Only (No MR)
-		# -----------------------------
-		po_amt_expr = "poi.base_amount"
-		try:
-			if not frappe.db.has_column("Purchase Order Item", "base_amount"):
-				po_amt_expr = "poi.amount" if frappe.db.has_column("Purchase Order Item", "amount") else "(COALESCE(poi.qty,0) * COALESCE(poi.rate,0))"
-		except Exception:
-			pass
-
+		# Query Purchase Orders
 		po_summary_query = f"""
 			SELECT
 				{po_cc_expr} AS cost_center,
@@ -349,20 +261,20 @@ def get_summary_data(filters):
 			FROM `tabPurchase Order` po
 			JOIN `tabPurchase Order Item` poi ON poi.parent = po.name
 			WHERE po.docstatus = 1
-			  AND COALESCE(po.transaction_date, DATE(po.creation)) BETWEEN %(from_date)s AND %(to_date)s
-			  {po_filter_sql}
+			AND COALESCE(po.transaction_date, DATE(po.creation)) BETWEEN %(from_date)s AND %(to_date)s
+			{po_filter_sql}
 			GROUP BY {po_cc_expr}
 		"""
 
-		po_summary = frappe.db.sql(
-			po_summary_query,
-			{**{'from_date': from_date, 'to_date': to_date}, **po_filter_params},
-			as_dict=True
-		)
+		params = {
+			'from_date': from_date,
+			'to_date': to_date,
+			**po_filter_params
+		}
 
-		# -----------------------------
-		# Build summary dict (PO only)
-		# -----------------------------
+		po_summary = frappe.db.sql(po_summary_query, params, as_dict=True)
+
+		# Build summary dict
 		summary_dict = {}
 
 		for row in po_summary:
@@ -411,7 +323,7 @@ def get_summary_data(filters):
 
 @frappe.whitelist()
 def get_item_wise_data(filters=None):
-	"""Get expense data grouped by item"""
+	"""Get expense data grouped by item from Purchase Orders"""
 	try:
 		if isinstance(filters, str):
 			import json
@@ -439,18 +351,20 @@ def get_item_wise_data(filters=None):
 			FROM `tabPurchase Order` po
 			JOIN `tabPurchase Order Item` poi ON poi.parent = po.name
 			WHERE po.docstatus = 1
-			  AND COALESCE(po.transaction_date, DATE(po.creation)) BETWEEN %(from_date)s AND %(to_date)s
-			  {po_filter_sql}
+			AND COALESCE(po.transaction_date, DATE(po.creation)) BETWEEN %(from_date)s AND %(to_date)s
+			{po_filter_sql}
 			GROUP BY poi.item_code, poi.item_name
 			ORDER BY SUM({po_amt_expr}) DESC
 			LIMIT 50
 		"""
 		
-		results = frappe.db.sql(query, {
+		params = {
 			'from_date': from_date,
 			'to_date': to_date,
 			**po_filter_params
-		}, as_dict=True)
+		}
+		
+		results = frappe.db.sql(query, params, as_dict=True)
 		
 		return results
 	
@@ -461,7 +375,7 @@ def get_item_wise_data(filters=None):
 
 @frappe.whitelist()
 def get_department_wise_data(filters=None):
-	"""Get expense data grouped by department"""
+	"""Get expense data grouped by department from Purchase Orders"""
 	try:
 		if isinstance(filters, str):
 			import json
@@ -473,7 +387,7 @@ def get_department_wise_data(filters=None):
 		to_date = filters.get('to_date')
 		cost_centers = filters.get('cost_centers', []) or []
 		
-		# Build department filter - only get departments, not cost centers
+		# Build department filter - get from custom_department or cost center
 		po_dept_expr = "COALESCE(NULLIF(po.custom_department, ''), 'Not Set')"
 		has_custom_dept = frappe.db.has_column('Purchase Order', 'custom_department')
 		
@@ -505,18 +419,20 @@ def get_department_wise_data(filters=None):
 			FROM `tabPurchase Order` po
 			JOIN `tabPurchase Order Item` poi ON poi.parent = po.name
 			WHERE po.docstatus = 1
-			  AND COALESCE(po.transaction_date, DATE(po.creation)) BETWEEN %(from_date)s AND %(to_date)s
-			  {dept_filter_sql}
+			AND COALESCE(po.transaction_date, DATE(po.creation)) BETWEEN %(from_date)s AND %(to_date)s
+			{dept_filter_sql}
 			GROUP BY {po_dept_expr}
 			HAVING {po_dept_expr} != 'Not Set'
 			ORDER BY SUM({po_amt_expr}) DESC
 		"""
 		
-		results = frappe.db.sql(query, {
+		params = {
 			'from_date': from_date,
 			'to_date': to_date,
 			**dept_filter_params
-		}, as_dict=True)
+		}
+		
+		results = frappe.db.sql(query, params, as_dict=True)
 		
 		# Get department names
 		for row in results:
@@ -533,5 +449,461 @@ def get_department_wise_data(filters=None):
 	
 	except Exception as e:
 		frappe.log_error(f"Error in get_department_wise_data: {str(e)}", "Procurement Expense Error")
+		return []
+
+@frappe.whitelist()
+def get_payment_entry_details(filters=None):
+	"""Get Payment Entry details for Purchase Invoices - Mode of Payment breakdown"""
+	try:
+		if isinstance(filters, str):
+			import json
+			filters = json.loads(filters)
+		elif not filters:
+			filters = {}
+		
+		from_date = filters.get('from_date')
+		to_date = filters.get('to_date')
+		cost_centers = filters.get('cost_centers', []) or []
+		
+		# Build cost center filter for Payment Entries
+		cost_center_filter = ""
+		cost_center_params = {}
+		if cost_centers:
+			placeholders = []
+			for i, cc in enumerate(cost_centers):
+				key = f"cc_{i}"
+				placeholders.append(f"%({key})s")
+				cost_center_params[key] = cc
+			cost_center_filter = f"AND pe.cost_center IN ({', '.join(placeholders)})"
+		
+		# Query Payment Entries linked to Purchase Invoices only
+		query = f"""
+			SELECT 
+				pe.name AS payment_entry,
+				pe.posting_date,
+				pe.mode_of_payment,
+				COALESCE(mop.type, 'Other') AS payment_type,
+				per.allocated_amount,
+				pe.paid_amount,
+				pe.cost_center,
+				per.reference_name AS pi_name,
+				pi.supplier,
+				pi.posting_date AS pi_posting_date
+			FROM `tabPayment Entry` pe
+			INNER JOIN `tabPayment Entry Reference` per ON per.parent = pe.name
+			INNER JOIN `tabPurchase Invoice` pi ON pi.name = per.reference_name
+			LEFT JOIN `tabMode of Payment` mop ON mop.name = pe.mode_of_payment
+			WHERE pe.docstatus = 1
+			AND pe.payment_type = 'Pay'
+			AND per.reference_doctype = 'Purchase Invoice'
+			AND pe.posting_date BETWEEN %(from_date)s AND %(to_date)s
+			{cost_center_filter}
+			ORDER BY pe.posting_date DESC, pe.name DESC
+		"""
+		
+		params = {
+			'from_date': from_date,
+			'to_date': to_date,
+			**cost_center_params
+		}
+		
+		payment_entries = frappe.db.sql(query, params, as_dict=True)
+		
+		# Process and group by mode of payment
+		payment_summary = {}
+		
+		for pe in payment_entries:
+			# Get mode of payment name
+			mode_of_payment = pe.mode_of_payment or 'Not Specified'
+			
+			# Determine payment type (Cash or Other)
+			payment_type = pe.payment_type or 'Other'
+			is_cash = payment_type == 'Cash'
+			
+			# Use allocated_amount from reference, fallback to paid_amount
+			amount = flt(pe.allocated_amount or pe.paid_amount or 0)
+			
+			# Group by mode of payment
+			if mode_of_payment not in payment_summary:
+				payment_summary[mode_of_payment] = {
+					'mode_of_payment': mode_of_payment,
+					'payment_type': payment_type,
+					'cash_amount': 0,
+					'other_amount': 0,
+					'total_amount': 0,
+					'payment_count': 0,
+					'invoice_count': 0
+				}
+			
+			payment_summary[mode_of_payment]['total_amount'] += amount
+			payment_summary[mode_of_payment]['payment_count'] += 1
+			
+			# Track unique invoices
+			if pe.pi_name:
+				if 'invoices' not in payment_summary[mode_of_payment]:
+					payment_summary[mode_of_payment]['invoices'] = set()
+				payment_summary[mode_of_payment]['invoices'].add(pe.pi_name)
+			
+			if is_cash:
+				payment_summary[mode_of_payment]['cash_amount'] += amount
+			else:
+				payment_summary[mode_of_payment]['other_amount'] += amount
+		
+		# Convert to list, calculate invoice count, and sort
+		result = []
+		for mode, data in payment_summary.items():
+			data['invoice_count'] = len(data.get('invoices', set()))
+			del data['invoices']  # Remove set before returning
+			result.append(data)
+		
+		result.sort(key=lambda x: x['total_amount'], reverse=True)
+		
+		return result
+		
+	except Exception as e:
+		frappe.log_error(f"Error in get_payment_entry_details: {str(e)}", "Procurement Expense Error")
+		return []
+
+@frappe.whitelist()
+def get_item_payment_details(filters=None):
+	"""Get item-wise payment details - which items paid via Cash vs Cheque"""
+	try:
+		if isinstance(filters, str):
+			import json
+			filters = json.loads(filters)
+		elif not filters:
+			filters = {}
+		
+		from_date = filters.get('from_date')
+		to_date = filters.get('to_date')
+		cost_centers = filters.get('cost_centers', []) or []
+		
+		# Build cost center filter
+		cost_center_filter = ""
+		cost_center_params = {}
+		if cost_centers:
+			placeholders = []
+			for i, cc in enumerate(cost_centers):
+				key = f"cc_{i}"
+				placeholders.append(f"%({key})s")
+				cost_center_params[key] = cc
+			cost_center_filter = f"AND pe.cost_center IN ({', '.join(placeholders)})"
+		
+		# Query Payment Entries with Purchase Invoice Items
+		query = f"""
+			SELECT 
+				pe.mode_of_payment,
+				COALESCE(mop.type, 'Other') AS payment_type,
+				per.reference_name AS pi_name,
+				per.allocated_amount AS payment_amount,
+				pii.item_code,
+				pii.item_name,
+				pii.base_amount AS item_amount,
+				pi.grand_total AS invoice_total
+			FROM `tabPayment Entry` pe
+			INNER JOIN `tabPayment Entry Reference` per ON per.parent = pe.name
+			INNER JOIN `tabPurchase Invoice` pi ON pi.name = per.reference_name
+			INNER JOIN `tabPurchase Invoice Item` pii ON pii.parent = pi.name
+			LEFT JOIN `tabMode of Payment` mop ON mop.name = pe.mode_of_payment
+			WHERE pe.docstatus = 1
+			AND pe.payment_type = 'Pay'
+			AND per.reference_doctype = 'Purchase Invoice'
+			AND pe.posting_date BETWEEN %(from_date)s AND %(to_date)s
+			AND pi.grand_total > 0
+			{cost_center_filter}
+		"""
+		
+		params = {
+			'from_date': from_date,
+			'to_date': to_date,
+			**cost_center_params
+		}
+		
+		results = frappe.db.sql(query, params, as_dict=True)
+		
+		# Process and group by item and mode of payment
+		item_payment_summary = {}
+		
+		for row in results:
+			item_code = row.item_code or 'Unknown'
+			item_name = row.item_name or item_code
+			mode_of_payment = row.mode_of_payment or 'Not Specified'
+			payment_type = row.payment_type or 'Other'
+			
+			# Calculate proportional payment amount for this item
+			invoice_total = flt(row.invoice_total or 0)
+			item_amount = flt(row.item_amount or 0)
+			payment_amount = flt(row.payment_amount or 0)
+			
+			# Calculate proportion of payment allocated to this item
+			if invoice_total > 0:
+				item_proportion = item_amount / invoice_total
+				allocated_payment = payment_amount * item_proportion
+			else:
+				allocated_payment = 0
+			
+			# Group by item and mode of payment
+			key = f"{item_code}_{mode_of_payment}"
+			
+			if key not in item_payment_summary:
+				item_payment_summary[key] = {
+					'item_code': item_code,
+					'item_name': item_name,
+					'mode_of_payment': mode_of_payment,
+					'payment_type': payment_type,
+					'amount': 0,
+					'invoice_count': set()
+				}
+			
+			item_payment_summary[key]['amount'] += allocated_payment
+			if row.pi_name:
+				item_payment_summary[key]['invoice_count'].add(row.pi_name)
+		
+		# Separate cash and cheque items
+		cash_items = {}
+		cheque_items = {}
+		
+		for key, data in item_payment_summary.items():
+			item_code = data['item_code']
+			item_name = data['item_name']
+			mode = data['mode_of_payment'].lower()
+			
+			# Check if cash payment
+			if 'cash' in mode or data['payment_type'] == 'Cash':
+				if item_code not in cash_items:
+					cash_items[item_code] = {
+						'item_code': item_code,
+						'item_name': item_name,
+						'amount': 0,
+						'invoice_count': set()
+					}
+				cash_items[item_code]['amount'] += data['amount']
+				cash_items[item_code]['invoice_count'].update(data['invoice_count'])
+			
+			# Check if cheque payment
+			if 'cheque' in mode or 'check' in mode:
+				if item_code not in cheque_items:
+					cheque_items[item_code] = {
+						'item_code': item_code,
+						'item_name': item_name,
+						'amount': 0,
+						'invoice_count': set()
+					}
+				cheque_items[item_code]['amount'] += data['amount']
+				cheque_items[item_code]['invoice_count'].update(data['invoice_count'])
+		
+		# Convert to lists and calculate invoice counts
+		cash_list = []
+		for item_code, data in cash_items.items():
+			cash_list.append({
+				'item_code': item_code,
+				'item_name': data['item_name'],
+				'amount': flt(data['amount']),
+				'invoice_count': len(data['invoice_count'])
+			})
+		cash_list.sort(key=lambda x: x['amount'], reverse=True)
+		
+		cheque_list = []
+		for item_code, data in cheque_items.items():
+			cheque_list.append({
+				'item_code': item_code,
+				'item_name': data['item_name'],
+				'amount': flt(data['amount']),
+				'invoice_count': len(data['invoice_count'])
+			})
+		cheque_list.sort(key=lambda x: x['amount'], reverse=True)
+		
+		return {
+			'cash_items': cash_list[:20],  # Top 20 items
+			'cheque_items': cheque_list[:20]  # Top 20 items
+		}
+		
+	except Exception as e:
+		frappe.log_error(f"Error in get_item_payment_details: {str(e)}", "Procurement Expense Error")
+		return {'cash_items': [], 'cheque_items': []}
+
+@frappe.whitelist()
+def get_courier_details(filters=None):
+	"""Get courier expense details with courier name, type, cash, invoice, paid, pending amounts"""
+	try:
+		if isinstance(filters, str):
+			import json
+			filters = json.loads(filters)
+		elif not filters:
+			filters = {}
+		
+		from_date = filters.get('from_date')
+		to_date = filters.get('to_date')
+		cost_centers = filters.get('cost_centers', []) or []
+		
+		# Build cost center filter
+		cost_center_filter = ""
+		cost_center_params = {}
+		if cost_centers:
+			# Check if custom_supply_chain_cost_center column exists
+			has_supply_chain_cc = frappe.db.has_column('Delivery Note', 'custom_supply_chain_cost_center')
+			if has_supply_chain_cc:
+				placeholders = []
+				for i, cc in enumerate(cost_centers):
+					key = f"cc_{i}"
+					placeholders.append(f"%({key})s")
+					cost_center_params[key] = cc
+				cost_center_filter = f"AND (dn.custom_supply_chain_cost_center IN ({', '.join(placeholders)}) OR dn.cost_center IN ({', '.join(placeholders)}))"
+			else:
+				placeholders = []
+				for i, cc in enumerate(cost_centers):
+					key = f"cc_{i}"
+					placeholders.append(f"%({key})s")
+					cost_center_params[key] = cc
+				cost_center_filter = f"AND dn.cost_center IN ({', '.join(placeholders)})"
+		
+		# Check if courier-related columns exist
+		has_courier = frappe.db.has_column('Delivery Note', 'custom_courier')
+		has_courier_service = frappe.db.has_column('Delivery Note', 'custom_courier_service')
+		has_delivery_mode = frappe.db.has_column('Delivery Note', 'custom_delivery_mode')
+		has_delivery_rate = frappe.db.has_column('Delivery Note', 'custom_delivery_rate')
+		has_mode_of_payment = frappe.db.has_column('Delivery Note', 'custom_courier_mode_of_payment')
+		
+		if not (has_courier and has_delivery_rate):
+			return []
+		
+		# Query Delivery Notes with courier expenses
+		query = f"""
+			SELECT 
+				dn.name AS delivery_note,
+				dn.posting_date,
+				dn.custom_courier AS courier_name,
+				COALESCE(dn.custom_courier_service, 'N/A') AS courier_type,
+				dn.custom_delivery_rate AS amount,
+				COALESCE(dn.custom_courier_mode_of_payment, 'Cash') AS payment_mode,
+				COALESCE(dn.custom_supply_chain_cost_center, dn.cost_center, 'Not Set') AS cost_center
+			FROM `tabDelivery Note` dn
+			WHERE dn.docstatus = 1
+			AND dn.posting_date BETWEEN %(from_date)s AND %(to_date)s
+			AND dn.custom_delivery_mode = 'Courier'
+			AND dn.custom_delivery_rate > 0
+			AND dn.custom_courier IS NOT NULL
+			AND dn.custom_courier != ''
+			{cost_center_filter}
+			ORDER BY dn.posting_date DESC, dn.name DESC
+		"""
+		
+		params = {
+			'from_date': from_date,
+			'to_date': to_date,
+			**cost_center_params
+		}
+		
+		delivery_notes = frappe.db.sql(query, params, as_dict=True)
+		
+		# Get supplier for each courier to track invoices
+		courier_suppliers = {}
+		for dn in delivery_notes:
+			if dn.courier_name and dn.courier_name not in courier_suppliers:
+				supplier = frappe.db.get_value('Courier', dn.courier_name, 'supplier')
+				courier_suppliers[dn.courier_name] = supplier
+		
+		# Process delivery notes and calculate amounts
+		courier_summary = {}
+		
+		# Track invoice amounts by supplier for paid/pending calculation
+		supplier_invoice_totals = {}
+		supplier_paid_totals = {}
+		
+		for dn in delivery_notes:
+			courier_name = dn.courier_name or 'Unknown'
+			courier_type = dn.courier_type or 'N/A'
+			amount = flt(dn.amount or 0)
+			payment_mode = dn.payment_mode or 'Cash'
+			
+			key = f"{courier_name}_{courier_type}"
+			
+			if key not in courier_summary:
+				courier_summary[key] = {
+					'courier_name': courier_name,
+					'courier_type': courier_type,
+					'cash_amount': 0,
+					'invoice_amount': 0,
+					'paid_amount': 0,
+					'pending_amount': 0,
+					'total_amount': 0
+				}
+			
+			courier_summary[key]['total_amount'] += amount
+			
+			if payment_mode == 'Cash':
+				courier_summary[key]['cash_amount'] += amount
+			else:
+				# Invoice payment - track invoice amount
+				courier_summary[key]['invoice_amount'] += amount
+				supplier = courier_suppliers.get(courier_name)
+				if supplier:
+					if supplier not in supplier_invoice_totals:
+						supplier_invoice_totals[supplier] = 0
+					supplier_invoice_totals[supplier] += amount
+		
+		# Calculate paid amounts from Purchase Invoices
+		for supplier, total_invoice in supplier_invoice_totals.items():
+			# Get all Purchase Invoices for this supplier in date range
+			pi_query = """
+				SELECT 
+					name,
+					grand_total,
+					outstanding_amount
+				FROM `tabPurchase Invoice`
+				WHERE docstatus = 1
+				AND supplier = %(supplier)s
+				AND posting_date BETWEEN %(from_date)s AND %(to_date)s
+			"""
+			
+			pis = frappe.db.sql(pi_query, {
+				'supplier': supplier,
+				'from_date': from_date,
+				'to_date': to_date
+			}, as_dict=True)
+			
+			total_pi_amount = sum(flt(pi.grand_total) for pi in pis)
+			total_pi_outstanding = sum(flt(pi.outstanding_amount) for pi in pis)
+			total_pi_paid = total_pi_amount - total_pi_outstanding
+			
+			supplier_paid_totals[supplier] = {
+				'total': total_pi_amount,
+				'paid': total_pi_paid,
+				'outstanding': total_pi_outstanding
+			}
+		
+		# Allocate paid/pending amounts to courier summaries
+		for key, summary in courier_summary.items():
+			if summary['invoice_amount'] > 0:
+				# Find supplier for this courier
+				courier_name = summary['courier_name']
+				supplier = courier_suppliers.get(courier_name)
+				
+				if supplier and supplier in supplier_invoice_totals:
+					# Calculate proportion of paid/pending
+					supplier_total_invoice = supplier_invoice_totals[supplier]
+					supplier_paid_info = supplier_paid_totals.get(supplier, {'paid': 0, 'outstanding': 0})
+					
+					if supplier_total_invoice > 0:
+						# Proportion of this courier's invoice amount
+						proportion = summary['invoice_amount'] / supplier_total_invoice
+						
+						# Allocate paid/pending proportionally
+						summary['paid_amount'] = flt(supplier_paid_info['paid'] * proportion)
+						summary['pending_amount'] = flt(supplier_paid_info['outstanding'] * proportion)
+					else:
+						summary['pending_amount'] = summary['invoice_amount']
+				else:
+					# No supplier or no PI found - assume all pending
+					summary['pending_amount'] = summary['invoice_amount']
+		
+		# Convert to list and sort
+		result = list(courier_summary.values())
+		result.sort(key=lambda x: x['total_amount'], reverse=True)
+		
+		return result
+		
+	except Exception as e:
+		frappe.log_error(f"Error in get_courier_details: {str(e)}", "Procurement Expense Error")
 		return []
 
