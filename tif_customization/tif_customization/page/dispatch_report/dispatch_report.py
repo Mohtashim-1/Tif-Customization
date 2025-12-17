@@ -13,16 +13,29 @@ def get_dispatch_report_data(filters=None):
 			filters = {}
 		
 		# Set default date range if not provided
-		if not filters.get('from_date'):
+		from_date = filters.get('from_date')
+		if not from_date or from_date == '':
 			filters['from_date'] = add_days(today(), -30)
-		if not filters.get('to_date'):
+		else:
+			# Ensure date is in proper format
+			filters['from_date'] = getdate(from_date)
+		
+		to_date = filters.get('to_date')
+		if not to_date or to_date == '':
 			filters['to_date'] = today()
+		else:
+			# Ensure date is in proper format
+			filters['to_date'] = getdate(to_date)
 		
 		# Get dispatch data
 		dispatch_data = get_dispatch_data(filters)
 		
+		# Get summary/KPI data
+		summary_data = get_summary_data(filters, dispatch_data)
+		
 		return {
-			'dispatch_data': dispatch_data
+			'dispatch_data': dispatch_data,
+			'summary_data': summary_data
 		}
 	except Exception as e:
 		frappe.log_error(f"Error in get_dispatch_report_data: {str(e)}", "Dispatch Report Error")
@@ -33,6 +46,13 @@ def get_dispatch_data(filters):
 	try:
 		from_date = filters.get('from_date')
 		to_date = filters.get('to_date')
+		
+		# Dates should already be date objects from get_dispatch_report_data, but ensure they are
+		if from_date:
+			from_date = getdate(from_date)
+		if to_date:
+			to_date = getdate(to_date)
+		
 		customer = filters.get('customer')
 		book = filters.get('book')  # item_code
 		city = filters.get('city')
@@ -137,6 +157,58 @@ def get_dispatch_data(filters):
 	except Exception as e:
 		frappe.log_error(f"Error in get_dispatch_data: {str(e)}", "Dispatch Report Error")
 		return []
+
+def get_summary_data(filters, dispatch_data):
+	"""Calculate summary/KPI data from dispatch data"""
+	try:
+		if not dispatch_data:
+			return {
+				'total_quantity': 0,
+				'total_delivery_notes': 0,
+				'unique_customers': 0,
+				'unique_items': 0,
+				'mqh_quantity': 0,
+				'qaida_quantity': 0,
+				'other_quantity': 0
+			}
+		
+		# Calculate totals
+		total_quantity = sum(flt(row.get('qty', 0)) for row in dispatch_data)
+		
+		# Count unique delivery notes
+		unique_delivery_notes = len(set(row.get('delivery_note_no') for row in dispatch_data if row.get('delivery_note_no')))
+		
+		# Count unique customers
+		unique_customers = len(set(row.get('customer') for row in dispatch_data if row.get('customer')))
+		
+		# Count unique items
+		unique_items = len(set(row.get('item_code') for row in dispatch_data if row.get('item_code')))
+		
+		# Calculate quantities by book type
+		mqh_quantity = sum(flt(row.get('qty', 0)) for row in dispatch_data if row.get('book_type') == 'MQH')
+		qaida_quantity = sum(flt(row.get('qty', 0)) for row in dispatch_data if row.get('book_type') == 'Qaida')
+		other_quantity = sum(flt(row.get('qty', 0)) for row in dispatch_data if row.get('book_type') == 'Other')
+		
+		return {
+			'total_quantity': flt(total_quantity),
+			'total_delivery_notes': unique_delivery_notes,
+			'unique_customers': unique_customers,
+			'unique_items': unique_items,
+			'mqh_quantity': flt(mqh_quantity),
+			'qaida_quantity': flt(qaida_quantity),
+			'other_quantity': flt(other_quantity)
+		}
+	except Exception as e:
+		frappe.log_error(f"Error in get_summary_data: {str(e)}", "Dispatch Report Error")
+		return {
+			'total_quantity': 0,
+			'total_delivery_notes': 0,
+			'unique_customers': 0,
+			'unique_items': 0,
+			'mqh_quantity': 0,
+			'qaida_quantity': 0,
+			'other_quantity': 0
+		}
 
 @frappe.whitelist()
 def get_filter_options():

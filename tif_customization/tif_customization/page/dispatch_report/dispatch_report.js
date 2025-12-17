@@ -121,6 +121,13 @@ if (typeof window.DispatchReport === 'undefined') {
 					</div>
 				</div>
 				
+				<!-- KPI Section -->
+				<div class="kpi-section" id="kpi-section" style="margin-bottom: 20px;">
+					<div class="row">
+						<!-- KPIs will be rendered here -->
+					</div>
+				</div>
+				
 				<!-- Data Table Section -->
 				<div class="data-section">
 					<h5 style="margin-bottom: 15px;">Dispatch Data</h5>
@@ -146,6 +153,13 @@ if (typeof window.DispatchReport === 'undefined') {
 									<td colspan="11" class="text-center">Loading data...</td>
 								</tr>
 							</tbody>
+							<tfoot id="dispatch-tfoot" style="display: none;">
+								<tr style="background-color: #f8f9fa; font-weight: bold;">
+									<td colspan="8" class="text-right"><strong>Total</strong></td>
+									<td class="text-right"><strong id="total-quantity">0</strong></td>
+									<td colspan="2"></td>
+								</tr>
+							</tfoot>
 						</table>
 					</div>
 				</div>
@@ -253,8 +267,12 @@ if (typeof window.DispatchReport === 'undefined') {
 		let me = this;
 		
 		// Get filter values
-		me.filters.from_date = $('#from-date').val();
-		me.filters.to_date = $('#to-date').val();
+		let fromDate = $('#from-date').val();
+		let toDate = $('#to-date').val();
+		
+		// Set dates, use defaults if empty
+		me.filters.from_date = fromDate || frappe.datetime.add_days(frappe.datetime.get_today(), -30);
+		me.filters.to_date = toDate || frappe.datetime.get_today();
 		
 		// Get customer value - handle both regular input and frappe link field
 		let customerField = $('#customer-filter');
@@ -315,6 +333,7 @@ if (typeof window.DispatchReport === 'undefined') {
 			callback: function(r) {
 				if (r.message && !r.message.error) {
 					me.data = r.message;
+					me.render_kpis();
 					me.render_table();
 				} else {
 					$('#dispatch-tbody').html(`<tr><td colspan="11" class="text-center text-danger">Error loading data: ${r.message?.error || 'Unknown error'}</td></tr>`);
@@ -323,16 +342,69 @@ if (typeof window.DispatchReport === 'undefined') {
 		});
 	}
 	
+	render_kpis() {
+		let me = this;
+		let summary = me.data.summary_data || {};
+		
+		let total_quantity = summary.total_quantity || 0;
+		let total_delivery_notes = summary.total_delivery_notes || 0;
+		let unique_customers = summary.unique_customers || 0;
+		let unique_items = summary.unique_items || 0;
+		let mqh_quantity = summary.mqh_quantity || 0;
+		let qaida_quantity = summary.qaida_quantity || 0;
+		let other_quantity = summary.other_quantity || 0;
+		
+		let kpi_html = `
+			<div class="col-md-3">
+				<div class="kpi-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+					<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Total Quantity</h5>
+					<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${format_number_value(total_quantity)}</h2>
+					<p style="margin: 5px 0 0 0; font-size: 12px; opacity: 0.8;">${total_delivery_notes} Delivery Notes</p>
+				</div>
+			</div>
+			<div class="col-md-3">
+				<div class="kpi-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+					<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Unique Customers</h5>
+					<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${format_number_value(unique_customers)}</h2>
+					<p style="margin: 5px 0 0 0; font-size: 12px; opacity: 0.8;">${unique_items} Unique Items</p>
+				</div>
+			</div>
+			<div class="col-md-3">
+				<div class="kpi-card" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+					<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">MQH Quantity</h5>
+					<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${format_number_value(mqh_quantity)}</h2>
+					<p style="margin: 5px 0 0 0; font-size: 12px; opacity: 0.8;">${total_quantity > 0 ? ((mqh_quantity / total_quantity) * 100).toFixed(1) : 0}% of Total</p>
+				</div>
+			</div>
+			<div class="col-md-3">
+				<div class="kpi-card" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+					<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Qaida Quantity</h5>
+					<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${format_number_value(qaida_quantity)}</h2>
+					<p style="margin: 5px 0 0 0; font-size: 12px; opacity: 0.8;">${total_quantity > 0 ? ((qaida_quantity / total_quantity) * 100).toFixed(1) : 0}% of Total</p>
+				</div>
+			</div>
+		`;
+		
+		$('#kpi-section .row').html(kpi_html);
+	}
+	
 	render_table() {
 		let me = this;
 		let dispatch_data = me.data.dispatch_data || [];
 		let tbody = $('#dispatch-tbody');
+		let tfoot = $('#dispatch-tfoot');
 		tbody.empty();
 		
 		if (dispatch_data.length === 0) {
 			tbody.append('<tr><td colspan="11" class="text-center">No data found for the selected filters</td></tr>');
+			tfoot.hide();
 		} else {
+			let total_quantity = 0;
+			
 			dispatch_data.forEach(row => {
+				let qty = parseFloat(row.qty || 0) || 0;
+				total_quantity += qty;
+				
 				let tr = $(`
 					<tr>
 						<td><a href="/app/delivery-note/${row.delivery_note_no}" target="_blank">${row.delivery_note_no || '-'}</a></td>
@@ -350,6 +422,10 @@ if (typeof window.DispatchReport === 'undefined') {
 				`);
 				tbody.append(tr);
 			});
+			
+			// Update totals row
+			$('#total-quantity').text(format_number_value(total_quantity));
+			tfoot.show();
 		}
 	}
 	
@@ -394,5 +470,6 @@ function format_number_value(value) {
 	if (value === null || value === undefined || value === '') {
 		return '0';
 	}
-	return flt(value).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+	let numValue = parseFloat(value) || 0;
+	return numValue.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }

@@ -52,6 +52,11 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 			</div>
 		</div>
 		
+		<!-- KPI Section -->
+		<div class="kpi-section" id="kpi-section" style="margin: 20px 0; padding: 20px; background: #f8f9fa; border-radius: 8px;">
+			<!-- KPIs will be rendered here -->
+		</div>
+		
 		<div class="report-content">
 			<div class="report-section">
 				<h4>MQH Books Stock Details - 2025-26</h4>
@@ -60,7 +65,8 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 						<thead>
 							<tr>
 								<th>S.#</th>
-								<th>Particulars</th>
+								<th>Item Code</th>
+								<th>Item Name</th>
 								<th>Opening Stock Sep-2025</th>
 								<th>Received Vendor till 30-Sep-2025</th>
 								<th>Book Return till 30-Sep-2025</th>
@@ -86,7 +92,8 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 						<thead>
 							<tr>
 								<th>S.#</th>
-								<th>Particulars</th>
+								<th>Item Code</th>
+								<th>Item Name</th>
 								<th>Opening Stock Sep-2025</th>
 								<th>Received Vendor till 30-Sep-2025</th>
 								<th>Book Return till 30-Sep-2025</th>
@@ -347,6 +354,11 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 			args: {},
 			callback: function(r) {
 				if (r.message && !r.message.error) {
+					// Render KPIs
+					if (r.message.kpi_data) {
+						renderKPIs(r.message.kpi_data);
+					}
+					
 					// Populate tables with dynamic data
 					populateMQHBooksTable(r.message.mqh_books_data || []);
 					populateMQHUrduBooksTable(r.message.mqh_urdu_books_data || []);
@@ -497,6 +509,11 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 				console.log('Head Office Data:', r.message?.head_office_data);
 				
 				if (r.message && !r.message.error) {
+					// Render KPIs
+					if (r.message.kpi_data) {
+						renderKPIs(r.message.kpi_data);
+					}
+					
 					// Populate tables with filtered data
 					populateMQHBooksTable(r.message.mqh_books_data || []);
 					populateMQHUrduBooksTable(r.message.mqh_urdu_books_data || []);
@@ -533,27 +550,27 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 			// Update MQH Books table headers
 			$('#mqh-books-table thead tr th').each(function(index) {
 				const $th = $(this);
-				if (index === 2) $th.text(`Opening Stock ${fromDateFormatted}`);
-				if (index === 3) $th.text(`Received Vendor till ${toDateFormatted}`);
-				if (index === 4) $th.text(`Book Return till ${toDateFormatted}`);
-				if (index === 5) $th.text(`Delivered till ${toDateFormatted}`);
-				if (index === 6) $th.text(`Available Stock till ${toDateFormatted}`);
-				if (index === 7) $th.text(`Demand Received till ${toDateFormatted}`);
-				if (index === 8) $th.text(`Books Sale Details till ${toDateFormatted}`);
-				if (index === 9) $th.text(`Total Amount of Books Sale till ${toDateFormatted}`);
+				if (index === 3) $th.text(`Opening Stock ${fromDateFormatted}`);
+				if (index === 4) $th.text(`Received Vendor till ${toDateFormatted}`);
+				if (index === 5) $th.text(`Book Return till ${toDateFormatted}`);
+				if (index === 6) $th.text(`Delivered till ${toDateFormatted}`);
+				if (index === 7) $th.text(`Available Stock till ${toDateFormatted}`);
+				if (index === 8) $th.text(`Demand Received till ${toDateFormatted}`);
+				if (index === 9) $th.text(`Books Sale Details till ${toDateFormatted}`);
+				if (index === 10) $th.text(`Total Amount of Books Sale till ${toDateFormatted}`);
 			});
 			
 			// Update MQH Urdu Books table headers
 			$('#mqh-urdu-books-table thead tr th').each(function(index) {
 				const $th = $(this);
-				if (index === 2) $th.text(`Opening Stock ${fromDateFormatted}`);
-				if (index === 3) $th.text(`Received Vendor till ${toDateFormatted}`);
-				if (index === 4) $th.text(`Book Return till ${toDateFormatted}`);
-				if (index === 5) $th.text(`Delivered till ${toDateFormatted}`);
-				if (index === 6) $th.text(`Available Stock till ${toDateFormatted}`);
-				if (index === 7) $th.text(`Demand Received till ${toDateFormatted}`);
-				if (index === 8) $th.text(`Books Sale Details till ${toDateFormatted}`);
-				if (index === 9) $th.text(`Total Amount of Books Sale till ${toDateFormatted}`);
+				if (index === 3) $th.text(`Opening Stock ${fromDateFormatted}`);
+				if (index === 4) $th.text(`Received Vendor till ${toDateFormatted}`);
+				if (index === 5) $th.text(`Book Return till ${toDateFormatted}`);
+				if (index === 6) $th.text(`Delivered till ${toDateFormatted}`);
+				if (index === 7) $th.text(`Available Stock till ${toDateFormatted}`);
+				if (index === 8) $th.text(`Demand Received till ${toDateFormatted}`);
+				if (index === 9) $th.text(`Books Sale Details till ${toDateFormatted}`);
+				if (index === 10) $th.text(`Total Amount of Books Sale till ${toDateFormatted}`);
 			});
 		}
 	}
@@ -893,7 +910,8 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 				const row = $(`
 					<tr>
 						<td style="text-align: center;">${item.s_no || ''}</td>
-						<td class="particulars-cell">${item.particulars || ''}</td>
+						<td>${item.item_code || ''}</td>
+						<td>${item.item_name || ''}</td>
 						<td class="number-cell">${formatNumber(item.opening_stock || 0)}</td>
 						<td class="number-cell">${formatNumber(item.received_vendor || 0)}</td>
 						<td class="number-cell">${formatNumber(item.book_return || 0)}</td>
@@ -930,7 +948,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 		
 		const totalRow = $(`
 			<tr>
-				<td colspan="2"><strong>Total Stock</strong></td>
+				<td colspan="3" style="text-align: left;"><strong>Total Stock</strong></td>
 				<td class="number-cell"><strong>${formatNumber(totals.opening_stock)}</strong></td>
 				<td class="number-cell"><strong>${formatNumber(totals.received_vendor)}</strong></td>
 				<td class="number-cell"><strong>${formatNumber(totals.book_return)}</strong></td>
@@ -957,7 +975,8 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 			const row = $(`
 				<tr>
 					<td style="text-align: center;">${item.s_no}</td>
-					<td class="particulars-cell">${item.particulars}</td>
+					<td>${item.item_code || ''}</td>
+					<td>${item.item_name || ''}</td>
 					<td class="number-cell">${formatNumber(item.opening_stock)}</td>
 					<td class="number-cell">${formatNumber(item.received_vendor)}</td>
 					<td class="number-cell">${formatNumber(item.book_return)}</td>
@@ -985,7 +1004,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 		
 		const totalRow = $(`
 			<tr>
-				<td colspan="2"><strong>Total Stock</strong></td>
+				<td colspan="3" style="text-align: left;"><strong>Total Stock</strong></td>
 				<td class="number-cell"><strong>${formatNumber(totals.opening_stock)}</strong></td>
 				<td class="number-cell"><strong>${formatNumber(totals.received_vendor)}</strong></td>
 				<td class="number-cell"><strong>${formatNumber(totals.book_return)}</strong></td>
@@ -997,6 +1016,94 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 			</tr>
 		`);
 		tfoot.append(totalRow);
+	}
+	
+	function renderKPIs(kpiData) {
+		if (!kpiData) {
+			return;
+		}
+		
+		const kpiSection = $('#kpi-section');
+		kpiSection.empty();
+		
+		// Summary KPIs at the top
+		const summaryHtml = `
+			<h4 style="margin-bottom: 15px;">Key Performance Indicators (KPIs)</h4>
+			<div class="row" style="margin-bottom: 30px;">
+				<div class="col-md-3">
+					<div class="kpi-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+						<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Total Items</h5>
+						<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${kpiData.total_items || 0}</h2>
+						<p style="margin: 5px 0 0 0; font-size: 12px; opacity: 0.8;">Items Tracked</p>
+					</div>
+				</div>
+				<div class="col-md-3">
+					<div class="kpi-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+						<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Total Opening Stock</h5>
+						<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${formatNumber(kpiData.total_opening_stock || 0)}</h2>
+						<p style="margin: 5px 0 0 0; font-size: 12px; opacity: 0.8;">Units</p>
+					</div>
+				</div>
+				<div class="col-md-3">
+					<div class="kpi-card" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+						<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Total Available Stock</h5>
+						<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${formatNumber(kpiData.total_available_stock || 0)}</h2>
+						<p style="margin: 5px 0 0 0; font-size: 12px; opacity: 0.8;">Units</p>
+					</div>
+				</div>
+				<div class="col-md-3">
+					<div class="kpi-card" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+						<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Total Delivered</h5>
+						<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${formatNumber(kpiData.total_delivered || 0)}</h2>
+						<p style="margin: 5px 0 0 0; font-size: 12px; opacity: 0.8;">Units</p>
+					</div>
+				</div>
+			</div>
+		`;
+		
+		// Individual Item KPIs
+		let itemsHtml = '';
+		if (kpiData.items && kpiData.items.length > 0) {
+			itemsHtml = `
+				<h5 style="margin-bottom: 15px; margin-top: 20px;">Individual Item KPIs</h5>
+				<div class="table-responsive">
+					<table class="table table-bordered table-striped" style="background: white;">
+						<thead>
+							<tr style="background-color: #f8f9fa;">
+								<th>Item Code</th>
+								<th>Item Name</th>
+								<th class="text-right">Opening Stock</th>
+								<th class="text-right">Available Stock</th>
+								<th class="text-right">Delivered</th>
+								<th class="text-right">Received Vendor</th>
+								<th class="text-right">Book Return</th>
+								<th class="text-right">Demand Received</th>
+								<th class="text-right">Books Sale</th>
+								<th class="text-right">Total Amount</th>
+							</tr>
+						</thead>
+						<tbody>
+							${kpiData.items.map(item => `
+								<tr>
+									<td><strong>${item.item_code || '-'}</strong></td>
+									<td>${item.item_name || '-'}</td>
+									<td class="text-right">${formatNumber(item.opening_stock || 0)}</td>
+									<td class="text-right">${formatNumber(item.available_stock || 0)}</td>
+									<td class="text-right">${formatNumber(item.delivered || 0)}</td>
+									<td class="text-right">${formatNumber(item.received_vendor || 0)}</td>
+									<td class="text-right">${formatNumber(item.book_return || 0)}</td>
+									<td class="text-right">${formatNumber(item.demand_received || 0)}</td>
+									<td class="text-right">${formatNumber(item.books_sale || 0)}</td>
+									<td class="text-right">${formatNumber(item.total_amount || 0)}</td>
+								</tr>
+							`).join('')}
+						</tbody>
+					</table>
+				</div>
+			`;
+		}
+		
+		kpiSection.html(summaryHtml + itemsHtml);
 	}
 	
 	function populateHeadOfficeTable(data) {
