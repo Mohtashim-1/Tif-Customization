@@ -27,6 +27,8 @@ if (typeof window.DispatchReport === 'undefined') {
 		};
 		this.data = {};
 		this.filter_options = {};
+		this.customer_control = null;
+		this.book_control = null;
 	}
 	
 	make() {
@@ -173,38 +175,56 @@ if (typeof window.DispatchReport === 'undefined') {
 			let customerField = $('#customer-filter');
 			if (customerField.length && !customerField.data('setup')) {
 				customerField.data('setup', true);
-				frappe.ui.form.make_control({
-					parent: customerField.parent(),
-					df: {
-						fieldtype: 'Link',
-						options: 'Customer',
-						fieldname: 'customer',
-						placeholder: 'Search customer...'
-					},
-					render_input: true
-				}).then(control => {
-					customerField.replaceWith(control.$input);
-					control.$input.attr('id', 'customer-filter');
-				});
+				try {
+					// Create a wrapper div for the link field
+					let wrapper = $('<div class="link-field-wrapper"></div>');
+					customerField.replaceWith(wrapper);
+					
+					let control = frappe.ui.form.make_control({
+						parent: wrapper[0],
+						df: {
+							fieldtype: 'Link',
+							options: 'Customer',
+							fieldname: 'customer',
+							placeholder: 'Search customer...'
+						},
+						render_input: true
+					});
+					if (control && control.$input) {
+						me.customer_control = control;
+						control.$input.attr('id', 'customer-filter');
+					}
+				} catch (e) {
+					console.error('Error setting up customer field:', e);
+				}
 			}
 			
 			// Setup book/item autocomplete
 			let bookField = $('#book-filter');
 			if (bookField.length && !bookField.data('setup')) {
 				bookField.data('setup', true);
-				frappe.ui.form.make_control({
-					parent: bookField.parent(),
-					df: {
-						fieldtype: 'Link',
-						options: 'Item',
-						fieldname: 'book',
-						placeholder: 'Search book/item...'
-					},
-					render_input: true
-				}).then(control => {
-					bookField.replaceWith(control.$input);
-					control.$input.attr('id', 'book-filter');
-				});
+				try {
+					// Create a wrapper div for the link field
+					let wrapper = $('<div class="link-field-wrapper"></div>');
+					bookField.replaceWith(wrapper);
+					
+					let control = frappe.ui.form.make_control({
+						parent: wrapper[0],
+						df: {
+							fieldtype: 'Link',
+							options: 'Item',
+							fieldname: 'book',
+							placeholder: 'Search book/item...'
+						},
+						render_input: true
+					});
+					if (control && control.$input) {
+						me.book_control = control;
+						control.$input.attr('id', 'book-filter');
+					}
+				} catch (e) {
+					console.error('Error setting up book/item field:', e);
+				}
 			}
 		}, 300);
 		
@@ -274,13 +294,25 @@ if (typeof window.DispatchReport === 'undefined') {
 		me.filters.from_date = fromDate || frappe.datetime.add_days(frappe.datetime.get_today(), -30);
 		me.filters.to_date = toDate || frappe.datetime.get_today();
 		
-		// Get customer value - handle both regular input and frappe link field
-		let customerField = $('#customer-filter');
-		me.filters.customer = customerField.val() || customerField.attr('data-value') || '';
+		// Get customer value - use control if available, otherwise fallback to input
+		if (me.customer_control && typeof me.customer_control.get_value === 'function') {
+			me.filters.customer = me.customer_control.get_value() || '';
+		} else {
+			let customerField = $('#customer-filter');
+			me.filters.customer = customerField.val() || 
+				customerField.closest('.link-field').find('input').val() || 
+				'';
+		}
 		
-		// Get book value - handle both regular input and frappe link field
-		let bookField = $('#book-filter');
-		me.filters.book = bookField.val() || bookField.attr('data-value') || '';
+		// Get book value - use control if available, otherwise fallback to input
+		if (me.book_control && typeof me.book_control.get_value === 'function') {
+			me.filters.book = me.book_control.get_value() || '';
+		} else {
+			let bookField = $('#book-filter');
+			me.filters.book = bookField.val() || 
+				bookField.closest('.link-field').find('input').val() || 
+				'';
+		}
 		
 		me.filters.city = $('#city-filter').val() || '';
 		me.filters.province = $('#province-filter').val() || '';
@@ -309,8 +341,30 @@ if (typeof window.DispatchReport === 'undefined') {
 		// Reset form fields
 		$('#from-date').val(me.filters.from_date);
 		$('#to-date').val(me.filters.to_date);
-		$('#customer-filter').val('').trigger('change');
-		$('#book-filter').val('').trigger('change');
+		
+		// Reset link fields - use control if available
+		if (me.customer_control && typeof me.customer_control.set_value === 'function') {
+			me.customer_control.set_value('');
+		} else {
+			let customerField = $('#customer-filter');
+			if (customerField.closest('.link-field').length) {
+				customerField.closest('.link-field').find('input').val('').trigger('input');
+			} else {
+				customerField.val('').trigger('change');
+			}
+		}
+		
+		if (me.book_control && typeof me.book_control.set_value === 'function') {
+			me.book_control.set_value('');
+		} else {
+			let bookField = $('#book-filter');
+			if (bookField.closest('.link-field').length) {
+				bookField.closest('.link-field').find('input').val('').trigger('input');
+			} else {
+				bookField.val('').trigger('change');
+			}
+		}
+		
 		$('#city-filter').val('');
 		$('#province-filter').val('');
 		$('#area-filter').val('');
@@ -345,7 +399,6 @@ if (typeof window.DispatchReport === 'undefined') {
 	render_kpis() {
 		let me = this;
 		let summary = me.data.summary_data || {};
-		
 		let total_quantity = summary.total_quantity || 0;
 		let total_delivery_notes = summary.total_delivery_notes || 0;
 		let unique_customers = summary.unique_customers || 0;
@@ -405,6 +458,9 @@ if (typeof window.DispatchReport === 'undefined') {
 				let qty = parseFloat(row.qty || 0) || 0;
 				total_quantity += qty;
 				
+				let item_display = row.item_name || row.item_code || '-';
+				let item_link = row.item_code ? `<a href="/app/item/${encodeURIComponent(row.item_code)}" target="_blank">${item_display}</a>` : item_display;
+				
 				let tr = $(`
 					<tr>
 						<td><a href="/app/delivery-note/${row.delivery_note_no}" target="_blank">${row.delivery_note_no || '-'}</a></td>
@@ -413,7 +469,7 @@ if (typeof window.DispatchReport === 'undefined') {
 						<td>${row.city || '-'}</td>
 						<td>${row.province || '-'}</td>
 						<td>${row.area || '-'}</td>
-						<td>${row.item_name || row.item_code || '-'}</td>
+						<td>${item_link}</td>
 						<td><span class="label ${row.book_type === 'MQH' ? 'label-primary' : row.book_type === 'Qaida' ? 'label-success' : 'label-default'}">${row.book_type || '-'}</span></td>
 						<td class="text-right">${format_number_value(row.qty || 0)}</td>
 						<td>${row.stock_uom || '-'}</td>

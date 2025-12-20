@@ -1292,7 +1292,9 @@ def get_stock_data(filters=None):
         print(f"[get_stock_data] Expected {len(SPECIFIC_ITEM_CODES)} items, got {len(mqh_books_data)} items")
         if len(mqh_books_data) < len(SPECIFIC_ITEM_CODES):
             missing = set(SPECIFIC_ITEM_CODES) - seen_codes
-            print(f"[get_stock_data] Missing items: {missing}")
+            print(f"[get_stock_data] Missing items after combining: {missing}")
+            # Note: Missing items should have been handled earlier (lines 1234-1268)
+            # This is just for logging purposes
         
         # If specific warehouse is selected, get only that warehouse data
         if filters.get('warehouse'):
@@ -1335,11 +1337,52 @@ def get_stock_data(filters=None):
         
         print(f"[get_stock_data] Returning: MQH Books: {len(mqh_books_data)}, Urdu Books: {len(mqh_urdu_books_data)}, Warehouse: {len(warehouse_data)}, Head Office: {len(head_office_data)}")
         
+        # Ensure we always return at least empty arrays, not None
+        if not mqh_books_data:
+            mqh_books_data = []
+        if not mqh_urdu_books_data:
+            mqh_urdu_books_data = []
+        if not warehouse_data:
+            warehouse_data = []
+        if not head_office_data:
+            head_office_data = []
+        if not old_office_data:
+            old_office_data = []
+        if not nazimabad_warehouse_data:
+            nazimabad_warehouse_data = []
+        
+        result = {
+            "mqh_books_data": mqh_books_data,
+            "mqh_totals": mqh_totals,
+            "mqh_urdu_books_data": mqh_urdu_books_data,
+            "mqh_urdu_totals": mqh_urdu_totals,
+            "warehouse_data": warehouse_data,
+            "head_office_data": head_office_data,
+            "head_office_totals": head_office_totals,
+            "old_office_data": old_office_data,
+            "old_office_totals": old_office_totals,
+            "nazimabad_warehouse_data": nazimabad_warehouse_data,
+            "nazimabad_totals": nazimabad_totals,
+            "kpi_data": kpi_data
+        }
+        
         return result
         
     except Exception as e:
-        print(f"Error getting stock data: {str(e)}")
-        return {"error": str(e)}
+        import traceback
+        error_msg = f"Error getting stock data: {str(e)}\n{traceback.format_exc()}"
+        print(error_msg)
+        frappe.log_error(error_msg, "Stock Detail Error")
+        return {
+            "error": str(e),
+            "mqh_books_data": [],
+            "mqh_urdu_books_data": [],
+            "warehouse_data": [],
+            "head_office_data": [],
+            "old_office_data": [],
+            "nazimabad_warehouse_data": [],
+            "kpi_data": {}
+        }
 
 @frappe.whitelist()
 def get_warehouses():

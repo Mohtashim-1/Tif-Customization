@@ -353,25 +353,63 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 			method: 'tif_customization.tif_customization.page.stock_detail.stock_detail.get_stock_data',
 			args: {},
 			callback: function(r) {
-				if (r.message && !r.message.error) {
-					// Render KPIs
+				console.log('Initial load response:', r);
+				console.log('Response message:', r.message);
+				console.log('Has error?', r.message?.error);
+				console.log('MQH Books Data:', r.message?.mqh_books_data);
+				console.log('MQH Books Data Length:', r.message?.mqh_books_data?.length || 0);
+				
+				if (r.message) {
+					if (r.message.error) {
+						console.error('Error in response:', r.message.error);
+						frappe.msgprint({
+							title: 'Error Loading Data',
+							message: `Error: ${r.message.error}`,
+							indicator: 'red'
+						});
+					}
+					
+					// Render KPIs even if data is empty
 					if (r.message.kpi_data) {
 						renderKPIs(r.message.kpi_data);
 					}
 					
-					// Populate tables with dynamic data
-					populateMQHBooksTable(r.message.mqh_books_data || []);
-					populateMQHUrduBooksTable(r.message.mqh_urdu_books_data || []);
-					populateHeadOfficeTable(r.message.head_office_data || []);
-					populateOldOfficeTable(r.message.old_office_data || []);
-					populateNazimabadTable(r.message.nazimabad_warehouse_data || []);
+					// Populate tables with dynamic data (even if empty arrays)
+					const mqhData = r.message.mqh_books_data || [];
+					const urduData = r.message.mqh_urdu_books_data || [];
+					const headOfficeData = r.message.head_office_data || [];
+					const oldOfficeData = r.message.old_office_data || [];
+					const nazimabadData = r.message.nazimabad_warehouse_data || [];
+					
+					console.log('Populating tables with:', {
+						mqh: mqhData.length,
+						urdu: urduData.length,
+						headOffice: headOfficeData.length,
+						oldOffice: oldOfficeData.length,
+						nazimabad: nazimabadData.length
+					});
+					
+					populateMQHBooksTable(mqhData);
+					populateMQHUrduBooksTable(urduData);
+					populateHeadOfficeTable(headOfficeData);
+					populateOldOfficeTable(oldOfficeData);
+					populateNazimabadTable(nazimabadData);
+					
+					// Show message if no data
+					if (mqhData.length === 0 && urduData.length === 0 && !r.message.error) {
+						frappe.msgprint({
+							title: 'No Data Found',
+							message: 'No stock data found for the specified items. Please check:<br>1. Items exist in your system<br>2. Stock transactions exist<br>3. Check server logs for details',
+							indicator: 'orange'
+						});
+					}
 				} else {
-					// Fallback to hardcoded data if dynamic data fails
+					console.error('No message in response');
 					loadStockDataFallback();
 				}
 			},
-			error: function() {
-				// Fallback to hardcoded data on error
+			error: function(err) {
+				console.error('Error calling get_stock_data:', err);
 				loadStockDataFallback();
 			}
 		});
