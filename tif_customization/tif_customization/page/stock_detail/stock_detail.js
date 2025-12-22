@@ -1129,11 +1129,30 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 				'linear-gradient(135deg, #ee0979 0%, #ff6a00 100%)'
 			];
 			
+			// Debug: Check for MQHWB-01/U/12 duplicates
+			const mqhwb01Items = kpiData.items.filter(item => item.item_code === 'MQHWB-01/U/12');
+			if (mqhwb01Items.length > 1) {
+				console.error('[DEBUG] MQHWB-01/U/12 appears', mqhwb01Items.length, 'times in KPI items!', mqhwb01Items);
+			} else if (mqhwb01Items.length === 1) {
+				console.log('[DEBUG] MQHWB-01/U/12 KPI data:', mqhwb01Items[0]);
+			}
+			
 			itemsHtml = `
 				<h5 style="margin-bottom: 20px; margin-top: 30px; font-weight: bold; color: #495057;">Individual Item Balance KPIs</h5>
 				<div class="row" style="margin-bottom: 20px;">
 					${kpiData.items.map((item, index) => {
 						const balance = item.available_stock || 0;
+						
+						// Debug for MQHWB-01/U/12
+						if (item.item_code === 'MQHWB-01/U/12') {
+							console.log('[DEBUG Frontend] Rendering MQHWB-01/U/12:', {
+								item_code: item.item_code,
+								available_stock: item.available_stock,
+								balance: balance,
+								index: index
+							});
+						}
+						
 						const colorGradient = colorGradients[index % colorGradients.length];
 						const itemName = (item.item_name || item.item_code || 'Unknown').substring(0, 30);
 						const itemCode = item.item_code || '-';

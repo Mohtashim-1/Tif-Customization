@@ -1209,40 +1209,47 @@ def calculate_kpis_for_specific_items(data, filters=None):
         # Calculate individual item KPIs (deduplicate by item_code to avoid duplicates)
         items_kpi_dict = {}
         
-        # Process data items
+        # Process data items - use a set to track processed items to avoid duplicates
+        processed_items = set()
         for item in data:
             item_code = item.get("item_code", "")
             if not item_code:
                 continue
             
-            # If item already exists, sum the values (deduplicate)
+            # If item already exists in items_kpi_dict, it means we've seen it before - DON'T SUM, just use the first value
+            # This prevents double-counting when the same item appears multiple times in the data
             if item_code in items_kpi_dict:
-                existing = items_kpi_dict[item_code]
-                items_kpi_dict[item_code] = {
-                    "item_code": item_code,
-                    "item_name": existing.get("item_name") or item.get("item_name", ""),
-                    "opening_stock": flt(existing.get("opening_stock", 0)) + flt(item.get("opening_stock", 0)),
-                    "available_stock": flt(existing.get("available_stock", 0)) + flt(item.get("available_stock", 0)),
-                    "delivered": flt(existing.get("delivered", 0)) + flt(item.get("delivered", 0)),
-                    "received_vendor": flt(existing.get("received_vendor", 0)) + flt(item.get("received_vendor", 0)),
-                    "book_return": flt(existing.get("book_return", 0)) + flt(item.get("book_return", 0)),
-                    "demand_received": flt(existing.get("demand_received", 0)) + flt(item.get("demand_received", 0)),
-                    "books_sale": cint(existing.get("books_sale", 0)) + cint(item.get("books_sale", 0)),
-                    "total_amount": flt(existing.get("total_amount", 0)) + flt(item.get("total_amount", 0))
-                }
-            else:
-                items_kpi_dict[item_code] = {
-                    "item_code": item_code,
-                    "item_name": item.get("item_name", ""),
-                    "opening_stock": flt(item.get("opening_stock", 0)),
-                    "available_stock": flt(item.get("available_stock", 0)),
-                    "delivered": flt(item.get("delivered", 0)),
-                    "received_vendor": flt(item.get("received_vendor", 0)),
-                    "book_return": flt(item.get("book_return", 0)),
-                    "demand_received": flt(item.get("demand_received", 0)),
-                    "books_sale": cint(item.get("books_sale", 0)),
-                    "total_amount": flt(item.get("total_amount", 0))
-                }
+                # Debug: Log if we see a duplicate
+                if item_code == 'MQHWB-01/U/12':
+                    existing_balance = items_kpi_dict[item_code].get("available_stock", 0)
+                    new_balance = item.get("available_stock", 0)
+                    print(f"[DEBUG calculate_kpis] Duplicate item MQHWB-01/U/12 found! Existing: {existing_balance}, New: {new_balance}, Skipping duplicate")
+                # Skip duplicates - use the first value we found
+                continue
+            
+            # If we've already processed this item in this loop, skip it
+            if item_code in processed_items:
+                if item_code == 'MQHWB-01/U/12':
+                    print(f"[DEBUG calculate_kpis] Item MQHWB-01/U/12 already processed in this loop, skipping")
+                continue
+            
+            processed_items.add(item_code)
+            items_kpi_dict[item_code] = {
+                "item_code": item_code,
+                "item_name": item.get("item_name", ""),
+                "opening_stock": flt(item.get("opening_stock", 0)),
+                "available_stock": flt(item.get("available_stock", 0)),
+                "delivered": flt(item.get("delivered", 0)),
+                "received_vendor": flt(item.get("received_vendor", 0)),
+                "book_return": flt(item.get("book_return", 0)),
+                "demand_received": flt(item.get("demand_received", 0)),
+                "books_sale": cint(item.get("books_sale", 0)),
+                "total_amount": flt(item.get("total_amount", 0))
+            }
+            
+            # Debug for MQHWB-01/U/12
+            if item_code == 'MQHWB-01/U/12':
+                print(f"[DEBUG calculate_kpis] Added MQHWB-01/U/12 to KPI dict with available_stock: {items_kpi_dict[item_code]['available_stock']}")
         
         # Ensure ALL items from SPECIFIC_ITEM_CODES are included (even if zero balance)
         # Only when not filtering by a specific item
@@ -1287,9 +1294,29 @@ def calculate_kpis_for_specific_items(data, filters=None):
                 items_kpi = [items_kpi_dict[filters.get('item')]]
         else:
             # Return all items in SPECIFIC_ITEM_CODES order
+            seen_in_list = set()  # Track items already added to prevent duplicates
             for item_code in SPECIFIC_ITEM_CODES:
                 if item_code in items_kpi_dict:
+                    if item_code in seen_in_list:
+                        # Debug: Log if we see a duplicate
+                        if item_code == 'MQHWB-01/U/12':
+                            print(f"[DEBUG calculate_kpis] MQHWB-01/U/12 already in items_kpi list, skipping duplicate")
+                        continue
+                    seen_in_list.add(item_code)
                     items_kpi.append(items_kpi_dict[item_code])
+                    
+                    # Debug for MQHWB-01/U/12
+                    if item_code == 'MQHWB-01/U/12':
+                        print(f"[DEBUG calculate_kpis] Added MQHWB-01/U/12 to items_kpi list with available_stock: {items_kpi_dict[item_code]['available_stock']}")
+        
+        # Final debug: Check for duplicates in items_kpi
+        mqhwb01_in_list = [item for item in items_kpi if item.get('item_code') == 'MQHWB-01/U/12']
+        if len(mqhwb01_in_list) > 1:
+            print(f"[DEBUG calculate_kpis] ERROR: MQHWB-01/U/12 appears {len(mqhwb01_in_list)} times in final items_kpi list!")
+            for idx, item in enumerate(mqhwb01_in_list):
+                print(f"  [{idx}] available_stock: {item.get('available_stock')}")
+        elif len(mqhwb01_in_list) == 1:
+            print(f"[DEBUG calculate_kpis] Final MQHWB-01/U/12 in items_kpi: available_stock = {mqhwb01_in_list[0].get('available_stock')}")
         
         # Calculate totals from all items
         totals = {
@@ -1367,6 +1394,14 @@ def get_stock_data(filters=None):
         
         print(f"[get_stock_data] MQH Books: {len(mqh_books_data)} items, Urdu Books: {len(mqh_urdu_books_data)} items")
         
+        # Debug: Check for MQHWB-01/U/12 in both lists
+        mqhwb01_in_mqh = [item for item in mqh_books_data if item.get('item_code') == 'MQHWB-01/U/12']
+        mqhwb01_in_urdu = [item for item in mqh_urdu_books_data if item.get('item_code') == 'MQHWB-01/U/12']
+        if mqhwb01_in_mqh:
+            print(f"[DEBUG get_stock_data] MQHWB-01/U/12 in mqh_books_data: {len(mqhwb01_in_mqh)} times, available_stock = {mqhwb01_in_mqh[0].get('available_stock')}")
+        if mqhwb01_in_urdu:
+            print(f"[DEBUG get_stock_data] MQHWB-01/U/12 in mqh_urdu_books_data: {len(mqhwb01_in_urdu)} times, available_stock = {mqhwb01_in_urdu[0].get('available_stock')}")
+        
         # Combine and deduplicate items by item_code
         # Create a combined dictionary to avoid duplicates
         combined_items_dict = {}
@@ -1375,28 +1410,25 @@ def get_stock_data(filters=None):
         for item in mqh_books_data:
             item_code = item.get('item_code', '')
             if item_code:
+                if item_code in combined_items_dict:
+                    # Item already exists - DON'T SUM, just use the first one
+                    if item_code == 'MQHWB-01/U/12':
+                        print(f"[DEBUG get_stock_data] MQHWB-01/U/12 already in combined_items_dict, skipping duplicate from mqh_books_data")
+                    continue
                 combined_items_dict[item_code] = item
         
-        # Add items from mqh_urdu_books_data (will overwrite if duplicate, or add if new)
+        # Add items from mqh_urdu_books_data
+        # If item exists in both, DON'T SUM - use the one from mqh_books_data (skip the one from urdu)
         for item in mqh_urdu_books_data:
             item_code = item.get('item_code', '')
             if item_code:
                 if item_code in combined_items_dict:
-                    # Item exists in both, merge the data (sum values)
-                    existing = combined_items_dict[item_code]
-                    combined_items_dict[item_code] = {
-                        'item_code': item_code,
-                        'item_name': existing.get('item_name') or item.get('item_name', ''),
-                        'particulars': existing.get('particulars') or item.get('particulars', ''),
-                        'opening_stock': flt(existing.get('opening_stock', 0)) + flt(item.get('opening_stock', 0)),
-                        'received_vendor': flt(existing.get('received_vendor', 0)) + flt(item.get('received_vendor', 0)),
-                        'book_return': flt(existing.get('book_return', 0)) + flt(item.get('book_return', 0)),
-                        'delivered': flt(existing.get('delivered', 0)) + flt(item.get('delivered', 0)),
-                        'available_stock': flt(existing.get('available_stock', 0)) + flt(item.get('available_stock', 0)),
-                        'demand_received': flt(existing.get('demand_received', 0)) + flt(item.get('demand_received', 0)),
-                        'books_sale': cint(existing.get('books_sale', 0)) + cint(item.get('books_sale', 0)),
-                        'total_amount': flt(existing.get('total_amount', 0)) + flt(item.get('total_amount', 0))
-                    }
+                    # Item exists in both - DON'T SUM, just skip (use the one from mqh_books_data)
+                    if item_code == 'MQHWB-01/U/12':
+                        existing_balance = combined_items_dict[item_code].get('available_stock', 0)
+                        new_balance = item.get('available_stock', 0)
+                        print(f"[DEBUG get_stock_data] MQHWB-01/U/12 exists in both lists! Existing: {existing_balance}, New: {new_balance}, NOT summing - using existing")
+                    continue
                 else:
                     combined_items_dict[item_code] = item
         
@@ -1489,7 +1521,27 @@ def get_stock_data(filters=None):
         nazimabad_totals = calculate_nazimabad_totals(nazimabad_warehouse_data)
         
         # Calculate KPIs for specific items - ensure all items from SPECIFIC_ITEM_CODES are included
-        kpi_data = calculate_kpis_for_specific_items(mqh_books_data + mqh_urdu_books_data, filters)
+        # Use only mqh_books_data since mqh_urdu_books_data is empty after combining
+        # This prevents double-counting
+        
+        # Debug: Check for duplicates in mqh_books_data before passing to calculate_kpis
+        mqhwb01_in_mqh = [item for item in mqh_books_data if item.get('item_code') == 'MQHWB-01/U/12']
+        if len(mqhwb01_in_mqh) > 1:
+            print(f"[DEBUG get_stock_data] WARNING: MQHWB-01/U/12 appears {len(mqhwb01_in_mqh)} times in mqh_books_data!")
+            for idx, item in enumerate(mqhwb01_in_mqh):
+                print(f"  [{idx}] available_stock: {item.get('available_stock')}")
+        elif len(mqhwb01_in_mqh) == 1:
+            print(f"[DEBUG get_stock_data] MQHWB-01/U/12 in mqh_books_data: available_stock = {mqhwb01_in_mqh[0].get('available_stock')}")
+        
+        kpi_data = calculate_kpis_for_specific_items(mqh_books_data, filters)
+        
+        # Debug: Check if MQHWB-01/U/12 balance is correct in KPI data
+        if kpi_data and kpi_data.get('items'):
+            mqhwb01_in_kpi = [item for item in kpi_data['items'] if item.get('item_code') == 'MQHWB-01/U/12']
+            if len(mqhwb01_in_kpi) > 1:
+                print(f"[DEBUG get_stock_data] ERROR: MQHWB-01/U/12 appears {len(mqhwb01_in_kpi)} times in KPI items!")
+            elif len(mqhwb01_in_kpi) == 1:
+                print(f"[DEBUG get_stock_data] Final KPI data for MQHWB-01/U/12: available_stock = {mqhwb01_in_kpi[0].get('available_stock')}")
         
         result = {
             "mqh_books_data": mqh_books_data,
