@@ -167,25 +167,25 @@ if (typeof window.CourierDashboard === 'undefined') {
 						</div>
 						<div class="col-md-6" style="margin-bottom: 20px;">
 							<div class="chart-container" style="background: white; padding: 15px; border-radius: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-								<h5>Delivery Mode Distribution</h5>
+								<h5>Delivery Mode Distribution (Expense Amount)</h5>
 								<div id="chart-delivery-mode"></div>
 							</div>
 						</div>
 						<div class="col-md-6" style="margin-bottom: 20px;">
 							<div class="chart-container" style="background: white; padding: 15px; border-radius: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-								<h5>Courier Distribution</h5>
+								<h5>Courier Distribution (Expense Amount)</h5>
 								<div id="chart-courier"></div>
 							</div>
 						</div>
 						<div class="col-md-6" style="margin-bottom: 20px;">
 							<div class="chart-container" style="background: white; padding: 15px; border-radius: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-								<h5>Courier Service Distribution</h5>
+								<h5>Courier Service Distribution (Expense Amount)</h5>
 								<div id="chart-courier-service"></div>
 							</div>
 						</div>
 						<div class="col-md-6" style="margin-bottom: 20px;">
 							<div class="chart-container" style="background: white; padding: 15px; border-radius: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-								<h5>Courier Payment Mode Distribution</h5>
+								<h5>Courier Payment Mode Distribution (Expense Amount)</h5>
 								<div id="chart-courier-payment-mode"></div>
 							</div>
 						</div>
@@ -691,7 +691,7 @@ if (typeof window.CourierDashboard === 'undefined') {
 			let chart_data = {
 				labels: delivery_mode_data.map(d => String(d.label || 'Not Set')),
 				datasets: [{
-					name: 'Delivery Notes',
+					name: 'Expense Amount',
 					values: delivery_mode_data.map(d => flt(d.value || 0))
 				}]
 			};
@@ -723,7 +723,7 @@ if (typeof window.CourierDashboard === 'undefined') {
 			let chart_data = {
 				labels: courier_data.map(d => String(d.label || 'Not Set')),
 				datasets: [{
-					name: 'Delivery Notes',
+					name: 'Expense Amount',
 					values: courier_data.map(d => flt(d.value || 0))
 				}]
 			};
@@ -755,7 +755,7 @@ if (typeof window.CourierDashboard === 'undefined') {
 			let chart_data = {
 				labels: courier_service_data.map(d => String(d.label || 'Not Set')),
 				datasets: [{
-					name: 'Delivery Notes',
+					name: 'Expense Amount',
 					values: courier_service_data.map(d => flt(d.value || 0))
 				}]
 			};
@@ -787,7 +787,7 @@ if (typeof window.CourierDashboard === 'undefined') {
 			let chart_data = {
 				labels: courier_payment_mode_data.map(d => String(d.label || 'Not Set')),
 				datasets: [{
-					name: 'Delivery Notes',
+					name: 'Expense Amount',
 					values: courier_payment_mode_data.map(d => flt(d.value || 0))
 				}]
 			};

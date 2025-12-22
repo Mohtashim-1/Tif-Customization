@@ -744,7 +744,7 @@ def get_cost_centers():
 		return []
 
 def get_delivery_mode_data(filters):
-	"""Get delivery mode distribution from Delivery Notes"""
+	"""Get delivery mode distribution expense amounts from Journal Entries"""
 	try:
 		from_date = filters.get('from_date')
 		to_date = filters.get('to_date')
@@ -753,18 +753,21 @@ def get_delivery_mode_data(filters):
 		cost_center_filter = ""
 		if cost_centers:
 			cost_center_list = "', '".join(cost_centers)
-			cost_center_filter = f"AND (dn.cost_center IN ('{cost_center_list}') OR dn.cost_center IS NULL OR dn.cost_center = '')"
+			cost_center_filter = f"AND jea.cost_center IN ('{cost_center_list}')"
 		
 		query = f"""
 			SELECT 
 				COALESCE(dn.custom_delivery_mode, 'Not Set') AS delivery_mode,
-				COUNT(DISTINCT dn.name) AS count
-			FROM `tabDelivery Note` dn
-			WHERE dn.docstatus = 1
-			AND dn.posting_date BETWEEN %(from_date)s AND %(to_date)s
+				COALESCE(SUM(jea.debit - jea.credit), 0) AS expense_amount
+			FROM `tabJournal Entry Account` jea
+			JOIN `tabJournal Entry` je ON je.name = jea.parent
+			LEFT JOIN `tabDelivery Note` dn ON dn.name = je.cheque_no
+			WHERE je.docstatus = 1
+			AND COALESCE(dn.posting_date, je.posting_date) BETWEEN %(from_date)s AND %(to_date)s
+			AND (jea.account LIKE '%%Courier%%' OR jea.account LIKE '%%Courier Expense%%')
 			{cost_center_filter}
 			GROUP BY COALESCE(dn.custom_delivery_mode, 'Not Set')
-			ORDER BY count DESC
+			ORDER BY expense_amount DESC
 		"""
 		
 		results = frappe.db.sql(query, {
@@ -779,7 +782,7 @@ def get_delivery_mode_data(filters):
 				continue
 			filtered_results.append({
 				'label': row.get('delivery_mode') or 'Not Set',
-				'value': flt(row.get('count', 0))
+				'value': flt(row.get('expense_amount', 0))
 			})
 		
 		return filtered_results
@@ -788,7 +791,7 @@ def get_delivery_mode_data(filters):
 		return []
 
 def get_courier_data(filters):
-	"""Get courier distribution from Delivery Notes"""
+	"""Get courier distribution expense amounts from Journal Entries"""
 	try:
 		from_date = filters.get('from_date')
 		to_date = filters.get('to_date')
@@ -797,18 +800,21 @@ def get_courier_data(filters):
 		cost_center_filter = ""
 		if cost_centers:
 			cost_center_list = "', '".join(cost_centers)
-			cost_center_filter = f"AND (dn.cost_center IN ('{cost_center_list}') OR dn.cost_center IS NULL OR dn.cost_center = '')"
+			cost_center_filter = f"AND jea.cost_center IN ('{cost_center_list}')"
 		
 		query = f"""
 			SELECT 
 				COALESCE(dn.custom_courier, 'Not Set') AS courier,
-				COUNT(DISTINCT dn.name) AS count
-			FROM `tabDelivery Note` dn
-			WHERE dn.docstatus = 1
-			AND dn.posting_date BETWEEN %(from_date)s AND %(to_date)s
+				COALESCE(SUM(jea.debit - jea.credit), 0) AS expense_amount
+			FROM `tabJournal Entry Account` jea
+			JOIN `tabJournal Entry` je ON je.name = jea.parent
+			LEFT JOIN `tabDelivery Note` dn ON dn.name = je.cheque_no
+			WHERE je.docstatus = 1
+			AND COALESCE(dn.posting_date, je.posting_date) BETWEEN %(from_date)s AND %(to_date)s
+			AND (jea.account LIKE '%%Courier%%' OR jea.account LIKE '%%Courier Expense%%')
 			{cost_center_filter}
 			GROUP BY COALESCE(dn.custom_courier, 'Not Set')
-			ORDER BY count DESC
+			ORDER BY expense_amount DESC
 		"""
 		
 		results = frappe.db.sql(query, {
@@ -823,7 +829,7 @@ def get_courier_data(filters):
 				continue
 			filtered_results.append({
 				'label': row.get('courier') or 'Not Set',
-				'value': flt(row.get('count', 0))
+				'value': flt(row.get('expense_amount', 0))
 			})
 		
 		return filtered_results
@@ -832,7 +838,7 @@ def get_courier_data(filters):
 		return []
 
 def get_courier_service_data(filters):
-	"""Get courier service distribution from Delivery Notes"""
+	"""Get courier service distribution expense amounts from Journal Entries"""
 	try:
 		from_date = filters.get('from_date')
 		to_date = filters.get('to_date')
@@ -841,18 +847,21 @@ def get_courier_service_data(filters):
 		cost_center_filter = ""
 		if cost_centers:
 			cost_center_list = "', '".join(cost_centers)
-			cost_center_filter = f"AND (dn.cost_center IN ('{cost_center_list}') OR dn.cost_center IS NULL OR dn.cost_center = '')"
+			cost_center_filter = f"AND jea.cost_center IN ('{cost_center_list}')"
 		
 		query = f"""
 			SELECT 
 				COALESCE(dn.custom_courier_service, 'Not Set') AS courier_service,
-				COUNT(DISTINCT dn.name) AS count
-			FROM `tabDelivery Note` dn
-			WHERE dn.docstatus = 1
-			AND dn.posting_date BETWEEN %(from_date)s AND %(to_date)s
+				COALESCE(SUM(jea.debit - jea.credit), 0) AS expense_amount
+			FROM `tabJournal Entry Account` jea
+			JOIN `tabJournal Entry` je ON je.name = jea.parent
+			LEFT JOIN `tabDelivery Note` dn ON dn.name = je.cheque_no
+			WHERE je.docstatus = 1
+			AND COALESCE(dn.posting_date, je.posting_date) BETWEEN %(from_date)s AND %(to_date)s
+			AND (jea.account LIKE '%%Courier%%' OR jea.account LIKE '%%Courier Expense%%')
 			{cost_center_filter}
 			GROUP BY COALESCE(dn.custom_courier_service, 'Not Set')
-			ORDER BY count DESC
+			ORDER BY expense_amount DESC
 		"""
 		
 		results = frappe.db.sql(query, {
@@ -867,7 +876,7 @@ def get_courier_service_data(filters):
 				continue
 			filtered_results.append({
 				'label': row.get('courier_service') or 'Not Set',
-				'value': flt(row.get('count', 0))
+				'value': flt(row.get('expense_amount', 0))
 			})
 		
 		return filtered_results
@@ -876,7 +885,7 @@ def get_courier_service_data(filters):
 		return []
 
 def get_courier_payment_mode_data(filters):
-	"""Get courier payment mode distribution from Delivery Notes"""
+	"""Get courier payment mode distribution expense amounts from Journal Entries"""
 	try:
 		from_date = filters.get('from_date')
 		to_date = filters.get('to_date')
@@ -885,18 +894,21 @@ def get_courier_payment_mode_data(filters):
 		cost_center_filter = ""
 		if cost_centers:
 			cost_center_list = "', '".join(cost_centers)
-			cost_center_filter = f"AND (dn.cost_center IN ('{cost_center_list}') OR dn.cost_center IS NULL OR dn.cost_center = '')"
+			cost_center_filter = f"AND jea.cost_center IN ('{cost_center_list}')"
 		
 		query = f"""
 			SELECT 
 				COALESCE(dn.custom_courier_mode_of_payment, 'Not Set') AS payment_mode,
-				COUNT(DISTINCT dn.name) AS count
-			FROM `tabDelivery Note` dn
-			WHERE dn.docstatus = 1
-			AND dn.posting_date BETWEEN %(from_date)s AND %(to_date)s
+				COALESCE(SUM(jea.debit - jea.credit), 0) AS expense_amount
+			FROM `tabJournal Entry Account` jea
+			JOIN `tabJournal Entry` je ON je.name = jea.parent
+			LEFT JOIN `tabDelivery Note` dn ON dn.name = je.cheque_no
+			WHERE je.docstatus = 1
+			AND COALESCE(dn.posting_date, je.posting_date) BETWEEN %(from_date)s AND %(to_date)s
+			AND (jea.account LIKE '%%Courier%%' OR jea.account LIKE '%%Courier Expense%%')
 			{cost_center_filter}
 			GROUP BY COALESCE(dn.custom_courier_mode_of_payment, 'Not Set')
-			ORDER BY count DESC
+			ORDER BY expense_amount DESC
 		"""
 		
 		results = frappe.db.sql(query, {
@@ -911,7 +923,7 @@ def get_courier_payment_mode_data(filters):
 				continue
 			filtered_results.append({
 				'label': row.get('payment_mode') or 'Not Set',
-				'value': flt(row.get('count', 0))
+				'value': flt(row.get('expense_amount', 0))
 			})
 		
 		return filtered_results
