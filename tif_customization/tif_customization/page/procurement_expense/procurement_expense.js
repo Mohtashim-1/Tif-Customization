@@ -82,6 +82,9 @@ if (typeof window.ProcurementExpense === 'undefined') {
 								<button class="btn btn-secondary" id="reset-filters">
 									<i class="fa fa-refresh"></i> Reset
 								</button>
+								<button class="btn btn-info" id="toggle-voucher-details" style="margin-left: 10px;">
+									<i class="fa fa-list"></i> Show Voucher-Wise Details
+								</button>
 								<button class="btn btn-success" id="export-excel" style="float: right;">
 									<i class="fa fa-file-excel-o"></i> Export to Excel
 								</button>
@@ -307,6 +310,77 @@ if (typeof window.ProcurementExpense === 'undefined') {
 							</div>
 						</div>
 					</div>
+					
+					<!-- Voucher-Wise Details Section -->
+					<div id="voucher-wise-section" style="margin-top: 30px; display: none;">
+						<!-- Cash Vouchers -->
+						<div class="data-section" style="margin-bottom: 30px;">
+							<h5 style="margin-bottom: 15px; color: #5cb85c;">
+								<i class="fa fa-money"></i> Cash Payment Vouchers
+							</h5>
+							<div class="table-responsive">
+								<table class="table table-bordered table-striped" id="cash-vouchers-table">
+									<thead>
+										<tr>
+											<th>S.#</th>
+											<th>Payment Entry</th>
+											<th>Posting Date</th>
+											<th>Mode of Payment</th>
+											<th>Cost Center</th>
+											<th>Purchase Invoice</th>
+											<th>Supplier</th>
+											<th>Amount</th>
+										</tr>
+									</thead>
+									<tbody id="cash-vouchers-tbody">
+										<tr>
+											<td colspan="8" class="text-center">Loading data...</td>
+										</tr>
+									</tbody>
+									<tfoot id="cash-vouchers-tfoot">
+										<tr>
+											<td colspan="7"><strong>Total</strong></td>
+											<td class="text-right"><strong id="cash-vouchers-total">0.00</strong></td>
+										</tr>
+									</tfoot>
+								</table>
+							</div>
+						</div>
+						
+						<!-- Cheque Vouchers -->
+						<div class="data-section" style="margin-bottom: 30px;">
+							<h5 style="margin-bottom: 15px; color: #337ab7;">
+								<i class="fa fa-bank"></i> Cheque Payment Vouchers
+							</h5>
+							<div class="table-responsive">
+								<table class="table table-bordered table-striped" id="cheque-vouchers-table">
+									<thead>
+										<tr>
+											<th>S.#</th>
+											<th>Payment Entry</th>
+											<th>Posting Date</th>
+											<th>Mode of Payment</th>
+											<th>Cost Center</th>
+											<th>Purchase Invoice</th>
+											<th>Supplier</th>
+											<th>Amount</th>
+										</tr>
+									</thead>
+									<tbody id="cheque-vouchers-tbody">
+										<tr>
+											<td colspan="8" class="text-center">Loading data...</td>
+										</tr>
+									</tbody>
+									<tfoot id="cheque-vouchers-tfoot">
+										<tr>
+											<td colspan="7"><strong>Total</strong></td>
+											<td class="text-right"><strong id="cheque-vouchers-total">0.00</strong></td>
+										</tr>
+									</tfoot>
+								</table>
+							</div>
+						</div>
+					</div>
 				</div>
 			`;
 			
@@ -358,6 +432,10 @@ if (typeof window.ProcurementExpense === 'undefined') {
 			
 			$('#export-excel').on('click', function() {
 				me.export_to_excel();
+			});
+			
+			$('#toggle-voucher-details').on('click', function() {
+				me.toggle_voucher_details();
 			});
 			
 			// Load initial data
@@ -451,6 +529,7 @@ if (typeof window.ProcurementExpense === 'undefined') {
 					me.render_charts();
 					me.render_payment_charts();
 					me.render_item_payment_charts();
+					me.render_voucher_wise_details();
 					} else {
 						let errorMsg = r.message?.error || r.message || 'Unknown error';
 						console.error('Procurement expense error:', errorMsg);
@@ -1623,6 +1702,85 @@ if (typeof window.ProcurementExpense === 'undefined') {
 						console.error('Error creating cheque items pie chart:', e);
 					}
 				}, 1500);
+			}
+		}
+		
+		toggle_voucher_details() {
+			let me = this;
+			let section = $('#voucher-wise-section');
+			let button = $('#toggle-voucher-details');
+			
+			if (section.is(':visible')) {
+				section.slideUp();
+				button.html('<i class="fa fa-list"></i> Show Voucher-Wise Details');
+			} else {
+				section.slideDown();
+				button.html('<i class="fa fa-times"></i> Hide Voucher-Wise Details');
+				// Render if data is available
+				if (me.data && me.data.voucher_wise_details) {
+					me.render_voucher_wise_details();
+				}
+			}
+		}
+		
+		render_voucher_wise_details() {
+			let me = this;
+			let voucher_data = me.data.voucher_wise_details || {};
+			let cash_vouchers = voucher_data.cash || [];
+			let cheque_vouchers = voucher_data.cheque || [];
+			
+			// Render Cash Vouchers
+			let cash_tbody = $('#cash-vouchers-tbody');
+			cash_tbody.empty();
+			
+			if (cash_vouchers.length === 0) {
+				cash_tbody.append('<tr><td colspan="8" class="text-center">No cash payment vouchers found</td></tr>');
+			} else {
+				let cash_total = 0;
+				cash_vouchers.forEach((voucher, index) => {
+					cash_total += flt(voucher.amount || 0);
+					let tr = $(`
+						<tr>
+							<td>${index + 1}</td>
+							<td><a href="/app/payment-entry/${voucher.payment_entry}" target="_blank">${voucher.payment_entry}</a></td>
+							<td>${voucher.posting_date || '-'}</td>
+							<td>${voucher.mode_of_payment || 'Not Specified'}</td>
+							<td>${voucher.cost_center_name || voucher.cost_center || 'Not Set'}</td>
+							<td><a href="/app/purchase-invoice/${voucher.pi_name}" target="_blank">${voucher.pi_name || '-'}</a></td>
+							<td>${voucher.supplier || '-'}</td>
+							<td class="text-right">${format_currency_value(voucher.amount || 0)}</td>
+						</tr>
+					`);
+					cash_tbody.append(tr);
+				});
+				$('#cash-vouchers-total').text(format_currency_value(cash_total));
+			}
+			
+			// Render Cheque Vouchers
+			let cheque_tbody = $('#cheque-vouchers-tbody');
+			cheque_tbody.empty();
+			
+			if (cheque_vouchers.length === 0) {
+				cheque_tbody.append('<tr><td colspan="8" class="text-center">No cheque payment vouchers found</td></tr>');
+			} else {
+				let cheque_total = 0;
+				cheque_vouchers.forEach((voucher, index) => {
+					cheque_total += flt(voucher.amount || 0);
+					let tr = $(`
+						<tr>
+							<td>${index + 1}</td>
+							<td><a href="/app/payment-entry/${voucher.payment_entry}" target="_blank">${voucher.payment_entry}</a></td>
+							<td>${voucher.posting_date || '-'}</td>
+							<td>${voucher.mode_of_payment || 'Not Specified'}</td>
+							<td>${voucher.cost_center_name || voucher.cost_center || 'Not Set'}</td>
+							<td><a href="/app/purchase-invoice/${voucher.pi_name}" target="_blank">${voucher.pi_name || '-'}</a></td>
+							<td>${voucher.supplier || '-'}</td>
+							<td class="text-right">${format_currency_value(voucher.amount || 0)}</td>
+						</tr>
+					`);
+					cheque_tbody.append(tr);
+				});
+				$('#cheque-vouchers-total').text(format_currency_value(cheque_total));
 			}
 		}
 		

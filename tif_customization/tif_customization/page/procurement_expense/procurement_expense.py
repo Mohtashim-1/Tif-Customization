@@ -38,6 +38,8 @@ def get_procurement_expense_data(filters=None):
 			payment_data = payment_result if isinstance(payment_result, list) else []
 			not_specified_details = []
 		
+		voucher_wise_details = get_voucher_wise_details(filters)
+		
 		return {
 			'expense_data': expense_data,
 			'summary_data': summary_data,
@@ -46,6 +48,7 @@ def get_procurement_expense_data(filters=None):
 			'payment_data': payment_data,
 			'not_specified_details': not_specified_details,
 			'item_payment_data': item_payment_data,
+			'voucher_wise_details': voucher_wise_details,
 			'period_type': period_type
 		}
 	except Exception as e:
@@ -940,4 +943,142 @@ def get_courier_details(filters=None):
 	except Exception as e:
 		frappe.log_error(f"Error in get_courier_details: {str(e)}", "Procurement Expense Error")
 		return []
+
+@frappe.whitelist()
+def get_voucher_wise_details(filters=None):
+	"""Get voucher-wise (Payment Entry) details separated by Cash and Cheque"""
+	try:
+		if isinstance(filters, str):
+			import json
+			filters = json.loads(filters)
+		elif not filters:
+			filters = {}
+		
+		from_date = filters.get('from_date')
+		to_date = filters.get('to_date')
+		cost_centers = filters.get('cost_centers', []) or []
+		
+		# Build cost center filter
+		cost_center_filter = ""
+		cost_center_params = {}
+		if cost_centers:
+			placeholders = []
+			for i, cc in enumerate(cost_centers):
+				key = f"cc_{i}"
+				placeholders.append(f"%({key})s")
+				cost_center_params[key] = cc
+			cost_center_filter = f"AND pe.cost_center IN ({', '.join(placeholders)})"
+		
+		# Query Payment Entries linked to Purchase Invoices
+		query = f"""
+			SELECT 
+				pe.name AS payment_entry,
+				pe.posting_date,
+				pe.mode_of_payment,
+				COALESCE(mop.type, 'Other') AS payment_type,
+				per.allocated_amount,
+				pe.paid_amount,
+				pe.cost_center,
+				per.reference_name AS pi_name,
+				pi.supplier,
+				pi.posting_date AS pi_posting_date,
+				pi.grand_total AS invoice_total
+			FROM `tabPayment Entry` pe
+			INNER JOIN `tabPayment Entry Reference` per ON per.parent = pe.name
+			INNER JOIN `tabPurchase Invoice` pi ON pi.name = per.reference_name
+			LEFT JOIN `tabMode of Payment` mop ON mop.name = pe.mode_of_payment
+			WHERE pe.docstatus = 1
+			AND pe.payment_type = 'Pay'
+			AND per.reference_doctype = 'Purchase Invoice'
+			AND pe.posting_date BETWEEN %(from_date)s AND %(to_date)s
+			{cost_center_filter}
+			ORDER BY pe.posting_date DESC, pe.name DESC
+		"""
+		
+		params = {
+			'from_date': from_date,
+			'to_date': to_date,
+			**cost_center_params
+		}
+		
+		payment_entries = frappe.db.sql(query, params, as_dict=True)
+		
+		# Separate into cash and cheque
+		cash_vouchers = []
+		cheque_vouchers = []
+		
+		for pe in payment_entries:
+			mode_of_payment = (pe.mode_of_payment or '').lower()
+			payment_type = (pe.payment_type or 'Other').lower()
+			
+			# Determine if cash or cheque
+			is_cash = False
+			is_cheque = False
+			
+			if 'cash' in mode_of_payment or payment_type == 'cash':
+				is_cash = True
+			elif 'cheque' in mode_of_payment or 'check' in mode_of_payment or payment_type == 'bank':
+				is_cheque = True
+			
+			# Get cost center name
+			cost_center_name = pe.cost_center or 'Not Set'
+			if cost_center_name != 'Not Set':
+				try:
+					# Try to get department name first
+					dept_name = frappe.db.get_value('Department', cost_center_name, 'department_name')
+					if dept_name:
+						cost_center_name = dept_name
+					else:
+						# Try cost center name
+						cc_name = frappe.db.get_value('Cost Center', cost_center_name, 'cost_center_name')
+						if cc_name:
+							cost_center_name = cc_name
+				except:
+					pass
+			
+			# Format posting date
+			posting_date_str = ''
+			if pe.posting_date:
+				if isinstance(pe.posting_date, str):
+					posting_date_str = pe.posting_date
+				else:
+					posting_date_str = pe.posting_date.strftime('%Y-%m-%d')
+			
+			voucher_data = {
+				'payment_entry': pe.payment_entry,
+				'posting_date': posting_date_str,
+				'mode_of_payment': pe.mode_of_payment or 'Not Specified',
+				'payment_type': pe.payment_type or 'Other',
+				'amount': flt(pe.allocated_amount or pe.paid_amount or 0),
+				'cost_center': pe.cost_center or 'Not Set',
+				'cost_center_name': cost_center_name,
+				'pi_name': pe.pi_name,
+				'supplier': pe.supplier,
+				'invoice_total': flt(pe.invoice_total or 0)
+			}
+			
+			if is_cash:
+				cash_vouchers.append(voucher_data)
+			elif is_cheque:
+				cheque_vouchers.append(voucher_data)
+			else:
+				# If not clearly cash or cheque, check payment type
+				# Default to cheque if it's bank type, otherwise cash
+				if payment_type == 'bank':
+					cheque_vouchers.append(voucher_data)
+				else:
+					cash_vouchers.append(voucher_data)
+		
+		# Sort by posting date descending
+		cash_vouchers.sort(key=lambda x: x['posting_date'], reverse=True)
+		cheque_vouchers.sort(key=lambda x: x['posting_date'], reverse=True)
+		
+		return {
+			'cash': cash_vouchers,
+			'cheque': cheque_vouchers
+		}
+		
+	except Exception as e:
+		frappe.log_error(f"Error in get_voucher_wise_details: {str(e)}", "Procurement Expense Error")
+		return {'cash': [], 'cheque': []}
 
