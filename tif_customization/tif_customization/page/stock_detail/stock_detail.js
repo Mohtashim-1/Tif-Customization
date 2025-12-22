@@ -1099,11 +1099,60 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 			</div>
 		`;
 		
-		// Individual Item KPIs
+		// Individual Item Balance KPIs - Separate KPI cards for each item
 		let itemsHtml = '';
 		if (kpiData.items && kpiData.items.length > 0) {
+			// Generate color gradients for each item (cycling through colors)
+			const colorGradients = [
+				'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+				'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+				'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+				'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+				'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+				'linear-gradient(135deg, #30cfd0 0%, #330867 100%)',
+				'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
+				'linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)',
+				'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
+				'linear-gradient(135deg, #ff8a80 0%, #ea6100 100%)',
+				'linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%)',
+				'linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%)',
+				'linear-gradient(135deg, #ff6e7f 0%, #bfe9ff 100%)',
+				'linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%)',
+				'linear-gradient(135deg, #fad961 0%, #f76b1c 100%)',
+				'linear-gradient(135deg, #fa8bff 0%, #2bd2ff 100%)',
+				'linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%)',
+				'linear-gradient(135deg, #fdcbf1 0%, #e6dee9 100%)',
+				'linear-gradient(135deg, #a8caba 0%, #5d4e75 100%)',
+				'linear-gradient(135deg, #d299c2 0%, #fef9d7 100%)',
+				'linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%)',
+				'linear-gradient(135deg, #fdbb2d 0%, #22c1c3 100%)',
+				'linear-gradient(135deg, #ee0979 0%, #ff6a00 100%)'
+			];
+			
 			itemsHtml = `
-				<h5 style="margin-bottom: 15px; margin-top: 20px;">Individual Item KPIs</h5>
+				<h5 style="margin-bottom: 20px; margin-top: 30px; font-weight: bold; color: #495057;">Individual Item Balance KPIs</h5>
+				<div class="row" style="margin-bottom: 20px;">
+					${kpiData.items.map((item, index) => {
+						const balance = item.available_stock || 0;
+						const colorGradient = colorGradients[index % colorGradients.length];
+						const itemName = (item.item_name || item.item_code || 'Unknown').substring(0, 30);
+						const itemCode = item.item_code || '-';
+						
+						return `
+							<div class="col-md-3" style="margin-bottom: 15px;">
+								<div class="kpi-card" style="background: ${colorGradient}; color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); min-height: 140px;">
+									<h6 style="margin: 0 0 8px 0; font-size: 12px; opacity: 0.95; font-weight: bold; line-height: 1.3;">${itemCode}</h6>
+									<p style="margin: 0 0 12px 0; font-size: 11px; opacity: 0.9; line-height: 1.2; height: 28px; overflow: hidden;">${itemName}</p>
+									<h2 style="margin: 0; font-size: 32px; font-weight: bold; text-align: center;">${formatNumber(balance)}</h2>
+									<p style="margin: 8px 0 0 0; font-size: 11px; opacity: 0.85; text-align: center;">Available Stock</p>
+								</div>
+							</div>
+						`;
+					}).join('')}
+				</div>
+				
+				<!-- Detailed Table for Individual Items -->
+				<h5 style="margin-bottom: 15px; margin-top: 30px; font-weight: bold; color: #495057;">Detailed Item Information</h5>
 				<div class="table-responsive">
 					<table class="table table-bordered table-striped" style="background: white;">
 						<thead>
@@ -1126,7 +1175,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 									<td><strong>${item.item_code || '-'}</strong></td>
 									<td>${item.item_name || '-'}</td>
 									<td class="text-right">${formatNumber(item.opening_stock || 0)}</td>
-									<td class="text-right">${formatNumber(item.available_stock || 0)}</td>
+									<td class="text-right"><strong style="color: #28a745;">${formatNumber(item.available_stock || 0)}</strong></td>
 									<td class="text-right">${formatNumber(item.delivered || 0)}</td>
 									<td class="text-right">${formatNumber(item.received_vendor || 0)}</td>
 									<td class="text-right">${formatNumber(item.book_return || 0)}</td>

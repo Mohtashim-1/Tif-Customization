@@ -27,8 +27,16 @@ def get_procurement_expense_data(filters=None):
 		summary_data = get_summary_data(filters)
 		item_data = get_item_wise_data(filters)
 		department_data = get_department_wise_data(filters)
-		payment_data = get_payment_entry_details(filters)
+		payment_result = get_payment_entry_details(filters)
 		item_payment_data = get_item_payment_details(filters)
+		
+		# Handle payment_data structure (can be dict with summary/details or list)
+		if isinstance(payment_result, dict) and 'summary' in payment_result:
+			payment_data = payment_result['summary']
+			not_specified_details = payment_result.get('not_specified_details', [])
+		else:
+			payment_data = payment_result if isinstance(payment_result, list) else []
+			not_specified_details = []
 		
 		return {
 			'expense_data': expense_data,
@@ -36,6 +44,7 @@ def get_procurement_expense_data(filters=None):
 			'item_data': item_data,
 			'department_data': department_data,
 			'payment_data': payment_data,
+			'not_specified_details': not_specified_details,
 			'item_payment_data': item_payment_data,
 			'period_type': period_type
 		}
@@ -549,6 +558,27 @@ def get_payment_entry_details(filters=None):
 			else:
 				payment_summary[mode_of_payment]['other_amount'] += amount
 		
+		# Collect detailed entries for "Not Specified" before processing summary
+		detailed_entries = []
+		for pe in payment_entries:
+			if not pe.mode_of_payment or pe.mode_of_payment == '':
+				posting_date_str = ''
+				if pe.posting_date:
+					if isinstance(pe.posting_date, str):
+						posting_date_str = pe.posting_date
+					else:
+						posting_date_str = pe.posting_date.strftime('%Y-%m-%d')
+				
+				detailed_entries.append({
+					'payment_entry': pe.payment_entry,
+					'posting_date': posting_date_str,
+					'pi_name': pe.pi_name,
+					'supplier': pe.supplier,
+					'amount': flt(pe.allocated_amount or pe.paid_amount or 0),
+					'cost_center': pe.cost_center,
+					'payment_type': pe.payment_type
+				})
+		
 		# Convert to list, calculate invoice count, and sort
 		result = []
 		for mode, data in payment_summary.items():
@@ -558,7 +588,11 @@ def get_payment_entry_details(filters=None):
 		
 		result.sort(key=lambda x: x['total_amount'], reverse=True)
 		
-		return result
+		# Return both summary and detailed entries
+		return {
+			'summary': result,
+			'not_specified_details': detailed_entries
+		}
 		
 	except Exception as e:
 		frappe.log_error(f"Error in get_payment_entry_details: {str(e)}", "Procurement Expense Error")

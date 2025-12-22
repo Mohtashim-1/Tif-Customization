@@ -109,17 +109,7 @@ if (typeof window.ProcurementExpense === 'undefined') {
 					</div>
 					
 					<div class="row" style="margin-bottom: 20px;">
-						<div class="col-md-6">
-							<div class="panel panel-default">
-								<div class="panel-heading">
-									<h5>Cumulative Expense Trend</h5>
-								</div>
-								<div class="panel-body">
-									<canvas id="chart-cumulative" style="height: 300px;"></canvas>
-								</div>
-							</div>
-						</div>
-						<div class="col-md-6">
+						<div class="col-md-12">
 							<div class="panel panel-default">
 								<div class="panel-heading">
 									<h5>Top 10 Expense Accounts</h5>
@@ -131,57 +121,15 @@ if (typeof window.ProcurementExpense === 'undefined') {
 						</div>
 					</div>
 					
-					<div class="row" style="margin-bottom: 20px;">
-						<div class="col-md-4">
-							<div class="panel panel-default">
-								<div class="panel-heading">
-									<h5>Expense by Cost Center</h5>
-								</div>
-								<div class="panel-body">
-									<canvas id="chart-cost-center" style="height: 300px;"></canvas>
-								</div>
-							</div>
-						</div>
-						<div class="col-md-4">
-							<div class="panel panel-default">
-								<div class="panel-heading">
-									<h5>Expense by Department</h5>
-								</div>
-								<div class="panel-body">
-									<canvas id="chart-department" style="height: 300px;"></canvas>
-								</div>
-							</div>
-						</div>
-						<div class="col-md-4">
-							<div class="panel panel-default">
-								<div class="panel-heading">
-									<h5>Expense by Account</h5>
-								</div>
-								<div class="panel-body">
-									<canvas id="chart-item" style="height: 300px;"></canvas>
-								</div>
-							</div>
-						</div>
-					</div>
 					
 					<div class="row" style="margin-bottom: 20px;">
-						<div class="col-md-6">
+						<div class="col-md-12">
 							<div class="panel panel-default">
 								<div class="panel-heading">
 									<h5>Monthly Comparison</h5>
 								</div>
 								<div class="panel-body">
 									<canvas id="chart-monthly-comparison" style="height: 300px;"></canvas>
-								</div>
-							</div>
-						</div>
-						<div class="col-md-6">
-							<div class="panel panel-default">
-								<div class="panel-heading">
-									<h5>Expense Distribution</h5>
-								</div>
-								<div class="panel-body">
-									<canvas id="chart-distribution" style="height: 300px;"></canvas>
 								</div>
 							</div>
 						</div>
@@ -269,54 +217,9 @@ if (typeof window.ProcurementExpense === 'undefined') {
 								</div>
 							</div>
 						</div>
-						<div class="col-md-6">
-							<div class="panel panel-default">
-								<div class="panel-heading">
-									<h5>Mode of Payment Comparison (Bar Chart)</h5>
-								</div>
-								<div class="panel-body">
-									<canvas id="chart-payment-bar" style="height: 350px;"></canvas>
-								</div>
-							</div>
-						</div>
 					</div>
 					
-					<div class="row" style="margin-bottom: 20px;">
-						<div class="col-md-6">
-							<div class="panel panel-default">
-								<div class="panel-heading">
-									<h5>Cash vs Other Payment Modes (Doughnut Chart)</h5>
-								</div>
-								<div class="panel-body">
-									<canvas id="chart-payment-doughnut" style="height: 350px;"></canvas>
-								</div>
-							</div>
-						</div>
-						<div class="col-md-6">
-							<div class="panel panel-default">
-								<div class="panel-heading">
-									<h5>Payment Count by Mode (Horizontal Bar)</h5>
-								</div>
-								<div class="panel-body">
-									<canvas id="chart-payment-count" style="height: 350px;"></canvas>
-								</div>
-							</div>
-						</div>
-					</div>
 					
-					<!-- Item Payment Charts -->
-					<div class="row" style="margin-bottom: 20px;">
-						<div class="col-md-12">
-							<div class="panel panel-default">
-								<div class="panel-heading">
-									<h5>Items Paid via Cash (Top Items)</h5>
-								</div>
-								<div class="panel-body">
-									<canvas id="chart-items-cash" style="height: 400px;"></canvas>
-								</div>
-							</div>
-						</div>
-					</div>
 					
 					<div class="row" style="margin-bottom: 20px;">
 						<div class="col-md-6">
@@ -341,18 +244,6 @@ if (typeof window.ProcurementExpense === 'undefined') {
 						</div>
 					</div>
 					
-					<div class="row" style="margin-bottom: 20px;">
-						<div class="col-md-12">
-							<div class="panel panel-default">
-								<div class="panel-heading">
-									<h5>Items Paid via Cheque (Top Items)</h5>
-								</div>
-								<div class="panel-body">
-									<canvas id="chart-items-cheque" style="height: 400px;"></canvas>
-								</div>
-							</div>
-						</div>
-					</div>
 					
 					<!-- Payment Entry Details Table -->
 					<div class="data-section" style="margin-top: 20px;">
@@ -387,6 +278,33 @@ if (typeof window.ProcurementExpense === 'undefined') {
 								</tr>
 							</tfoot>
 						</table>
+						</div>
+						
+						<!-- Not Specified Payment Details Table -->
+						<div id="not-specified-details-section" style="margin-top: 30px; display: none;">
+							<h5 style="margin-bottom: 15px; color: #d9534f;">
+								<i class="fa fa-info-circle"></i> Detailed Breakdown: "Not Specified" Payment Entries
+							</h5>
+							<div class="table-responsive">
+								<table class="table table-bordered table-striped" id="not-specified-table">
+									<thead>
+										<tr>
+											<th>S.#</th>
+											<th>Payment Entry</th>
+											<th>Posting Date</th>
+											<th>Purchase Invoice</th>
+											<th>Supplier</th>
+											<th>Cost Center</th>
+											<th>Amount</th>
+										</tr>
+									</thead>
+									<tbody id="not-specified-tbody">
+										<tr>
+											<td colspan="7" class="text-center">No data available</td>
+										</tr>
+									</tbody>
+								</table>
+							</div>
 						</div>
 					</div>
 				</div>
@@ -645,6 +563,7 @@ if (typeof window.ProcurementExpense === 'undefined') {
 		render_payment_table() {
 			let me = this;
 			let payment_data = me.data.payment_data || [];
+			let not_specified_details = me.data.not_specified_details || [];
 			let tbody = $('#payment-tbody');
 			tbody.empty();
 			
@@ -655,6 +574,7 @@ if (typeof window.ProcurementExpense === 'undefined') {
 				$('#payment-total-amount').text('0.00');
 				$('#payment-count-total').text('0');
 				$('#payment-invoice-count-total').text('0');
+				$('#not-specified-details-section').hide();
 			} else {
 				let s_no = 1;
 				let totals = {
@@ -671,6 +591,7 @@ if (typeof window.ProcurementExpense === 'undefined') {
 					let total_amt = flt(row.total_amount || 0);
 					let payment_count = cint(row.payment_count || 0);
 					let invoice_count = cint(row.invoice_count || 0);
+					let mode_of_payment = row.mode_of_payment || 'Not Specified';
 					
 					totals.cash += cash_amt;
 					totals.other += other_amt;
@@ -681,7 +602,7 @@ if (typeof window.ProcurementExpense === 'undefined') {
 					let tr = $(`
 						<tr>
 							<td>${s_no}</td>
-							<td><strong>${row.mode_of_payment || 'Not Specified'}</strong></td>
+							<td><strong>${mode_of_payment}</strong></td>
 							<td>${row.payment_type || '-'}</td>
 							<td class="text-right">${format_currency_value(cash_amt)}</td>
 							<td class="text-right">${format_currency_value(other_amt)}</td>
@@ -700,6 +621,50 @@ if (typeof window.ProcurementExpense === 'undefined') {
 				$('#payment-total-amount').text(format_currency_value(totals.total));
 				$('#payment-count-total').text(format_number_value(totals.count));
 				$('#payment-invoice-count-total').text(format_number_value(totals.invoice_count));
+				
+				// Render "Not Specified" details table if data exists
+				if (not_specified_details && not_specified_details.length > 0) {
+					me.render_not_specified_details(not_specified_details);
+				} else {
+					$('#not-specified-details-section').hide();
+				}
+			}
+		}
+		
+		render_not_specified_details(details) {
+			let me = this;
+			let tbody = $('#not-specified-tbody');
+			tbody.empty();
+			
+			if (details.length === 0) {
+				tbody.append('<tr><td colspan="7" class="text-center">No "Not Specified" payment entries found</td></tr>');
+				$('#not-specified-details-section').hide();
+			} else {
+				let s_no = 1;
+				details.forEach(row => {
+					let tr = $(`
+						<tr>
+							<td>${s_no}</td>
+							<td>
+								<a href="/app/payment-entry/${row.payment_entry}" target="_blank" style="color: #007bff;">
+									${row.payment_entry || '-'}
+								</a>
+							</td>
+							<td>${row.posting_date || '-'}</td>
+							<td>
+								<a href="/app/purchase-invoice/${row.pi_name}" target="_blank" style="color: #007bff;">
+									${row.pi_name || '-'}
+								</a>
+							</td>
+							<td>${row.supplier || '-'}</td>
+							<td>${row.cost_center || '-'}</td>
+							<td class="text-right">${format_currency_value(row.amount || 0)}</td>
+						</tr>
+					`);
+					tbody.append(tr);
+					s_no++;
+				});
+				$('#not-specified-details-section').show();
 			}
 		}
 		
@@ -841,118 +806,6 @@ if (typeof window.ProcurementExpense === 'undefined') {
 					}
 				}, 100);
 			}
-			
-			// Cost Center Chart with animations
-			if (summary.length > 0) {
-				let topSummary = summary.slice(0, 10);
-				let labels = topSummary.map(s => (s.cost_center_name || s.cost_center).substring(0, 20));
-				let values = topSummary.map(s => s.po_amount || 0);
-				
-				if (me.charts.cost_center) {
-					try {
-						me.charts.cost_center.destroy();
-					} catch(e) {}
-				}
-				
-				setTimeout(() => {
-					try {
-						let canvas = document.getElementById('chart-cost-center');
-						if (canvas) {
-							let ctx = canvas.getContext('2d');
-							me.charts.cost_center = new Chart(ctx, {
-								type: 'bar',
-								data: {
-									labels: labels,
-									datasets: [{
-										label: 'Expense Amount',
-										data: values,
-										backgroundColor: 'rgba(102, 126, 234, 0.8)',
-										borderColor: '#667eea',
-										borderWidth: 2,
-										borderRadius: 8,
-										borderSkipped: false
-									}]
-								},
-								options: {
-									responsive: true,
-									maintainAspectRatio: false,
-									indexAxis: 'y',
-									animation: {
-										duration: 2000,
-										easing: 'easeInOutBounce',
-										delay: (context) => {
-											let delay = 0;
-											if (context.type === 'data' && context.mode === 'default') {
-												delay = context.dataIndex * 150;
-											}
-											return delay;
-										}
-									},
-									plugins: {
-										legend: {
-											display: true,
-											position: 'top',
-											labels: {
-												font: {
-													size: 12,
-													weight: 'bold'
-												},
-												padding: 15
-											}
-										},
-										tooltip: {
-											backgroundColor: 'rgba(0, 0, 0, 0.8)',
-											padding: 12,
-											titleFont: {
-												size: 14,
-												weight: 'bold'
-											},
-											bodyFont: {
-												size: 13
-											},
-											callbacks: {
-												label: function(context) {
-													return format_currency_value(context.parsed.x);
-												}
-											}
-										}
-									},
-									scales: {
-										x: {
-											beginAtZero: true,
-											grid: {
-												color: 'rgba(0, 0, 0, 0.05)',
-												lineWidth: 1
-											},
-											ticks: {
-												callback: function(value) {
-													return format_currency_value(value);
-												},
-												font: {
-													size: 11
-												}
-											}
-										},
-										y: {
-											grid: {
-												display: false
-											},
-											ticks: {
-												font: {
-													size: 10
-												}
-											}
-										}
-									}
-								}
-							});
-						}
-					} catch(e) {
-						console.error('Error creating cost center chart:', e);
-					}
-				}, 300);
-			}
-			
 			// Summary Pie Chart by Department/Cost Center
 			if (summary.length > 0) {
 				let labels = summary.map(s => (s.cost_center_name || s.cost_center).substring(0, 30));
@@ -1068,334 +921,7 @@ if (typeof window.ProcurementExpense === 'undefined') {
 					}
 				}, 400);
 			}
-			
-			// Department Chart with animations
-			if (dept_data.length > 0) {
-				let topDept = dept_data.slice(0, 10);
-				let labels = topDept.map(d => (d.department_name || d.department).substring(0, 20));
-				let values = topDept.map(d => d.po_amount || 0);
-				
-				if (me.charts.department) {
-					try {
-						me.charts.department.destroy();
-					} catch(e) {}
-				}
-				
-				setTimeout(() => {
-					try {
-						let ctx = document.getElementById('chart-department');
-						if (ctx) {
-							me.charts.department = new Chart(ctx, {
-								type: 'doughnut',
-								data: {
-									labels: labels,
-									datasets: [{
-										label: 'Expense Amount',
-										data: values,
-										backgroundColor: [
-											'rgba(245, 87, 108, 0.8)',
-											'rgba(102, 126, 234, 0.8)',
-											'rgba(67, 233, 123, 0.8)',
-											'rgba(255, 193, 7, 0.8)',
-											'rgba(156, 39, 176, 0.8)',
-											'rgba(233, 30, 99, 0.8)',
-											'rgba(0, 188, 212, 0.8)',
-											'rgba(255, 152, 0, 0.8)',
-											'rgba(76, 175, 80, 0.8)',
-											'rgba(63, 81, 181, 0.8)'
-										],
-										borderColor: [
-											'#f5576c',
-											'#667eea',
-											'#43e97b',
-											'#ffc107',
-											'#9c27b0',
-											'#e91e63',
-											'#00bcd4',
-											'#ff9800',
-											'#4caf50',
-											'#3f51b5'
-										],
-										borderWidth: 3,
-										hoverOffset: 10
-									}]
-								},
-								options: {
-									responsive: true,
-									maintainAspectRatio: false,
-									animation: {
-										animateRotate: true,
-										animateScale: true,
-										duration: 2000,
-										easing: 'easeInOutQuart',
-										delay: (context) => {
-											let delay = 0;
-											if (context.type === 'data' && context.mode === 'default') {
-												delay = context.dataIndex * 100;
-											}
-											return delay;
-										}
-									},
-									plugins: {
-										legend: {
-											display: true,
-											position: 'right',
-											labels: {
-												font: {
-													size: 11
-												},
-												padding: 10,
-												usePointStyle: true
-											}
-										},
-										tooltip: {
-											backgroundColor: 'rgba(0, 0, 0, 0.8)',
-											padding: 12,
-											titleFont: {
-												size: 14,
-												weight: 'bold'
-											},
-											bodyFont: {
-												size: 13
-											},
-											callbacks: {
-												label: function(context) {
-													let label = context.label || '';
-													let value = format_currency_value(context.parsed);
-													let total = context.dataset.data.reduce((a, b) => a + b, 0);
-													let percentage = ((context.parsed / total) * 100).toFixed(1);
-													return `${label}: ${value} (${percentage}%)`;
-												}
-											}
-										}
-									}
-								}
-							});
-						}
-					} catch(e) {
-						console.error('Error creating department chart:', e);
-					}
-				}, 500);
-			}
-			
-			// Item Chart with animations
-			if (item_data.length > 0) {
-				let topItems = item_data.slice(0, 10);
-				let labels = topItems.map(i => (i.item_name || i.item_code).substring(0, 20));
-				let values = topItems.map(i => i.po_amount || 0);
-				
-				if (me.charts.item) {
-					try {
-						me.charts.item.destroy();
-					} catch(e) {}
-				}
-				
-				setTimeout(() => {
-					try {
-						let canvas = document.getElementById('chart-item');
-						if (canvas) {
-							let ctx = canvas.getContext('2d');
-							me.charts.item = new Chart(ctx, {
-								type: 'bar',
-								data: {
-									labels: labels,
-									datasets: [{
-										label: 'Expense Amount',
-										data: values,
-										backgroundColor: 'rgba(67, 233, 123, 0.8)',
-										borderColor: '#43e97b',
-										borderWidth: 2,
-										borderRadius: 8,
-										borderSkipped: false
-									}]
-								},
-								options: {
-									responsive: true,
-									maintainAspectRatio: false,
-									animation: {
-										duration: 2000,
-										easing: 'easeInOutElastic',
-										delay: (context) => {
-											let delay = 0;
-											if (context.type === 'data' && context.mode === 'default') {
-												delay = context.dataIndex * 120;
-											}
-											return delay;
-										}
-									},
-									plugins: {
-										legend: {
-											display: true,
-											position: 'top',
-											labels: {
-												font: {
-													size: 12,
-													weight: 'bold'
-												},
-												padding: 15
-											}
-										},
-										tooltip: {
-											backgroundColor: 'rgba(0, 0, 0, 0.8)',
-											padding: 12,
-											titleFont: {
-												size: 14,
-												weight: 'bold'
-											},
-											bodyFont: {
-												size: 13
-											},
-											callbacks: {
-												label: function(context) {
-													return format_currency_value(context.parsed.y);
-												}
-											}
-										}
-									},
-									scales: {
-										y: {
-											beginAtZero: true,
-											grid: {
-												color: 'rgba(0, 0, 0, 0.05)',
-												lineWidth: 1
-											},
-											ticks: {
-												callback: function(value) {
-													return format_currency_value(value);
-												},
-												font: {
-													size: 11
-												}
-											}
-										},
-										x: {
-											grid: {
-												display: false
-											},
-											ticks: {
-												font: {
-													size: 10
-												},
-												maxRotation: 45,
-												minRotation: 45
-											}
-										}
-									}
-								}
-							});
-						}
-					} catch(e) {
-						console.error('Error creating item chart:', e);
-					}
-				}, 700);
-			}
-			
-			// Cumulative Expense Chart
-			if (expense_data.length > 0) {
-				let period_data = {};
-				expense_data.forEach(row => {
-					if (!period_data[row.period]) {
-						period_data[row.period] = {
-							period: row.period,
-							po_amount: 0
-						};
-					}
-					period_data[row.period].po_amount += row.po_amount || 0;
-				});
-				
-				let periods = Object.keys(period_data).sort();
-				let cumulative = 0;
-				let cumulativeAmounts = periods.map(p => {
-					cumulative += period_data[p].po_amount;
-					return cumulative;
-				});
-				
-				if (me.charts.cumulative) {
-					try {
-						me.charts.cumulative.destroy();
-					} catch(e) {}
-				}
-				
-				setTimeout(() => {
-					try {
-						let canvas = document.getElementById('chart-cumulative');
-						if (canvas) {
-							let ctx = canvas.getContext('2d');
-							me.charts.cumulative = new Chart(ctx, {
-								type: 'line',
-								data: {
-									labels: periods,
-									datasets: [{
-										label: 'Cumulative Expense',
-										data: cumulativeAmounts,
-										borderColor: '#667eea',
-										backgroundColor: 'rgba(102, 126, 234, 0.1)',
-										borderWidth: 3,
-										fill: true,
-										tension: 0.4,
-										pointRadius: 6,
-										pointHoverRadius: 9,
-										pointBackgroundColor: '#667eea',
-										pointBorderColor: '#fff',
-										pointBorderWidth: 2,
-										stepped: 'after'
-									}]
-								},
-								options: {
-									responsive: true,
-									maintainAspectRatio: false,
-									animation: {
-										duration: 2500,
-										easing: 'easeInOutQuart',
-										delay: (context) => context.dataIndex * 80
-									},
-									plugins: {
-										legend: {
-											display: true,
-											position: 'top',
-											labels: {
-												font: { size: 12, weight: 'bold' },
-												padding: 15
-											}
-										},
-										tooltip: {
-											backgroundColor: 'rgba(0, 0, 0, 0.8)',
-											padding: 12,
-											titleFont: { size: 14, weight: 'bold' },
-											bodyFont: { size: 13 },
-											callbacks: {
-												label: function(context) {
-													return format_currency_value(context.parsed.y);
-												}
-											}
-										}
-									},
-									scales: {
-										y: {
-											beginAtZero: true,
-											grid: { color: 'rgba(0, 0, 0, 0.05)', lineWidth: 1 },
-											ticks: {
-												callback: function(value) {
-													return format_currency_value(value);
-												},
-												font: { size: 11 }
-											}
-										},
-										x: {
-											grid: { display: false },
-											ticks: { font: { size: 11 } }
-										}
-									}
-								}
-							});
-						}
-					} catch(e) {
-						console.error('Error creating cumulative chart:', e);
-					}
-				}, 900);
-			}
-			
-			// Top 10 Expense Accounts Pie Chart
+// Top 10 Expense Accounts Pie Chart
 			if (item_data.length > 0) {
 				let topItems = item_data.slice(0, 10);
 				let labels = topItems.map(i => (i.item_name || i.item_code).substring(0, 25));
@@ -1593,101 +1119,6 @@ if (typeof window.ProcurementExpense === 'undefined') {
 					}
 				}, 1300);
 			}
-			
-			// Expense Distribution Chart (Polar Area)
-			if (expense_data.length > 0) {
-				if (dept_data.length > 0) {
-					let topDept = dept_data.slice(0, 8);
-					let labels = topDept.map(d => (d.department_name || d.department).substring(0, 15));
-					let values = topDept.map(d => d.po_amount || 0);
-					
-					if (me.charts.distribution) {
-						try {
-							me.charts.distribution.destroy();
-						} catch(e) {}
-					}
-					
-					setTimeout(() => {
-						try {
-							let canvas = document.getElementById('chart-distribution');
-							if (canvas) {
-								let ctx = canvas.getContext('2d');
-								me.charts.distribution = new Chart(ctx, {
-									type: 'polarArea',
-									data: {
-										labels: labels,
-										datasets: [{
-											label: 'Expense Amount',
-											data: values,
-											backgroundColor: [
-												'rgba(245, 87, 108, 0.7)', 'rgba(102, 126, 234, 0.7)', 'rgba(67, 233, 123, 0.7)',
-												'rgba(255, 193, 7, 0.7)', 'rgba(156, 39, 176, 0.7)', 'rgba(233, 30, 99, 0.7)',
-												'rgba(0, 188, 212, 0.7)', 'rgba(255, 152, 0, 0.7)'
-											],
-											borderColor: [
-												'#f5576c', '#667eea', '#43e97b', '#ffc107',
-												'#9c27b0', '#e91e63', '#00bcd4', '#ff9800'
-											],
-											borderWidth: 2
-										}]
-									},
-									options: {
-										responsive: true,
-										maintainAspectRatio: false,
-										animation: {
-											animateRotate: true,
-											animateScale: true,
-											duration: 2000,
-											easing: 'easeInOutQuart',
-											delay: (context) => context.dataIndex * 100
-										},
-										plugins: {
-											legend: {
-												display: true,
-												position: 'right',
-												labels: {
-													font: { size: 10 },
-													padding: 8,
-													usePointStyle: true
-												}
-											},
-											tooltip: {
-												backgroundColor: 'rgba(0, 0, 0, 0.8)',
-												padding: 12,
-												titleFont: { size: 14, weight: 'bold' },
-												bodyFont: { size: 13 },
-												callbacks: {
-													label: function(context) {
-														let label = context.label || '';
-														let value = format_currency_value(context.parsed.r);
-														let total = context.dataset.data.reduce((a, b) => a + b, 0);
-														let percentage = ((context.parsed.r / total) * 100).toFixed(1);
-														return `${label}: ${value} (${percentage}%)`;
-													}
-												}
-											}
-										},
-										scales: {
-											r: {
-												beginAtZero: true,
-												ticks: {
-													display: false
-												},
-												grid: {
-													color: 'rgba(0, 0, 0, 0.1)'
-												}
-											}
-										}
-									}
-								});
-							}
-						} catch(e) {
-							console.error('Error creating distribution chart:', e);
-						}
-					}, 1500);
-				}
-			}
-			
 			// Expense vs Transaction Count Chart (Dual Axis)
 			if (expense_data.length > 0) {
 				let period_data = {};
@@ -1963,263 +1394,6 @@ if (typeof window.ProcurementExpense === 'undefined') {
 					console.error('Error creating payment pie chart:', e);
 				}
 			}, 100);
-			
-			// 2. Bar Chart - Mode of Payment Comparison
-			if (me.charts.payment_bar) {
-				try {
-					me.charts.payment_bar.destroy();
-				} catch(e) {}
-			}
-			
-			setTimeout(() => {
-				try {
-					let canvas = document.getElementById('chart-payment-bar');
-					if (canvas) {
-						let ctx = canvas.getContext('2d');
-						me.charts.payment_bar = new Chart(ctx, {
-							type: 'bar',
-							data: {
-								labels: labels,
-								datasets: [
-									{
-										label: 'Cash Amount',
-										data: cash_amounts,
-										backgroundColor: 'rgba(67, 233, 123, 0.8)',
-										borderColor: '#43e97b',
-										borderWidth: 2,
-										borderRadius: 6
-									},
-									{
-										label: 'Other Amount',
-										data: other_amounts,
-										backgroundColor: 'rgba(102, 126, 234, 0.8)',
-										borderColor: '#667eea',
-										borderWidth: 2,
-										borderRadius: 6
-									}
-								]
-							},
-							options: {
-								responsive: true,
-								maintainAspectRatio: false,
-								animation: {
-									duration: 2000,
-									easing: 'easeInOutBounce',
-									delay: (context) => {
-										if (context.type === 'data' && context.mode === 'default') {
-											return context.dataIndex * 100 + context.datasetIndex * 50;
-										}
-										return 0;
-									}
-								},
-								plugins: {
-									legend: {
-										display: true,
-										position: 'top',
-										labels: {
-											font: { size: 12, weight: 'bold' },
-											padding: 15
-										}
-									},
-									tooltip: {
-										backgroundColor: 'rgba(0, 0, 0, 0.8)',
-										padding: 12,
-										titleFont: { size: 14, weight: 'bold' },
-										bodyFont: { size: 13 },
-										callbacks: {
-											label: function(context) {
-												return `${context.dataset.label}: ${format_currency_value(context.parsed.y)}`;
-											}
-										}
-									}
-								},
-								scales: {
-									y: {
-										beginAtZero: true,
-										stacked: false,
-										grid: { color: 'rgba(0, 0, 0, 0.05)', lineWidth: 1 },
-										ticks: {
-											callback: function(value) {
-												return format_currency_value(value);
-											},
-											font: { size: 11 }
-										}
-									},
-									x: {
-										stacked: false,
-										grid: { display: false },
-										ticks: {
-											font: { size: 11 },
-											maxRotation: 45,
-											minRotation: 45
-										}
-									}
-								}
-							}
-						});
-					}
-				} catch(e) {
-					console.error('Error creating payment bar chart:', e);
-				}
-			}, 300);
-			
-			// 3. Doughnut Chart - Cash vs Other
-			if (me.charts.payment_doughnut) {
-				try {
-					me.charts.payment_doughnut.destroy();
-				} catch(e) {}
-			}
-			
-			setTimeout(() => {
-				try {
-					let canvas = document.getElementById('chart-payment-doughnut');
-					if (canvas) {
-						let ctx = canvas.getContext('2d');
-						me.charts.payment_doughnut = new Chart(ctx, {
-							type: 'doughnut',
-							data: {
-								labels: ['Cash Payments', 'Other Payments'],
-								datasets: [{
-									label: 'Payment Amount',
-									data: [total_cash, total_other],
-									backgroundColor: ['rgba(67, 233, 123, 0.8)', 'rgba(102, 126, 234, 0.8)'],
-									borderColor: ['#43e97b', '#667eea'],
-									borderWidth: 3,
-									hoverOffset: 15
-								}]
-							},
-							options: {
-								responsive: true,
-								maintainAspectRatio: false,
-								animation: {
-									animateRotate: true,
-									animateScale: true,
-									duration: 2000,
-									easing: 'easeInOutQuart'
-								},
-								plugins: {
-									legend: {
-										display: true,
-										position: 'right',
-										labels: {
-											font: { size: 12 },
-											padding: 15,
-											usePointStyle: true
-										}
-									},
-									tooltip: {
-										backgroundColor: 'rgba(0, 0, 0, 0.8)',
-										padding: 12,
-										titleFont: { size: 14, weight: 'bold' },
-										bodyFont: { size: 13 },
-										callbacks: {
-											label: function(context) {
-												let label = context.label || '';
-												let value = format_currency_value(context.parsed);
-												let total = total_cash + total_other;
-												let percentage = total > 0 ? ((context.parsed / total) * 100).toFixed(1) : 0;
-												return `${label}: ${value} (${percentage}%)`;
-											}
-										}
-									}
-								}
-							}
-						});
-					}
-				} catch(e) {
-					console.error('Error creating payment doughnut chart:', e);
-				}
-			}, 500);
-			
-			// 4. Horizontal Bar Chart - Payment Count by Mode
-			if (me.charts.payment_count) {
-				try {
-					me.charts.payment_count.destroy();
-				} catch(e) {}
-			}
-			
-			setTimeout(() => {
-				try {
-					let canvas = document.getElementById('chart-payment-count');
-					if (canvas) {
-						let ctx = canvas.getContext('2d');
-						me.charts.payment_count = new Chart(ctx, {
-							type: 'bar',
-							data: {
-								labels: labels,
-								datasets: [{
-									label: 'Payment Count',
-									data: payment_counts,
-									backgroundColor: colors.slice(0, labels.length).map(c => c.replace('0.8', '0.7')),
-									borderColor: borderColors.slice(0, labels.length),
-									borderWidth: 2,
-									borderRadius: 6,
-									borderSkipped: false
-								}]
-							},
-							options: {
-								responsive: true,
-								maintainAspectRatio: false,
-								indexAxis: 'y',
-								animation: {
-									duration: 2000,
-									easing: 'easeInOutBounce',
-									delay: (context) => {
-										if (context.type === 'data' && context.mode === 'default') {
-											return context.dataIndex * 120;
-										}
-										return 0;
-									}
-								},
-								plugins: {
-									legend: {
-										display: true,
-										position: 'top',
-										labels: {
-											font: { size: 12, weight: 'bold' },
-											padding: 15
-										}
-									},
-									tooltip: {
-										backgroundColor: 'rgba(0, 0, 0, 0.8)',
-										padding: 12,
-										titleFont: { size: 14, weight: 'bold' },
-										bodyFont: { size: 13 },
-										callbacks: {
-											label: function(context) {
-												let count = context.parsed.x;
-												let invoiceCount = payment_data[context.dataIndex]?.invoice_count || 0;
-												return [
-													`Payment Count: ${format_number_value(count)}`,
-													`Invoice Count: ${format_number_value(invoiceCount)}`
-												];
-											}
-										}
-									}
-								},
-								scales: {
-									x: {
-										beginAtZero: true,
-										grid: { color: 'rgba(0, 0, 0, 0.05)', lineWidth: 1 },
-										ticks: {
-											stepSize: 1,
-											font: { size: 11 }
-										}
-									},
-									y: {
-										grid: { display: false },
-										ticks: {
-											font: { size: 11 }
-										}
-									}
-								}
-							}
-						});
-					}
-				} catch(e) {
-					console.error('Error creating payment count chart:', e);
-				}
-			}, 700);
 		}
 		
 		render_item_payment_charts() {
@@ -2251,105 +1425,8 @@ if (typeof window.ProcurementExpense === 'undefined') {
 				'#f44336', '#2196f3', '#8bc34a', '#ffeb3b', '#ec407a'
 			];
 			
-			// 1. Items Paid via Cash - Bar Chart
+			// Cash Items Pie Chart
 			if (cash_items.length > 0) {
-				let topCashItems = cash_items.slice(0, 15);
-				let cashLabels = topCashItems.map(i => (i.item_name || i.item_code).substring(0, 30));
-				let cashAmounts = topCashItems.map(i => i.amount || 0);
-				
-				if (me.charts.items_cash) {
-					try {
-						me.charts.items_cash.destroy();
-					} catch(e) {}
-				}
-				
-				setTimeout(() => {
-					try {
-						let canvas = document.getElementById('chart-items-cash');
-						if (canvas) {
-							let ctx = canvas.getContext('2d');
-							me.charts.items_cash = new Chart(ctx, {
-								type: 'bar',
-								data: {
-									labels: cashLabels,
-									datasets: [{
-										label: 'Cash Payment Amount',
-										data: cashAmounts,
-										backgroundColor: 'rgba(67, 233, 123, 0.8)',
-										borderColor: '#43e97b',
-										borderWidth: 2,
-										borderRadius: 8,
-										borderSkipped: false
-									}]
-								},
-								options: {
-									responsive: true,
-									maintainAspectRatio: false,
-									animation: {
-										duration: 2000,
-										easing: 'easeInOutBounce',
-										delay: (context) => {
-											if (context.type === 'data' && context.mode === 'default') {
-												return context.dataIndex * 80;
-											}
-											return 0;
-										}
-									},
-									plugins: {
-										legend: {
-											display: true,
-											position: 'top',
-											labels: {
-												font: { size: 12, weight: 'bold' },
-												padding: 15
-											}
-										},
-										tooltip: {
-											backgroundColor: 'rgba(0, 0, 0, 0.8)',
-											padding: 12,
-											titleFont: { size: 14, weight: 'bold' },
-											bodyFont: { size: 13 },
-											callbacks: {
-												label: function(context) {
-													let amount = format_currency_value(context.parsed.y);
-													let invoiceCount = topCashItems[context.dataIndex]?.invoice_count || 0;
-													return [
-														`Amount: ${amount}`,
-														`Invoice Count: ${format_number_value(invoiceCount)}`
-													];
-												}
-											}
-										}
-									},
-									scales: {
-										y: {
-											beginAtZero: true,
-											grid: { color: 'rgba(0, 0, 0, 0.05)', lineWidth: 1 },
-											ticks: {
-												callback: function(value) {
-													return format_currency_value(value);
-												},
-												font: { size: 11 }
-											}
-										},
-										x: {
-											grid: { display: false },
-											ticks: {
-												font: { size: 10 },
-												maxRotation: 45,
-												minRotation: 45
-											}
-										}
-									}
-								}
-							});
-						}
-					} catch(e) {
-						console.error('Error creating cash items bar chart:', e);
-					}
-				}, 900);
-				
-				// Cash Items Pie Chart
 				if (me.charts.items_cash_pie) {
 					try {
 						me.charts.items_cash_pie.destroy();
@@ -2448,105 +1525,8 @@ if (typeof window.ProcurementExpense === 'undefined') {
 				}, 1100);
 			}
 			
-			// 2. Items Paid via Cheque - Bar Chart
+			// Cheque Items Pie Chart
 			if (cheque_items.length > 0) {
-				let topChequeItems = cheque_items.slice(0, 15);
-				let chequeLabels = topChequeItems.map(i => (i.item_name || i.item_code).substring(0, 30));
-				let chequeAmounts = topChequeItems.map(i => i.amount || 0);
-				
-				if (me.charts.items_cheque) {
-					try {
-						me.charts.items_cheque.destroy();
-					} catch(e) {}
-				}
-				
-				setTimeout(() => {
-					try {
-						let canvas = document.getElementById('chart-items-cheque');
-						if (canvas) {
-							let ctx = canvas.getContext('2d');
-							me.charts.items_cheque = new Chart(ctx, {
-								type: 'bar',
-								data: {
-									labels: chequeLabels,
-									datasets: [{
-										label: 'Cheque Payment Amount',
-										data: chequeAmounts,
-										backgroundColor: 'rgba(102, 126, 234, 0.8)',
-										borderColor: '#667eea',
-										borderWidth: 2,
-										borderRadius: 8,
-										borderSkipped: false
-									}]
-								},
-								options: {
-									responsive: true,
-									maintainAspectRatio: false,
-									animation: {
-										duration: 2000,
-										easing: 'easeInOutBounce',
-										delay: (context) => {
-											if (context.type === 'data' && context.mode === 'default') {
-												return context.dataIndex * 80;
-											}
-											return 0;
-										}
-									},
-									plugins: {
-										legend: {
-											display: true,
-											position: 'top',
-											labels: {
-												font: { size: 12, weight: 'bold' },
-												padding: 15
-											}
-										},
-										tooltip: {
-											backgroundColor: 'rgba(0, 0, 0, 0.8)',
-											padding: 12,
-											titleFont: { size: 14, weight: 'bold' },
-											bodyFont: { size: 13 },
-											callbacks: {
-												label: function(context) {
-													let amount = format_currency_value(context.parsed.y);
-													let invoiceCount = topChequeItems[context.dataIndex]?.invoice_count || 0;
-													return [
-														`Amount: ${amount}`,
-														`Invoice Count: ${format_number_value(invoiceCount)}`
-													];
-												}
-											}
-										}
-									},
-									scales: {
-										y: {
-											beginAtZero: true,
-											grid: { color: 'rgba(0, 0, 0, 0.05)', lineWidth: 1 },
-											ticks: {
-												callback: function(value) {
-													return format_currency_value(value);
-												},
-												font: { size: 11 }
-											}
-										},
-										x: {
-											grid: { display: false },
-											ticks: {
-												font: { size: 10 },
-												maxRotation: 45,
-												minRotation: 45
-											}
-										}
-									}
-								}
-							});
-						}
-					} catch(e) {
-						console.error('Error creating cheque items bar chart:', e);
-					}
-				}, 1300);
-				
-				// Cheque Items Pie Chart
 				if (me.charts.items_cheque_pie) {
 					try {
 						me.charts.items_cheque_pie.destroy();

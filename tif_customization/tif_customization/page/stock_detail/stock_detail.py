@@ -547,21 +547,156 @@ def get_item_stock_data(item_code, filters=None):
             AND si.docstatus = 1
         """, (item_code, from_date.strftime('%Y-%m-%d'), to_date.strftime('%Y-%m-%d')), as_dict=True)
         
-        # Calculate Available Stock using the formula: Opening + Received + Book Return - Delivered
-        # This matches the user's expected calculation
-        calculated_available_stock = opening_stock_qty + received_vendor_qty + book_return_qty - delivered_qty
+        # Get actual stock balance across all warehouses
+        # Use a reliable approach: get max posting_datetime per warehouse, then get entry with max creation
+        actual_balance = 0
+        warehouse_final_balances = {}
         
-        # Create result dict - use values directly since we calculated them
+        # First, get the max posting_datetime for each warehouse
+        max_entries = frappe.db.sql("""
+            SELECT 
+                warehouse,
+                MAX(posting_datetime) as max_datetime
+            FROM `tabStock Ledger Entry`
+            WHERE item_code = %s
+            AND posting_date <= %s
+            AND is_cancelled = 0
+            GROUP BY warehouse
+        """, (item_code, to_date_str), as_dict=True)
+        
+        # Debug: Check if we found any warehouses
+        if item_code == 'MQHWB-01/U/12':
+            print(f"[DEBUG get_item_stock_data] Found {len(max_entries)} warehouses with max_datetime query")
+        
+        # For each warehouse, get the entry with max_datetime and max creation for that datetime
+        for max_entry in max_entries:
+            warehouse = max_entry.warehouse
+            max_datetime = max_entry.max_datetime
+            
+            # Get the entry with max_datetime and max creation for that datetime
+            last_entry = frappe.db.sql("""
+                SELECT qty_after_transaction, posting_datetime, creation
+                FROM `tabStock Ledger Entry`
+                WHERE item_code = %s
+                AND warehouse = %s
+                AND posting_datetime = %s
+                AND posting_date <= %s
+                AND is_cancelled = 0
+                ORDER BY creation DESC
+                LIMIT 1
+            """, (item_code, warehouse, max_datetime, to_date_str), as_dict=True)
+            
+            if last_entry and len(last_entry) > 0:
+                balance = flt(last_entry[0].qty_after_transaction)
+                warehouse_final_balances[warehouse] = balance
+                actual_balance += balance
+            else:
+                warehouse_final_balances[warehouse] = 0
+        
+        # Use actual balance from Stock Ledger Entry (matches Stock Balance report)
+        final_available_stock = actual_balance
+        
+        # Debug: Always log for MQHWB-01/U/12
+        if item_code == 'MQHWB-01/U/12':
+            print(f"[DEBUG get_item_stock_data] After balance calculation:")
+            print(f"  - actual_balance: {actual_balance}")
+            print(f"  - final_available_stock: {final_available_stock}")
+            print(f"  - warehouse_final_balances: {warehouse_final_balances}")
+        
+        # Debug output for specific items - ALWAYS log for MQHWB-01/U/12
+        debug_items = ['MQHWB-01/U/12', 'Noorani Qaida Teacher Guide']
+        if item_code and item_code in debug_items:
+            print(f"\n{'='*80}")
+            print(f"[DEBUG get_item_stock_data] Item: {item_code}")
+            print(f"[DEBUG get_item_stock_data] From Date: {from_date_str}, To Date: {to_date_str}")
+            print(f"[DEBUG get_item_stock_data] Number of warehouses found: {len(warehouse_final_balances)}")
+            print(f"[DEBUG get_item_stock_data] Warehouse final balances (from SLE qty_after_transaction): {warehouse_final_balances}")
+            print(f"[DEBUG get_item_stock_data] Actual Balance (sum of all warehouses): {actual_balance}")
+            print(f"[DEBUG get_item_stock_data] Opening: {opening_stock_qty}, Received: {received_vendor_qty}, Return: {book_return_qty}, Delivered: {delivered_qty}")
+            print(f"[DEBUG get_item_stock_data] Calculated Available Stock (formula): {opening_stock_qty + received_vendor_qty + book_return_qty - delivered_qty}")
+            print(f"[DEBUG get_item_stock_data] final_available_stock value: {final_available_stock}")
+            print(f"{'='*80}\n")
+            
+            # Log to error log so it's visible
+            frappe.log_error(
+                f"Balance Debug for {item_code}:\n"
+                f"From Date: {from_date_str}, To Date: {to_date_str}\n"
+                f"Number of Warehouses: {len(warehouse_final_balances)}\n"
+                f"Warehouse Balances: {warehouse_final_balances}\n"
+                f"Total Balance (Sum): {actual_balance}\n"
+                f"Opening Stock: {opening_stock_qty}\n"
+                f"Received Vendor: {received_vendor_qty}\n"
+                f"Book Return: {book_return_qty}\n"
+                f"Delivered: {delivered_qty}\n"
+                f"Calculated (Formula): {opening_stock_qty + received_vendor_qty + book_return_qty - delivered_qty}\n"
+                f"Final Available Stock: {final_available_stock}",
+                f"Balance Debug - {item_code}"
+            )
+            
+            # Verify by direct SQL query - sum of last qty_after_transaction per warehouse
+            verify_query = frappe.db.sql("""
+                SELECT 
+                    warehouse,
+                    SUM(CASE WHEN rn = 1 THEN qty_after_transaction ELSE 0 END) as warehouse_balance
+                FROM (
+                    SELECT 
+                        warehouse,
+                        qty_after_transaction,
+                        ROW_NUMBER() OVER (PARTITION BY warehouse ORDER BY posting_datetime DESC, creation DESC) as rn
+                    FROM `tabStock Ledger Entry`
+                    WHERE item_code = %s
+                    AND posting_date <= %s
+                    AND is_cancelled = 0
+                ) ranked
+                GROUP BY warehouse
+            """, (item_code, to_date_str), as_dict=True)
+            
+            if verify_query:
+                verify_total = sum(flt(row.warehouse_balance) for row in verify_query)
+                print(f"[DEBUG get_item_stock_data] Verification - Warehouse balances from ROW_NUMBER query: {[(r.warehouse, r.warehouse_balance) for r in verify_query]}")
+                print(f"[DEBUG get_item_stock_data] Verification - Total from ROW_NUMBER query: {verify_total}")
+            
+            # Also try a simpler verification - just sum all last entries
+            simple_verify = frappe.db.sql("""
+                SELECT SUM(qty) as total
+                FROM (
+                    SELECT 
+                        warehouse,
+                        qty_after_transaction as qty,
+                        ROW_NUMBER() OVER (PARTITION BY warehouse ORDER BY posting_datetime DESC, creation DESC) as rn
+                    FROM `tabStock Ledger Entry`
+                    WHERE item_code = %s
+                    AND posting_date <= %s
+                    AND is_cancelled = 0
+                ) ranked
+                WHERE rn = 1
+            """, (item_code, to_date_str), as_dict=True)
+            if simple_verify:
+                print(f"[DEBUG get_item_stock_data] Simple verification total: {simple_verify[0].get('total', 0)}")
+        
+        # Ensure final_available_stock is not None
+        if final_available_stock is None:
+            final_available_stock = 0
+        
+        # Create result dict - use actual balance from Stock Ledger Entry
         result = {
             "opening_stock": flt(opening_stock_qty),
             "received_vendor": flt(received_vendor_qty),
             "book_return": flt(book_return_qty),
             "delivered": flt(delivered_qty),
-            "available_stock": flt(calculated_available_stock),
+            "available_stock": flt(final_available_stock) if final_available_stock is not None else 0,  # Use actual balance from SLE
             "demand_received": flt(demand_received[0].get('qty', 0)) if demand_received and len(demand_received) > 0 else 0,
             "books_sale": flt(books_sale[0].get('qty', 0)) if books_sale and len(books_sale) > 0 else 0,
             "total_amount": flt(books_sale[0].get('amount', 0)) if books_sale and len(books_sale) > 0 else 0
         }
+        
+        # Debug: Always log for MQHWB-01/U/12 to see what's being returned
+        if item_code == 'MQHWB-01/U/12':
+            print(f"[DEBUG get_item_stock_data RETURN] Item: {item_code}")
+            print(f"[DEBUG get_item_stock_data RETURN] result['available_stock']: {result['available_stock']}")
+            print(f"[DEBUG get_item_stock_data RETURN] final_available_stock: {final_available_stock}")
+            print(f"[DEBUG get_item_stock_data RETURN] actual_balance: {actual_balance}")
+            print(f"[DEBUG get_item_stock_data RETURN] Full result: {result}")
         
         return result
         
@@ -1064,38 +1199,17 @@ def calculate_nazimabad_totals(data):
     """Calculate totals for Nazimabad Warehouse data"""
     return calculate_head_office_totals(data)  # Same structure
 
-def calculate_kpis_for_specific_items(data):
-    """Calculate KPIs for specific items - returns both totals and individual item KPIs"""
+def calculate_kpis_for_specific_items(data, filters=None):
+    """Calculate KPIs for specific items - returns both totals and individual item KPIs
+    Ensures all items from SPECIFIC_ITEM_CODES are included"""
     try:
-        if not data:
-            return {
-                "total_items": 0,
-                "total_opening_stock": 0,
-                "total_available_stock": 0,
-                "total_delivered": 0,
-                "total_received_vendor": 0,
-                "total_book_return": 0,
-                "total_demand_received": 0,
-                "total_books_sale": 0,
-                "total_amount": 0,
-                "items": []
-            }
-        
-        # Calculate totals
-        totals = {
-            "total_items": len(data),
-            "total_opening_stock": sum(flt(item.get("opening_stock", 0)) for item in data),
-            "total_available_stock": sum(flt(item.get("available_stock", 0)) for item in data),
-            "total_delivered": sum(flt(item.get("delivered", 0)) for item in data),
-            "total_received_vendor": sum(flt(item.get("received_vendor", 0)) for item in data),
-            "total_book_return": sum(flt(item.get("book_return", 0)) for item in data),
-            "total_demand_received": sum(flt(item.get("demand_received", 0)) for item in data),
-            "total_books_sale": sum(cint(item.get("books_sale", 0)) for item in data),
-            "total_amount": sum(flt(item.get("total_amount", 0)) for item in data)
-        }
+        if filters is None:
+            filters = {}
         
         # Calculate individual item KPIs (deduplicate by item_code to avoid duplicates)
         items_kpi_dict = {}
+        
+        # Process data items
         for item in data:
             item_code = item.get("item_code", "")
             if not item_code:
@@ -1130,8 +1244,65 @@ def calculate_kpis_for_specific_items(data):
                     "total_amount": flt(item.get("total_amount", 0))
                 }
         
-        # Convert dictionary to list
-        items_kpi = list(items_kpi_dict.values())
+        # Ensure ALL items from SPECIFIC_ITEM_CODES are included (even if zero balance)
+        # Only when not filtering by a specific item
+        if not filters.get('item'):
+            for item_code in SPECIFIC_ITEM_CODES:
+                if item_code not in items_kpi_dict:
+                    # Get item name
+                    try:
+                        item_name = frappe.db.get_value('Item', item_code, 'item_name')
+                        if not item_name:
+                            item_name = item_code
+                    except:
+                        item_name = item_code
+                    
+                    # Get stock data for this item
+                    try:
+                        stock_data = get_item_stock_data(item_code, filters)
+                        if not isinstance(stock_data, dict):
+                            stock_data = {}
+                    except Exception as e:
+                        print(f"[calculate_kpis_for_specific_items] Error getting stock data for {item_code}: {str(e)}")
+                        stock_data = {}
+                    
+                    items_kpi_dict[item_code] = {
+                        "item_code": item_code,
+                        "item_name": item_name,
+                        "opening_stock": flt(stock_data.get('opening_stock', 0)),
+                        "available_stock": flt(stock_data.get('available_stock', 0)),
+                        "delivered": flt(stock_data.get('delivered', 0)),
+                        "received_vendor": flt(stock_data.get('received_vendor', 0)),
+                        "book_return": flt(stock_data.get('book_return', 0)),
+                        "demand_received": flt(stock_data.get('demand_received', 0)),
+                        "books_sale": cint(stock_data.get('books_sale', 0)),
+                        "total_amount": flt(stock_data.get('total_amount', 0))
+                    }
+        
+        # Convert dictionary to list, maintaining order from SPECIFIC_ITEM_CODES
+        items_kpi = []
+        if filters.get('item'):
+            # If filtering by specific item, just return that item
+            if filters.get('item') in items_kpi_dict:
+                items_kpi = [items_kpi_dict[filters.get('item')]]
+        else:
+            # Return all items in SPECIFIC_ITEM_CODES order
+            for item_code in SPECIFIC_ITEM_CODES:
+                if item_code in items_kpi_dict:
+                    items_kpi.append(items_kpi_dict[item_code])
+        
+        # Calculate totals from all items
+        totals = {
+            "total_items": len(items_kpi),
+            "total_opening_stock": sum(flt(item.get("opening_stock", 0)) for item in items_kpi),
+            "total_available_stock": sum(flt(item.get("available_stock", 0)) for item in items_kpi),
+            "total_delivered": sum(flt(item.get("delivered", 0)) for item in items_kpi),
+            "total_received_vendor": sum(flt(item.get("received_vendor", 0)) for item in items_kpi),
+            "total_book_return": sum(flt(item.get("book_return", 0)) for item in items_kpi),
+            "total_demand_received": sum(flt(item.get("demand_received", 0)) for item in items_kpi),
+            "total_books_sale": sum(cint(item.get("books_sale", 0)) for item in items_kpi),
+            "total_amount": sum(flt(item.get("total_amount", 0)) for item in items_kpi)
+        }
         
         # Combine totals and individual items
         kpi_data = {
@@ -1317,8 +1488,8 @@ def get_stock_data(filters=None):
         old_office_totals = calculate_old_office_totals(old_office_data)
         nazimabad_totals = calculate_nazimabad_totals(nazimabad_warehouse_data)
         
-        # Calculate KPIs for specific items
-        kpi_data = calculate_kpis_for_specific_items(mqh_books_data + mqh_urdu_books_data)
+        # Calculate KPIs for specific items - ensure all items from SPECIFIC_ITEM_CODES are included
+        kpi_data = calculate_kpis_for_specific_items(mqh_books_data + mqh_urdu_books_data, filters)
         
         result = {
             "mqh_books_data": mqh_books_data,
