@@ -58,6 +58,10 @@ def get_courier_report_data(filters=None):
 		books_by_cost_center = get_books_by_cost_center(filters)
 		daily_trend = get_daily_trend(filters)
 		expense_by_cost_center = get_expense_by_cost_center(filters)
+		delivery_mode_data = get_delivery_mode_data(filters)
+		courier_data = get_courier_data(filters)
+		courier_service_data = get_courier_service_data(filters)
+		courier_payment_mode_data = get_courier_payment_mode_data(filters)
 		
 		return {
 			'kpi_data': kpi_data,
@@ -68,7 +72,11 @@ def get_courier_report_data(filters=None):
 			'top_items': top_items,
 			'books_by_cost_center': books_by_cost_center,
 			'daily_trend': daily_trend,
-			'expense_by_cost_center': expense_by_cost_center
+			'expense_by_cost_center': expense_by_cost_center,
+			'delivery_mode_data': delivery_mode_data,
+			'courier_data': courier_data,
+			'courier_service_data': courier_service_data,
+			'courier_payment_mode_data': courier_payment_mode_data
 		}
 	except Exception as e:
 		frappe.log_error(f"Error in get_courier_report_data: {str(e)}", "Courier Report Error")
@@ -87,13 +95,14 @@ def get_kpi_data(filters):
 			cost_center_list = "', '".join(cost_centers)
 			cost_center_filter = f"AND jea.cost_center IN ('{cost_center_list}')"
 		
-		# Total Courier Expense from JV
+		# Total Courier Expense from JV - Use Delivery Note posting date instead of JV posting date
 		courier_expense_query = f"""
 			SELECT COALESCE(SUM(jea.debit - jea.credit), 0) AS total_expense
 			FROM `tabJournal Entry Account` jea
 			JOIN `tabJournal Entry` je ON je.name = jea.parent
+			LEFT JOIN `tabDelivery Note` dn ON dn.name = je.cheque_no
 			WHERE je.docstatus = 1
-			AND je.posting_date BETWEEN %(from_date)s AND %(to_date)s
+			AND COALESCE(dn.posting_date, je.posting_date) BETWEEN %(from_date)s AND %(to_date)s
 			AND (jea.account LIKE '%%Courier%%' OR jea.account LIKE '%%Courier Expense%%')
 			{cost_center_filter}
 		"""
@@ -104,13 +113,14 @@ def get_kpi_data(filters):
 		}, as_dict=True)
 		total_courier_expense = flt(total_expense[0].total_expense) if total_expense else 0
 		
-		# Total No. of JVs Created for Courier
+		# Total No. of JVs Created for Courier - Use Delivery Note posting date instead of JV posting date
 		jv_count_query = f"""
 			SELECT COUNT(DISTINCT je.name) AS jv_count
 			FROM `tabJournal Entry` je
 			JOIN `tabJournal Entry Account` jea ON jea.parent = je.name
+			LEFT JOIN `tabDelivery Note` dn ON dn.name = je.cheque_no
 			WHERE je.docstatus = 1
-			AND je.posting_date BETWEEN %(from_date)s AND %(to_date)s
+			AND COALESCE(dn.posting_date, je.posting_date) BETWEEN %(from_date)s AND %(to_date)s
 			AND (jea.account LIKE '%%Courier%%' OR jea.account LIKE '%%Courier Expense%%')
 			{cost_center_filter}
 		"""
@@ -217,8 +227,9 @@ def get_cost_center_allocation(filters, total_expense):
 				COALESCE(SUM(jea.debit - jea.credit), 0) AS expense
 			FROM `tabJournal Entry Account` jea
 			JOIN `tabJournal Entry` je ON je.name = jea.parent
+			LEFT JOIN `tabDelivery Note` dn ON dn.name = je.cheque_no
 			WHERE je.docstatus = 1
-			AND je.posting_date BETWEEN %(from_date)s AND %(to_date)s
+			AND COALESCE(dn.posting_date, je.posting_date) BETWEEN %(from_date)s AND %(to_date)s
 			AND (jea.account LIKE '%%Courier%%' OR jea.account LIKE '%%Courier Expense%%')
 			AND jea.cost_center IS NOT NULL
 			AND jea.cost_center != ''
@@ -259,7 +270,7 @@ def get_cost_center_summary(filters):
 			# For DNs: show specified cost centers OR DNs without cost center
 			dn_cost_center_filter = f"AND (dn.cost_center IN ('{cost_center_list}') OR dn.cost_center IS NULL OR dn.cost_center = '')"
 		
-		# Get expense by cost center
+		# Get expense by cost center - Use Delivery Note posting date instead of JV posting date
 		expense_query = f"""
 			SELECT 
 				jea.cost_center,
@@ -267,8 +278,9 @@ def get_cost_center_summary(filters):
 				COUNT(DISTINCT je.name) AS jv_count
 			FROM `tabJournal Entry Account` jea
 			JOIN `tabJournal Entry` je ON je.name = jea.parent
+			LEFT JOIN `tabDelivery Note` dn ON dn.name = je.cheque_no
 			WHERE je.docstatus = 1
-			AND je.posting_date BETWEEN %(from_date)s AND %(to_date)s
+			AND COALESCE(dn.posting_date, je.posting_date) BETWEEN %(from_date)s AND %(to_date)s
 			AND (jea.account LIKE '%%Courier%%' OR jea.account LIKE '%%Courier Expense%%')
 			AND jea.cost_center IS NOT NULL
 			AND jea.cost_center != ''
@@ -383,7 +395,7 @@ def get_journal_entries(filters):
 		
 		query = f"""
 			SELECT 
-				je.posting_date,
+				COALESCE(dn.posting_date, je.posting_date) AS posting_date,
 				je.name AS jv_number,
 				jea.cost_center,
 				(jea.debit - jea.credit) AS expense_amount,
@@ -391,14 +403,15 @@ def get_journal_entries(filters):
 				je.owner AS created_by
 			FROM `tabJournal Entry Account` jea
 			JOIN `tabJournal Entry` je ON je.name = jea.parent
+			LEFT JOIN `tabDelivery Note` dn ON dn.name = je.cheque_no
 			WHERE je.docstatus = 1
-			AND je.posting_date BETWEEN %(from_date)s AND %(to_date)s
+			AND COALESCE(dn.posting_date, je.posting_date) BETWEEN %(from_date)s AND %(to_date)s
 			AND (jea.account LIKE '%%Courier%%' OR jea.account LIKE '%%Courier Expense%%')
 			AND jea.cost_center IS NOT NULL
 			AND jea.cost_center != ''
 			{cost_center_filter}
 			{customer_filter}
-			ORDER BY je.posting_date DESC, je.name DESC
+			ORDER BY COALESCE(dn.posting_date, je.posting_date) DESC, je.name DESC
 		"""
 		
 		params = {
@@ -627,16 +640,17 @@ def get_daily_trend(filters):
 		
 		query = f"""
 			SELECT 
-				je.posting_date AS date,
+				COALESCE(dn.posting_date, je.posting_date) AS date,
 				COALESCE(SUM(jea.debit - jea.credit), 0) AS expense
 			FROM `tabJournal Entry Account` jea
 			JOIN `tabJournal Entry` je ON je.name = jea.parent
+			LEFT JOIN `tabDelivery Note` dn ON dn.name = je.cheque_no
 			WHERE je.docstatus = 1
-			AND je.posting_date BETWEEN %(from_date)s AND %(to_date)s
+			AND COALESCE(dn.posting_date, je.posting_date) BETWEEN %(from_date)s AND %(to_date)s
 			AND (jea.account LIKE '%%Courier%%' OR jea.account LIKE '%%Courier Expense%%')
 			{cost_center_filter}
-			GROUP BY je.posting_date
-			ORDER BY je.posting_date ASC
+			GROUP BY COALESCE(dn.posting_date, je.posting_date)
+			ORDER BY COALESCE(dn.posting_date, je.posting_date) ASC
 		"""
 		
 		results = frappe.db.sql(query, {
@@ -676,8 +690,9 @@ def get_expense_by_cost_center(filters):
 				COALESCE(SUM(jea.debit - jea.credit), 0) AS expense
 			FROM `tabJournal Entry Account` jea
 			JOIN `tabJournal Entry` je ON je.name = jea.parent
+			LEFT JOIN `tabDelivery Note` dn ON dn.name = je.cheque_no
 			WHERE je.docstatus = 1
-			AND je.posting_date BETWEEN %(from_date)s AND %(to_date)s
+			AND COALESCE(dn.posting_date, je.posting_date) BETWEEN %(from_date)s AND %(to_date)s
 			AND (jea.account LIKE '%%Courier%%' OR jea.account LIKE '%%Courier Expense%%')
 			AND jea.cost_center IS NOT NULL
 			AND jea.cost_center != ''
@@ -726,6 +741,182 @@ def get_cost_centers():
 		return [cc['cost_center'] for cc in cost_centers]
 	except Exception as e:
 		frappe.log_error(f"Error in get_cost_centers: {str(e)}", "Courier Report Error")
+		return []
+
+def get_delivery_mode_data(filters):
+	"""Get delivery mode distribution from Delivery Notes"""
+	try:
+		from_date = filters.get('from_date')
+		to_date = filters.get('to_date')
+		cost_centers = filters.get('cost_centers', [])
+		
+		cost_center_filter = ""
+		if cost_centers:
+			cost_center_list = "', '".join(cost_centers)
+			cost_center_filter = f"AND (dn.cost_center IN ('{cost_center_list}') OR dn.cost_center IS NULL OR dn.cost_center = '')"
+		
+		query = f"""
+			SELECT 
+				COALESCE(dn.custom_delivery_mode, 'Not Set') AS delivery_mode,
+				COUNT(DISTINCT dn.name) AS count
+			FROM `tabDelivery Note` dn
+			WHERE dn.docstatus = 1
+			AND dn.posting_date BETWEEN %(from_date)s AND %(to_date)s
+			{cost_center_filter}
+			GROUP BY COALESCE(dn.custom_delivery_mode, 'Not Set')
+			ORDER BY count DESC
+		"""
+		
+		results = frappe.db.sql(query, {
+			'from_date': from_date,
+			'to_date': to_date
+		}, as_dict=True)
+		
+		# Filter out "Not Set" if there are other values
+		filtered_results = []
+		for row in results:
+			if row.get('delivery_mode') == 'Not Set' and len(results) > 1:
+				continue
+			filtered_results.append({
+				'label': row.get('delivery_mode') or 'Not Set',
+				'value': flt(row.get('count', 0))
+			})
+		
+		return filtered_results
+	except Exception as e:
+		frappe.log_error(f"Error in get_delivery_mode_data: {str(e)}", "Courier Report Error")
+		return []
+
+def get_courier_data(filters):
+	"""Get courier distribution from Delivery Notes"""
+	try:
+		from_date = filters.get('from_date')
+		to_date = filters.get('to_date')
+		cost_centers = filters.get('cost_centers', [])
+		
+		cost_center_filter = ""
+		if cost_centers:
+			cost_center_list = "', '".join(cost_centers)
+			cost_center_filter = f"AND (dn.cost_center IN ('{cost_center_list}') OR dn.cost_center IS NULL OR dn.cost_center = '')"
+		
+		query = f"""
+			SELECT 
+				COALESCE(dn.custom_courier, 'Not Set') AS courier,
+				COUNT(DISTINCT dn.name) AS count
+			FROM `tabDelivery Note` dn
+			WHERE dn.docstatus = 1
+			AND dn.posting_date BETWEEN %(from_date)s AND %(to_date)s
+			{cost_center_filter}
+			GROUP BY COALESCE(dn.custom_courier, 'Not Set')
+			ORDER BY count DESC
+		"""
+		
+		results = frappe.db.sql(query, {
+			'from_date': from_date,
+			'to_date': to_date
+		}, as_dict=True)
+		
+		# Filter out "Not Set" if there are other values
+		filtered_results = []
+		for row in results:
+			if row.get('courier') == 'Not Set' and len(results) > 1:
+				continue
+			filtered_results.append({
+				'label': row.get('courier') or 'Not Set',
+				'value': flt(row.get('count', 0))
+			})
+		
+		return filtered_results
+	except Exception as e:
+		frappe.log_error(f"Error in get_courier_data: {str(e)}", "Courier Report Error")
+		return []
+
+def get_courier_service_data(filters):
+	"""Get courier service distribution from Delivery Notes"""
+	try:
+		from_date = filters.get('from_date')
+		to_date = filters.get('to_date')
+		cost_centers = filters.get('cost_centers', [])
+		
+		cost_center_filter = ""
+		if cost_centers:
+			cost_center_list = "', '".join(cost_centers)
+			cost_center_filter = f"AND (dn.cost_center IN ('{cost_center_list}') OR dn.cost_center IS NULL OR dn.cost_center = '')"
+		
+		query = f"""
+			SELECT 
+				COALESCE(dn.custom_courier_service, 'Not Set') AS courier_service,
+				COUNT(DISTINCT dn.name) AS count
+			FROM `tabDelivery Note` dn
+			WHERE dn.docstatus = 1
+			AND dn.posting_date BETWEEN %(from_date)s AND %(to_date)s
+			{cost_center_filter}
+			GROUP BY COALESCE(dn.custom_courier_service, 'Not Set')
+			ORDER BY count DESC
+		"""
+		
+		results = frappe.db.sql(query, {
+			'from_date': from_date,
+			'to_date': to_date
+		}, as_dict=True)
+		
+		# Filter out "Not Set" if there are other values
+		filtered_results = []
+		for row in results:
+			if row.get('courier_service') == 'Not Set' and len(results) > 1:
+				continue
+			filtered_results.append({
+				'label': row.get('courier_service') or 'Not Set',
+				'value': flt(row.get('count', 0))
+			})
+		
+		return filtered_results
+	except Exception as e:
+		frappe.log_error(f"Error in get_courier_service_data: {str(e)}", "Courier Report Error")
+		return []
+
+def get_courier_payment_mode_data(filters):
+	"""Get courier payment mode distribution from Delivery Notes"""
+	try:
+		from_date = filters.get('from_date')
+		to_date = filters.get('to_date')
+		cost_centers = filters.get('cost_centers', [])
+		
+		cost_center_filter = ""
+		if cost_centers:
+			cost_center_list = "', '".join(cost_centers)
+			cost_center_filter = f"AND (dn.cost_center IN ('{cost_center_list}') OR dn.cost_center IS NULL OR dn.cost_center = '')"
+		
+		query = f"""
+			SELECT 
+				COALESCE(dn.custom_courier_mode_of_payment, 'Not Set') AS payment_mode,
+				COUNT(DISTINCT dn.name) AS count
+			FROM `tabDelivery Note` dn
+			WHERE dn.docstatus = 1
+			AND dn.posting_date BETWEEN %(from_date)s AND %(to_date)s
+			{cost_center_filter}
+			GROUP BY COALESCE(dn.custom_courier_mode_of_payment, 'Not Set')
+			ORDER BY count DESC
+		"""
+		
+		results = frappe.db.sql(query, {
+			'from_date': from_date,
+			'to_date': to_date
+		}, as_dict=True)
+		
+		# Filter out "Not Set" if there are other values
+		filtered_results = []
+		for row in results:
+			if row.get('payment_mode') == 'Not Set' and len(results) > 1:
+				continue
+			filtered_results.append({
+				'label': row.get('payment_mode') or 'Not Set',
+				'value': flt(row.get('count', 0))
+			})
+		
+		return filtered_results
+	except Exception as e:
+		frappe.log_error(f"Error in get_courier_payment_mode_data: {str(e)}", "Courier Report Error")
 		return []
 
 @frappe.whitelist()

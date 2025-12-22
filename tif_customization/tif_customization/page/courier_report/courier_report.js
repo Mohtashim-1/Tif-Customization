@@ -24,7 +24,7 @@ if (typeof window.CourierDashboard === 'undefined') {
 		this.filters = {
 			from_date: frappe.datetime.add_days(frappe.datetime.get_today(), -30),
 			to_date: frappe.datetime.get_today(),
-			cost_centers: ['8121', '8122'], // Default to cost center numbers 8121 and 8122
+			cost_centers: ['811', '8121', '8122'], // Default to cost center numbers 811, 8121 and 8122
 			customer: '',
 			view_type: 'all' // 'all', 'jv', 'dn'
 		};
@@ -167,8 +167,26 @@ if (typeof window.CourierDashboard === 'undefined') {
 						</div>
 						<div class="col-md-6" style="margin-bottom: 20px;">
 							<div class="chart-container" style="background: white; padding: 15px; border-radius: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-								<h5>Books Sent per Cost Center</h5>
-								<div id="chart-books-by-cost-center"></div>
+								<h5>Delivery Mode Distribution</h5>
+								<div id="chart-delivery-mode"></div>
+							</div>
+						</div>
+						<div class="col-md-6" style="margin-bottom: 20px;">
+							<div class="chart-container" style="background: white; padding: 15px; border-radius: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+								<h5>Courier Distribution</h5>
+								<div id="chart-courier"></div>
+							</div>
+						</div>
+						<div class="col-md-6" style="margin-bottom: 20px;">
+							<div class="chart-container" style="background: white; padding: 15px; border-radius: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+								<h5>Courier Service Distribution</h5>
+								<div id="chart-courier-service"></div>
+							</div>
+						</div>
+						<div class="col-md-6" style="margin-bottom: 20px;">
+							<div class="chart-container" style="background: white; padding: 15px; border-radius: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+								<h5>Courier Payment Mode Distribution</h5>
+								<div id="chart-courier-payment-mode"></div>
 							</div>
 						</div>
 					</div>
@@ -194,6 +212,9 @@ if (typeof window.CourierDashboard === 'undefined') {
 					<div class="row">
 						<div class="col-md-6">
 							<h5>Top 10 Customers by Books Sent</h5>
+							<div class="chart-container" style="background: white; padding: 15px; border-radius: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 15px;">
+								<div id="chart-top-customers"></div>
+							</div>
 							<div class="table-responsive">
 								<table class="table table-bordered table-striped">
 									<thead>
@@ -209,6 +230,9 @@ if (typeof window.CourierDashboard === 'undefined') {
 						</div>
 						<div class="col-md-6">
 							<h5>Top 10 Items Sent by Quantity</h5>
+							<div class="chart-container" style="background: white; padding: 15px; border-radius: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 15px;">
+								<div id="chart-top-items"></div>
+							</div>
 							<div class="table-responsive">
 								<table class="table table-bordered table-striped">
 									<thead>
@@ -243,12 +267,12 @@ if (typeof window.CourierDashboard === 'undefined') {
 						select.append(`<option value="${cc}">${cc}</option>`);
 					});
 					
-					// Find cost centers that match numbers 8121 and 8122
+					// Find cost centers that match numbers 811, 8121 and 8122
 					// First, try to find by cost center number via backend
 					let found_ccs = [];
 					r.message.forEach(cc => {
-						// Check if cost center name contains the numbers 8121 or 8122
-						if (cc.includes('8121') || cc.includes('8122')) {
+						// Check if cost center name contains the numbers 811, 8121 or 8122
+						if (cc.includes('811') || cc.includes('8121') || cc.includes('8122')) {
 							found_ccs.push(cc);
 							select.find(`option[value="${cc}"]`).prop('selected', true);
 						}
@@ -258,7 +282,7 @@ if (typeof window.CourierDashboard === 'undefined') {
 					// Keep both numbers in filters - backend converts them to names
 					// But also add found names to ensure they're selected
 					if (found_ccs.length > 0) {
-						me.filters.cost_centers = ['8121', '8122']; // Keep numbers, backend converts
+						me.filters.cost_centers = ['811', '8121', '8122']; // Keep numbers, backend converts
 					}
 					
 					// Trigger change to update the select UI
@@ -298,7 +322,7 @@ if (typeof window.CourierDashboard === 'undefined') {
 		me.filters = {
 			from_date: frappe.datetime.add_days(frappe.datetime.get_today(), -30),
 			to_date: frappe.datetime.get_today(),
-			cost_centers: ['8121', '8122'], // Reset to default cost center numbers
+			cost_centers: ['811', '8121', '8122'], // Reset to default cost center numbers
 			customer: '',
 			view_type: 'all'
 		};
@@ -365,12 +389,6 @@ if (typeof window.CourierDashboard === 'undefined') {
 				<div class="kpi-card" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
 					<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Total JVs Created</h5>
 					<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${format_number_value(kpi_data.total_jvs_created || 0)}</h2>
-				</div>
-			</div>
-			<div class="col-md-3" style="margin-top: 15px;">
-				<div class="kpi-card" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-					<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Avg. Cost Per Book</h5>
-					<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${format_currency_value(kpi_data.avg_cost_per_book || 0)}</h2>
 				</div>
 			</div>
 			<div class="col-md-3" style="margin-top: 15px;">
@@ -666,6 +684,134 @@ if (typeof window.CourierDashboard === 'undefined') {
 		} else {
 			$('#chart-books-by-cost-center').html('<p class="text-muted">No data available</p>');
 		}
+		
+		// Delivery Mode Chart
+		let delivery_mode_data = me.data.delivery_mode_data || [];
+		if (delivery_mode_data.length > 0) {
+			let chart_data = {
+				labels: delivery_mode_data.map(d => String(d.label || 'Not Set')),
+				datasets: [{
+					name: 'Delivery Notes',
+					values: delivery_mode_data.map(d => flt(d.value || 0))
+				}]
+			};
+			
+			if (me.charts.delivery_mode) {
+				try {
+					me.charts.delivery_mode.destroy();
+				} catch(e) {}
+			}
+			
+			try {
+				me.charts.delivery_mode = new frappe.Chart('#chart-delivery-mode', {
+					title: '',
+					data: chart_data,
+					type: 'pie',
+					height: 300
+				});
+			} catch(e) {
+				console.error('Error creating delivery mode chart:', e);
+				$('#chart-delivery-mode').html('<p class="text-muted">Chart data unavailable</p>');
+			}
+		} else {
+			$('#chart-delivery-mode').html('<p class="text-muted">No data available</p>');
+		}
+		
+		// Courier Chart
+		let courier_data = me.data.courier_data || [];
+		if (courier_data.length > 0) {
+			let chart_data = {
+				labels: courier_data.map(d => String(d.label || 'Not Set')),
+				datasets: [{
+					name: 'Delivery Notes',
+					values: courier_data.map(d => flt(d.value || 0))
+				}]
+			};
+			
+			if (me.charts.courier) {
+				try {
+					me.charts.courier.destroy();
+				} catch(e) {}
+			}
+			
+			try {
+				me.charts.courier = new frappe.Chart('#chart-courier', {
+					title: '',
+					data: chart_data,
+					type: 'pie',
+					height: 300
+				});
+			} catch(e) {
+				console.error('Error creating courier chart:', e);
+				$('#chart-courier').html('<p class="text-muted">Chart data unavailable</p>');
+			}
+		} else {
+			$('#chart-courier').html('<p class="text-muted">No data available</p>');
+		}
+		
+		// Courier Service Chart
+		let courier_service_data = me.data.courier_service_data || [];
+		if (courier_service_data.length > 0) {
+			let chart_data = {
+				labels: courier_service_data.map(d => String(d.label || 'Not Set')),
+				datasets: [{
+					name: 'Delivery Notes',
+					values: courier_service_data.map(d => flt(d.value || 0))
+				}]
+			};
+			
+			if (me.charts.courier_service) {
+				try {
+					me.charts.courier_service.destroy();
+				} catch(e) {}
+			}
+			
+			try {
+				me.charts.courier_service = new frappe.Chart('#chart-courier-service', {
+					title: '',
+					data: chart_data,
+					type: 'pie',
+					height: 300
+				});
+			} catch(e) {
+				console.error('Error creating courier service chart:', e);
+				$('#chart-courier-service').html('<p class="text-muted">Chart data unavailable</p>');
+			}
+		} else {
+			$('#chart-courier-service').html('<p class="text-muted">No data available</p>');
+		}
+		
+		// Courier Payment Mode Chart
+		let courier_payment_mode_data = me.data.courier_payment_mode_data || [];
+		if (courier_payment_mode_data.length > 0) {
+			let chart_data = {
+				labels: courier_payment_mode_data.map(d => String(d.label || 'Not Set')),
+				datasets: [{
+					name: 'Delivery Notes',
+					values: courier_payment_mode_data.map(d => flt(d.value || 0))
+				}]
+			};
+			
+			if (me.charts.courier_payment_mode) {
+				try {
+					me.charts.courier_payment_mode.destroy();
+				} catch(e) {}
+			}
+			
+			try {
+				me.charts.courier_payment_mode = new frappe.Chart('#chart-courier-payment-mode', {
+					title: '',
+					data: chart_data,
+					type: 'pie',
+					height: 300
+				});
+			} catch(e) {
+				console.error('Error creating courier payment mode chart:', e);
+				$('#chart-courier-payment-mode').html('<p class="text-muted">Chart data unavailable</p>');
+			}
+		} else {
+			$('#chart-courier-payment-mode').html('<p class="text-muted">No data available</p>');
+		}
 	}
 	
 	render_transaction_table() {
@@ -815,6 +961,7 @@ if (typeof window.CourierDashboard === 'undefined') {
 		
 		if (top_customers.length === 0) {
 			customers_tbody.append('<tr><td colspan="2" class="text-center">No data available</td></tr>');
+			$('#chart-top-customers').html('<p class="text-muted">No data available</p>');
 		} else {
 			top_customers.forEach((row, index) => {
 				let tr = $(`
@@ -825,6 +972,51 @@ if (typeof window.CourierDashboard === 'undefined') {
 				`);
 				customers_tbody.append(tr);
 			});
+			
+			// Render Top Customers Chart
+			let valid_customers = top_customers.filter(d => {
+				if (!d) return false;
+				let books = flt(d.books_sent);
+				return !isNaN(books) && books !== null && books !== undefined && books > 0;
+			});
+			
+			if (valid_customers.length > 0) {
+				let chart_data = {
+					labels: valid_customers.map(d => {
+						let name = String(d.customer_name || d.customer || '');
+						// Truncate long names for better display
+						return name.length > 20 ? name.substring(0, 17) + '...' : name;
+					}),
+					datasets: [{
+						name: 'Books Sent',
+						values: valid_customers.map(d => {
+							let val = flt(d.books_sent);
+							return isNaN(val) ? 0 : val;
+						})
+					}]
+				};
+				
+				// Destroy existing chart if it exists
+				if (me.charts.top_customers) {
+					try {
+						me.charts.top_customers.destroy();
+					} catch(e) {}
+				}
+				
+				try {
+					me.charts.top_customers = new frappe.Chart('#chart-top-customers', {
+						title: '',
+						data: chart_data,
+						type: 'pie',
+						height: 250
+					});
+				} catch(e) {
+					console.error('Error creating top customers chart:', e);
+					$('#chart-top-customers').html('<p class="text-muted">Chart data unavailable</p>');
+				}
+			} else {
+				$('#chart-top-customers').html('<p class="text-muted">No data available</p>');
+			}
 		}
 		
 		// Top Items
@@ -834,6 +1026,7 @@ if (typeof window.CourierDashboard === 'undefined') {
 		
 		if (top_items.length === 0) {
 			items_tbody.append('<tr><td colspan="2" class="text-center">No data available</td></tr>');
+			$('#chart-top-items').html('<p class="text-muted">No data available</p>');
 		} else {
 			top_items.forEach((row, index) => {
 				let tr = $(`
@@ -844,6 +1037,51 @@ if (typeof window.CourierDashboard === 'undefined') {
 				`);
 				items_tbody.append(tr);
 			});
+			
+			// Render Top Items Chart
+			let valid_items = top_items.filter(d => {
+				if (!d) return false;
+				let qty = flt(d.qty);
+				return !isNaN(qty) && qty !== null && qty !== undefined && qty > 0;
+			});
+			
+			if (valid_items.length > 0) {
+				let chart_data = {
+					labels: valid_items.map(d => {
+						let name = String(d.item_name || d.item_code || '');
+						// Truncate long names for better display
+						return name.length > 20 ? name.substring(0, 17) + '...' : name;
+					}),
+					datasets: [{
+						name: 'Quantity',
+						values: valid_items.map(d => {
+							let val = flt(d.qty);
+							return isNaN(val) ? 0 : val;
+						})
+					}]
+				};
+				
+				// Destroy existing chart if it exists
+				if (me.charts.top_items) {
+					try {
+						me.charts.top_items.destroy();
+					} catch(e) {}
+				}
+				
+				try {
+					me.charts.top_items = new frappe.Chart('#chart-top-items', {
+						title: '',
+						data: chart_data,
+						type: 'pie',
+						height: 250
+					});
+				} catch(e) {
+					console.error('Error creating top items chart:', e);
+					$('#chart-top-items').html('<p class="text-muted">Chart data unavailable</p>');
+				}
+			} else {
+				$('#chart-top-items').html('<p class="text-muted">No data available</p>');
+			}
 		}
 	}
 	
