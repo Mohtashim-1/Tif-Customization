@@ -1639,21 +1639,50 @@ def get_item_groups():
         return []
 
 @frappe.whitelist()
-def get_items():
-    """Get list of items for filter dropdown (only specific items - all are item codes)"""
+def get_items(item_group=None):
+    """Get list of items for filter dropdown (only specific items - all are item codes)
+    
+    Args:
+        item_group: Optional item group to filter items by
+    """
     try:
+        # Handle item_group parameter - convert empty string or None to None
+        if item_group == '' or item_group == 'None' or item_group is None:
+            item_group = None
+        
+        print(f"[get_items] Called with item_group: {item_group} (type: {type(item_group)})")
+        
         # Build filter for specific item codes only
         item_code_placeholders = ','.join(['%s'] * len(SPECIFIC_ITEM_CODES))
         
-        items = frappe.db.sql(f"""
-            SELECT DISTINCT i.item_code, i.item_name
+        # Build item group filter if provided
+        item_group_filter = ""
+        sql_params = list(SPECIFIC_ITEM_CODES)
+        
+        if item_group:
+            item_group_filter = "AND i.item_group = %s"
+            sql_params.append(item_group)
+            print(f"[get_items] Filtering by item_group: {item_group}")
+        else:
+            print(f"[get_items] No item_group filter - returning all items from SPECIFIC_ITEM_CODES")
+        
+        query = f"""
+            SELECT DISTINCT i.item_code, i.item_name, i.item_group
             FROM `tabItem` i
             WHERE i.item_code IN ({item_code_placeholders})
             AND i.disabled = 0
+            {item_group_filter}
             ORDER BY i.item_name, i.item_code
-        """, tuple(SPECIFIC_ITEM_CODES), as_dict=True)
-        print(f"[get_items] Found {len(items)} items")
-        print(f"[get_items] Sample items: {[i.item_code for i in items[:5]]}")
+        """
+        
+        print(f"[get_items] SQL Query: {query}")
+        print(f"[get_items] SQL Params: {sql_params}")
+        
+        items = frappe.db.sql(query, tuple(sql_params), as_dict=True)
+        print(f"[get_items] Found {len(items)} items (item_group: {item_group})")
+        if items:
+            print(f"[get_items] Sample items: {[i.item_code for i in items[:5]]}")
+            print(f"[get_items] Item groups in results: {set([i.item_group for i in items if i.item_group])}")
         return items
     except Exception as e:
         print(f"[ERROR] Error getting items: {str(e)}")

@@ -415,13 +415,7 @@ if (typeof window.DispatchReport === 'undefined') {
 					<p style="margin: 5px 0 0 0; font-size: 12px; opacity: 0.8;">${total_delivery_notes} Delivery Notes</p>
 				</div>
 			</div>
-			<div class="col-md-3">
-				<div class="kpi-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-					<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Unique Customers</h5>
-					<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${format_number_value(unique_customers)}</h2>
-					<p style="margin: 5px 0 0 0; font-size: 12px; opacity: 0.8;">${unique_items} Unique Items</p>
-				</div>
-			</div>
+			
 			<div class="col-md-3">
 				<div class="kpi-card" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
 					<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">MQH Quantity</h5>

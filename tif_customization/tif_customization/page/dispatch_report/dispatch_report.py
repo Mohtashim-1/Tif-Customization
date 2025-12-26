@@ -76,9 +76,9 @@ def get_dispatch_data(filters):
 			where_conditions.append("dn.customer = %(customer)s")
 			params['customer'] = customer
 		
-		# City filter
+		# City filter (from address)
 		if city:
-			where_conditions.append("dn.custom_city = %(city)s")
+			where_conditions.append("(addr.city = %(city)s OR addr.city IS NULL)")
 			params['city'] = city
 		
 		# Book/Item filter
@@ -101,7 +101,7 @@ def get_dispatch_data(filters):
 			params['province'] = province
 		
 		if area:
-			where_conditions.append("(addr.county = %(area)s OR addr.county IS NULL)")
+			where_conditions.append("(addr.custom_area = %(area)s OR addr.custom_area IS NULL)")
 			params['area'] = area
 		
 		where_clause = " AND ".join(where_conditions)
@@ -113,9 +113,9 @@ def get_dispatch_data(filters):
 				dn.posting_date,
 				dn.customer,
 				dn.customer_name,
-				dn.custom_city AS city,
+				COALESCE(addr.city, '') AS city,
 				COALESCE(addr.state, '') AS province,
-				COALESCE(addr.county, '') AS area,
+				COALESCE(addr.custom_area, '') AS area,
 				dni.item_code,
 				dni.item_name,
 				dni.qty,
@@ -214,12 +214,12 @@ def get_summary_data(filters, dispatch_data):
 def get_filter_options():
 	"""Get options for filters"""
 	try:
-		# Get unique cities
+		# Get unique cities from addresses
 		cities = frappe.db.sql("""
-			SELECT DISTINCT custom_city AS city
-			FROM `tabDelivery Note`
-			WHERE custom_city IS NOT NULL AND custom_city != ''
-			ORDER BY custom_city ASC
+			SELECT DISTINCT city
+			FROM `tabAddress`
+			WHERE city IS NOT NULL AND city != ''
+			ORDER BY city ASC
 		""", as_dict=True)
 		
 		# Get unique provinces from addresses
@@ -230,12 +230,12 @@ def get_filter_options():
 			ORDER BY state ASC
 		""", as_dict=True)
 		
-		# Get unique areas (county) from addresses
+		# Get unique areas (custom_area) from addresses
 		areas = frappe.db.sql("""
-			SELECT DISTINCT county AS area
+			SELECT DISTINCT custom_area AS area
 			FROM `tabAddress`
-			WHERE county IS NOT NULL AND county != ''
-			ORDER BY county ASC
+			WHERE custom_area IS NOT NULL AND custom_area != ''
+			ORDER BY custom_area ASC
 		""", as_dict=True)
 		
 		return {

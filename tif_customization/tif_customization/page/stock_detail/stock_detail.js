@@ -39,6 +39,11 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 					<label>Item Group:</label>
 					<select id="item-group-filter" class="form-control">
 						<option value="">All Item Groups</option>
+						<option value="MQH Teacher Guides (Urdu Version)">MQH Teacher Guides (Urdu Version)</option>
+						<option value="MQH Books (Urdu Version)">MQH Books (Urdu Version)</option>
+						<option value="MQH Books (Sindhi Version)">MQH Books (Sindhi Version)</option>
+						<option value="MQH Books (English Version)">MQH Books (English Version)</option>
+						<option value="QPS">QPS</option>
 					</select>
 				</div>
 			</div>
@@ -47,7 +52,6 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 					<button id="apply-filters" class="btn btn-primary">Apply Filters</button>
 					<button id="reset-filters" class="btn btn-secondary">Reset</button>
 					<button id="export-excel" class="btn btn-success">Export to Excel</button>
-					<button id="test-button" class="btn btn-warning">Test</button>
 				</div>
 			</div>
 		</div>
@@ -444,38 +448,35 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 			}
 		});
 		
-		// Load item groups
-		frappe.call({
-			method: 'tif_customization.tif_customization.page.stock_detail.stock_detail.get_item_groups',
-			args: {},
-			callback: function(r) {
-				console.log('Item groups response:', r);
-				if (r.message) {
-					const itemGroupSelect = $('#item-group-filter');
-					if (itemGroupSelect.length) {
-						itemGroupSelect.empty().append('<option value="">All Item Groups</option>');
-						r.message.forEach(group => {
-							itemGroupSelect.append(`<option value="${group.item_group}">${group.item_group}</option>`);
-						});
-						console.log('Item groups loaded:', r.message.length);
-					} else {
-						console.log('Item group select not found');
-					}
-				}
-			},
-			error: function(err) {
-				console.log('Error loading item groups:', err);
-			}
-		});
+		// Item group filter is already populated with predefined options in HTML
+		// No need to load from database - only using predefined filters:
+		// - MQH Teacher Guides (Urdu Version)
+		// - MQH Books (Urdu Version)
+		// - MQH Books (Sindhi Version)
+		// - MQH Books (English Version)
+		// - QPS
 		
-		// Load items
+		// Load items initially (without item group filter)
+		loadItems();
+	}
+	
+	// Function to load items (optionally filtered by item group)
+	function loadItems(itemGroup = null) {
+		// Ensure itemGroup is null if empty string
+		if (itemGroup === '' || itemGroup === undefined) {
+			itemGroup = null;
+		}
+		
 		frappe.call({
 			method: 'tif_customization.tif_customization.page.stock_detail.stock_detail.get_items',
-			args: {},
+			args: {
+				item_group: itemGroup
+			},
 			callback: function(r) {
 				console.log('Items response:', r);
 				console.log('Items response message:', r.message);
 				console.log('Items count:', r.message ? r.message.length : 0);
+				console.log('Filtered by item group:', itemGroup);
 				if (r.message && r.message.length > 0) {
 					const itemSelect = $('#item-filter');
 					console.log('Item select element found:', itemSelect.length > 0);
@@ -495,6 +496,10 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 					}
 				} else {
 					console.log('No items returned from backend');
+					const itemSelect = $('#item-filter');
+					if (itemSelect.length) {
+						itemSelect.empty().append('<option value="">All Items</option>');
+					}
 				}
 			},
 			error: function(err) {
@@ -504,9 +509,58 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 		});
 	}
 	
+	// Show custom loader overlay
+	function showLoader() {
+		// Remove existing loader if any
+		$('#stock-detail-loader').remove();
+		
+		// Create loader overlay
+		const loader = $(`
+			<div id="stock-detail-loader" style="
+				position: fixed;
+				top: 0;
+				left: 0;
+				width: 100%;
+				height: 100%;
+				background: rgba(0, 0, 0, 0.5);
+				z-index: 9999;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+			">
+				<div style="
+					background: white;
+					padding: 30px 50px;
+					border-radius: 8px;
+					box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+					text-align: center;
+				">
+					<i class="fa fa-spinner fa-spin" style="font-size: 32px; color: #2d5a27; margin-bottom: 15px;"></i>
+					<div style="font-size: 16px; color: #495057; font-weight: 500;">Loading data...</div>
+					<div style="font-size: 12px; color: #6c757d; margin-top: 5px;">Please wait while we fetch your data</div>
+				</div>
+			</div>
+		`);
+		$('body').append(loader);
+	}
+	
+	// Hide custom loader overlay
+	function hideLoader() {
+		$('#stock-detail-loader').fadeOut(300, function() {
+			$(this).remove();
+		});
+	}
+	
 	// Apply filters
 	function applyFilters() {
 		console.log('Apply filters clicked');
+		
+		// Show loader and disable button
+		const applyButton = $('#apply-filters');
+		const originalButtonText = applyButton.html();
+		applyButton.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Loading...');
+		showLoader();
+		
 		const itemSelect = $('#item-filter');
 		const itemFilterValue = itemSelect.val();
 		const selectedOption = itemSelect.find('option:selected');
@@ -566,12 +620,27 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 						populateOldOfficeTable(r.message.old_office_data || []);
 						populateNazimabadTable(r.message.nazimabad_warehouse_data || []);
 					}
+					
+					// Hide loader and re-enable button after tables are rendered
+					// Use requestAnimationFrame to ensure DOM updates are complete
+					requestAnimationFrame(function() {
+						setTimeout(function() {
+							hideLoader();
+							applyButton.prop('disabled', false).html(originalButtonText);
+						}, 200);
+					});
 				} else {
 					console.log('Error in filter response:', r.message);
+					hideLoader();
+					applyButton.prop('disabled', false).html(originalButtonText);
 					loadStockDataFallback();
 				}
 			},
 			error: function(err) {
+				// Hide loader and re-enable button on error
+				hideLoader();
+				applyButton.prop('disabled', false).html(originalButtonText);
+				
 				console.log('Filter error:', err);
 				loadStockDataFallback();
 			}
@@ -594,7 +663,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 				if (index === 6) $th.text(`Delivered till ${toDateFormatted}`);
 				if (index === 7) $th.text(`Available Stock till ${toDateFormatted}`);
 				if (index === 8) $th.text(`Demand Received till ${toDateFormatted}`);
-				if (index === 9) $th.text(`Books Sale Details till ${toDateFormatted}`);
+				if (index === 9) $th.text(`Books Sale <br/> Details till ${toDateFormatted}`);
 				if (index === 10) $th.text(`Total Amount of Books Sale till ${toDateFormatted}`);
 			});
 			
@@ -767,6 +836,29 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 			alert('Test button works!');
 			console.log('Test button clicked');
 		});
+		
+		// Add change event listener to item group filter
+		const itemGroupFilter = $('#item-group-filter');
+		if (itemGroupFilter.length > 0) {
+			console.log('Setting up item group filter change listener');
+			itemGroupFilter.on('change', function() {
+				const selectedItemGroup = $(this).val();
+				console.log('=== Item group changed ===');
+				console.log('Selected item group:', selectedItemGroup);
+				console.log('Item group filter element:', $(this));
+				
+				// Reset item filter when item group changes
+				$('#item-filter').val('');
+				
+				// Reload items filtered by selected item group (pass null if empty string)
+				const itemGroupValue = selectedItemGroup && selectedItemGroup !== '' ? selectedItemGroup : null;
+				console.log('Calling loadItems with item_group:', itemGroupValue);
+				loadItems(itemGroupValue);
+			});
+			console.log('Item group filter change listener attached');
+		} else {
+			console.error('Item group filter element not found!');
+		}
 		
 		// Load filter options
 		loadFilterOptions();
@@ -1138,7 +1230,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 			}
 			
 			itemsHtml = `
-				<h5 style="margin-bottom: 20px; margin-top: 30px; font-weight: bold; color: #495057;">Individual Item Balance KPIs</h5>
+				<h5 style="margin-bottom: 15px; margin-top: 30px; font-weight: bold; color: #495057;">Individual Item Balance KPIs</h5>
 				<div class="row" style="margin-bottom: 20px;">
 					${kpiData.items.map((item, index) => {
 						const balance = item.available_stock || 0;
@@ -1158,12 +1250,12 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 						const itemCode = item.item_code || '-';
 						
 						return `
-							<div class="col-md-3" style="margin-bottom: 15px;">
-								<div class="kpi-card" style="background: ${colorGradient}; color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); min-height: 140px;">
-									<h6 style="margin: 0 0 8px 0; font-size: 12px; opacity: 0.95; font-weight: bold; line-height: 1.3;">${itemCode}</h6>
-									<p style="margin: 0 0 12px 0; font-size: 11px; opacity: 0.9; line-height: 1.2; height: 28px; overflow: hidden;">${itemName}</p>
-									<h2 style="margin: 0; font-size: 32px; font-weight: bold; text-align: center;">${formatNumber(balance)}</h2>
-									<p style="margin: 8px 0 0 0; font-size: 11px; opacity: 0.85; text-align: center;">Available Stock</p>
+							<div class="col-md-2" style="margin-bottom: 10px;">
+								<div class="kpi-card" style="background: ${colorGradient}; color: white; padding: 12px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); min-height: 100px;">
+									<h6 style="margin: 0 0 5px 0; font-size: 10px; opacity: 0.95; font-weight: bold; line-height: 1.2;">${itemCode}</h6>
+									<p style="margin: 0 0 8px 0; font-size: 9px; opacity: 0.9; line-height: 1.1; height: 20px; overflow: hidden;">${itemName}</p>
+									<h2 style="margin: 0; font-size: 22px; font-weight: bold; text-align: center;">${formatNumber(balance)}</h2>
+									<p style="margin: 5px 0 0 0; font-size: 9px; opacity: 0.85; text-align: center;">Available Stock</p>
 								</div>
 							</div>
 						`;
