@@ -1331,6 +1331,16 @@ def calculate_kpis_for_specific_items(data, filters=None):
             "total_amount": sum(flt(item.get("total_amount", 0)) for item in items_kpi)
         }
         
+        # Get pending dispatches count (submitted Sales Orders pending delivery)
+        pending_dispatches_count = get_pending_dispatches_count()
+        totals["pending_dispatches_count"] = pending_dispatches_count
+        
+        # Get Sales Invoice statistics
+        sales_invoice_stats = get_sales_invoice_stats()
+        totals["sales_invoice_count"] = sales_invoice_stats.get("invoice_count", 0)
+        totals["sales_invoice_total_qty"] = sales_invoice_stats.get("total_qty", 0)
+        totals["sales_invoice_total_amount"] = sales_invoice_stats.get("total_amount", 0)
+        
         # Combine totals and individual items
         kpi_data = {
             **totals,
@@ -1350,7 +1360,59 @@ def calculate_kpis_for_specific_items(data, filters=None):
             "total_demand_received": 0,
             "total_books_sale": 0,
             "total_amount": 0,
+            "pending_dispatches_count": 0,
+            "sales_invoice_count": 0,
+            "sales_invoice_total_qty": 0,
+            "sales_invoice_total_amount": 0,
             "items": []
+        }
+
+def get_pending_dispatches_count():
+    """Get count of submitted Sales Orders that are pending delivery"""
+    try:
+        count = frappe.db.sql("""
+            SELECT COUNT(DISTINCT so.name) as count
+            FROM `tabSales Order` so
+            WHERE so.docstatus = 1
+            AND so.status NOT IN ('Closed', 'Cancelled', 'Completed', 'Stopped', 'On Hold')
+            AND (so.per_delivered < 100 OR so.per_delivered IS NULL)
+        """, as_dict=True)
+        
+        return cint(count[0].get('count', 0)) if count else 0
+    except Exception as e:
+        frappe.log_error(f"Error getting pending dispatches count: {str(e)}", "Pending Dispatches Count Error")
+        return 0
+
+def get_sales_invoice_stats():
+    """Get Sales Invoice count, total quantity, and total amount"""
+    try:
+        result = frappe.db.sql("""
+            SELECT 
+                COUNT(DISTINCT si.name) as invoice_count,
+                COALESCE(SUM(sii.qty), 0) as total_qty,
+                COALESCE(SUM(si.base_grand_total), 0) as total_amount
+            FROM `tabSales Invoice` si
+            LEFT JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
+            WHERE si.docstatus = 1
+        """, as_dict=True)
+        
+        if result and len(result) > 0:
+            return {
+                "invoice_count": cint(result[0].get('invoice_count', 0)),
+                "total_qty": flt(result[0].get('total_qty', 0)),
+                "total_amount": flt(result[0].get('total_amount', 0))
+            }
+        return {
+            "invoice_count": 0,
+            "total_qty": 0,
+            "total_amount": 0
+        }
+    except Exception as e:
+        frappe.log_error(f"Error getting sales invoice stats: {str(e)}", "Sales Invoice Stats Error")
+        return {
+            "invoice_count": 0,
+            "total_qty": 0,
+            "total_amount": 0
         }
 
 @frappe.whitelist()

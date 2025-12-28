@@ -9,7 +9,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 	let container = $(`<div class="stock-detail-container">
 		<div class="report-header">
 			<h2>The ILM Foundation</h2>
-			<h3>MQH Books Stock Details - 2025-26</h3>
+			<!-- <h3>MQH Books Stock Details - 2025-26</h3> -->
 		</div>
 		
 		<!-- Filter Section -->
@@ -46,6 +46,16 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 						<option value="QPS">QPS</option>
 					</select>
 				</div>
+				<div class="col-md-2">
+					<label>Show Warehouse Stock:</label>
+					<select id="warehouse-stock-filter" class="form-control">
+						<option value="">Hide All</option>
+						<option value="head-office">TIF Head Office Stock</option>
+						<option value="old-office">TIF Old Office</option>
+						<option value="nazimabad">Nazimabad Warehouse</option>
+						<option value="all">Show All</option>
+					</select>
+				</div>
 			</div>
 			<div class="row" style="margin-top: 10px;">
 				<div class="col-md-12">
@@ -62,7 +72,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 		</div>
 		
 		<div class="report-content">
-			<div class="report-section">
+			<!-- <div class="report-section">
 				<h4>MQH Books Stock Details - 2025-26</h4>
 				<div class="table-container">
 					<table class="table table-bordered table-striped" id="mqh-books-table">
@@ -87,7 +97,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 						</tfoot>
 					</table>
 				</div>
-			</div>
+			</div> -->
 			
 			<div class="report-section">
 				<h4>MQH Books (Urdu Version) - 2025-26</h4>
@@ -142,7 +152,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 				</div>
 			</div>
 			
-			<div class="report-section head-office-section">
+			<div class="report-section head-office-section" style="display: none;">
 				<h4>TIF Head Office Stock 30-Sep-2025</h4>
 				<div class="table-container">
 					<table class="table table-bordered table-striped" id="head-office-table">
@@ -167,7 +177,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 				</div>
 			</div>
 			
-			<div class="report-section old-office-section">
+			<div class="report-section old-office-section" style="display: none;">
 				<h4>TIF Old Office 30-Sep-2025</h4>
 				<div class="table-container">
 					<table class="table table-bordered table-striped" id="old-office-table">
@@ -192,7 +202,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 				</div>
 			</div>
 			
-			<div class="report-section nazimabad-section">
+			<div class="report-section nazimabad-section" style="display: none;">
 				<h4>Nazimabad Warehouse 30-Sep-2025</h4>
 				<div class="table-container">
 					<table class="table table-bordered table-striped" id="nazimabad-table">
@@ -349,8 +359,9 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 	loadStockData();
 	
 	function loadStockData() {
-		// Show all warehouse sections by default
+		// Hide all warehouse sections by default
 		updateWarehouseSections('');
+		updateWarehouseStockVisibility(''); // Hide all warehouse stock tables by default
 		
 		// Get data from Python controller via AJAX
 		frappe.call({
@@ -393,7 +404,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 						nazimabad: nazimabadData.length
 					});
 					
-					populateMQHBooksTable(mqhData);
+					// populateMQHBooksTable(mqhData);
 					populateMQHUrduBooksTable(urduData);
 					populateHeadOfficeTable(headOfficeData);
 					populateOldOfficeTable(oldOfficeData);
@@ -692,13 +703,32 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 			// Show single warehouse section
 			$('.single-warehouse-section').show();
 		} else {
-			// Show individual warehouse sections
-			$('.head-office-section').show();
-			$('.old-office-section').show();
-			$('.nazimabad-section').show();
+			// Don't show individual warehouse sections by default - controlled by warehouse-stock-filter
 			// Hide single warehouse section
 			$('.single-warehouse-section').hide();
 		}
+	}
+	
+	// Update warehouse stock visibility based on filter selection
+	function updateWarehouseStockVisibility(selectedValue) {
+		// Hide all warehouse sections first
+		$('.head-office-section').hide();
+		$('.old-office-section').hide();
+		$('.nazimabad-section').hide();
+		
+		// Show selected warehouse section(s)
+		if (selectedValue === 'head-office') {
+			$('.head-office-section').show();
+		} else if (selectedValue === 'old-office') {
+			$('.old-office-section').show();
+		} else if (selectedValue === 'nazimabad') {
+			$('.nazimabad-section').show();
+		} else if (selectedValue === 'all') {
+			$('.head-office-section').show();
+			$('.old-office-section').show();
+			$('.nazimabad-section').show();
+		}
+		// If selectedValue is empty or 'Hide All', all sections remain hidden
 	}
 	
 	// Populate single warehouse table
@@ -831,6 +861,13 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 			exportToExcel();
 		});
 		
+		// Add change event listener for warehouse stock filter
+		$('#warehouse-stock-filter').on('change', function() {
+			const selectedValue = $(this).val();
+			console.log('Warehouse stock filter changed:', selectedValue);
+			updateWarehouseStockVisibility(selectedValue);
+		});
+		
 		$('#test-button').click(function(e) {
 			e.preventDefault();
 			alert('Test button works!');
@@ -865,8 +902,9 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 	}, 500);
 	
 	function loadStockDataFallback() {
-		// Show all warehouse sections by default
+		// Hide all warehouse sections by default
 		updateWarehouseSections('');
+		updateWarehouseStockVisibility(''); // Hide all warehouse stock tables by default
 		
 		// Fallback hardcoded data
 		const mqhBooksData = [
@@ -1159,33 +1197,47 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 		// Summary KPIs at the top
 		const summaryHtml = `
 			<h4 style="margin-bottom: 15px;">Key Performance Indicators (KPIs)</h4>
-			<div class="row" style="margin-bottom: 30px;">
-				<div class="col-md-3">
+			<div class="row" style="margin-bottom: 30px; display: flex; flex-wrap: nowrap;">
+				<div style="flex: 1; padding: 0 8px;">
 					<div class="kpi-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
 						<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Total Items</h5>
 						<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${kpiData.total_items || 0}</h2>
 						<p style="margin: 5px 0 0 0; font-size: 12px; opacity: 0.8;">Items Tracked</p>
 					</div>
 				</div>
-				<div class="col-md-3">
+				<div style="flex: 1; padding: 0 8px;">
 					<div class="kpi-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
 						<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Total Opening Stock</h5>
 						<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${formatNumber(kpiData.total_opening_stock || 0)}</h2>
 						<p style="margin: 5px 0 0 0; font-size: 12px; opacity: 0.8;">Units</p>
 					</div>
 				</div>
-				<div class="col-md-3">
+				<div style="flex: 1; padding: 0 8px;">
 					<div class="kpi-card" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
 						<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Total Available Stock</h5>
 						<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${formatNumber(kpiData.total_available_stock || 0)}</h2>
 						<p style="margin: 5px 0 0 0; font-size: 12px; opacity: 0.8;">Units</p>
 					</div>
 				</div>
-				<div class="col-md-3">
+				<div style="flex: 1; padding: 0 8px;">
 					<div class="kpi-card" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
 						<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Total Delivered</h5>
 						<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${formatNumber(kpiData.total_delivered || 0)}</h2>
 						<p style="margin: 5px 0 0 0; font-size: 12px; opacity: 0.8;">Units</p>
+					</div>
+				</div>
+				<div style="flex: 1; padding: 0 8px;">
+					<div class="kpi-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+						<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Pending Dispatches</h5>
+						<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${formatNumber(kpiData.pending_dispatches_count || 0)}</h2>
+						<p style="margin: 5px 0 0 0; font-size: 12px; opacity: 0.8;">Sales Orders</p>
+					</div>
+				</div>
+				<div style="flex: 1; padding: 0 8px;">
+					<div class="kpi-card" style="background: linear-gradient(135deg, #30cfd0 0%, #330867 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+						<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Sales Invoices</h5>
+						<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${formatNumber(kpiData.sales_invoice_count || 0)}</h2>
+						<p style="margin: 5px 0 0 0; font-size: 12px; opacity: 0.8;">${formatNumber(kpiData.sales_invoice_total_qty || 0)} Qty | ${formatCurrency(kpiData.sales_invoice_total_amount || 0)}</p>
 					</div>
 				</div>
 			</div>
@@ -1263,7 +1315,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 				</div>
 				
 				<!-- Detailed Table for Individual Items -->
-				<h5 style="margin-bottom: 15px; margin-top: 30px; font-weight: bold; color: #495057;">Detailed Item Information</h5>
+				<!-- <h5 style="margin-bottom: 15px; margin-top: 30px; font-weight: bold; color: #495057;">Detailed Item Information</h5>
 				<div class="table-responsive">
 					<table class="table table-bordered table-striped" style="background: white;">
 						<thead>
@@ -1297,7 +1349,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 							`).join('')}
 						</tbody>
 					</table>
-				</div>
+				</div> -->
 			`;
 		}
 		
@@ -1493,5 +1545,15 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 	function formatNumber(num) {
 		if (num === 0) return '-';
 		return num.toLocaleString();
+	}
+	
+	function formatCurrency(value) {
+		if (value === null || value === undefined || value === '') {
+			return '0.00';
+		}
+		var currency = frappe.boot.sysdefaults.currency || 'PKR';
+		var precision = cint(frappe.boot.sysdefaults.currency_precision || 2);
+		value = flt(value);
+		return format_currency(value, currency, precision);
 	}
 }
