@@ -56,7 +56,7 @@ def get_courier_report_data(filters=None):
 		top_customers = get_top_customers(filters)
 		top_items = get_top_items(filters)
 		books_by_cost_center = get_books_by_cost_center(filters)
-		daily_trend = get_daily_trend(filters)
+		monthly_trend = get_monthly_trend(filters)
 		expense_by_cost_center = get_expense_by_cost_center(filters)
 		delivery_mode_data = get_delivery_mode_data(filters)
 		courier_data = get_courier_data(filters)
@@ -71,7 +71,7 @@ def get_courier_report_data(filters=None):
 			'top_customers': top_customers,
 			'top_items': top_items,
 			'books_by_cost_center': books_by_cost_center,
-			'daily_trend': daily_trend,
+			'monthly_trend': monthly_trend,
 			'expense_by_cost_center': expense_by_cost_center,
 			'delivery_mode_data': delivery_mode_data,
 			'courier_data': courier_data,
@@ -626,8 +626,8 @@ def get_books_by_cost_center(filters):
 		frappe.log_error(f"Error in get_books_by_cost_center: {str(e)}", "Courier Report Error")
 		return []
 
-def get_daily_trend(filters):
-	"""Get daily courier expense trend"""
+def get_monthly_trend(filters):
+	"""Get monthly courier expense trend"""
 	try:
 		from_date = filters.get('from_date')
 		to_date = filters.get('to_date')
@@ -640,7 +640,7 @@ def get_daily_trend(filters):
 		
 		query = f"""
 			SELECT 
-				COALESCE(dn.posting_date, je.posting_date) AS date,
+				DATE_FORMAT(COALESCE(dn.posting_date, je.posting_date), '%%Y-%%m') AS date,
 				COALESCE(SUM(jea.debit - jea.credit), 0) AS expense
 			FROM `tabJournal Entry Account` jea
 			JOIN `tabJournal Entry` je ON je.name = jea.parent
@@ -649,8 +649,8 @@ def get_daily_trend(filters):
 			AND COALESCE(dn.posting_date, je.posting_date) BETWEEN %(from_date)s AND %(to_date)s
 			AND (jea.account LIKE '%%Courier%%' OR jea.account LIKE '%%Courier Expense%%')
 			{cost_center_filter}
-			GROUP BY COALESCE(dn.posting_date, je.posting_date)
-			ORDER BY COALESCE(dn.posting_date, je.posting_date) ASC
+			GROUP BY DATE_FORMAT(COALESCE(dn.posting_date, je.posting_date), '%%Y-%%m')
+			ORDER BY DATE_FORMAT(COALESCE(dn.posting_date, je.posting_date), '%%Y-%%m') ASC
 		"""
 		
 		results = frappe.db.sql(query, {
@@ -661,7 +661,7 @@ def get_daily_trend(filters):
 		for row in results:
 			# Format date as string and ensure expense is a valid number
 			if row.get('date'):
-				# Convert date to ISO format string (YYYY-MM-DD)
+				# Date is already in YYYY-MM format from SQL
 				row['date'] = str(row['date'])
 			else:
 				row['date'] = ''
@@ -669,7 +669,7 @@ def get_daily_trend(filters):
 		
 		return results
 	except Exception as e:
-		frappe.log_error(f"Error in get_daily_trend: {str(e)}", "Courier Report Error")
+		frappe.log_error(f"Error in get_monthly_trend: {str(e)}", "Courier Report Error")
 		return []
 
 def get_expense_by_cost_center(filters):

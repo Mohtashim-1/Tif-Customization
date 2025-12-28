@@ -24,7 +24,6 @@ if (typeof window.CourierDashboard === 'undefined') {
 		this.filters = {
 			from_date: frappe.datetime.add_days(frappe.datetime.get_today(), -30),
 			to_date: frappe.datetime.get_today(),
-			cost_centers: ['811', '8121', '8122'], // Default to cost center numbers 811, 8121 and 8122
 			customer: '',
 			view_type: 'all' // 'all', 'jv', 'dn'
 		};
@@ -46,21 +45,15 @@ if (typeof window.CourierDashboard === 'undefined') {
 		let filter_html = `
 			<div class="filter-section" style="background: #f8f9fa; padding: 20px; margin-bottom: 20px; border-radius: 5px;">
 				<div class="row">
-					<div class="col-md-3">
+					<div class="col-md-4">
 						<label>From Date:</label>
 						<input type="date" id="from-date" class="form-control" value="${me.filters.from_date}">
 					</div>
-					<div class="col-md-3">
+					<div class="col-md-4">
 						<label>To Date:</label>
 						<input type="date" id="to-date" class="form-control" value="${me.filters.to_date}">
 					</div>
-					<div class="col-md-3">
-						<label>Cost Center:</label>
-						<select id="cost-center-filter" class="form-control" multiple>
-							<option value="">All Cost Centers</option>
-						</select>
-					</div>
-					<div class="col-md-3">
+					<div class="col-md-4">
 						<label>Customer (Optional):</label>
 						<select id="customer-filter" class="form-control">
 							<option value="">All Customers</option>
@@ -149,14 +142,8 @@ if (typeof window.CourierDashboard === 'undefined') {
 					<div class="row">
 						<div class="col-md-6" style="margin-bottom: 20px;">
 							<div class="chart-container" style="background: white; padding: 15px; border-radius: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-								<h5>Cost Center vs Courier Expense</h5>
-								<div id="chart-expense-by-cost-center"></div>
-							</div>
-						</div>
-						<div class="col-md-6" style="margin-bottom: 20px;">
-							<div class="chart-container" style="background: white; padding: 15px; border-radius: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-								<h5>Daily Courier Expense Trend</h5>
-								<div id="chart-daily-trend"></div>
+								<h5>Monthly Courier Expense Trend</h5>
+								<div id="chart-monthly-trend"></div>
 							</div>
 						</div>
 						<div class="col-md-6" style="margin-bottom: 20px;">
@@ -257,40 +244,6 @@ if (typeof window.CourierDashboard === 'undefined') {
 	load_filter_options() {
 		let me = this;
 		
-		// Load cost centers
-		frappe.call({
-			method: 'tif_customization.tif_customization.page.courier_report.courier_report.get_cost_centers',
-			callback: function(r) {
-				if (r.message) {
-					let select = $('#cost-center-filter');
-					r.message.forEach(cc => {
-						select.append(`<option value="${cc}">${cc}</option>`);
-					});
-					
-					// Find cost centers that match numbers 811, 8121 and 8122
-					// First, try to find by cost center number via backend
-					let found_ccs = [];
-					r.message.forEach(cc => {
-						// Check if cost center name contains the numbers 811, 8121 or 8122
-						if (cc.includes('811') || cc.includes('8121') || cc.includes('8122')) {
-							found_ccs.push(cc);
-							select.find(`option[value="${cc}"]`).prop('selected', true);
-						}
-					});
-					
-					// Update filters with actual cost center names (backend will handle number conversion)
-					// Keep both numbers in filters - backend converts them to names
-					// But also add found names to ensure they're selected
-					if (found_ccs.length > 0) {
-						me.filters.cost_centers = ['811', '8121', '8122']; // Keep numbers, backend converts
-					}
-					
-					// Trigger change to update the select UI
-					select.trigger('change');
-				}
-			}
-		});
-		
 		// Load customers
 		frappe.call({
 			method: 'tif_customization.tif_customization.page.courier_report.courier_report.get_customers',
@@ -310,7 +263,6 @@ if (typeof window.CourierDashboard === 'undefined') {
 		
 		me.filters.from_date = $('#from-date').val();
 		me.filters.to_date = $('#to-date').val();
-		me.filters.cost_centers = $('#cost-center-filter').val() || [];
 		me.filters.customer = $('#customer-filter').val() || '';
 		
 		me.load_data();
@@ -322,14 +274,12 @@ if (typeof window.CourierDashboard === 'undefined') {
 		me.filters = {
 			from_date: frappe.datetime.add_days(frappe.datetime.get_today(), -30),
 			to_date: frappe.datetime.get_today(),
-			cost_centers: ['811', '8121', '8122'], // Reset to default cost center numbers
 			customer: '',
 			view_type: 'all'
 		};
 		
 		$('#from-date').val(me.filters.from_date);
 		$('#to-date').val(me.filters.to_date);
-		$('#cost-center-filter').val(null).trigger('change');
 		$('#customer-filter').val('');
 		$('.btn-group button[data-view="all"]').click();
 		
@@ -432,78 +382,14 @@ if (typeof window.CourierDashboard === 'undefined') {
 	render_charts() {
 		let me = this;
 		
-		// Expense by Cost Center - Bar Chart
+		// Get expense data for pie chart
 		let expense_data = me.data.expense_by_cost_center || [];
-		if (expense_data.length > 0) {
-			// Filter out undefined/null values and ensure numeric values
-			let valid_data = expense_data.filter(d => {
-				if (!d) return false;
-				if (!d.cost_center || d.cost_center === 'undefined' || d.cost_center === 'null') return false;
-				let expense = flt(d.expense);
-				return !isNaN(expense) && expense !== null && expense !== undefined && expense !== 'undefined' && expense !== 'null';
-			});
-			
-			if (valid_data.length > 0) {
-				let chart_data = {
-					labels: valid_data.map(d => {
-						let ccStr = String(d.cost_center || '');
-						return ccStr && ccStr !== 'undefined' && ccStr !== 'null' ? ccStr : '';
-					}).filter(label => label !== ''),
-					datasets: [{
-						name: 'Courier Expense',
-						values: valid_data.map(d => {
-							let val = flt(d.expense);
-							if (isNaN(val) || val === null || val === undefined || val === 'undefined' || val === 'null') {
-								return 0;
-							}
-							return val;
-						}).filter(val => val !== undefined && val !== null && !isNaN(val))
-					}]
-				};
-				
-				// Ensure labels and values arrays have the same length
-				if (chart_data.labels.length !== chart_data.datasets[0].values.length) {
-					let minLength = Math.min(chart_data.labels.length, chart_data.datasets[0].values.length);
-					chart_data.labels = chart_data.labels.slice(0, minLength);
-					chart_data.datasets[0].values = chart_data.datasets[0].values.slice(0, minLength);
-				}
-			
-				// Only create chart if we have valid data
-				if (chart_data.labels.length > 0 && chart_data.datasets[0].values.length > 0) {
-					// Destroy existing chart if it exists
-					if (me.charts.expense_by_cost_center) {
-						try {
-							me.charts.expense_by_cost_center.destroy();
-						} catch(e) {}
-					}
-					
-					try {
-						me.charts.expense_by_cost_center = new frappe.Chart('#chart-expense-by-cost-center', {
-							title: '',
-							data: chart_data,
-							type: 'bar',
-							colors: ['#667eea'],
-							height: 300
-						});
-					} catch(e) {
-						console.error('Error creating expense chart:', e);
-						$('#chart-expense-by-cost-center').html('<p class="text-muted">Chart data unavailable</p>');
-					}
-				} else {
-					$('#chart-expense-by-cost-center').html('<p class="text-muted">No valid data available</p>');
-				}
-			} else {
-				$('#chart-expense-by-cost-center').html('<p class="text-muted">No data available</p>');
-			}
-		} else {
-			$('#chart-expense-by-cost-center').html('<p class="text-muted">No data available</p>');
-		}
 		
-		// Daily Trend - Line Chart
-		let daily_data = me.data.daily_trend || [];
-		if (daily_data.length > 0) {
+		// Monthly Trend - Line Chart
+		let monthly_data = me.data.monthly_trend || [];
+		if (monthly_data.length > 0) {
 			// Filter out undefined/null values and ensure numeric values
-			let valid_data = daily_data.filter(d => {
+			let valid_data = monthly_data.filter(d => {
 				if (!d) return false;
 				// Ensure date exists and is a valid string
 				if (!d.date || d.date === 'undefined' || d.date === 'null') return false;
@@ -517,10 +403,16 @@ if (typeof window.CourierDashboard === 'undefined') {
 				let chart_data = {
 					labels: valid_data.map(d => {
 						let dateStr = String(d.date || '');
+						// Format YYYY-MM to "Month YYYY" for better readability
+						if (dateStr && dateStr !== 'undefined' && dateStr !== 'null' && dateStr.match(/^\d{4}-\d{2}$/)) {
+							let [year, month] = dateStr.split('-');
+							let monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+							return `${monthNames[parseInt(month) - 1]} ${year}`;
+						}
 						return dateStr && dateStr !== 'undefined' && dateStr !== 'null' ? dateStr : '';
 					}).filter(label => label !== ''),
 					datasets: [{
-						name: 'Daily Expense',
+						name: 'Monthly Expense',
 						values: valid_data.map(d => {
 							let val = flt(d.expense);
 							// Ensure we return a valid number, default to 0 if invalid
@@ -542,16 +434,16 @@ if (typeof window.CourierDashboard === 'undefined') {
 				// Only create chart if we have valid data
 				if (chart_data.labels.length > 0 && chart_data.datasets[0].values.length > 0) {
 					// Destroy existing chart if it exists to avoid errors
-					if (me.charts.daily_trend) {
+					if (me.charts.monthly_trend) {
 						try {
-							me.charts.daily_trend.destroy();
+							me.charts.monthly_trend.destroy();
 						} catch(e) {
 							// Ignore destroy errors
 						}
 					}
 					
 					try {
-						me.charts.daily_trend = new frappe.Chart('#chart-daily-trend', {
+						me.charts.monthly_trend = new frappe.Chart('#chart-monthly-trend', {
 							title: '',
 							data: chart_data,
 							type: 'line',
@@ -559,17 +451,17 @@ if (typeof window.CourierDashboard === 'undefined') {
 							height: 300
 						});
 					} catch(e) {
-						console.error('Error creating daily trend chart:', e);
-						$('#chart-daily-trend').html('<p class="text-muted">Chart data unavailable</p>');
+						console.error('Error creating monthly trend chart:', e);
+						$('#chart-monthly-trend').html('<p class="text-muted">Chart data unavailable</p>');
 					}
 				} else {
-					$('#chart-daily-trend').html('<p class="text-muted">No valid data available for selected period</p>');
+					$('#chart-monthly-trend').html('<p class="text-muted">No valid data available for selected period</p>');
 				}
 			} else {
-				$('#chart-daily-trend').html('<p class="text-muted">No data available for selected period</p>');
+				$('#chart-monthly-trend').html('<p class="text-muted">No data available for selected period</p>');
 			}
 		} else {
-			$('#chart-daily-trend').html('<p class="text-muted">No data available for selected period</p>');
+			$('#chart-monthly-trend').html('<p class="text-muted">No data available for selected period</p>');
 		}
 		
 		// Expense Share - Pie Chart
@@ -635,54 +527,6 @@ if (typeof window.CourierDashboard === 'undefined') {
 			}
 		} else {
 			$('#chart-expense-share').html('<p class="text-muted">No data available</p>');
-		}
-		
-		// Books by Cost Center - Bar Chart
-		let books_data = me.data.books_by_cost_center || [];
-		if (books_data.length > 0) {
-			// Filter out undefined/null values and ensure numeric values
-			let valid_data = books_data.filter(d => {
-				if (!d || !d.cost_center) return false;
-				let books = flt(d.books_sent);
-				return !isNaN(books) && books !== null && books !== undefined;
-			});
-			
-			if (valid_data.length > 0) {
-				let chart_data = {
-					labels: valid_data.map(d => String(d.cost_center || '')),
-					datasets: [{
-						name: 'Books Sent',
-						values: valid_data.map(d => {
-							let val = flt(d.books_sent);
-							return isNaN(val) ? 0 : val;
-						})
-					}]
-				};
-			
-				// Destroy existing chart if it exists
-				if (me.charts.books_by_cost_center) {
-					try {
-						me.charts.books_by_cost_center.destroy();
-					} catch(e) {}
-				}
-				
-				try {
-					me.charts.books_by_cost_center = new frappe.Chart('#chart-books-by-cost-center', {
-						title: '',
-						data: chart_data,
-						type: 'bar',
-						colors: ['#4facfe'],
-						height: 300
-					});
-				} catch(e) {
-					console.error('Error creating books chart:', e);
-					$('#chart-books-by-cost-center').html('<p class="text-muted">Chart data unavailable</p>');
-				}
-			} else {
-				$('#chart-books-by-cost-center').html('<p class="text-muted">No data available</p>');
-			}
-		} else {
-			$('#chart-books-by-cost-center').html('<p class="text-muted">No data available</p>');
 		}
 		
 		// Delivery Mode Chart
@@ -1115,6 +959,185 @@ if (typeof window.CourierDashboard === 'undefined') {
 	}
 	
 	print_report() {
+		let me = this;
+		
+		// Add print styles if not already added
+		if (!$('#print-styles-courier').length) {
+			let printStyles = `
+				<style id="print-styles-courier" media="print">
+					@page {
+						size: A4 landscape;
+						margin: 1cm;
+					}
+					* {
+						-webkit-print-color-adjust: exact !important;
+						print-color-adjust: exact !important;
+					}
+					body {
+						font-size: 10pt;
+						background: white !important;
+					}
+					.filter-section,
+					.btn,
+					#apply-filters,
+					#reset-filters,
+					#export-excel,
+					#print-report,
+					.btn-group,
+					.page-head,
+					.sidebar,
+					.navbar,
+					.footer {
+						display: none !important;
+					}
+					.page-content {
+						margin: 0 !important;
+						padding: 0 !important;
+					}
+					.courier-dashboard {
+						padding: 0 !important;
+						background: white !important;
+					}
+					.print-header-courier {
+						text-align: center;
+						margin-bottom: 20px;
+						border-bottom: 2px solid #333;
+						padding-bottom: 10px;
+						page-break-after: avoid;
+					}
+					.print-header-courier h3 {
+						margin: 0;
+						font-size: 16pt;
+						font-weight: bold;
+					}
+					.print-header-courier p {
+						margin: 5px 0;
+						font-size: 10pt;
+					}
+					.kpi-section {
+						margin-bottom: 20px;
+						page-break-inside: avoid;
+					}
+					.kpi-card {
+						page-break-inside: avoid;
+						margin-bottom: 10px;
+					}
+					.summary-table-section {
+						margin-bottom: 20px;
+						page-break-inside: avoid;
+					}
+					.summary-table-section h4 {
+						font-size: 14pt;
+						font-weight: bold;
+						margin-bottom: 10px;
+						border-bottom: 1px solid #333;
+						padding-bottom: 5px;
+					}
+					.charts-section {
+						margin-bottom: 20px;
+					}
+					.charts-section h4 {
+						font-size: 14pt;
+						font-weight: bold;
+						margin-bottom: 10px;
+						border-bottom: 1px solid #333;
+						padding-bottom: 5px;
+					}
+					.chart-container {
+						page-break-inside: avoid;
+						margin-bottom: 15px;
+					}
+					.chart-container h5 {
+						font-size: 12pt;
+						font-weight: bold;
+						margin-bottom: 10px;
+						border-bottom: 2px solid #333;
+						padding-bottom: 5px;
+					}
+					.transaction-section {
+						margin-bottom: 20px;
+					}
+					.transaction-section h4 {
+						font-size: 14pt;
+						font-weight: bold;
+						margin-bottom: 10px;
+						border-bottom: 1px solid #333;
+						padding-bottom: 5px;
+					}
+					.book-movement-section {
+						margin-bottom: 20px;
+					}
+					.book-movement-section h4 {
+						font-size: 14pt;
+						font-weight: bold;
+						margin-bottom: 10px;
+						border-bottom: 1px solid #333;
+						padding-bottom: 5px;
+					}
+					.book-movement-section h5 {
+						font-size: 12pt;
+						font-weight: bold;
+						margin-bottom: 10px;
+					}
+					table {
+						font-size: 9pt;
+						width: 100%;
+						border-collapse: collapse;
+						page-break-inside: auto;
+					}
+					table thead {
+						display: table-header-group;
+					}
+					table tbody {
+						display: table-row-group;
+					}
+					table tr {
+						page-break-inside: avoid;
+						page-break-after: auto;
+					}
+					table th,
+					table td {
+						padding: 5px;
+						border: 1px solid #ddd;
+					}
+					table th {
+						background-color: #f5f5f5 !important;
+						font-weight: bold;
+					}
+					.row {
+						margin-left: 0;
+						margin-right: 0;
+					}
+					.col-md-3,
+					.col-md-4,
+					.col-md-6,
+					.col-md-12 {
+						padding-left: 5px;
+						padding-right: 5px;
+					}
+				</style>
+			`;
+			$('head').append(printStyles);
+		}
+		
+		// Add print header if not exists
+		if (!$('.print-header-courier').length) {
+			let printHeader = `
+				<div class="print-header print-header-courier">
+					<h3>Courier Expense & Operational Dashboard</h3>
+					<p>Period: ${me.filters.from_date} to ${me.filters.to_date}</p>
+					<p>Generated on: ${frappe.datetime.str_to_user(frappe.datetime.get_datetime_as_string())}</p>
+				</div>
+			`;
+			$('.courier-dashboard').prepend(printHeader);
+		} else {
+			// Update existing header
+			$('.print-header-courier h3').text('Courier Expense & Operational Dashboard');
+			$('.print-header-courier p').first().text(`Period: ${me.filters.from_date} to ${me.filters.to_date}`);
+			$('.print-header-courier p').last().text(`Generated on: ${frappe.datetime.str_to_user(frappe.datetime.get_datetime_as_string())}`);
+		}
+		
+		// Trigger print
 		window.print();
 	}
 	};
