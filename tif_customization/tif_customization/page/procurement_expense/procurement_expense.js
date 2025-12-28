@@ -85,8 +85,11 @@ if (typeof window.ProcurementExpense === 'undefined') {
 								<button class="btn btn-info" id="toggle-voucher-details" style="margin-left: 10px;">
 									<i class="fa fa-list"></i> Show Voucher-Wise Details
 								</button>
-								<button class="btn btn-success" id="export-excel" style="float: right;">
+								<button class="btn btn-success" id="export-excel" style="float: right; margin-left: 10px;">
 									<i class="fa fa-file-excel-o"></i> Export to Excel
+								</button>
+								<button class="btn btn-default" id="print-report" style="float: right;">
+									<i class="fa fa-print"></i> Print
 								</button>
 							</div>
 						</div>
@@ -432,6 +435,10 @@ if (typeof window.ProcurementExpense === 'undefined') {
 			
 			$('#export-excel').on('click', function() {
 				me.export_to_excel();
+			});
+			
+			$('#print-report').on('click', function() {
+				me.print_report();
 			});
 			
 			$('#toggle-voucher-details').on('click', function() {
@@ -1782,6 +1789,113 @@ if (typeof window.ProcurementExpense === 'undefined') {
 				});
 				$('#cheque-vouchers-total').text(format_currency_value(cheque_total));
 			}
+		}
+		
+		print_report() {
+			let me = this;
+			
+			// Add print styles if not already added
+			if (!$('#print-styles').length) {
+				let printStyles = `
+					<style id="print-styles" media="print">
+						@page {
+							size: A4 landscape;
+							margin: 1cm;
+						}
+						body {
+							font-size: 10pt;
+						}
+						.filter-section,
+						.btn,
+						#apply-filters,
+						#reset-filters,
+						#export-excel,
+						#print-report,
+						#toggle-voucher-details,
+						.panel-heading h5 {
+							display: none !important;
+						}
+						.procurement-expense-container {
+							padding: 0 !important;
+						}
+						.panel {
+							border: 1px solid #ddd;
+							margin-bottom: 15px;
+							page-break-inside: avoid;
+						}
+						.panel-body {
+							padding: 10px;
+						}
+						table {
+							font-size: 9pt;
+							width: 100%;
+							border-collapse: collapse;
+						}
+						table th,
+						table td {
+							padding: 5px;
+							border: 1px solid #ddd;
+						}
+						table th {
+							background-color: #f5f5f5;
+							font-weight: bold;
+						}
+						.kpi-card {
+							page-break-inside: avoid;
+							margin-bottom: 10px;
+						}
+						canvas {
+							max-height: 200px !important;
+						}
+						.data-section {
+							page-break-inside: avoid;
+							margin-bottom: 20px;
+						}
+						.data-section h5 {
+							font-size: 12pt;
+							font-weight: bold;
+							margin-bottom: 10px;
+							border-bottom: 2px solid #333;
+							padding-bottom: 5px;
+						}
+						.print-header {
+							text-align: center;
+							margin-bottom: 20px;
+							border-bottom: 2px solid #333;
+							padding-bottom: 10px;
+						}
+						.print-header h3 {
+							margin: 0;
+							font-size: 16pt;
+						}
+						.print-header p {
+							margin: 5px 0;
+							font-size: 10pt;
+						}
+					</style>
+				`;
+				$('head').append(printStyles);
+			}
+			
+			// Add print header if not exists
+			if (!$('.print-header').length) {
+				let printHeader = `
+					<div class="print-header">
+						<h3>Procurement Expense Report</h3>
+						<p>Period: ${me.filters.from_date} to ${me.filters.to_date} | Period Type: ${me.filters.period_type}</p>
+						<p>Generated on: ${frappe.datetime.str_to_user(frappe.datetime.get_datetime_as_string())}</p>
+					</div>
+				`;
+				$('.procurement-expense-container').prepend(printHeader);
+			} else {
+				// Update existing header
+				$('.print-header h3').text('Procurement Expense Report');
+				$('.print-header p').first().text(`Period: ${me.filters.from_date} to ${me.filters.to_date} | Period Type: ${me.filters.period_type}`);
+				$('.print-header p').last().text(`Generated on: ${frappe.datetime.str_to_user(frappe.datetime.get_datetime_as_string())}`);
+			}
+			
+			// Trigger print
+			window.print();
 		}
 		
 		export_to_excel() {
