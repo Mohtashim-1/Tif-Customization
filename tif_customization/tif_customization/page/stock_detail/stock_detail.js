@@ -61,7 +61,10 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 				<div class="col-md-12">
 					<button id="apply-filters" class="btn btn-primary">Apply Filters</button>
 					<button id="reset-filters" class="btn btn-secondary">Reset</button>
-					<button id="export-excel" class="btn btn-success">Export to Excel</button>
+					<button id="export-excel" class="btn btn-success" style="float: right; margin-left: 10px;">Export to Excel</button>
+					<button id="print-report" class="btn btn-info" style="float: right;">
+						<i class="fa fa-print"></i> Print
+					</button>
 				</div>
 			</div>
 		</div>
@@ -99,7 +102,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 				</div>
 			</div> -->
 			
-			<div class="report-section">
+			<!-- <div class="report-section">
 				<h4>MQH Books (Urdu Version) - 2025-26</h4>
 				<div class="table-container">
 					<table class="table table-bordered table-striped" id="mqh-urdu-books-table">
@@ -124,7 +127,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 						</tfoot>
 					</table>
 				</div>
-			</div>
+			</div> -->
 			
 			<!-- Single Warehouse Section (shown when specific warehouse is selected) -->
 			<div class="report-section single-warehouse-section" style="display: none;">
@@ -827,6 +830,273 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 		window.URL.revokeObjectURL(url);
 	}
 	
+	// Print Report
+	function printReport() {
+		// Get date range from filters
+		const fromDate = $('#from-date').val() || '2025-09-01';
+		const toDate = $('#to-date').val() || '2025-09-30';
+		
+		// Add print styles if not already added
+		if (!$('#print-styles-stock-detail').length) {
+			let printStyles = `
+				<style id="print-styles-stock-detail" media="print">
+					@page {
+						size: A4 landscape;
+						margin: 1cm;
+					}
+					* {
+						background: white !important;
+						color: black !important;
+						-webkit-print-color-adjust: exact !important;
+						print-color-adjust: exact !important;
+					}
+					body {
+						font-size: 10pt;
+						background: white !important;
+						color: black !important;
+					}
+					.filter-section,
+					.btn,
+					#apply-filters,
+					#reset-filters,
+					#export-excel,
+					#print-report,
+					.page-head,
+					.sidebar,
+					.navbar,
+					.footer {
+						display: none !important;
+					}
+					.page-content {
+						margin: 0 !important;
+						padding: 0 !important;
+						background: white !important;
+					}
+					.stock-detail-container {
+						padding: 0 !important;
+						background: white !important;
+						color: black !important;
+					}
+					.print-header-stock-detail {
+						text-align: center;
+						margin-bottom: 20px;
+						border-bottom: 2px solid black !important;
+						padding-bottom: 10px;
+						page-break-after: avoid;
+						background: white !important;
+						color: black !important;
+					}
+					.print-header-stock-detail h2 {
+						margin: 0;
+						font-size: 18pt;
+						font-weight: bold;
+						color: black !important;
+					}
+					.print-header-stock-detail h3 {
+						margin: 5px 0;
+						font-size: 16pt;
+						font-weight: bold;
+						color: black !important;
+					}
+					.print-header-stock-detail p {
+						margin: 5px 0;
+						font-size: 10pt;
+						color: black !important;
+					}
+					.kpi-section {
+						display: block !important;
+						background: white !important;
+					}
+					.kpi-section h4:first-child,
+					.kpi-section .kpi-card {
+						display: none !important;
+					}
+					.kpi-section h5:first-of-type {
+						display: none !important;
+					}
+					.kpi-section h5:first-of-type + .row {
+						display: none !important;
+					}
+					.kpi-section h5:last-of-type {
+						display: block !important;
+						margin-top: 20px !important;
+						margin-bottom: 15px !important;
+						color: black !important;
+						font-weight: bold !important;
+					}
+					.kpi-section .table-responsive {
+						display: block !important;
+						overflow: visible !important;
+						width: 100% !important;
+						background: white !important;
+					}
+					.kpi-section table {
+						display: table !important;
+						width: 100% !important;
+						border-collapse: collapse !important;
+						margin-bottom: 20px !important;
+						background: white !important;
+						border: 1px solid black !important;
+					}
+					.kpi-section table thead {
+						display: table-header-group !important;
+					}
+					.kpi-section table tbody {
+						display: table-row-group !important;
+					}
+					.kpi-section table tr {
+						display: table-row !important;
+						background: white !important;
+					}
+					.kpi-section table th,
+					.kpi-section table td {
+						display: table-cell !important;
+						padding: 8px !important;
+						border: 1px solid black !important;
+						background: white !important;
+						color: black !important;
+					}
+					.kpi-section table th {
+						background: white !important;
+						font-weight: bold !important;
+						color: black !important;
+					}
+					.kpi-section table tbody tr:nth-child(even) {
+						background: white !important;
+					}
+					.kpi-section table tbody tr:nth-child(odd) {
+						background: white !important;
+					}
+					.report-content {
+						display: block !important;
+						background: white !important;
+					}
+					.report-section {
+						display: block !important;
+						margin-bottom: 20px;
+						page-break-inside: avoid;
+						background: white !important;
+					}
+					.report-section h4 {
+						font-size: 14pt;
+						font-weight: bold;
+						margin-bottom: 10px;
+						border-bottom: 1px solid black !important;
+						padding-bottom: 5px;
+						color: black !important;
+						background: white !important;
+					}
+					.report-section h5 {
+						font-size: 12pt;
+						font-weight: bold;
+						margin-bottom: 10px;
+						border-bottom: 1px solid black !important;
+						padding-bottom: 5px;
+						color: black !important;
+						background: white !important;
+					}
+					.table-container {
+						display: block !important;
+						overflow: visible !important;
+						background: white !important;
+					}
+					table {
+						display: table !important;
+						font-size: 9pt;
+						width: 100%;
+						border-collapse: collapse;
+						page-break-inside: auto;
+						background: white !important;
+						border: 1px solid black !important;
+					}
+					table thead {
+						display: table-header-group;
+					}
+					table tbody {
+						display: table-row-group;
+					}
+					table tr {
+						page-break-inside: avoid;
+						page-break-after: auto;
+						background: white !important;
+					}
+					table th,
+					table td {
+						padding: 5px;
+						border: 1px solid black !important;
+						background: white !important;
+						color: black !important;
+					}
+					table th {
+						background: white !important;
+						font-weight: bold;
+						color: black !important;
+					}
+					table tbody tr:nth-child(even) {
+						background: white !important;
+					}
+					table tbody tr:nth-child(odd) {
+						background: white !important;
+					}
+					table tfoot {
+						display: table-footer-group;
+					}
+					table tfoot td {
+						background: white !important;
+						font-weight: bold;
+						border-top: 2px solid black !important;
+						color: black !important;
+					}
+					.table-responsive {
+						overflow: visible !important;
+						background: white !important;
+					}
+					.table-bordered {
+						border: 1px solid black !important;
+					}
+					.table-striped tbody tr:nth-child(even) {
+						background: white !important;
+					}
+					.table-striped tbody tr:nth-child(odd) {
+						background: white !important;
+					}
+					strong {
+						color: black !important;
+						font-weight: bold !important;
+					}
+					.text-right {
+						text-align: right !important;
+					}
+					.number-cell {
+						text-align: right !important;
+					}
+				</style>
+			`;
+			$('head').append(printStyles);
+		}
+		
+		// Add print header if not exists
+		if (!$('.print-header-stock-detail').length) {
+			let printHeader = `
+				<div class="print-header print-header-stock-detail">
+					<h2>The ILM Foundation</h2>
+					<h3>Stock Detail Report</h3>
+					<p>Period: ${fromDate} to ${toDate}</p>
+					<p>Generated on: ${frappe.datetime.str_to_user(frappe.datetime.get_datetime_as_string())}</p>
+				</div>
+			`;
+			$('.stock-detail-container').prepend(printHeader);
+		} else {
+			// Update existing header
+			$('.print-header-stock-detail h3').text('Stock Detail Report');
+			$('.print-header-stock-detail p').first().text(`Period: ${fromDate} to ${toDate}`);
+			$('.print-header-stock-detail p').last().text(`Generated on: ${frappe.datetime.str_to_user(frappe.datetime.get_datetime_as_string())}`);
+		}
+		
+		// Trigger print
+		window.print();
+	}
+	
 	// Event listeners - set up after container is added to DOM
 	setTimeout(function() {
 		console.log('Setting up event listeners...');
@@ -859,6 +1129,12 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 			e.preventDefault();
 			console.log('Export button clicked');
 			exportToExcel();
+		});
+		
+		$('#print-report').click(function(e) {
+			e.preventDefault();
+			console.log('Print button clicked');
+			printReport();
 		});
 		
 		// Add change event listener for warehouse stock filter
@@ -1315,7 +1591,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 				</div>
 				
 				<!-- Detailed Table for Individual Items -->
-				<!-- <h5 style="margin-bottom: 15px; margin-top: 30px; font-weight: bold; color: #495057;">Detailed Item Information</h5>
+				<h5 style="margin-bottom: 15px; margin-top: 30px; font-weight: bold; color: #495057;">Detailed Item Information</h5>
 				<div class="table-responsive">
 					<table class="table table-bordered table-striped" style="background: white;">
 						<thead>
@@ -1349,7 +1625,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 							`).join('')}
 						</tbody>
 					</table>
-				</div> -->
+				</div>
 			`;
 		}
 		
@@ -1360,8 +1636,8 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 		console.log('populateHeadOfficeTable called with data:', data);
 		console.log('populateHeadOfficeTable - Data length:', data.length);
 		
-		// Ensure the section is visible
-		$('.head-office-section').show();
+		// Don't show the section automatically - it's controlled by warehouse-stock-filter
+		// $('.head-office-section').show();
 		
 		const tbody = $('#head-office-tbody');
 		const tfoot = $('#head-office-tfoot');
