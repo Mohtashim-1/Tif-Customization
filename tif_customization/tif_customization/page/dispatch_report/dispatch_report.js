@@ -116,19 +116,22 @@ if (typeof window.DispatchReport === 'undefined') {
 							<button class="btn btn-secondary" id="reset-filters">
 								<i class="fa fa-refresh"></i> Reset
 							</button>
-							<button class="btn btn-success" id="export-excel" style="float: right;">
+							<button class="btn btn-success" id="export-excel" style="float: right; margin-left: 10px;">
 								<i class="fa fa-file-excel-o"></i> Export to Excel
+							</button>
+							<button class="btn btn-info" id="print-report" style="float: right;">
+								<i class="fa fa-print"></i> Print
 							</button>
 						</div>
 					</div>
 				</div>
 				
-				<!-- KPI Section -->
-				<div class="kpi-section" id="kpi-section" style="margin-bottom: 20px;">
-					<div class="row">
-						<!-- KPIs will be rendered here -->
-					</div>
+			<!-- KPI Section -->
+			<div class="kpi-section" id="kpi-section" style="margin-bottom: 20px;">
+				<div class="row">
+					<!-- KPIs will be rendered here -->
 				</div>
+			</div>
 				
 				<!-- Data Table Section -->
 				<div class="data-section">
@@ -239,6 +242,10 @@ if (typeof window.DispatchReport === 'undefined') {
 		
 		$('#export-excel').on('click', function() {
 			me.export_to_excel();
+		});
+		
+		$('#print-report').on('click', function() {
+			me.print_report();
 		});
 		
 		// Load initial data
@@ -408,7 +415,7 @@ if (typeof window.DispatchReport === 'undefined') {
 		let other_quantity = summary.other_quantity || 0;
 		
 		let kpi_html = `
-			<div class="col-md-3">
+			<div class="col-md-4">
 				<div class="kpi-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
 					<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Total Quantity</h5>
 					<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${format_number_value(total_quantity)}</h2>
@@ -416,14 +423,14 @@ if (typeof window.DispatchReport === 'undefined') {
 				</div>
 			</div>
 			
-			<div class="col-md-3">
+			<div class="col-md-4">
 				<div class="kpi-card" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
 					<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">MQH Quantity</h5>
 					<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${format_number_value(mqh_quantity)}</h2>
 					<p style="margin: 5px 0 0 0; font-size: 12px; opacity: 0.8;">${total_quantity > 0 ? ((mqh_quantity / total_quantity) * 100).toFixed(1) : 0}% of Total</p>
 				</div>
 			</div>
-			<div class="col-md-3">
+			<div class="col-md-4">
 				<div class="kpi-card" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
 					<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Qaida Quantity</h5>
 					<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${format_number_value(qaida_quantity)}</h2>
@@ -511,6 +518,145 @@ if (typeof window.DispatchReport === 'undefined') {
 		a.download = `dispatch_report_${me.filters.from_date}_to_${me.filters.to_date}.csv`;
 		a.click();
 		window.URL.revokeObjectURL(url);
+	}
+	
+	print_report() {
+		let me = this;
+		
+		// Add print styles if not already added
+		if (!$('#print-styles-dispatch').length) {
+			let printStyles = `
+				<style id="print-styles-dispatch" media="print">
+					@page {
+						size: A4 landscape;
+						margin: 1cm;
+					}
+					* {
+						-webkit-print-color-adjust: exact !important;
+						print-color-adjust: exact !important;
+					}
+					body {
+						font-size: 10pt;
+						background: white !important;
+					}
+					.filter-section,
+					.btn,
+					#apply-filters,
+					#reset-filters,
+					#export-excel,
+					#print-report,
+					.page-head,
+					.sidebar,
+					.navbar,
+					.footer {
+						display: none !important;
+					}
+					.page-content {
+						margin: 0 !important;
+						padding: 0 !important;
+					}
+					.dispatch-report-container {
+						padding: 0 !important;
+						background: white !important;
+					}
+					.print-header-dispatch {
+						text-align: center;
+						margin-bottom: 20px;
+						border-bottom: 2px solid #333;
+						padding-bottom: 10px;
+						page-break-after: avoid;
+					}
+					.print-header-dispatch h3 {
+						margin: 0;
+						font-size: 16pt;
+						font-weight: bold;
+					}
+					.print-header-dispatch p {
+						margin: 5px 0;
+						font-size: 10pt;
+					}
+					.kpi-section {
+						display: none !important;
+					}
+					.data-section {
+						margin-bottom: 20px;
+					}
+					.data-section h5 {
+						font-size: 14pt;
+						font-weight: bold;
+						margin-bottom: 10px;
+						border-bottom: 1px solid #333;
+						padding-bottom: 5px;
+					}
+					table {
+						font-size: 9pt;
+						width: 100%;
+						border-collapse: collapse;
+						page-break-inside: auto;
+					}
+					table thead {
+						display: table-header-group;
+					}
+					table tbody {
+						display: table-row-group;
+					}
+					table tr {
+						page-break-inside: avoid;
+						page-break-after: auto;
+					}
+					table th,
+					table td {
+						padding: 5px;
+						border: 1px solid #ddd;
+					}
+					table th {
+						background-color: #f5f5f5 !important;
+						font-weight: bold;
+					}
+					table tfoot {
+						display: table-footer-group;
+					}
+					.label {
+						padding: 3px 8px;
+						border-radius: 3px;
+						font-size: 9pt;
+					}
+					.label-primary {
+						background-color: #337ab7 !important;
+						color: white !important;
+					}
+					.label-success {
+						background-color: #5cb85c !important;
+						color: white !important;
+					}
+					.label-default {
+						background-color: #777 !important;
+						color: white !important;
+					}
+				</style>
+			`;
+			$('head').append(printStyles);
+		}
+		
+		// Add print header if not exists
+		if (!$('.print-header-dispatch').length) {
+			let printHeader = `
+				<div class="print-header print-header-dispatch">
+					<h3>Dispatch Report</h3>
+					<p>Period: ${me.filters.from_date} to ${me.filters.to_date}</p>
+					<p>Generated on: ${frappe.datetime.str_to_user(frappe.datetime.get_datetime_as_string())}</p>
+				</div>
+			`;
+			$('.dispatch-report-container').prepend(printHeader);
+		} else {
+			// Update existing header
+			$('.print-header-dispatch h3').text('Dispatch Report');
+			$('.print-header-dispatch p').first().text(`Period: ${me.filters.from_date} to ${me.filters.to_date}`);
+			$('.print-header-dispatch p').last().text(`Generated on: ${frappe.datetime.str_to_user(frappe.datetime.get_datetime_as_string())}`);
+		}
+		
+		// Trigger print
+		window.print();
 	}
 	};
 }
