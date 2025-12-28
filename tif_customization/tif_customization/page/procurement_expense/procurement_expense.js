@@ -105,7 +105,8 @@ if (typeof window.ProcurementExpense === 'undefined') {
 						<div class="col-md-12">
 							<div class="panel panel-default">
 								<div class="panel-heading">
-									<h5>Expense Trend by Period</h5>
+									<h5>Purchase Invoice Expense Trend by Period</h5>
+									<p style="margin: 5px 0 0 0; font-size: 11px; color: #666;">Based on Purchase Invoice amounts</p>
 								</div>
 								<div class="panel-body">
 									<canvas id="chart-expense-trend" style="height: 300px;"></canvas>
@@ -118,7 +119,8 @@ if (typeof window.ProcurementExpense === 'undefined') {
 						<div class="col-md-12">
 							<div class="panel panel-default">
 								<div class="panel-heading">
-									<h5>Top 10 Expense Accounts</h5>
+									<h5>Top 10 Items by Purchase Invoice Expense</h5>
+									<p style="margin: 5px 0 0 0; font-size: 11px; color: #666;">Based on Purchase Invoice amounts</p>
 								</div>
 								<div class="panel-body">
 									<canvas id="chart-top-accounts" style="height: 300px;"></canvas>
@@ -132,7 +134,8 @@ if (typeof window.ProcurementExpense === 'undefined') {
 						<div class="col-md-12">
 							<div class="panel panel-default">
 								<div class="panel-heading">
-									<h5>Monthly Comparison</h5>
+									<h5>Purchase Invoice Expense Comparison by Department</h5>
+									<p style="margin: 5px 0 0 0; font-size: 11px; color: #666;">Based on Purchase Invoice amounts</p>
 								</div>
 								<div class="panel-body">
 									<canvas id="chart-monthly-comparison" style="height: 300px;"></canvas>
@@ -145,7 +148,8 @@ if (typeof window.ProcurementExpense === 'undefined') {
 						<div class="col-md-12">
 							<div class="panel panel-default">
 								<div class="panel-heading">
-									<h5>Expense vs Transaction Count</h5>
+									<h5>Purchase Invoice Expense vs Invoice Count</h5>
+									<p style="margin: 5px 0 0 0; font-size: 11px; color: #666;">Invoice Amount vs Number of Purchase Invoices</p>
 								</div>
 								<div class="panel-body">
 									<canvas id="chart-expense-vs-count" style="height: 300px;"></canvas>
@@ -159,7 +163,8 @@ if (typeof window.ProcurementExpense === 'undefined') {
 						<div class="col-md-12">
 							<div class="panel panel-default">
 								<div class="panel-heading">
-									<h5>Summary by Department / Cost Center (Pie Chart)</h5>
+									<h5>Purchase Invoice Expense by Department / Cost Center</h5>
+									<p style="margin: 5px 0 0 0; font-size: 11px; color: #666;">Based on Purchase Invoice amounts</p>
 								</div>
 								<div class="panel-body">
 									<canvas id="chart-summary-pie" style="height: 400px;"></canvas>
@@ -176,8 +181,8 @@ if (typeof window.ProcurementExpense === 'undefined') {
 							<thead>
 								<tr>
 									<th>Department / Cost Center</th>
-									<th>PO Amount</th>
-									<th>PO Count</th>
+									<th>Invoice Amount</th>
+									<th>Invoice Count</th>
 								</tr>
 							</thead>
 							<tbody id="summary-tbody">
@@ -198,8 +203,8 @@ if (typeof window.ProcurementExpense === 'undefined') {
 								<tr>
 									<th>Period</th>
 									<th>Department / Cost Center</th>
-									<th>PO Amount</th>
-									<th>PO Count</th>
+									<th>Invoice Amount</th>
+									<th>Invoice Count</th>
 								</tr>
 							</thead>
 							<tbody id="detail-tbody">
@@ -216,7 +221,8 @@ if (typeof window.ProcurementExpense === 'undefined') {
 						<div class="col-md-6">
 							<div class="panel panel-default">
 								<div class="panel-heading">
-									<h5>Mode of Payment Distribution (Pie Chart)</h5>
+									<h5>Total Payments by Mode of Payment</h5>
+									<p style="margin: 5px 0 0 0; font-size: 11px; color: #666;">Based on Payment Entry amounts</p>
 								</div>
 								<div class="panel-body">
 									<canvas id="chart-payment-pie" style="height: 350px;"></canvas>
@@ -231,7 +237,8 @@ if (typeof window.ProcurementExpense === 'undefined') {
 						<div class="col-md-6">
 							<div class="panel panel-default">
 								<div class="panel-heading">
-									<h5>Items Paid via Cash (Pie Chart)</h5>
+									<h5>Items Paid via Cash</h5>
+									<p style="margin: 5px 0 0 0; font-size: 11px; color: #666;">Based on Payment Entry amounts</p>
 								</div>
 								<div class="panel-body">
 									<canvas id="chart-items-cash-pie" style="height: 350px;"></canvas>
@@ -241,7 +248,8 @@ if (typeof window.ProcurementExpense === 'undefined') {
 						<div class="col-md-6">
 							<div class="panel panel-default">
 								<div class="panel-heading">
-									<h5>Items Paid via Cheque (Pie Chart)</h5>
+									<h5>Items Paid via Cheque</h5>
+									<p style="margin: 5px 0 0 0; font-size: 11px; color: #666;">Based on Payment Entry amounts</p>
 								</div>
 								<div class="panel-body">
 									<canvas id="chart-items-cheque-pie" style="height: 350px;"></canvas>
@@ -567,12 +575,17 @@ if (typeof window.ProcurementExpense === 'undefined') {
 			let total_payment_count = payment_data.reduce((sum, row) => sum + (row.payment_count || 0), 0);
 			let total_invoice_count = payment_data.reduce((sum, row) => sum + (row.invoice_count || 0), 0);
 			
+			// Get MR, PO, and Pending Acknowledgement counts
+			let mr_count = me.data.mr_count || 0;
+			let po_count = me.data.po_count || 0;
+			let pending_acknowledgment_count = me.data.pending_acknowledgment_count || 0;
+			
 			let kpi_html = `
 				<div class="col-md-3">
 					<div class="kpi-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-						<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Total PO Expense</h5>
+						<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Total Purchase Invoice Expense</h5>
 						<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${format_currency_value(total_po)}</h2>
-						<p style="margin: 5px 0 0 0; font-size: 12px; opacity: 0.8;">${total_po_count} Purchase Orders</p>
+						<p style="margin: 5px 0 0 0; font-size: 12px; opacity: 0.8;">${total_po_count} Purchase Invoices</p>
 					</div>
 				</div>
 				<div class="col-md-3">
@@ -594,6 +607,27 @@ if (typeof window.ProcurementExpense === 'undefined') {
 						<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Other Payments</h5>
 						<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${format_currency_value(total_other)}</h2>
 						<p style="margin: 5px 0 0 0; font-size: 12px; opacity: 0.8;">${((total_other / total_payment) * 100).toFixed(1) || 0}% of Total</p>
+					</div>
+				</div>
+				<div class="col-md-4" style="margin-top: 15px;">
+					<div class="kpi-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+						<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Total Material Requests</h5>
+						<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${format_number_value(mr_count)}</h2>
+						<p style="margin: 5px 0 0 0; font-size: 12px; opacity: 0.8;">MRs Created</p>
+					</div>
+				</div>
+				<div class="col-md-4" style="margin-top: 15px;">
+					<div class="kpi-card" style="background: linear-gradient(135deg, #f093fb 0%, #4facfe 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+						<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Total Purchase Invoices</h5>
+						<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${format_number_value(po_count)}</h2>
+						<p style="margin: 5px 0 0 0; font-size: 12px; opacity: 0.8;">POs Created</p>
+					</div>
+				</div>
+				<div class="col-md-4" style="margin-top: 15px;">
+					<div class="kpi-card" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+						<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Pending Acknowledgements</h5>
+						<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${format_number_value(pending_acknowledgment_count)}</h2>
+						<p style="margin: 5px 0 0 0; font-size: 12px; opacity: 0.8;">Awaiting Receipt</p>
 					</div>
 				</div>
 			`;
@@ -800,7 +834,7 @@ if (typeof window.ProcurementExpense === 'undefined') {
 								data: {
 									labels: periods,
 									datasets: [{
-										label: 'Expense Amount',
+										label: 'Purchase Invoice Expense Amount',
 										data: amounts,
 										borderColor: '#f5576c',
 										backgroundColor: 'rgba(245, 87, 108, 0.1)',
@@ -852,7 +886,7 @@ if (typeof window.ProcurementExpense === 'undefined') {
 											},
 											callbacks: {
 												label: function(context) {
-													return format_currency_value(context.parsed.y);
+													return `Purchase Invoice Expense: ${format_currency_value(context.parsed.y)}`;
 												}
 											}
 										}
@@ -913,7 +947,7 @@ if (typeof window.ProcurementExpense === 'undefined') {
 								data: {
 									labels: labels,
 									datasets: [{
-										label: 'PO Amount',
+										label: 'Invoice Amount',
 										data: values,
 										backgroundColor: [
 											'rgba(245, 87, 108, 0.8)', 'rgba(102, 126, 234, 0.8)', 'rgba(67, 233, 123, 0.8)',
@@ -993,7 +1027,7 @@ if (typeof window.ProcurementExpense === 'undefined') {
 													return [
 														`${label}: ${value}`,
 														`Percentage: ${percentage}%`,
-														`PO Count: ${format_number_value(poCount)}`
+														`Invoice Count: ${format_number_value(poCount)}`
 													];
 												}
 											}
@@ -1240,7 +1274,7 @@ if (typeof window.ProcurementExpense === 'undefined') {
 									labels: periods,
 									datasets: [
 										{
-											label: 'Expense Amount',
+											label: 'Purchase Invoice Expense Amount',
 											data: amounts,
 											yAxisID: 'y',
 											backgroundColor: 'rgba(245, 87, 108, 0.7)',
@@ -1249,7 +1283,7 @@ if (typeof window.ProcurementExpense === 'undefined') {
 											borderRadius: 6
 										},
 										{
-											label: 'Transaction Count',
+											label: 'Invoice Count',
 											data: counts,
 											yAxisID: 'y1',
 											type: 'line',
@@ -1300,9 +1334,9 @@ if (typeof window.ProcurementExpense === 'undefined') {
 											callbacks: {
 												label: function(context) {
 													if (context.datasetIndex === 0) {
-														return `Expense: ${format_currency_value(context.parsed.y)}`;
+														return `Purchase Invoice Expense: ${format_currency_value(context.parsed.y)}`;
 													} else {
-														return `Transactions: ${format_number_value(context.parsed.y)}`;
+														return `Invoice Count: ${format_number_value(context.parsed.y)}`;
 													}
 												}
 											}
@@ -1404,7 +1438,7 @@ if (typeof window.ProcurementExpense === 'undefined') {
 							data: {
 								labels: labels,
 								datasets: [{
-									label: 'Payment Amount',
+									label: 'Total Payment Amount',
 									data: amounts,
 									backgroundColor: colors.slice(0, labels.length),
 									borderColor: borderColors.slice(0, labels.length),
@@ -1533,7 +1567,7 @@ if (typeof window.ProcurementExpense === 'undefined') {
 								data: {
 									labels: pieLabels,
 									datasets: [{
-										label: 'Cash Payment Amount',
+										label: 'Total Cash Payment Amount',
 										data: pieAmounts,
 										backgroundColor: colors.slice(0, pieLabels.length),
 										borderColor: borderColors.slice(0, pieLabels.length),
@@ -1633,7 +1667,7 @@ if (typeof window.ProcurementExpense === 'undefined') {
 								data: {
 									labels: pieLabels,
 									datasets: [{
-										label: 'Cheque Payment Amount',
+										label: 'Total Cheque Payment Amount',
 										data: pieAmounts,
 										backgroundColor: colors.slice(0, pieLabels.length),
 										borderColor: borderColors.slice(0, pieLabels.length),
@@ -1910,7 +1944,7 @@ if (typeof window.ProcurementExpense === 'undefined') {
 			csv.push(`Period Type: ${me.filters.period_type}`);
 			csv.push('');
 			csv.push('Summary by Cost Center');
-			csv.push('Cost Center,PO Amount,PO Count');
+			csv.push('Cost Center,Invoice Amount,Invoice Count');
 			
 			summary.forEach(row => {
 				csv.push([
@@ -1922,7 +1956,7 @@ if (typeof window.ProcurementExpense === 'undefined') {
 			
 			csv.push('');
 			csv.push('Detailed Expense by Period');
-			csv.push('Period,Cost Center,PO Amount,PO Count');
+			csv.push('Period,Cost Center,Invoice Amount,Invoice Count');
 			
 			expense_data.forEach(row => {
 				csv.push([
