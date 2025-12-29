@@ -3,8 +3,8 @@
  "creation": "2025-12-12 11:58:19.515446",
  "docstatus": 0,
  "doctype": "Page",
- "idx": 0,
- "modified": "2025-12-12 11:58:19.515446",
+ "idx": 6,
+ "modified": "2025-12-29 17:17:09.595382",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "procurement-expense",
@@ -15,5 +15,5 @@
  "standard": "Yes",
  "style": null,
  "system_page": 0,
- "title": "Procurement Expense"
+ "title": "Expense"
 }

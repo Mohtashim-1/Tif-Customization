@@ -1,7 +1,7 @@
 frappe.pages['procurement-expense'].on_page_load = function(wrapper) {
 	let page = frappe.ui.make_app_page({
 		parent: wrapper,
-		title: 'Procurement Expense Report',
+		title: 'Expense Report',
 		single_column: true
 	});
 	

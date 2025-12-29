@@ -81,7 +81,8 @@ def get_courier_report_data(filters=None):
 			'delivery_mode_distribution': delivery_mode_distribution
 		}
 	except Exception as e:
-		frappe.log_error(f"Error in get_courier_report_data: {str(e)}", "Courier Report Error")
+		error_msg = str(e)[:100] if len(str(e)) > 100 else str(e)
+		frappe.log_error(f"get_courier_report_data error: {error_msg}", "Courier Report Error")
 		return {'error': str(e)}
 
 def get_kpi_data(filters):
@@ -462,7 +463,13 @@ def get_delivery_notes(filters):
 				COALESCE(SUM(dni.qty), 0) AS total_books,
 				dn.owner AS created_by,
 				dn.custom_delivery_mode,
-				COALESCE(dn.custom_transport_charges, 0) AS transport_charges
+				COALESCE((
+					SELECT SUM(tc.amount)
+					FROM `tabTransport Charges` tc
+					WHERE tc.parent = dn.name 
+					AND tc.parenttype = 'Delivery Note' 
+					AND tc.parentfield = 'custom_transport_charges'
+				), 0) AS transport_charges
 			FROM `tabDelivery Note` dn
 			JOIN `tabDelivery Note Item` dni ON dni.parent = dn.name
 			WHERE dn.docstatus = 1
@@ -482,12 +489,9 @@ def get_delivery_notes(filters):
 		
 		results = frappe.db.sql(query, params, as_dict=True)
 		
-		# Format created_by to show user name and filter out "Not Set"
+		# Format created_by to show user name - show all delivery notes including those without cost center
 		filtered_results = []
 		for row in results:
-			# Skip "Not Set" cost centers
-			if row.get('cost_center') == 'Not Set':
-				continue
 			row['total_books'] = flt(row['total_books'])
 			row['transport_charges'] = flt(row.get('transport_charges', 0))
 			row['created_by_name'] = frappe.db.get_value('User', row['created_by'], 'full_name') or row['created_by']
@@ -632,7 +636,7 @@ def get_books_by_cost_center(filters):
 		return []
 
 def get_monthly_trend(filters):
-	"""Get monthly courier expense trend"""
+	"""Get monthly courier and transport expense trend"""
 	try:
 		from_date = filters.get('from_date')
 		to_date = filters.get('to_date')
@@ -643,6 +647,7 @@ def get_monthly_trend(filters):
 			cost_center_list = "', '".join(cost_centers)
 			cost_center_filter = f"AND jea.cost_center IN ('{cost_center_list}')"
 		
+		# Get courier expenses from Journal Entries
 		query = f"""
 			SELECT 
 				DATE_FORMAT(COALESCE(dn.posting_date, je.posting_date), '%%Y-%%m') AS date,
@@ -658,19 +663,60 @@ def get_monthly_trend(filters):
 			ORDER BY DATE_FORMAT(COALESCE(dn.posting_date, je.posting_date), '%%Y-%%m') ASC
 		"""
 		
-		results = frappe.db.sql(query, {
+		courier_results = frappe.db.sql(query, {
 			'from_date': from_date,
 			'to_date': to_date
 		}, as_dict=True)
 		
-		for row in results:
-			# Format date as string and ensure expense is a valid number
-			if row.get('date'):
-				# Date is already in YYYY-MM format from SQL
-				row['date'] = str(row['date'])
-			else:
-				row['date'] = ''
-			row['expense'] = flt(row['expense']) or 0
+		# Get transport charges from Transport Charges child table
+		cost_center_filter_transport = ""
+		if cost_centers:
+			cost_center_list = "', '".join(cost_centers)
+			cost_center_filter_transport = f"AND dn.cost_center IN ('{cost_center_list}')"
+		
+		transport_query = f"""
+			SELECT 
+				DATE_FORMAT(dn.posting_date, '%%Y-%%m') AS date,
+				COALESCE(SUM(tc.amount), 0) AS expense
+			FROM `tabDelivery Note` dn
+			JOIN `tabTransport Charges` tc ON tc.parent = dn.name 
+				AND tc.parenttype = 'Delivery Note' 
+				AND tc.parentfield = 'custom_transport_charges'
+			WHERE dn.docstatus = 1
+			AND dn.posting_date BETWEEN %(from_date)s AND %(to_date)s
+			AND dn.custom_delivery_mode = 'Transport'
+			{cost_center_filter_transport}
+			GROUP BY DATE_FORMAT(dn.posting_date, '%%Y-%%m')
+			ORDER BY DATE_FORMAT(dn.posting_date, '%%Y-%%m') ASC
+		"""
+		
+		transport_results = frappe.db.sql(transport_query, {
+			'from_date': from_date,
+			'to_date': to_date
+		}, as_dict=True)
+		
+		# Combine courier and transport expenses by date
+		expense_dict = {}
+		for row in courier_results:
+			date = str(row.get('date', ''))
+			if date:
+				expense_dict[date] = flt(row.get('expense', 0))
+		
+		for row in transport_results:
+			date = str(row.get('date', ''))
+			if date:
+				if date in expense_dict:
+					expense_dict[date] += flt(row.get('expense', 0))
+				else:
+					expense_dict[date] = flt(row.get('expense', 0))
+		
+		# Convert back to list format
+		results = []
+		for date, expense in sorted(expense_dict.items()):
+			results.append({
+				'date': date,
+				'expense': flt(expense) or 0
+			})
 		
 		return results
 	except Exception as e:
@@ -678,7 +724,7 @@ def get_monthly_trend(filters):
 		return []
 
 def get_expense_by_cost_center(filters):
-	"""Get expense by cost center for bar chart"""
+	"""Get expense by cost center for bar chart (includes courier and transport)"""
 	try:
 		from_date = filters.get('from_date')
 		to_date = filters.get('to_date')
@@ -689,6 +735,7 @@ def get_expense_by_cost_center(filters):
 			cost_center_list = "', '".join(cost_centers)
 			cost_center_filter = f"AND jea.cost_center IN ('{cost_center_list}')"
 		
+		# Get courier expenses from Journal Entries
 		query = f"""
 			SELECT 
 				jea.cost_center,
@@ -706,13 +753,62 @@ def get_expense_by_cost_center(filters):
 			ORDER BY expense DESC
 		"""
 		
-		results = frappe.db.sql(query, {
+		courier_results = frappe.db.sql(query, {
 			'from_date': from_date,
 			'to_date': to_date
 		}, as_dict=True)
 		
-		for row in results:
-			row['expense'] = flt(row['expense'])
+		# Get transport charges from Transport Charges child table
+		cost_center_filter_transport = ""
+		if cost_centers:
+			cost_center_list = "', '".join(cost_centers)
+			cost_center_filter_transport = f"AND dn.cost_center IN ('{cost_center_list}')"
+		
+		transport_query = f"""
+			SELECT 
+				dn.cost_center,
+				COALESCE(SUM(tc.amount), 0) AS expense
+			FROM `tabDelivery Note` dn
+			JOIN `tabTransport Charges` tc ON tc.parent = dn.name 
+				AND tc.parenttype = 'Delivery Note' 
+				AND tc.parentfield = 'custom_transport_charges'
+			WHERE dn.docstatus = 1
+			AND dn.posting_date BETWEEN %(from_date)s AND %(to_date)s
+			AND dn.custom_delivery_mode = 'Transport'
+			AND dn.cost_center IS NOT NULL
+			AND dn.cost_center != ''
+			{cost_center_filter_transport}
+			GROUP BY dn.cost_center
+			ORDER BY expense DESC
+		"""
+		
+		transport_results = frappe.db.sql(transport_query, {
+			'from_date': from_date,
+			'to_date': to_date
+		}, as_dict=True)
+		
+		# Combine courier and transport expenses by cost center
+		expense_dict = {}
+		for row in courier_results:
+			cost_center = row.get('cost_center')
+			if cost_center:
+				expense_dict[cost_center] = flt(row.get('expense', 0))
+		
+		for row in transport_results:
+			cost_center = row.get('cost_center')
+			if cost_center:
+				if cost_center in expense_dict:
+					expense_dict[cost_center] += flt(row.get('expense', 0))
+				else:
+					expense_dict[cost_center] = flt(row.get('expense', 0))
+		
+		# Convert back to list format
+		results = []
+		for cost_center, expense in sorted(expense_dict.items(), key=lambda x: x[1], reverse=True):
+			results.append({
+				'cost_center': cost_center,
+				'expense': flt(expense)
+			})
 		
 		return results
 	except Exception as e:
@@ -749,7 +845,7 @@ def get_cost_centers():
 		return []
 
 def get_delivery_mode_data(filters):
-	"""Get delivery mode distribution expense amounts from Journal Entries"""
+	"""Get delivery mode distribution expense amounts (includes courier and transport)"""
 	try:
 		from_date = filters.get('from_date')
 		to_date = filters.get('to_date')
@@ -760,6 +856,7 @@ def get_delivery_mode_data(filters):
 			cost_center_list = "', '".join(cost_centers)
 			cost_center_filter = f"AND jea.cost_center IN ('{cost_center_list}')"
 		
+		# Get courier expenses from Journal Entries
 		query = f"""
 			SELECT 
 				COALESCE(dn.custom_delivery_mode, 'Not Set') AS delivery_mode,
@@ -775,19 +872,58 @@ def get_delivery_mode_data(filters):
 			ORDER BY expense_amount DESC
 		"""
 		
-		results = frappe.db.sql(query, {
+		courier_results = frappe.db.sql(query, {
 			'from_date': from_date,
 			'to_date': to_date
 		}, as_dict=True)
 		
-		# Filter out "Not Set" if there are other values
+		# Get transport charges from Transport Charges child table
+		cost_center_filter_transport = ""
+		if cost_centers:
+			cost_center_list = "', '".join(cost_centers)
+			cost_center_filter_transport = f"AND dn.cost_center IN ('{cost_center_list}')"
+		
+		transport_query = f"""
+			SELECT 
+				'Transport' AS delivery_mode,
+				COALESCE(SUM(tc.amount), 0) AS expense_amount
+			FROM `tabDelivery Note` dn
+			JOIN `tabTransport Charges` tc ON tc.parent = dn.name 
+				AND tc.parenttype = 'Delivery Note' 
+				AND tc.parentfield = 'custom_transport_charges'
+			WHERE dn.docstatus = 1
+			AND dn.posting_date BETWEEN %(from_date)s AND %(to_date)s
+			AND dn.custom_delivery_mode = 'Transport'
+			{cost_center_filter_transport}
+		"""
+		
+		transport_result = frappe.db.sql(transport_query, {
+			'from_date': from_date,
+			'to_date': to_date
+		}, as_dict=True)
+		
+		# Combine courier and transport expenses by delivery mode
+		expense_dict = {}
+		for row in courier_results:
+			mode = row.get('delivery_mode') or 'Not Set'
+			expense_dict[mode] = flt(row.get('expense_amount', 0))
+		
+		# Add transport charges to Transport mode
+		if transport_result and transport_result[0].get('expense_amount', 0) > 0:
+			transport_amount = flt(transport_result[0].get('expense_amount', 0))
+			if 'Transport' in expense_dict:
+				expense_dict['Transport'] += transport_amount
+			else:
+				expense_dict['Transport'] = transport_amount
+		
+		# Convert to filtered results format
 		filtered_results = []
-		for row in results:
-			if row.get('delivery_mode') == 'Not Set' and len(results) > 1:
+		for mode, expense in sorted(expense_dict.items(), key=lambda x: x[1], reverse=True):
+			if mode == 'Not Set' and len(expense_dict) > 1:
 				continue
 			filtered_results.append({
-				'label': row.get('delivery_mode') or 'Not Set',
-				'value': flt(row.get('expense_amount', 0))
+				'label': mode or 'Not Set',
+				'value': flt(expense)
 			})
 		
 		return filtered_results
@@ -802,22 +938,47 @@ def get_delivery_mode_distribution(filters):
 		to_date = filters.get('to_date')
 		customer = filters.get('customer')
 		
+		# First, check if there are any delivery notes in the date range
+		check_query = """
+			SELECT COUNT(*) as count
+			FROM `tabDelivery Note` dn
+			WHERE dn.docstatus = 1
+			AND dn.posting_date BETWEEN %(from_date)s AND %(to_date)s
+		"""
+		check_params = {'from_date': from_date, 'to_date': to_date}
+		if customer:
+			check_query += " AND dn.customer = %(customer)s"
+			check_params['customer'] = customer
+		
+		check_result = frappe.db.sql(check_query, check_params, as_dict=True)
+		total_dns = check_result[0].count if check_result else 0
+		
+		# Debug logging removed - use print() for debugging if needed
+		# print(f"Delivery Mode Distribution - Total DNs: {total_dns}")
+		
 		customer_filter = ""
 		if customer:
 			customer_filter = "AND dn.customer = %(customer)s"
 		
+		# Simplified query - remove HAVING clause as it's redundant
 		query = f"""
 			SELECT 
-				COALESCE(dn.custom_delivery_mode, 'Not Set') AS delivery_mode,
+				COALESCE(NULLIF(dn.custom_delivery_mode, ''), 'Not Set') AS delivery_mode,
 				COUNT(DISTINCT dn.name) AS delivery_note_count,
-				COALESCE(SUM(dni.qty), 0) AS total_books,
-				COALESCE(SUM(dn.custom_transport_charges), 0) AS total_transport_charges
+				COALESCE(SUM(COALESCE(dni.qty, 0)), 0) AS total_books,
+				COALESCE(SUM(COALESCE((
+					SELECT SUM(tc.amount)
+					FROM `tabTransport Charges` tc
+					WHERE tc.parent = dn.name 
+					AND tc.parenttype = 'Delivery Note' 
+					AND tc.parentfield = 'custom_transport_charges'
+				), 0)), 0) AS total_transport_charges
 			FROM `tabDelivery Note` dn
-			JOIN `tabDelivery Note Item` dni ON dni.parent = dn.name
+			LEFT JOIN `tabDelivery Note Item` dni ON dni.parent = dn.name
 			WHERE dn.docstatus = 1
 			AND dn.posting_date BETWEEN %(from_date)s AND %(to_date)s
 			{customer_filter}
-			GROUP BY COALESCE(dn.custom_delivery_mode, 'Not Set')
+			GROUP BY COALESCE(NULLIF(dn.custom_delivery_mode, ''), 'Not Set')
 			ORDER BY delivery_note_count DESC
 		"""
 		
@@ -830,19 +991,73 @@ def get_delivery_mode_distribution(filters):
 		
 		results = frappe.db.sql(query, params, as_dict=True)
 		
+		# Debug logging removed - use print() for debugging if needed
+		# print(f"Query Results: {len(results)} modes found")
+		
 		# Format results
 		formatted_results = []
 		for row in results:
+			delivery_mode = row.get('delivery_mode')
+			if not delivery_mode or delivery_mode == '':
+				delivery_mode = 'Not Set'
+			
+			delivery_note_count = cint(row.get('delivery_note_count', 0))
+			# Include all results, even if count is 0 (shouldn't happen but just in case)
 			formatted_results.append({
-				'label': row.get('delivery_mode') or 'Not Set',
-				'delivery_note_count': cint(row.get('delivery_note_count', 0)),
+				'label': delivery_mode,
+				'delivery_note_count': delivery_note_count,
 				'total_books': flt(row.get('total_books', 0)),
 				'total_transport_charges': flt(row.get('total_transport_charges', 0))
 			})
 		
+		# Filter out entries with 0 count only if we have other entries
+		if len(formatted_results) > 1:
+			formatted_results = [r for r in formatted_results if r['delivery_note_count'] > 0]
+		
+		# If we have delivery notes but no results, it means all have NULL/empty delivery_mode
+		# In that case, ensure we return at least one "Not Set" entry
+		if total_dns > 0 and len(formatted_results) == 0:
+			# Re-run query to get the count for "Not Set"
+			not_set_query = f"""
+				SELECT 
+					COUNT(DISTINCT dn.name) AS delivery_note_count,
+					COALESCE(SUM(COALESCE(dni.qty, 0)), 0) AS total_books,
+					COALESCE(SUM(COALESCE((
+						SELECT SUM(tc.amount)
+						FROM `tabTransport Charges` tc
+						WHERE tc.parent = dn.name 
+						AND tc.parenttype = 'Delivery Note' 
+						AND tc.parentfield = 'custom_transport_charges'
+					), 0)), 0) AS total_transport_charges
+				FROM `tabDelivery Note` dn
+				LEFT JOIN `tabDelivery Note Item` dni ON dni.parent = dn.name
+				WHERE dn.docstatus = 1
+				AND dn.posting_date BETWEEN %(from_date)s AND %(to_date)s
+				AND (dn.custom_delivery_mode IS NULL OR dn.custom_delivery_mode = '')
+				{customer_filter}
+			"""
+			not_set_result = frappe.db.sql(not_set_query, params, as_dict=True)
+			if not_set_result and not_set_result[0].get('delivery_note_count', 0) > 0:
+				formatted_results.append({
+					'label': 'Not Set',
+					'delivery_note_count': cint(not_set_result[0].get('delivery_note_count', 0)),
+					'total_books': flt(not_set_result[0].get('total_books', 0)),
+					'total_transport_charges': flt(not_set_result[0].get('total_transport_charges', 0))
+				})
+		
+		# Debug logging removed - use print() for debugging if needed
+		# print(f"Formatted Results: {len(formatted_results)} modes")
+		
 		return formatted_results
 	except Exception as e:
-		frappe.log_error(f"Error in get_delivery_mode_distribution: {str(e)}", "Courier Report Error")
+		import traceback
+		error_msg = str(e)[:100] if len(str(e)) > 100 else str(e)
+		frappe.log_error(f"get_delivery_mode_distribution error: {error_msg}", "Courier Report Error")
+		# Log full traceback separately if needed
+		traceback_str = traceback.format_exc()
+		if len(traceback_str) > 500:
+			traceback_str = traceback_str[:500] + "... (truncated)"
+		frappe.log_error(f"Traceback: {traceback_str}", "Courier Report Error")
 		return []
 
 def get_courier_data(filters):

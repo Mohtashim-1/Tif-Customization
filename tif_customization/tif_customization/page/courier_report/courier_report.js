@@ -142,19 +142,19 @@ if (typeof window.CourierDashboard === 'undefined') {
 					<div class="row">
 						<div class="col-md-6" style="margin-bottom: 20px;">
 							<div class="chart-container" style="background: white; padding: 15px; border-radius: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-								<h5>Monthly Courier Expense Trend</h5>
+								<h5>Monthly Courier & Transport Expense Trend</h5>
 								<div id="chart-monthly-trend"></div>
 							</div>
 						</div>
 						<div class="col-md-6" style="margin-bottom: 20px;">
 							<div class="chart-container" style="background: white; padding: 15px; border-radius: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-								<h5>Courier Expense Share by Cost Center</h5>
+								<h5>Courier & Transport Expense Share by Cost Center</h5>
 								<div id="chart-expense-share"></div>
 							</div>
 						</div>
 						<div class="col-md-6" style="margin-bottom: 20px;">
 							<div class="chart-container" style="background: white; padding: 15px; border-radius: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-								<h5>Delivery Mode Distribution (Expense Amount)</h5>
+								<h5>Delivery Mode Distribution (Courier & Transport Expense)</h5>
 								<div id="chart-delivery-mode"></div>
 							</div>
 						</div>
@@ -418,7 +418,7 @@ if (typeof window.CourierDashboard === 'undefined') {
 						return dateStr && dateStr !== 'undefined' && dateStr !== 'null' ? dateStr : '';
 					}).filter(label => label !== ''),
 					datasets: [{
-						name: 'Monthly Expense',
+						name: 'Monthly Courier & Transport Expense',
 						values: valid_data.map(d => {
 							let val = flt(d.expense);
 							// Ensure we return a valid number, default to 0 if invalid
@@ -665,18 +665,27 @@ if (typeof window.CourierDashboard === 'undefined') {
 		
 		// Delivery Mode Distribution Chart (from Delivery Notes)
 		let delivery_mode_distribution = me.data.delivery_mode_distribution || [];
-		if (delivery_mode_distribution.length > 0) {
-			// Filter out "Not Set" if there are other values
+		console.log('Delivery Mode Distribution Data:', delivery_mode_distribution);
+		console.log('Data length:', delivery_mode_distribution.length);
+		console.log('Full data object:', JSON.stringify(delivery_mode_distribution));
+		
+		if (delivery_mode_distribution && delivery_mode_distribution.length > 0) {
+			// Get all valid data with count > 0
 			let valid_data = delivery_mode_distribution.filter(d => {
-				if (!d) return false;
-				let count = flt(d.delivery_note_count);
-				return !isNaN(count) && count !== null && count !== undefined && count > 0;
+				if (!d || !d.hasOwnProperty('delivery_note_count')) {
+					console.log('Filtered out invalid entry:', d);
+					return false;
+				}
+				let count = parseFloat(d.delivery_note_count) || 0;
+				if (count > 0) {
+					console.log('Valid entry:', d.label, 'count:', count);
+					return true;
+				}
+				return false;
 			});
 			
-			// If we have valid data, show it; otherwise show "Not Set" if it exists
-			if (valid_data.length === 0) {
-				valid_data = delivery_mode_distribution.filter(d => d && d.label === 'Not Set');
-			}
+			console.log('Valid data after filtering:', valid_data);
+			console.log('Valid data length:', valid_data.length);
 			
 			if (valid_data.length > 0) {
 				let chart_data = {
@@ -684,18 +693,27 @@ if (typeof window.CourierDashboard === 'undefined') {
 					datasets: [{
 						name: 'Delivery Notes',
 						values: valid_data.map(d => {
-							let val = flt(d.delivery_note_count);
+							let val = parseFloat(d.delivery_note_count) || 0;
 							return isNaN(val) ? 0 : val;
 						})
 					}]
 				};
 				
+				console.log('Chart data:', chart_data);
+				
 				// Destroy existing chart if it exists
 				if (me.charts.delivery_mode_distribution) {
 					try {
 						me.charts.delivery_mode_distribution.destroy();
-					} catch(e) {}
+						me.charts.delivery_mode_distribution = null;
+					} catch(e) {
+						console.log('Error destroying chart:', e);
+						me.charts.delivery_mode_distribution = null;
+					}
 				}
+				
+				// Clear the chart container first
+				$('#chart-delivery-mode-distribution').empty();
 				
 				try {
 					me.charts.delivery_mode_distribution = new frappe.Chart('#chart-delivery-mode-distribution', {
@@ -704,14 +722,20 @@ if (typeof window.CourierDashboard === 'undefined') {
 						type: 'pie',
 						height: 300
 					});
+					console.log('Chart created successfully');
 				} catch(e) {
 					console.error('Error creating delivery mode distribution chart:', e);
-					$('#chart-delivery-mode-distribution').html('<p class="text-muted">Chart data unavailable</p>');
+					console.error('Chart error details:', e.message, e.stack);
+					$('#chart-delivery-mode-distribution').html('<p class="text-muted">Chart data unavailable: ' + e.message + '</p>');
 				}
 			} else {
-				$('#chart-delivery-mode-distribution').html('<p class="text-muted">No data available</p>');
+				console.log('No valid data for delivery mode distribution chart - all entries filtered out');
+				console.log('Original data:', delivery_mode_distribution);
+				$('#chart-delivery-mode-distribution').html('<p class="text-muted">No data available (all entries have 0 count)</p>');
 			}
 		} else {
+			console.log('No delivery mode distribution data received from backend');
+			console.log('me.data:', me.data);
 			$('#chart-delivery-mode-distribution').html('<p class="text-muted">No data available</p>');
 		}
 	}
