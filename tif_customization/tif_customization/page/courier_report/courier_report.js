@@ -176,6 +176,12 @@ if (typeof window.CourierDashboard === 'undefined') {
 								<div id="chart-courier-payment-mode"></div>
 							</div>
 						</div>
+						<div class="col-md-6" style="margin-bottom: 20px;">
+							<div class="chart-container" style="background: white; padding: 15px; border-radius: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+								<h5>Delivery Mode Distribution (By Delivery Notes)</h5>
+								<div id="chart-delivery-mode-distribution"></div>
+							</div>
+						</div>
 					</div>
 				</div>
 				
@@ -656,6 +662,58 @@ if (typeof window.CourierDashboard === 'undefined') {
 		} else {
 			$('#chart-courier-payment-mode').html('<p class="text-muted">No data available</p>');
 		}
+		
+		// Delivery Mode Distribution Chart (from Delivery Notes)
+		let delivery_mode_distribution = me.data.delivery_mode_distribution || [];
+		if (delivery_mode_distribution.length > 0) {
+			// Filter out "Not Set" if there are other values
+			let valid_data = delivery_mode_distribution.filter(d => {
+				if (!d) return false;
+				let count = flt(d.delivery_note_count);
+				return !isNaN(count) && count !== null && count !== undefined && count > 0;
+			});
+			
+			// If we have valid data, show it; otherwise show "Not Set" if it exists
+			if (valid_data.length === 0) {
+				valid_data = delivery_mode_distribution.filter(d => d && d.label === 'Not Set');
+			}
+			
+			if (valid_data.length > 0) {
+				let chart_data = {
+					labels: valid_data.map(d => String(d.label || 'Not Set')),
+					datasets: [{
+						name: 'Delivery Notes',
+						values: valid_data.map(d => {
+							let val = flt(d.delivery_note_count);
+							return isNaN(val) ? 0 : val;
+						})
+					}]
+				};
+				
+				// Destroy existing chart if it exists
+				if (me.charts.delivery_mode_distribution) {
+					try {
+						me.charts.delivery_mode_distribution.destroy();
+					} catch(e) {}
+				}
+				
+				try {
+					me.charts.delivery_mode_distribution = new frappe.Chart('#chart-delivery-mode-distribution', {
+						title: '',
+						data: chart_data,
+						type: 'pie',
+						height: 300
+					});
+				} catch(e) {
+					console.error('Error creating delivery mode distribution chart:', e);
+					$('#chart-delivery-mode-distribution').html('<p class="text-muted">Chart data unavailable</p>');
+				}
+			} else {
+				$('#chart-delivery-mode-distribution').html('<p class="text-muted">No data available</p>');
+			}
+		} else {
+			$('#chart-delivery-mode-distribution').html('<p class="text-muted">No data available</p>');
+		}
 	}
 	
 	render_transaction_table() {
@@ -716,6 +774,7 @@ if (typeof window.CourierDashboard === 'undefined') {
 						<th>Customer</th>
 						<th>Cost Center</th>
 						<th>Amount / Books</th>
+						<th>Transport Charges</th>
 						<th>Remarks</th>
 						<th>Created By</th>
 					</tr>
@@ -731,6 +790,7 @@ if (typeof window.CourierDashboard === 'undefined') {
 							<td>-</td>
 							<td>${row.cost_center || '-'}</td>
 							<td class="text-right">${format_currency_value(row.expense_amount || 0)}</td>
+							<td>-</td>
 							<td>${row.remarks || '-'}</td>
 							<td>${row.created_by_name || row.created_by || '-'}</td>
 						</tr>
@@ -741,6 +801,13 @@ if (typeof window.CourierDashboard === 'undefined') {
 				// Add DNs
 				let dn_data = me.data.delivery_notes || [];
 				dn_data.forEach(row => {
+					let transportCharges = '';
+					if (row.custom_delivery_mode === 'Transport' && row.transport_charges) {
+						transportCharges = format_currency_value(row.transport_charges || 0);
+					} else {
+						transportCharges = '-';
+					}
+					
 					let tr = $(`
 						<tr>
 							<td><span class="label label-success">DN</span></td>
@@ -749,7 +816,7 @@ if (typeof window.CourierDashboard === 'undefined') {
 							<td>${row.customer_name || row.customer || '-'}</td>
 							<td>${row.cost_center || '-'}</td>
 							<td class="text-right">${format_number_value(row.total_books || 0)} books</td>
-							<td>-</td>
+							<td class="text-right">${transportCharges}</td>
 							<td>${row.created_by_name || row.created_by || '-'}</td>
 						</tr>
 					`);
@@ -757,7 +824,7 @@ if (typeof window.CourierDashboard === 'undefined') {
 				});
 				
 				if (jv_data.length === 0 && dn_data.length === 0) {
-					tbody.append('<tr><td colspan="8" class="text-center">No transactions found</td></tr>');
+					tbody.append('<tr><td colspan="9" class="text-center">No transactions found</td></tr>');
 				}
 			}
 		} else if (view_type === 'dn') {
@@ -770,19 +837,31 @@ if (typeof window.CourierDashboard === 'undefined') {
 					<th>Delivery Note No.</th>
 					<th>Customer</th>
 					<th>Cost Center</th>
+					<th>Delivery Mode</th>
 					<th>Total Books</th>
+					<th>Transport Charges</th>
 					<th>Created By</th>
 				</tr>
 			`);
 			
 			dn_data.forEach(row => {
+				let deliveryMode = row.custom_delivery_mode || '-';
+				let transportCharges = '';
+				if (row.custom_delivery_mode === 'Transport' && row.transport_charges) {
+					transportCharges = format_currency_value(row.transport_charges || 0);
+				} else {
+					transportCharges = '-';
+				}
+				
 				let tr = $(`
 					<tr>
 						<td>${row.posting_date || '-'}</td>
 						<td><a href="/app/delivery-note/${row.delivery_note_no}" target="_blank">${row.delivery_note_no || '-'}</a></td>
 						<td>${row.customer_name || row.customer || '-'}</td>
 						<td>${row.cost_center || '-'}</td>
+						<td>${deliveryMode}</td>
 						<td class="text-right">${format_number_value(row.total_books || 0)}</td>
+						<td class="text-right">${transportCharges}</td>
 						<td>${row.created_by_name || row.created_by || '-'}</td>
 					</tr>
 				`);
@@ -790,7 +869,7 @@ if (typeof window.CourierDashboard === 'undefined') {
 			});
 			
 			if (dn_data.length === 0) {
-				tbody.append('<tr><td colspan="6" class="text-center">No delivery notes found</td></tr>');
+				tbody.append('<tr><td colspan="8" class="text-center">No delivery notes found</td></tr>');
 			}
 		}
 	}

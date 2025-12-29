@@ -596,6 +596,7 @@ if (typeof window.DispatchReport === 'undefined') {
 					}
 					table thead {
 						display: table-header-group;
+						page-break-after: avoid;
 					}
 					table tbody {
 						display: table-row-group;
@@ -613,8 +614,16 @@ if (typeof window.DispatchReport === 'undefined') {
 						background-color: #f5f5f5 !important;
 						font-weight: bold;
 					}
+					/* Change tfoot to table-row-group so it doesn't repeat on each page */
+					/* table-footer-group repeats on every page, table-row-group only appears once */
 					table tfoot {
-						display: table-footer-group;
+						display: table-row-group !important;
+						page-break-inside: avoid;
+						page-break-before: auto;
+					}
+					table tfoot tr {
+						page-break-inside: avoid;
+						page-break-before: avoid;
 					}
 					.label {
 						padding: 3px 8px;

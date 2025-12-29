@@ -1,6 +1,6 @@
 import frappe
 from frappe import _
-from frappe.utils import flt, getdate, today, add_days, date_diff
+from frappe.utils import flt, cint, getdate, today, add_days, date_diff
 from datetime import datetime, timedelta
 
 @frappe.whitelist()
@@ -62,6 +62,7 @@ def get_courier_report_data(filters=None):
 		courier_data = get_courier_data(filters)
 		courier_service_data = get_courier_service_data(filters)
 		courier_payment_mode_data = get_courier_payment_mode_data(filters)
+		delivery_mode_distribution = get_delivery_mode_distribution(filters)
 		
 		return {
 			'kpi_data': kpi_data,
@@ -76,7 +77,8 @@ def get_courier_report_data(filters=None):
 			'delivery_mode_data': delivery_mode_data,
 			'courier_data': courier_data,
 			'courier_service_data': courier_service_data,
-			'courier_payment_mode_data': courier_payment_mode_data
+			'courier_payment_mode_data': courier_payment_mode_data,
+			'delivery_mode_distribution': delivery_mode_distribution
 		}
 	except Exception as e:
 		frappe.log_error(f"Error in get_courier_report_data: {str(e)}", "Courier Report Error")
@@ -458,7 +460,9 @@ def get_delivery_notes(filters):
 				dn.customer,
 				COALESCE(dn.cost_center, 'Not Set') AS cost_center,
 				COALESCE(SUM(dni.qty), 0) AS total_books,
-				dn.owner AS created_by
+				dn.owner AS created_by,
+				dn.custom_delivery_mode,
+				COALESCE(dn.custom_transport_charges, 0) AS transport_charges
 			FROM `tabDelivery Note` dn
 			JOIN `tabDelivery Note Item` dni ON dni.parent = dn.name
 			WHERE dn.docstatus = 1
@@ -485,6 +489,7 @@ def get_delivery_notes(filters):
 			if row.get('cost_center') == 'Not Set':
 				continue
 			row['total_books'] = flt(row['total_books'])
+			row['transport_charges'] = flt(row.get('transport_charges', 0))
 			row['created_by_name'] = frappe.db.get_value('User', row['created_by'], 'full_name') or row['created_by']
 			row['customer_name'] = frappe.db.get_value('Customer', row['customer'], 'customer_name') or row['customer']
 			filtered_results.append(row)
@@ -788,6 +793,56 @@ def get_delivery_mode_data(filters):
 		return filtered_results
 	except Exception as e:
 		frappe.log_error(f"Error in get_delivery_mode_data: {str(e)}", "Courier Report Error")
+		return []
+
+def get_delivery_mode_distribution(filters):
+	"""Get delivery mode distribution from Delivery Notes (by count and books)"""
+	try:
+		from_date = filters.get('from_date')
+		to_date = filters.get('to_date')
+		customer = filters.get('customer')
+		
+		customer_filter = ""
+		if customer:
+			customer_filter = "AND dn.customer = %(customer)s"
+		
+		query = f"""
+			SELECT 
+				COALESCE(dn.custom_delivery_mode, 'Not Set') AS delivery_mode,
+				COUNT(DISTINCT dn.name) AS delivery_note_count,
+				COALESCE(SUM(dni.qty), 0) AS total_books,
+				COALESCE(SUM(dn.custom_transport_charges), 0) AS total_transport_charges
+			FROM `tabDelivery Note` dn
+			JOIN `tabDelivery Note Item` dni ON dni.parent = dn.name
+			WHERE dn.docstatus = 1
+			AND dn.posting_date BETWEEN %(from_date)s AND %(to_date)s
+			{customer_filter}
+			GROUP BY COALESCE(dn.custom_delivery_mode, 'Not Set')
+			ORDER BY delivery_note_count DESC
+		"""
+		
+		params = {
+			'from_date': from_date,
+			'to_date': to_date
+		}
+		if customer:
+			params['customer'] = customer
+		
+		results = frappe.db.sql(query, params, as_dict=True)
+		
+		# Format results
+		formatted_results = []
+		for row in results:
+			formatted_results.append({
+				'label': row.get('delivery_mode') or 'Not Set',
+				'delivery_note_count': cint(row.get('delivery_note_count', 0)),
+				'total_books': flt(row.get('total_books', 0)),
+				'total_transport_charges': flt(row.get('total_transport_charges', 0))
+			})
+		
+		return formatted_results
+	except Exception as e:
+		frappe.log_error(f"Error in get_delivery_mode_distribution: {str(e)}", "Courier Report Error")
 		return []
 
 def get_courier_data(filters):
