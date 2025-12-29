@@ -836,13 +836,37 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 		const fromDate = $('#from-date').val() || '2025-09-01';
 		const toDate = $('#to-date').val() || '2025-09-30';
 		
+		// Get selected warehouse filter value
+		const selectedWarehouse = $('#warehouse-stock-filter').val() || '';
+		
+		// Add data attribute to track which sections should be visible in print
+		$('.head-office-section, .old-office-section, .nazimabad-section').removeAttr('data-print-visible');
+		
+		// Hide warehouse sections that are not selected before printing
+		if (selectedWarehouse === 'head-office') {
+			$('.old-office-section, .nazimabad-section').hide().attr('data-print-visible', 'false');
+			$('.head-office-section').show().attr('data-print-visible', 'true');
+		} else if (selectedWarehouse === 'old-office') {
+			$('.head-office-section, .nazimabad-section').hide().attr('data-print-visible', 'false');
+			$('.old-office-section').show().attr('data-print-visible', 'true');
+		} else if (selectedWarehouse === 'nazimabad') {
+			$('.head-office-section, .old-office-section').hide().attr('data-print-visible', 'false');
+			$('.nazimabad-section').show().attr('data-print-visible', 'true');
+		} else if (selectedWarehouse === 'all') {
+			// Show all warehouse sections
+			$('.head-office-section, .old-office-section, .nazimabad-section').show().attr('data-print-visible', 'true');
+		} else {
+			// Hide all warehouse sections if nothing is selected
+			$('.head-office-section, .old-office-section, .nazimabad-section').hide().attr('data-print-visible', 'false');
+		}
+		
 		// Add print styles if not already added
 		if (!$('#print-styles-stock-detail').length) {
 			let printStyles = `
 				<style id="print-styles-stock-detail" media="print">
 					@page {
 						size: A4 landscape;
-						margin: 1cm;
+						margin: 0.8cm;
 					}
 					* {
 						background: white !important;
@@ -977,6 +1001,18 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 						page-break-inside: avoid;
 						background: white !important;
 					}
+					.report-section[style*="display: none"],
+					.head-office-section[style*="display: none"],
+					.old-office-section[style*="display: none"],
+					.nazimabad-section[style*="display: none"] {
+						display: none !important;
+					}
+					/* Hide warehouse sections that are marked as not visible for print */
+					.head-office-section[data-print-visible="false"],
+					.old-office-section[data-print-visible="false"],
+					.nazimabad-section[data-print-visible="false"] {
+						display: none !important;
+					}
 					.report-section h4 {
 						font-size: 14pt;
 						font-weight: bold;
@@ -1011,6 +1047,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 					}
 					table thead {
 						display: table-header-group;
+						page-break-after: avoid;
 					}
 					table tbody {
 						display: table-row-group;
@@ -1019,6 +1056,12 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 						page-break-inside: avoid;
 						page-break-after: auto;
 						background: white !important;
+					}
+					table tbody tr:last-child {
+						page-break-after: auto;
+					}
+					table tfoot {
+						page-break-inside: avoid;
 					}
 					table th,
 					table td {
@@ -1070,6 +1113,27 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 					.number-cell {
 						text-align: right !important;
 					}
+					/* Prevent content from being cut off */
+					.stock-detail-container {
+						max-width: 100% !important;
+						overflow: visible !important;
+					}
+					/* Better page break handling */
+					.report-section:not(:last-child) {
+						page-break-after: auto;
+					}
+					/* Ensure tables don't get cut */
+					.table-container {
+						page-break-inside: auto;
+					}
+					/* Keep table headers on each page */
+					table {
+						page-break-after: auto;
+					}
+					table thead tr {
+						page-break-inside: avoid;
+						page-break-after: avoid;
+					}
 				</style>
 			`;
 			$('head').append(printStyles);
@@ -1095,6 +1159,11 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 		
 		// Trigger print
 		window.print();
+		
+		// Restore warehouse sections visibility after print (in case user cancels)
+		setTimeout(function() {
+			updateWarehouseStockVisibility(selectedWarehouse);
+		}, 1000);
 	}
 	
 	// Event listeners - set up after container is added to DOM
