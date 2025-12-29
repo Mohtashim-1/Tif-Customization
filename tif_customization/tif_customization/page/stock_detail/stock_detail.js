@@ -1624,6 +1624,19 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 								</tr>
 							`).join('')}
 						</tbody>
+						<tfoot>
+							<tr style="background-color: #e9ecef; font-weight: bold;">
+								<td colspan="2"><strong>Total</strong></td>
+								<td class="text-right"><strong>${formatNumber(kpiData.items.reduce((sum, item) => sum + (parseFloat(item.opening_stock) || 0), 0))}</strong></td>
+								<td class="text-right"><strong>${formatNumber(kpiData.items.reduce((sum, item) => sum + (parseFloat(item.available_stock) || 0), 0))}</strong></td>
+								<td class="text-right"><strong>${formatNumber(kpiData.items.reduce((sum, item) => sum + (parseFloat(item.delivered) || 0), 0))}</strong></td>
+								<td class="text-right"><strong>${formatNumber(kpiData.items.reduce((sum, item) => sum + (parseFloat(item.received_vendor) || 0), 0))}</strong></td>
+								<td class="text-right"><strong>${formatNumber(kpiData.items.reduce((sum, item) => sum + (parseFloat(item.book_return) || 0), 0))}</strong></td>
+								<td class="text-right"><strong>${formatNumber(kpiData.items.reduce((sum, item) => sum + (parseFloat(item.demand_received) || 0), 0))}</strong></td>
+								<td class="text-right"><strong>${formatNumber(kpiData.items.reduce((sum, item) => sum + (parseFloat(item.books_sale) || 0), 0))}</strong></td>
+								<td class="text-right"><strong>${formatNumber(kpiData.items.reduce((sum, item) => sum + (parseFloat(item.total_amount) || 0), 0))}</strong></td>
+							</tr>
+						</tfoot>
 					</table>
 				</div>
 			`;
