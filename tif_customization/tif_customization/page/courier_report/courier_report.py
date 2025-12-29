@@ -63,6 +63,7 @@ def get_courier_report_data(filters=None):
 		courier_service_data = get_courier_service_data(filters)
 		courier_payment_mode_data = get_courier_payment_mode_data(filters)
 		delivery_mode_distribution = get_delivery_mode_distribution(filters)
+		item_category_expense = get_item_category_expense(filters)
 		
 		return {
 			'kpi_data': kpi_data,
@@ -78,7 +79,8 @@ def get_courier_report_data(filters=None):
 			'courier_data': courier_data,
 			'courier_service_data': courier_service_data,
 			'courier_payment_mode_data': courier_payment_mode_data,
-			'delivery_mode_distribution': delivery_mode_distribution
+			'delivery_mode_distribution': delivery_mode_distribution,
+			'item_category_expense': item_category_expense
 		}
 	except Exception as e:
 		error_msg = str(e)[:100] if len(str(e)) > 100 else str(e)
@@ -822,7 +824,7 @@ def get_cost_centers():
 		# Get cost centers that have courier expenses or delivery notes
 		# Include cost center number for matching
 		cost_centers = frappe.db.sql("""
-			SELECT DISTINCT 
+			SELECT DISTINCT 	
 				cc.name AS cost_center,
 				cc.cost_center_number,
 				cc.cost_center_name
@@ -1200,6 +1202,175 @@ def get_courier_payment_mode_data(filters):
 	except Exception as e:
 		frappe.log_error(f"Error in get_courier_payment_mode_data: {str(e)}", "Courier Report Error")
 		return []
+
+def get_item_category_expense(filters):
+	"""Get courier expenses by item category (Books, Certificates, General Items)"""
+	try:
+		from_date = filters.get('from_date')
+		to_date = filters.get('to_date')
+		cost_centers = filters.get('cost_centers', [])
+		customer = filters.get('customer')
+		
+		cost_center_filter = ""
+		if cost_centers:
+			cost_center_list = "', '".join(cost_centers)
+			cost_center_filter = f"AND jea.cost_center IN ('{cost_center_list}')"
+		
+		customer_filter = ""
+		if customer:
+			customer_filter = "AND dn.customer = %(customer)s"
+		
+		# Get courier expenses from Journal Entries grouped by item category
+		# First, get the category for each delivery note based on its items
+		# Then sum expenses by category
+		query = f"""
+			SELECT 
+				dn_cat.category,
+				COUNT(DISTINCT dn_cat.dn_name) AS delivery_note_count,
+				COALESCE(SUM(dn_cat.expense), 0) AS expense_amount
+			FROM (
+				SELECT DISTINCT
+					dn.name AS dn_name,
+					CASE 
+						WHEN EXISTS (
+							SELECT 1 FROM `tabDelivery Note Item` dni2
+							JOIN `tabItem` i2 ON i2.item_code = dni2.item_code
+							WHERE dni2.parent = dn.name
+							AND (i2.item_group LIKE '%%Book%%' OR i2.item_group LIKE '%%MQH%%' OR i2.item_group LIKE '%%Qaida%%')
+						) THEN 'Books'
+						WHEN EXISTS (
+							SELECT 1 FROM `tabDelivery Note Item` dni2
+							JOIN `tabItem` i2 ON i2.item_code = dni2.item_code
+							WHERE dni2.parent = dn.name
+							AND (i2.item_group LIKE '%%Certificate%%' OR i2.item_name LIKE '%%Certificate%%' OR i2.item_code LIKE '%%Certificate%%')
+						) THEN 'Certificates'
+						ELSE 'General Items'
+					END AS category,
+					COALESCE(SUM(jea.debit - jea.credit), 0) AS expense
+				FROM `tabJournal Entry Account` jea
+				JOIN `tabJournal Entry` je ON je.name = jea.parent
+				LEFT JOIN `tabDelivery Note` dn ON dn.name = je.cheque_no
+				WHERE je.docstatus = 1
+				AND COALESCE(dn.posting_date, je.posting_date) BETWEEN %(from_date)s AND %(to_date)s
+				AND (jea.account LIKE '%%Courier%%' OR jea.account LIKE '%%Courier Expense%%')
+				AND dn.name IS NOT NULL
+				{cost_center_filter}
+				{customer_filter}
+				GROUP BY dn.name
+			) AS dn_cat
+			GROUP BY dn_cat.category
+			ORDER BY expense_amount DESC
+		"""
+		
+		params = {
+			'from_date': from_date,
+			'to_date': to_date
+		}
+		if customer:
+			params['customer'] = customer
+		
+		courier_results = frappe.db.sql(query, params, as_dict=True)
+		
+		# Get transport charges by item category
+		cost_center_filter_transport = ""
+		if cost_centers:
+			cost_center_list = "', '".join(cost_centers)
+			cost_center_filter_transport = f"AND dn.cost_center IN ('{cost_center_list}')"
+		
+		customer_filter_transport = ""
+		if customer:
+			customer_filter_transport = "AND dn.customer = %(customer)s"
+		
+		transport_query = f"""
+			SELECT 
+				dn_cat.category,
+				COUNT(DISTINCT dn_cat.dn_name) AS delivery_note_count,
+				COALESCE(SUM(dn_cat.expense), 0) AS expense_amount
+			FROM (
+				SELECT DISTINCT
+					dn.name AS dn_name,
+					CASE 
+						WHEN EXISTS (
+							SELECT 1 FROM `tabDelivery Note Item` dni2
+							JOIN `tabItem` i2 ON i2.item_code = dni2.item_code
+							WHERE dni2.parent = dn.name
+							AND (i2.item_group LIKE '%%Book%%' OR i2.item_group LIKE '%%MQH%%' OR i2.item_group LIKE '%%Qaida%%')
+						) THEN 'Books'
+						WHEN EXISTS (
+							SELECT 1 FROM `tabDelivery Note Item` dni2
+							JOIN `tabItem` i2 ON i2.item_code = dni2.item_code
+							WHERE dni2.parent = dn.name
+							AND (i2.item_group LIKE '%%Certificate%%' OR i2.item_name LIKE '%%Certificate%%' OR i2.item_code LIKE '%%Certificate%%')
+						) THEN 'Certificates'
+						ELSE 'General Items'
+					END AS category,
+					COALESCE(SUM(tc.amount), 0) AS expense
+				FROM `tabDelivery Note` dn
+				JOIN `tabTransport Charges` tc ON tc.parent = dn.name 
+					AND tc.parenttype = 'Delivery Note' 
+					AND tc.parentfield = 'custom_transport_charges'
+				WHERE dn.docstatus = 1
+				AND dn.posting_date BETWEEN %(from_date)s AND %(to_date)s
+				AND dn.custom_delivery_mode = 'Transport'
+				{cost_center_filter_transport}
+				{customer_filter_transport}
+				GROUP BY dn.name
+			) AS dn_cat
+			GROUP BY dn_cat.category
+			ORDER BY expense_amount DESC
+		"""
+		
+		transport_results = frappe.db.sql(transport_query, params, as_dict=True)
+		
+		# Combine courier and transport expenses by category
+		category_dict = {}
+		
+		# Process courier results
+		for row in courier_results:
+			category = row.get('category') or 'General Items'
+			if category not in category_dict:
+				category_dict[category] = {
+					'delivery_note_count': 0,
+					'expense_amount': 0
+				}
+			category_dict[category]['delivery_note_count'] += cint(row.get('delivery_note_count', 0))
+			category_dict[category]['expense_amount'] += flt(row.get('expense_amount', 0))
+		
+		# Process transport results
+		for row in transport_results:
+			category = row.get('category') or 'General Items'
+			if category not in category_dict:
+				category_dict[category] = {
+					'delivery_note_count': 0,
+					'expense_amount': 0
+				}
+			category_dict[category]['delivery_note_count'] += cint(row.get('delivery_note_count', 0))
+			category_dict[category]['expense_amount'] += flt(row.get('expense_amount', 0))
+		
+		# Convert to list format
+		results = []
+		for category in ['Books', 'Certificates', 'General Items']:
+			if category in category_dict:
+				results.append({
+					'category': category,
+					'delivery_note_count': category_dict[category]['delivery_note_count'],
+					'expense_amount': flt(category_dict[category]['expense_amount'])
+				})
+			else:
+				results.append({
+					'category': category,
+					'delivery_note_count': 0,
+					'expense_amount': 0
+				})
+		
+		return results
+	except Exception as e:
+		frappe.log_error(f"Error in get_item_category_expense: {str(e)}", "Courier Report Error")
+		return [
+			{'category': 'Books', 'delivery_note_count': 0, 'expense_amount': 0},
+			{'category': 'Certificates', 'delivery_note_count': 0, 'expense_amount': 0},
+			{'category': 'General Items', 'delivery_note_count': 0, 'expense_amount': 0}
+		]
 
 @frappe.whitelist()
 def get_customers():

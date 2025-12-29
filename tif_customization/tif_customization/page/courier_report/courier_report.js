@@ -182,6 +182,25 @@ if (typeof window.CourierDashboard === 'undefined') {
 								<div id="chart-delivery-mode-distribution"></div>
 							</div>
 						</div>
+						<div class="col-md-6" style="margin-bottom: 20px;">
+							<div class="chart-container" style="background: white; padding: 15px; border-radius: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+								<h5>Item Category Expense (Count & Amount)</h5>
+								<div id="chart-item-category-expense"></div>
+								<div class="table-responsive" style="margin-top: 15px;">
+									<table class="table table-bordered table-striped" style="font-size: 12px;">
+										<thead>
+											<tr>
+												<th>Category</th>
+												<th class="text-right">Delivery Notes</th>
+												<th class="text-right">Expense Amount</th>
+											</tr>
+										</thead>
+										<tbody id="item-category-expense-tbody">
+										</tbody>
+									</table>
+								</div>
+							</div>
+						</div>
 					</div>
 				</div>
 				
@@ -705,16 +724,14 @@ if (typeof window.CourierDashboard === 'undefined') {
 				if (me.charts.delivery_mode_distribution) {
 					try {
 						me.charts.delivery_mode_distribution.destroy();
-						me.charts.delivery_mode_distribution = null;
 					} catch(e) {
-						console.log('Error destroying chart:', e);
-						me.charts.delivery_mode_distribution = null;
+						// Ignore destroy errors - chart might already be destroyed or container removed
+						console.log('Chart destroy warning (non-critical):', e.message || e);
 					}
+					me.charts.delivery_mode_distribution = null;
 				}
 				
-				// Clear the chart container first
-				$('#chart-delivery-mode-distribution').empty();
-				
+				// Create new chart - don't call empty(), let the chart library handle the container
 				try {
 					me.charts.delivery_mode_distribution = new frappe.Chart('#chart-delivery-mode-distribution', {
 						title: '',
@@ -725,8 +742,7 @@ if (typeof window.CourierDashboard === 'undefined') {
 					console.log('Chart created successfully');
 				} catch(e) {
 					console.error('Error creating delivery mode distribution chart:', e);
-					console.error('Chart error details:', e.message, e.stack);
-					$('#chart-delivery-mode-distribution').html('<p class="text-muted">Chart data unavailable: ' + e.message + '</p>');
+					$('#chart-delivery-mode-distribution').html('<p class="text-muted">Chart data unavailable</p>');
 				}
 			} else {
 				console.log('No valid data for delivery mode distribution chart - all entries filtered out');
@@ -737,6 +753,68 @@ if (typeof window.CourierDashboard === 'undefined') {
 			console.log('No delivery mode distribution data received from backend');
 			console.log('me.data:', me.data);
 			$('#chart-delivery-mode-distribution').html('<p class="text-muted">No data available</p>');
+		}
+		
+		// Item Category Expense Chart (Books, Certificates, General Items)
+		let item_category_data = me.data.item_category_expense || [];
+		if (item_category_data.length > 0) {
+			// Filter out categories with zero expense
+			let valid_data = item_category_data.filter(d => {
+				return d && (flt(d.expense_amount) > 0 || cint(d.delivery_note_count) > 0);
+			});
+			
+			if (valid_data.length > 0) {
+				// Create chart data with both count and amount
+				let chart_data = {
+					labels: valid_data.map(d => {
+						let label = String(d.category || 'Unknown');
+						let count = cint(d.delivery_note_count || 0);
+						return `${label} (${count} DNs)`;
+					}),
+					datasets: [{
+						name: 'Expense Amount',
+						values: valid_data.map(d => flt(d.expense_amount || 0))
+					}]
+				};
+				
+				if (me.charts.item_category_expense) {
+					try {
+						me.charts.item_category_expense.destroy();
+					} catch(e) {}
+				}
+				
+				try {
+					me.charts.item_category_expense = new frappe.Chart('#chart-item-category-expense', {
+						title: '',
+						data: chart_data,
+						type: 'pie',
+						height: 300
+					});
+				} catch(e) {
+					console.error('Error creating item category expense chart:', e);
+					$('#chart-item-category-expense').html('<p class="text-muted">Chart data unavailable</p>');
+				}
+				
+				// Populate table with detailed data
+				let tbody = $('#item-category-expense-tbody');
+				tbody.empty();
+				valid_data.forEach(row => {
+					let tr = $(`
+						<tr>
+							<td><strong>${row.category || '-'}</strong></td>
+							<td class="text-right">${format_number_value(row.delivery_note_count || 0)}</td>
+							<td class="text-right">${format_currency_value(row.expense_amount || 0)}</td>
+						</tr>
+					`);
+					tbody.append(tr);
+				});
+			} else {
+				$('#chart-item-category-expense').html('<p class="text-muted">No data available</p>');
+				$('#item-category-expense-tbody').html('<tr><td colspan="3" class="text-center">No data available</td></tr>');
+			}
+		} else {
+			$('#chart-item-category-expense').html('<p class="text-muted">No data available</p>');
+			$('#item-category-expense-tbody').html('<tr><td colspan="3" class="text-center">No data available</td></tr>');
 		}
 	}
 	
