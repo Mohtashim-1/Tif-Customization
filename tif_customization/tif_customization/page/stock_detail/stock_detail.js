@@ -156,7 +156,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 			</div>
 			
 			<div class="report-section head-office-section" style="display: none;">
-				<h4>TIF Head Office Stock 30-Sep-2025</h4>
+				<h4>TIF Head Office Stock</h4>
 				<div class="table-container">
 					<table class="table table-bordered table-striped" id="head-office-table">
 						<thead>
@@ -181,7 +181,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 			</div>
 			
 			<div class="report-section old-office-section" style="display: none;">
-				<h4>TIF Old Office 30-Sep-2025</h4>
+				<h4>TIF Old Office</h4>
 				<div class="table-container">
 					<table class="table table-bordered table-striped" id="old-office-table">
 						<thead>
@@ -206,7 +206,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 			</div>
 			
 			<div class="report-section nazimabad-section" style="display: none;">
-				<h4>Nazimabad Warehouse 30-Sep-2025</h4>
+				<h4>Nazimabad Warehouse</h4>
 				<div class="table-container">
 					<table class="table table-bordered table-striped" id="nazimabad-table">
 						<thead>
