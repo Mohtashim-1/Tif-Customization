@@ -721,6 +721,7 @@ if (typeof window.CourierDashboard === 'undefined') {
 				console.log('Chart data:', chart_data);
 				
 				// Destroy existing chart if it exists
+				let chartContainer = $('#chart-delivery-mode-distribution');
 				if (me.charts.delivery_mode_distribution) {
 					try {
 						me.charts.delivery_mode_distribution.destroy();
@@ -728,10 +729,12 @@ if (typeof window.CourierDashboard === 'undefined') {
 						// Ignore destroy errors - chart might already be destroyed or container removed
 						console.log('Chart destroy warning (non-critical):', e.message || e);
 					}
-						me.charts.delivery_mode_distribution = null;
+					me.charts.delivery_mode_distribution = null;
+					// Clear container to remove any leftover DOM nodes
+					chartContainer.empty();
 				}
 				
-				// Create new chart - don't call empty(), let the chart library handle the container
+				// Create new chart
 				try {
 					me.charts.delivery_mode_distribution = new frappe.Chart('#chart-delivery-mode-distribution', {
 						title: '',
@@ -742,7 +745,7 @@ if (typeof window.CourierDashboard === 'undefined') {
 					console.log('Chart created successfully');
 				} catch(e) {
 					console.error('Error creating delivery mode distribution chart:', e);
-					$('#chart-delivery-mode-distribution').html('<p class="text-muted">Chart data unavailable</p>');
+					chartContainer.html('<p class="text-muted">Chart data unavailable</p>');
 				}
 			} else {
 				console.log('No valid data for delivery mode distribution chart - all entries filtered out');
@@ -755,7 +758,7 @@ if (typeof window.CourierDashboard === 'undefined') {
 			$('#chart-delivery-mode-distribution').html('<p class="text-muted">No data available</p>');
 		}
 		
-		// Item Category Expense Chart (Books, Certificates, General Items)
+		// Item Category Expense Chart (Books, General Courier Expense)
 		let item_category_data = me.data.item_category_expense || [];
 		if (item_category_data.length > 0) {
 			// Filter out categories with zero expense

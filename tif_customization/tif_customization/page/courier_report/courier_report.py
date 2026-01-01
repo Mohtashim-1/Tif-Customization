@@ -1204,7 +1204,7 @@ def get_courier_payment_mode_data(filters):
 		return []
 
 def get_item_category_expense(filters):
-	"""Get courier expenses by item category (Books, Certificates, General Items)"""
+	"""Get courier expenses by item category (Books, General Courier Expense)"""
 	try:
 		from_date = filters.get('from_date')
 		to_date = filters.get('to_date')
@@ -1238,13 +1238,7 @@ def get_item_category_expense(filters):
 							WHERE dni2.parent = dn.name
 							AND (i2.item_group LIKE '%%Book%%' OR i2.item_group LIKE '%%MQH%%' OR i2.item_group LIKE '%%Qaida%%')
 						) THEN 'Books'
-						WHEN EXISTS (
-							SELECT 1 FROM `tabDelivery Note Item` dni2
-							JOIN `tabItem` i2 ON i2.item_code = dni2.item_code
-							WHERE dni2.parent = dn.name
-							AND (i2.item_group LIKE '%%Certificate%%' OR i2.item_name LIKE '%%Certificate%%' OR i2.item_code LIKE '%%Certificate%%')
-						) THEN 'Certificates'
-						ELSE 'General Items'
+						ELSE 'General Courier Expense'
 					END AS category,
 					COALESCE(SUM(jea.debit - jea.credit), 0) AS expense
 				FROM `tabJournal Entry Account` jea
@@ -1296,13 +1290,7 @@ def get_item_category_expense(filters):
 							WHERE dni2.parent = dn.name
 							AND (i2.item_group LIKE '%%Book%%' OR i2.item_group LIKE '%%MQH%%' OR i2.item_group LIKE '%%Qaida%%')
 						) THEN 'Books'
-						WHEN EXISTS (
-							SELECT 1 FROM `tabDelivery Note Item` dni2
-							JOIN `tabItem` i2 ON i2.item_code = dni2.item_code
-							WHERE dni2.parent = dn.name
-							AND (i2.item_group LIKE '%%Certificate%%' OR i2.item_name LIKE '%%Certificate%%' OR i2.item_code LIKE '%%Certificate%%')
-						) THEN 'Certificates'
-						ELSE 'General Items'
+						ELSE 'General Courier Expense'
 					END AS category,
 					COALESCE(SUM(tc.amount), 0) AS expense
 				FROM `tabDelivery Note` dn
@@ -1327,7 +1315,7 @@ def get_item_category_expense(filters):
 		
 		# Process courier results
 		for row in courier_results:
-			category = row.get('category') or 'General Items'
+			category = row.get('category') or 'General Courier Expense'
 			if category not in category_dict:
 				category_dict[category] = {
 					'delivery_note_count': 0,
@@ -1338,7 +1326,7 @@ def get_item_category_expense(filters):
 		
 		# Process transport results
 		for row in transport_results:
-			category = row.get('category') or 'General Items'
+			category = row.get('category') or 'General Courier Expense'
 			if category not in category_dict:
 				category_dict[category] = {
 					'delivery_note_count': 0,
@@ -1349,7 +1337,7 @@ def get_item_category_expense(filters):
 		
 		# Convert to list format
 		results = []
-		for category in ['Books', 'Certificates', 'General Items']:
+		for category in ['Books', 'General Courier Expense']:
 			if category in category_dict:
 				results.append({
 					'category': category,
@@ -1368,8 +1356,7 @@ def get_item_category_expense(filters):
 		frappe.log_error(f"Error in get_item_category_expense: {str(e)}", "Courier Report Error")
 		return [
 			{'category': 'Books', 'delivery_note_count': 0, 'expense_amount': 0},
-			{'category': 'Certificates', 'delivery_note_count': 0, 'expense_amount': 0},
-			{'category': 'General Items', 'delivery_note_count': 0, 'expense_amount': 0}
+			{'category': 'General Courier Expense', 'delivery_note_count': 0, 'expense_amount': 0}
 		]
 
 @frappe.whitelist()
