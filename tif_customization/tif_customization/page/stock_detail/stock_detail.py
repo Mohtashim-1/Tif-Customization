@@ -932,7 +932,8 @@ def get_warehouse_stock_data(warehouse, warehouse_name, filters=None):
         
         # Build query using string concatenation
         # Note: %s for warehouse parameter must remain for parameterized query
-        sql_query_warehouse = "SELECT DISTINCT sle.item_code, i.item_name, i.item_group FROM `tabStock Ledger Entry` sle JOIN `tabItem` i ON i.item_code = sle.item_code WHERE sle.warehouse = %s AND sle.is_cancelled = 0 " + date_filter + " " + item_group_filter + " " + (item_code_filter if item_code_filter else '') + " " + (specific_items_filter if specific_items_filter else '') + " ORDER BY i.item_name"
+        # Remove ORDER BY clause since we'll sort by SPECIFIC_ITEM_CODES order instead
+        sql_query_warehouse = "SELECT DISTINCT sle.item_code, i.item_name, i.item_group FROM `tabStock Ledger Entry` sle JOIN `tabItem` i ON i.item_code = sle.item_code WHERE sle.warehouse = %s AND sle.is_cancelled = 0 " + date_filter + " " + item_group_filter + " " + (item_code_filter if item_code_filter else '') + " " + (specific_items_filter if specific_items_filter else '')
         
         print(f"[Warehouse {warehouse}] SQL Query:", sql_query_warehouse)
         print(f"[Warehouse {warehouse}] SQL Params: {sql_params}")
@@ -945,27 +946,57 @@ def get_warehouse_stock_data(warehouse, warehouse_name, filters=None):
         warehouse_data = []
         s_no = 1
         
-        for item in items:
-            stock_data = get_warehouse_item_data(item.item_code, warehouse, filters)
+        if item_filter_value:
+            # If filtering by specific item, just process that one item
+            if items:
+                item = items[0]
+                stock_data = get_warehouse_item_data(item.item_code, warehouse, filters)
+                
+                item_code = item.item_code or ""
+                item_name = item.item_name or ""
+                particulars = f"{item_code} - {item_name}" if item_code and item_name else (item_code or item_name)
+                
+                warehouse_data.append({
+                    "s_no": s_no,
+                    "item_code": item_code,
+                    "item_name": item_name,
+                    "particulars": particulars,
+                    "opening_balance": stock_data.get("opening_balance", 0),
+                    "received_vendor": stock_data.get("received_vendor", 0),
+                    "courier_returned": stock_data.get("courier_returned", 0),
+                    "transferred_in": stock_data.get("transferred_in", 0),
+                    "transferred_out": stock_data.get("transferred_out", 0),
+                    "delivered": stock_data.get("delivered", 0),
+                    "ending_balance": stock_data.get("ending_balance", 0)
+                })
+        else:
+            # Create a dictionary for quick lookup
+            items_dict = {item.item_code: item for item in items}
             
-            item_code = item.item_code or ""
-            item_name = item.item_name or ""
-            particulars = f"{item_code} - {item_name}" if item_code and item_name else (item_code or item_name)
-            
-            warehouse_data.append({
-                "s_no": s_no,
-                "item_code": item_code,
-                "item_name": item_name,
-                "particulars": particulars,
-                "opening_balance": stock_data.get("opening_balance", 0),
-                "received_vendor": stock_data.get("received_vendor", 0),
-                "courier_returned": stock_data.get("courier_returned", 0),
-                "transferred_in": stock_data.get("transferred_in", 0),
-                "transferred_out": stock_data.get("transferred_out", 0),
-                "delivered": stock_data.get("delivered", 0),
-                "ending_balance": stock_data.get("ending_balance", 0)
-            })
-            s_no += 1
+            # Process items in SPECIFIC_ITEM_CODES order (same as main report)
+            for item_code in SPECIFIC_ITEM_CODES:
+                if item_code in items_dict:
+                    item = items_dict[item_code]
+                    stock_data = get_warehouse_item_data(item.item_code, warehouse, filters)
+                    
+                    item_code = item.item_code or ""
+                    item_name = item.item_name or ""
+                    particulars = f"{item_code} - {item_name}" if item_code and item_name else (item_code or item_name)
+                    
+                    warehouse_data.append({
+                        "s_no": s_no,
+                        "item_code": item_code,
+                        "item_name": item_name,
+                        "particulars": particulars,
+                        "opening_balance": stock_data.get("opening_balance", 0),
+                        "received_vendor": stock_data.get("received_vendor", 0),
+                        "courier_returned": stock_data.get("courier_returned", 0),
+                        "transferred_in": stock_data.get("transferred_in", 0),
+                        "transferred_out": stock_data.get("transferred_out", 0),
+                        "delivered": stock_data.get("delivered", 0),
+                        "ending_balance": stock_data.get("ending_balance", 0)
+                    })
+                    s_no += 1
             
         return warehouse_data
         
@@ -1336,7 +1367,7 @@ def calculate_kpis_for_specific_items(data, filters=None):
         totals["pending_dispatches_count"] = pending_dispatches_count
         
         # Get Sales Invoice statistics
-        sales_invoice_stats = get_sales_invoice_stats()
+        sales_invoice_stats = get_sales_invoice_stats(filters)
         totals["sales_invoice_count"] = sales_invoice_stats.get("invoice_count", 0)
         totals["sales_invoice_total_qty"] = sales_invoice_stats.get("total_qty", 0)
         totals["sales_invoice_total_amount"] = sales_invoice_stats.get("total_amount", 0)
@@ -1383,10 +1414,28 @@ def get_pending_dispatches_count():
         frappe.log_error(f"Error getting pending dispatches count: {str(e)}", "Pending Dispatches Count Error")
         return 0
 
-def get_sales_invoice_stats():
-    """Get Sales Invoice count, total quantity, and total amount"""
+def get_sales_invoice_stats(filters=None):
+    """Get Sales Invoice count, total quantity, and total amount filtered by date range"""
     try:
-        result = frappe.db.sql("""
+        if filters is None:
+            filters = {}
+        
+        # Build date filter
+        date_filter = ""
+        sql_params = {}
+        
+        if filters.get('from_date') and filters.get('to_date'):
+            date_filter = "AND si.posting_date BETWEEN %(from_date)s AND %(to_date)s"
+            sql_params['from_date'] = filters.get('from_date')
+            sql_params['to_date'] = filters.get('to_date')
+        elif filters.get('from_date'):
+            date_filter = "AND si.posting_date >= %(from_date)s"
+            sql_params['from_date'] = filters.get('from_date')
+        elif filters.get('to_date'):
+            date_filter = "AND si.posting_date <= %(to_date)s"
+            sql_params['to_date'] = filters.get('to_date')
+        
+        result = frappe.db.sql(f"""
             SELECT 
                 COUNT(DISTINCT si.name) as invoice_count,
                 COALESCE(SUM(sii.qty), 0) as total_qty,
@@ -1394,7 +1443,8 @@ def get_sales_invoice_stats():
             FROM `tabSales Invoice` si
             LEFT JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
             WHERE si.docstatus = 1
-        """, as_dict=True)
+            {date_filter}
+        """, sql_params, as_dict=True)
         
         if result and len(result) > 0:
             return {

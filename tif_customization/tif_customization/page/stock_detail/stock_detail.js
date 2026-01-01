@@ -275,6 +275,9 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 				border: 1px solid #ced4da;
 				border-radius: 4px;
 				font-size: 14px;
+				min-height: 45px;
+				height: auto;
+				line-height: 1.5;
 			}
 			.filter-section .btn {
 				margin-right: 10px;
