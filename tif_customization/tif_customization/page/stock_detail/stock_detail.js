@@ -29,7 +29,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 						<option value="">All Items</option>
 					</select>
 				</div>
-				<div class="col-md-2">
+				<div class="col-md-2" style="display: none;">
 					<label>Warehouse:</label>
 					<select id="warehouse-filter" class="form-control">
 						<option value="">All Warehouses</option>
@@ -869,18 +869,27 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 				<style id="print-styles-stock-detail" media="print">
 					@page {
 						size: A4 landscape;
-						margin: 0.8cm;
+						margin: 0.30cm 0cm 0.5cm 0cm;
+					}
+					@page:first {
+						size: A4 landscape;
+						margin: 0.30cm 0cm 0.5cm 0cm;
 					}
 					* {
 						background: white !important;
 						color: black !important;
 						-webkit-print-color-adjust: exact !important;
 						print-color-adjust: exact !important;
+						box-sizing: border-box !important;
 					}
-					body {
+					html, body {
 						font-size: 10pt;
 						background: white !important;
 						color: black !important;
+						margin: 0 !important;
+						padding: 0 !important;
+						width: 100% !important;
+						max-width: 100% !important;
 					}
 					.filter-section,
 					.btn,
@@ -894,33 +903,47 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 					.footer {
 						display: none !important;
 					}
-					.page-content {
+					.page-content,
+					.page-content-wrapper,
+					.layout-main,
+					.main-section,
+					.container {
 						margin: 0 !important;
 						padding: 0 !important;
 						background: white !important;
+						width: 100% !important;
+						max-width: 100% !important;
 					}
 					.stock-detail-container {
 						padding: 0 !important;
+						margin: 0 !important;
 						background: white !important;
 						color: black !important;
+						width: 100% !important;
+						max-width: 100% !important;
+						box-sizing: border-box !important;
+						position: relative !important;
+						left: 0 !important;
+						right: 0 !important;
 					}
 					.print-header-stock-detail {
 						text-align: center;
-						margin-bottom: 20px;
+						margin-bottom: 30px;
+						margin-top: 0;
 						border-bottom: 2px solid black !important;
-						padding-bottom: 10px;
+						padding-bottom: 15px;
 						page-break-after: avoid;
 						background: white !important;
 						color: black !important;
 					}
 					.print-header-stock-detail h2 {
-						margin: 0;
+						margin: 0 0 15px 0;
 						font-size: 18pt;
 						font-weight: bold;
 						color: black !important;
 					}
 					.print-header-stock-detail h3 {
-						margin: 5px 0;
+						margin: 10px 0 5px 0;
 						font-size: 16pt;
 						font-weight: bold;
 						color: black !important;
@@ -1001,8 +1024,12 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 					.report-section {
 						display: block !important;
 						margin-bottom: 20px;
+						margin-top: 15px;
 						page-break-inside: avoid;
 						background: white !important;
+					}
+					.report-section:first-of-type {
+						margin-top: 0;
 					}
 					.report-section[style*="display: none"],
 					.head-office-section[style*="display: none"],
@@ -1020,10 +1047,14 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 						font-size: 14pt;
 						font-weight: bold;
 						margin-bottom: 10px;
+						margin-top: 10px;
 						border-bottom: 1px solid black !important;
 						padding-bottom: 5px;
 						color: black !important;
 						background: white !important;
+					}
+					.report-section:first-child h4 {
+						margin-top: 0 !important;
 					}
 					.report-section h5 {
 						font-size: 12pt;
@@ -1041,12 +1072,14 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 					}
 					table {
 						display: table !important;
-						font-size: 9pt;
-						width: 100%;
-						border-collapse: collapse;
+						font-size: 6.5pt !important;
+						width: 100% !important;
+						max-width: 100% !important;
+						border-collapse: collapse !important;
 						page-break-inside: auto;
 						background: white !important;
 						border: 1px solid black !important;
+						table-layout: fixed !important;
 					}
 					table thead {
 						display: table-header-group;
@@ -1068,10 +1101,32 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 					}
 					table th,
 					table td {
-						padding: 5px;
+						padding: 2px 2px !important;
 						border: 1px solid black !important;
 						background: white !important;
 						color: black !important;
+						word-wrap: break-word !important;
+						overflow: hidden !important;
+						text-overflow: ellipsis !important;
+						font-size: 6.5pt !important;
+					}
+					table th:first-child,
+					table td:first-child {
+						width: 4% !important;
+						padding: 2px 1px !important;
+					}
+					table th:nth-child(2),
+					table td:nth-child(2) {
+						width: 18% !important;
+						white-space: normal !important;
+						text-align: left !important;
+						padding: 2px 3px !important;
+					}
+					table th:nth-child(n+3),
+					table td:nth-child(n+3) {
+						width: 7.8% !important;
+						text-align: right !important;
+						padding: 2px 2px !important;
 					}
 					table th {
 						background: white !important;
@@ -1120,6 +1175,27 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 					.stock-detail-container {
 						max-width: 100% !important;
 						overflow: visible !important;
+						width: 100% !important;
+					}
+					.page-content-wrapper,
+					.page-content {
+						margin: 0 !important;
+						padding: 0 !important;
+						width: 100% !important;
+						max-width: 100% !important;
+					}
+					.table-container {
+						width: 100% !important;
+						max-width: 100% !important;
+						overflow: visible !important;
+						margin: 0 !important;
+						padding: 0 !important;
+					}
+					.report-content {
+						width: 100% !important;
+						max-width: 100% !important;
+						margin: 0 !important;
+						padding: 0 !important;
 					}
 					/* Better page break handling */
 					.report-section:not(:last-child) {
