@@ -23,6 +23,7 @@ if (typeof window.DispatchReport === 'undefined') {
 			city: '',
 			province: '',
 			area: '',
+			country: '',
 			book_type: ''
 		};
 		this.data = {};
@@ -38,7 +39,7 @@ if (typeof window.DispatchReport === 'undefined') {
 		me.load_filter_options();
 		
 		// Create layout
-		me.page.add_inner_message(__('Loading Dispatch Report...'));
+		// me.page.add_inner_message(__('Loading Dispatch Report...'));
 		
 		// Build HTML structure
 		let html = `
@@ -75,6 +76,14 @@ if (typeof window.DispatchReport === 'undefined') {
 					<div class="row">
 						<div class="col-md-3">
 							<div class="form-group">
+								<label>Country</label>
+								<select id="country-filter" class="form-control">
+									<option value="">All Countries</option>
+								</select>
+							</div>
+						</div>
+						<div class="col-md-3">
+							<div class="form-group">
 								<label>City</label>
 								<select id="city-filter" class="form-control">
 									<option value="">All Cities</option>
@@ -97,6 +106,8 @@ if (typeof window.DispatchReport === 'undefined') {
 								</select>
 							</div>
 						</div>
+					</div>
+					<div class="row">
 						<div class="col-md-3">
 							<div class="form-group">
 								<label>Book Type</label>
@@ -143,6 +154,7 @@ if (typeof window.DispatchReport === 'undefined') {
 									<th>Delivery Note</th>
 									<th>Posting Date</th>
 									<th>Customer</th>
+									<th>Country</th>
 									<th>City</th>
 									<th>Province</th>
 									<th>Area</th>
@@ -155,12 +167,12 @@ if (typeof window.DispatchReport === 'undefined') {
 							</thead>
 							<tbody id="dispatch-tbody">
 								<tr>
-									<td colspan="11" class="text-center">Loading data...</td>
+									<td colspan="12" class="text-center">Loading data...</td>
 								</tr>
 							</tbody>
 							<tfoot id="dispatch-tfoot" style="display: none;">
 								<tr style="background-color: #f8f9fa; font-weight: bold;">
-									<td colspan="8" class="text-right"><strong>Total</strong></td>
+									<td colspan="9" class="text-right"><strong>Total</strong></td>
 									<td class="text-right"><strong id="total-quantity">0</strong></td>
 									<td colspan="2"></td>
 								</tr>
@@ -288,10 +300,24 @@ if (typeof window.DispatchReport === 'undefined') {
 		me.filter_options.areas.forEach(area => {
 			areaSelect.append(`<option value="${area}">${area}</option>`);
 		});
+		
+		// Populate countries
+		let countrySelect = $('#country-filter');
+		if (me.filter_options.countries) {
+			me.filter_options.countries.forEach(country => {
+				countrySelect.append(`<option value="${country}">${country}</option>`);
+			});
+		}
 	}
 	
 	apply_filters() {
 		let me = this;
+		
+		// Show loader and disable button
+		const applyButton = $('#apply-filters');
+		const originalButtonText = applyButton.html();
+		applyButton.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Searching...');
+		me.showLoader();
 		
 		// Get filter values
 		let fromDate = $('#from-date').val();
@@ -324,6 +350,7 @@ if (typeof window.DispatchReport === 'undefined') {
 		me.filters.city = $('#city-filter').val() || '';
 		me.filters.province = $('#province-filter').val() || '';
 		me.filters.area = $('#area-filter').val() || '';
+		me.filters.country = $('#country-filter').val() || '';
 		me.filters.book_type = $('#book-type-filter').val() || '';
 		
 		// Load data with filters
@@ -375,6 +402,7 @@ if (typeof window.DispatchReport === 'undefined') {
 		$('#city-filter').val('');
 		$('#province-filter').val('');
 		$('#area-filter').val('');
+		$('#country-filter').val('');
 		$('#book-type-filter').val('');
 		
 		// Reload data
@@ -384,7 +412,7 @@ if (typeof window.DispatchReport === 'undefined') {
 	load_data() {
 		let me = this;
 		
-		$('#dispatch-tbody').html('<tr><td colspan="11" class="text-center">Loading data...</td></tr>');
+		$('#dispatch-tbody').html('<tr><td colspan="12" class="text-center">Loading data...</td></tr>');
 		
 		frappe.call({
 			method: 'tif_customization.tif_customization.page.dispatch_report.dispatch_report.get_dispatch_report_data',
@@ -396,9 +424,33 @@ if (typeof window.DispatchReport === 'undefined') {
 					me.data = r.message;
 					me.render_kpis();
 					me.render_table();
+					
+					// Hide loader and re-enable button after data is rendered
+					requestAnimationFrame(function() {
+						setTimeout(function() {
+							me.hideLoader();
+							const applyButton = $('#apply-filters');
+							if (applyButton.length) {
+								applyButton.prop('disabled', false).html('<i class="fa fa-filter"></i> Apply Filters');
+							}
+						}, 200);
+					});
 				} else {
-					$('#dispatch-tbody').html(`<tr><td colspan="11" class="text-center text-danger">Error loading data: ${r.message?.error || 'Unknown error'}</td></tr>`);
+					$('#dispatch-tbody').html(`<tr><td colspan="12" class="text-center text-danger">Error loading data: ${r.message?.error || 'Unknown error'}</td></tr>`);
+					me.hideLoader();
+					const applyButton = $('#apply-filters');
+					if (applyButton.length) {
+						applyButton.prop('disabled', false).html('<i class="fa fa-filter"></i> Apply Filters');
+					}
 				}
+			},
+			error: function(err) {
+				me.hideLoader();
+				const applyButton = $('#apply-filters');
+				if (applyButton.length) {
+					applyButton.prop('disabled', false).html('<i class="fa fa-filter"></i> Apply Filters');
+				}
+				$('#dispatch-tbody').html(`<tr><td colspan="12" class="text-center text-danger">Error loading data. Please try again.</td></tr>`);
 			}
 		});
 	}
@@ -450,7 +502,7 @@ if (typeof window.DispatchReport === 'undefined') {
 		tbody.empty();
 		
 		if (dispatch_data.length === 0) {
-			tbody.append('<tr><td colspan="11" class="text-center">No data found for the selected filters</td></tr>');
+			tbody.append('<tr><td colspan="12" class="text-center">No data found for the selected filters</td></tr>');
 			tfoot.hide();
 		} else {
 			let total_quantity = 0;
@@ -467,6 +519,7 @@ if (typeof window.DispatchReport === 'undefined') {
 						<td><a href="/app/delivery-note/${row.delivery_note_no}" target="_blank">${row.delivery_note_no || '-'}</a></td>
 						<td>${row.posting_date || '-'}</td>
 						<td>${row.customer_name || row.customer || '-'}</td>
+						<td>${row.country || '-'}</td>
 						<td>${row.city || '-'}</td>
 						<td>${row.province || '-'}</td>
 						<td>${row.area || '-'}</td>
@@ -492,13 +545,14 @@ if (typeof window.DispatchReport === 'undefined') {
 		
 		// Create CSV
 		let csv = [];
-		csv.push('Delivery Note,Posting Date,Customer,City,Province,Area,Book/Item,Book Type,Quantity,UOM,Created By');
+		csv.push('Delivery Note,Posting Date,Customer,Country,City,Province,Area,Book/Item,Book Type,Quantity,UOM,Created By');
 		
 		dispatch_data.forEach(row => {
 			csv.push([
 				row.delivery_note_no || '',
 				row.posting_date || '',
 				row.customer_name || row.customer || '',
+				row.country || '',
 				row.city || '',
 				row.province || '',
 				row.area || '',
@@ -666,6 +720,48 @@ if (typeof window.DispatchReport === 'undefined') {
 		
 		// Trigger print
 		window.print();
+	}
+	
+	showLoader() {
+		let me = this;
+		// Remove existing loader if any
+		$('#dispatch-report-loader').remove();
+		
+		// Create loader overlay
+		const loader = $(`
+			<div id="dispatch-report-loader" style="
+				position: fixed;
+				top: 0;
+				left: 0;
+				width: 100%;
+				height: 100%;
+				background: rgba(0, 0, 0, 0.5);
+				z-index: 9999;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+			">
+				<div style="
+					background: white;
+					padding: 30px 50px;
+					border-radius: 8px;
+					box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+					text-align: center;
+				">
+					<i class="fa fa-spinner fa-spin" style="font-size: 32px; color: #2d5a27; margin-bottom: 15px;"></i>
+					<div style="font-size: 16px; color: #495057; font-weight: 500;">Searching...</div>
+					<div style="font-size: 12px; color: #6c757d; margin-top: 5px;">Please wait while we fetch your data</div>
+				</div>
+			</div>
+		`);
+		$('body').append(loader);
+	}
+	
+	hideLoader() {
+		let me = this;
+		$('#dispatch-report-loader').fadeOut(300, function() {
+			$(this).remove();
+		});
 	}
 	};
 }

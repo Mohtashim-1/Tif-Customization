@@ -58,6 +58,7 @@ def get_dispatch_data(filters):
 		city = filters.get('city')
 		province = filters.get('province')
 		area = filters.get('area')
+		country = filters.get('country')
 		book_type = filters.get('book_type')  # MQH or Qaida
 		
 		# Build filters
@@ -104,6 +105,10 @@ def get_dispatch_data(filters):
 			where_conditions.append("(addr.custom_area = %(area)s OR addr.custom_area IS NULL)")
 			params['area'] = area
 		
+		if country:
+			where_conditions.append("(addr.country = %(country)s OR addr.country IS NULL)")
+			params['country'] = country
+		
 		where_clause = " AND ".join(where_conditions)
 		
 		# Main query - get delivery notes with items
@@ -116,6 +121,7 @@ def get_dispatch_data(filters):
 				COALESCE(addr.city, '') AS city,
 				COALESCE(addr.state, '') AS province,
 				COALESCE(addr.custom_area, '') AS area,
+				COALESCE(addr.country, '') AS country,
 				dni.item_code,
 				dni.item_name,
 				dni.qty,
@@ -238,16 +244,26 @@ def get_filter_options():
 			ORDER BY custom_area ASC
 		""", as_dict=True)
 		
+		# Get unique countries from addresses
+		countries = frappe.db.sql("""
+			SELECT DISTINCT country
+			FROM `tabAddress`
+			WHERE country IS NOT NULL AND country != ''
+			ORDER BY country ASC
+		""", as_dict=True)
+		
 		return {
 			'cities': [c['city'] for c in cities],
 			'provinces': [p['province'] for p in provinces],
-			'areas': [a['area'] for a in areas]
+			'areas': [a['area'] for a in areas],
+			'countries': [co['country'] for co in countries]
 		}
 	except Exception as e:
 		frappe.log_error(f"Error in get_filter_options: {str(e)}", "Dispatch Report Error")
 		return {
 			'cities': [],
 			'provinces': [],
-			'areas': []
+			'areas': [],
+			'countries': []
 		}
 

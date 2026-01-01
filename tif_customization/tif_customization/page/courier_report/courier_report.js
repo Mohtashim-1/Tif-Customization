@@ -728,7 +728,7 @@ if (typeof window.CourierDashboard === 'undefined') {
 						// Ignore destroy errors - chart might already be destroyed or container removed
 						console.log('Chart destroy warning (non-critical):', e.message || e);
 					}
-					me.charts.delivery_mode_distribution = null;
+						me.charts.delivery_mode_distribution = null;
 				}
 				
 				// Create new chart - don't call empty(), let the chart library handle the container
