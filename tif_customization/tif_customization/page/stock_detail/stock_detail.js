@@ -17,11 +17,11 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 			<div class="row">
 				<div class="col-md-2">
 					<label>From Date:</label>
-					<input type="date" id="from-date" class="form-control" value="2025-09-01">
+					<input type="date" id="from-date" class="form-control">
 				</div>
 				<div class="col-md-2">
 					<label>To Date:</label>
-					<input type="date" id="to-date" class="form-control" value="2025-09-30">
+					<input type="date" id="to-date" class="form-control">
 				</div>
 				<div class="col-md-2">
 					<label>Item:</label>
@@ -360,6 +360,36 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 	`);
 	
 	page.main.append(container);
+	
+	// Helper function to get first and last day of current month
+	function getCurrentMonthDates() {
+		const now = new Date();
+		const year = now.getFullYear();
+		const month = now.getMonth(); // 0-11
+		
+		// Format date as YYYY-MM-DD using local time
+		function formatDate(date) {
+			const y = date.getFullYear();
+			const m = String(date.getMonth() + 1).padStart(2, '0');
+			const d = String(date.getDate()).padStart(2, '0');
+			return `${y}-${m}-${d}`;
+		}
+		
+		// First day of current month
+		const firstDay = new Date(year, month, 1);
+		const fromDate = formatDate(firstDay);
+		
+		// Last day of current month
+		const lastDay = new Date(year, month + 1, 0);
+		const toDate = formatDate(lastDay);
+		
+		return { fromDate, toDate };
+	}
+	
+	// Set default dates to current month
+	const { fromDate: defaultFromDate, toDate: defaultToDate } = getCurrentMonthDates();
+	$('#from-date').val(defaultFromDate);
+	$('#to-date').val(defaultToDate);
 	
 	// Load data and populate tables
 	loadStockData();
@@ -795,14 +825,15 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 	
 	// Reset filters
 	function resetFilters() {
-		$('#from-date').val('2025-09-01');
-		$('#to-date').val('2025-09-30');
+		const { fromDate, toDate } = getCurrentMonthDates();
+		$('#from-date').val(fromDate);
+		$('#to-date').val(toDate);
 		$('#item-filter').val('');
 		$('#warehouse-filter').val('');
 		$('#item-group-filter').val('');
 		
 		// Reset table headers to default
-		updateTableHeaders('2025-09-01', '2025-09-30');
+		updateTableHeaders(fromDate, toDate);
 		
 		// Show all warehouse sections
 		updateWarehouseSections('');
@@ -836,8 +867,9 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 	// Print Report
 	function printReport() {
 		// Get date range from filters
-		const fromDate = $('#from-date').val() || '2025-09-01';
-		const toDate = $('#to-date').val() || '2025-09-30';
+		const { fromDate: defaultFromDate, toDate: defaultToDate } = getCurrentMonthDates();
+		const fromDate = $('#from-date').val() || defaultFromDate;
+		const toDate = $('#to-date').val() || defaultToDate;
 		
 		// Get selected warehouse filter value
 		const selectedWarehouse = $('#warehouse-stock-filter').val() || '';
