@@ -1220,3 +1220,174 @@ def get_mr_po_acknowledgment_counts(filters=None):
 			'pending_acknowledgment_count': 0
 		}
 
+@frappe.whitelist()
+def get_invoice_details_by_period(filters=None):
+	"""Get invoice/payment entry details for a specific period and cost center, grouped by date"""
+	try:
+		if isinstance(filters, str):
+			import json
+			filters = json.loads(filters)
+		elif not filters:
+			filters = {}
+		
+		period = filters.get('period')
+		cost_center = filters.get('cost_center')
+		period_type = filters.get('period_type', 'monthly')
+		
+		if not period or not cost_center:
+			return {'error': 'Period and cost center are required'}
+		
+		# Calculate date range from period
+		from_date, to_date = get_period_date_range(period, period_type)
+		
+		# Build cost center expressions
+		pi_cc_expr = _build_pi_cc_expr()
+		
+		# Build cost center filter - exact match
+		pi_filter_params = {}
+		if cost_center == 'Not Set':
+			pi_filter_sql = f"AND ({pi_cc_expr} = 'Not Set' OR {pi_cc_expr} IS NULL)"
+		else:
+			pi_filter_sql = f"AND {pi_cc_expr} = %(cost_center)s"
+			pi_filter_params = {'cost_center': cost_center}
+		
+		# Query Purchase Invoices with date grouping
+		pi_query = f"""
+			SELECT DISTINCT
+				pi.name AS invoice_name,
+				pi.posting_date,
+				COALESCE(pi.posting_date, DATE(pi.creation)) AS transaction_date,
+				pi.supplier,
+				pi.grand_total,
+				pi.status,
+				pi.bill_no,
+				pi.bill_date
+			FROM `tabPurchase Invoice` pi
+			JOIN `tabPurchase Invoice Item` pii ON pii.parent = pi.name
+			WHERE pi.docstatus = 1
+			{pi_filter_sql}
+			AND COALESCE(pi.posting_date, DATE(pi.creation)) BETWEEN %(from_date)s AND %(to_date)s
+			ORDER BY COALESCE(pi.posting_date, DATE(pi.creation)) DESC, pi.name DESC
+		"""
+		
+		params = {
+			'from_date': from_date,
+			'to_date': to_date,
+			**pi_filter_params
+		}
+		
+		invoices = frappe.db.sql(pi_query, params, as_dict=True)
+		
+		# Also get payment entries for these invoices
+		if invoices:
+			invoice_names = [inv['invoice_name'] for inv in invoices]
+			
+			payment_query = """
+				SELECT 
+					per.reference_name AS invoice_name,
+					pe.name AS payment_entry,
+					pe.posting_date AS payment_date,
+					pe.mode_of_payment,
+					per.allocated_amount AS payment_amount,
+					pe.paid_amount
+				FROM `tabPayment Entry` pe
+				INNER JOIN `tabPayment Entry Reference` per ON per.parent = pe.name
+				WHERE pe.docstatus = 1
+				AND per.reference_doctype = 'Purchase Invoice'
+				AND per.reference_name IN %(invoice_names)s
+				ORDER BY pe.posting_date DESC, pe.name DESC
+			"""
+			
+			payment_params = {'invoice_names': invoice_names}
+			payments = frappe.db.sql(payment_query, payment_params, as_dict=True)
+			
+			# Group payments by invoice
+			payments_by_invoice = {}
+			for payment in payments:
+				inv_name = payment['invoice_name']
+				if inv_name not in payments_by_invoice:
+					payments_by_invoice[inv_name] = []
+				payments_by_invoice[inv_name].append(payment)
+			
+			# Attach payments to invoices
+			for invoice in invoices:
+				invoice['payments'] = payments_by_invoice.get(invoice['invoice_name'], [])
+		else:
+			for invoice in invoices:
+				invoice['payments'] = []
+		
+		# Group by date
+		date_groups = {}
+		for invoice in invoices:
+			date_key = invoice['transaction_date'].strftime('%Y-%m-%d') if isinstance(invoice['transaction_date'], (datetime, type(getdate('2000-01-01')))) else str(invoice['transaction_date'])
+			
+			if date_key not in date_groups:
+				date_groups[date_key] = []
+			
+			# Format dates for JSON serialization
+			if invoice.get('posting_date'):
+				if hasattr(invoice['posting_date'], 'strftime'):
+					invoice['posting_date'] = invoice['posting_date'].strftime('%Y-%m-%d')
+			if invoice.get('transaction_date'):
+				if hasattr(invoice['transaction_date'], 'strftime'):
+					invoice['transaction_date'] = invoice['transaction_date'].strftime('%Y-%m-%d')
+			if invoice.get('bill_date'):
+				if hasattr(invoice['bill_date'], 'strftime'):
+					invoice['bill_date'] = invoice['bill_date'].strftime('%Y-%m-%d')
+			
+			for payment in invoice.get('payments', []):
+				if payment.get('payment_date'):
+					if hasattr(payment['payment_date'], 'strftime'):
+						payment['payment_date'] = payment['payment_date'].strftime('%Y-%m-%d')
+			
+			date_groups[date_key].append(invoice)
+		
+		# Convert to list and sort by date (descending)
+		result = []
+		for date_key in sorted(date_groups.keys(), reverse=True):
+			result.append({
+				'date': date_key,
+				'invoices': date_groups[date_key]
+			})
+		
+		return {'data': result}
+		
+	except Exception as e:
+		frappe.log_error(f"Error in get_invoice_details_by_period: {str(e)}", "Procurement Expense Error")
+		return {'error': str(e)}
+
+def get_period_date_range(period, period_type='monthly'):
+	"""Get from_date and to_date for a given period"""
+	try:
+		if period_type == 'monthly':
+			# period format: YYYY-MM
+			year, month = period.split('-')
+			from_date = get_first_day(f"{year}-{month}-01")
+			to_date = get_last_day(f"{year}-{month}-01")
+		elif period_type == 'quarterly':
+			# period format: YYYY-Q1, YYYY-Q2, etc.
+			year, quarter = period.split('-Q')
+			quarter = int(quarter)
+			month = (quarter - 1) * 3 + 1
+			from_date = get_first_day(f"{year}-{month:02d}-01")
+			# Last month of quarter
+			last_month = quarter * 3
+			to_date = get_last_day(f"{year}-{last_month:02d}-01")
+		elif period_type == 'yearly':
+			# period format: YYYY
+			year = period
+			from_date = get_first_day(f"{year}-01-01")
+			to_date = get_last_day(f"{year}-12-01")
+		else:
+			# Default to monthly
+			year, month = period.split('-')
+			from_date = get_first_day(f"{year}-{month}-01")
+			to_date = get_last_day(f"{year}-{month}-01")
+		
+		return from_date, to_date
+	except Exception as e:
+		frappe.log_error(f"Error in get_period_date_range: {str(e)}", "Procurement Expense Error")
+		# Fallback to current month
+		today_date = today()
+		return get_first_day(today_date), get_last_day(today_date)
+

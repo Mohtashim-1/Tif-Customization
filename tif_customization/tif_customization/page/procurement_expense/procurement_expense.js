@@ -397,6 +397,45 @@ if (typeof window.ProcurementExpense === 'undefined') {
 			
 			$(me.page.body).html(html);
 			
+			// Add CSS for expandable rows
+			if (!$('#expense-head-styles').length) {
+				let styles = `
+					<style id="expense-head-styles">
+						.expense-head-row:hover {
+							background-color: #f5f5f5 !important;
+						}
+						.expense-head-row.expanded {
+							background-color: #e8f4f8 !important;
+						}
+						.expand-icon {
+							display: inline-block;
+							width: 12px;
+						}
+						.period-row:hover {
+							background-color: #f0f8ff !important;
+						}
+						.period-row.expanded {
+							background-color: #e6f3ff !important;
+						}
+						.period-expand-icon {
+							display: inline-block;
+							width: 12px;
+						}
+						.invoice-details-row {
+							background-color: #f8f9fa !important;
+						}
+						.invoice-details-row.date-group-header {
+							background-color: #e9ecef !important;
+							font-weight: bold;
+						}
+						.invoice-details-row.invoice-row:hover {
+							background-color: #ffffff !important;
+						}
+					</style>
+				`;
+				$('head').append(styles);
+			}
+			
 			// Setup cost center multi-select
 			setTimeout(() => {
 				let costCenterField = $('#cost-center-filter');
@@ -540,6 +579,8 @@ if (typeof window.ProcurementExpense === 'undefined') {
 						me.render_kpis();
 						me.render_summary_table();
 						me.render_detail_table();
+						me.setup_expense_head_handlers();
+						me.setup_period_row_handlers();
 					me.render_payment_table();
 					me.render_charts();
 					me.render_payment_charts();
@@ -582,13 +623,6 @@ if (typeof window.ProcurementExpense === 'undefined') {
 			
 			let kpi_html = `
 				<div class="col-md-3">
-					<div class="kpi-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-						<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Total Purchase Invoice Expense</h5>
-						<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${format_currency_value(total_po)}</h2>
-						<p style="margin: 5px 0 0 0; font-size: 12px; opacity: 0.8;">${total_po_count} Purchase Invoices</p>
-					</div>
-				</div>
-				<div class="col-md-3">
 					<div class="kpi-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
 						<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Total Payments</h5>
 						<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${format_currency_value(total_payment)}</h2>
@@ -604,7 +638,7 @@ if (typeof window.ProcurementExpense === 'undefined') {
 				</div>
 				<div class="col-md-3">
 					<div class="kpi-card" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-						<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Other Payments</h5>
+						<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Cheque Payments</h5>
 						<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${format_currency_value(total_other)}</h2>
 						<p style="margin: 5px 0 0 0; font-size: 12px; opacity: 0.8;">${((total_other / total_payment) * 100).toFixed(1) || 0}% of Total</p>
 					</div>
@@ -641,20 +675,360 @@ if (typeof window.ProcurementExpense === 'undefined') {
 			let tbody = $('#summary-tbody');
 			tbody.empty();
 			
+			console.log('[Render Summary Table] Summary data length:', summary.length);
+			
 			if (summary.length === 0) {
+				console.log('[Render Summary Table] No summary data found');
 				tbody.append('<tr><td colspan="3" class="text-center">No data found</td></tr>');
 			} else {
-				summary.forEach(row => {
+				summary.forEach((row, index) => {
+					let cost_center_key = row.cost_center || (row.cost_center_name || '-');
+					let cost_center_name = row.cost_center_name || row.cost_center || '-';
+					
+					if (index < 3) {
+						console.log('[Render Summary Table] Sample row', index, '- Cost Center ID:', row.cost_center, 'Cost Center Name:', cost_center_name, 'Key:', cost_center_key);
+					}
+					
 					let tr = $(`
-						<tr>
-							<td>${row.cost_center_name || row.cost_center || '-'}</td>
+						<tr class="expense-head-row" data-cost-center="${cost_center_key}" data-cost-center-name="${cost_center_name}" style="cursor: pointer;">
+							<td>
+								<i class="fa fa-chevron-right expand-icon" style="margin-right: 8px; transition: transform 0.2s;"></i>
+								${cost_center_name}
+							</td>
 							<td class="text-right">${format_currency_value(row.po_amount || 0)}</td>
 							<td class="text-right">${format_number_value(row.po_count || 0)}</td>
 						</tr>
 					`);
 					tbody.append(tr);
 				});
+				
+				console.log('[Render Summary Table] Total rows rendered:', tbody.find('tr').length);
 			}
+		}
+		
+		setup_expense_head_handlers() {
+			let me = this;
+			console.log('[Expense Head Handlers] Setting up click handlers...');
+			console.log('[Expense Head Handlers] Found expense head rows:', $('.expense-head-row').length);
+			console.log('[Expense Head Handlers] Found detail rows:', $('#detail-tbody tr[data-cost-center]').length);
+			
+			// Add click handlers for expand/collapse (called after both tables are rendered)
+			$('.expense-head-row').off('click').on('click', function() {
+				let $row = $(this);
+				let costCenter = $row.data('cost-center');
+				let costCenterName = $row.data('cost-center-name');
+				let $icon = $row.find('.expand-icon');
+				
+				console.log('[Expense Head Click] Cost Center ID:', costCenter);
+				console.log('[Expense Head Click] Cost Center Name:', costCenterName);
+				console.log('[Expense Head Click] Is expanded:', $row.hasClass('expanded'));
+				
+				// Toggle icon
+				if ($row.hasClass('expanded')) {
+					console.log('[Expense Head Click] Collapsing...');
+					$row.removeClass('expanded');
+					$icon.removeClass('fa-chevron-down').addClass('fa-chevron-right');
+					// Show all detail rows
+					let detailRowsCount = $('#detail-tbody tr[data-cost-center]').length;
+					console.log('[Expense Head Click] Showing all detail rows. Count:', detailRowsCount);
+					$('#detail-tbody tr[data-cost-center]').show();
+				} else {
+					console.log('[Expense Head Click] Expanding...');
+					// Collapse all other rows
+					$('.expense-head-row').removeClass('expanded');
+					$('.expand-icon').removeClass('fa-chevron-down').addClass('fa-chevron-right');
+					
+					// Expand this row
+					$row.addClass('expanded');
+					$icon.removeClass('fa-chevron-right').addClass('fa-chevron-down');
+					
+					// Hide all detail rows first, then show only this cost center's rows
+					// Match by both cost_center ID and cost_center_name for better matching
+					let matchedCount = 0;
+					let totalDetailRows = $('#detail-tbody tr[data-cost-center]').length;
+					console.log('[Expense Head Click] Total detail rows to check:', totalDetailRows);
+					
+					// Helper function to normalize cost center names for comparison
+					function normalizeName(name) {
+						if (!name) return '';
+						// Remove common prefixes/suffixes and extra spaces
+						return name.toString().trim().toLowerCase();
+					}
+					
+					// Extract name parts for flexible matching
+					// The summary name might be just "Other Expenses" while detail might be "17113 - Other Expenses - TIF"
+					let costCenterNameOnly = costCenterName;
+					let costCenterIdNameOnly = '';
+					
+					// Extract name from cost center ID (e.g., "17113 - Other Expenses - TIF" -> "Other Expenses")
+					if (costCenter && costCenter.includes(' - ')) {
+						let parts = costCenter.split(' - ');
+						if (parts.length > 1) {
+							costCenterIdNameOnly = parts.slice(1).join(' - ').replace(/ - TIF$/, '').trim();
+						}
+					}
+					
+					console.log('[Expense Head Click] Searching for - ID:', costCenter, 'Name:', costCenterName, 'ID Name Only:', costCenterIdNameOnly);
+					
+					$('#detail-tbody tr[data-cost-center]').each(function() {
+						let $detailRow = $(this);
+						let detailCostCenter = $detailRow.data('cost-center');
+						let detailCostCenterName = $detailRow.data('cost-center-name');
+						
+						let isMatch = false;
+						
+						// Match by exact ID only (most reliable and precise)
+						// This ensures we only show the specific cost center, not all with similar names
+						if (detailCostCenter === costCenter) {
+							isMatch = true;
+							console.log('[Expense Head Click] ✓ Match by exact ID:', detailCostCenter);
+						}
+						
+						if (isMatch) {
+							console.log('[Expense Head Click] >>> SHOWING ROW - ID:', detailCostCenter, 'Name:', detailCostCenterName);
+							$detailRow.css('display', 'table-row'); // Force table-row display
+							$detailRow.removeClass('hidden').removeAttr('hidden');
+							matchedCount++;
+							console.log('[Expense Head Click] Row display after show:', $detailRow.css('display'), 'isVisible:', $detailRow.is(':visible'));
+						} else {
+							$detailRow.css('display', 'none');
+						}
+					});
+					
+					console.log('[Expense Head Click] Matched rows:', matchedCount);
+					
+					// Verify and ensure rows are visible
+					setTimeout(function() {
+						let visibleRows = $('#detail-tbody tr[data-cost-center]').filter(':visible').length;
+						let totalRows = $('#detail-tbody tr[data-cost-center]').length;
+						console.log('[Expense Head Click] Visible rows after filtering:', visibleRows, 'out of', totalRows);
+						
+						// Log all matched rows to verify they exist
+						$('#detail-tbody tr[data-cost-center]').each(function() {
+							let $detailRow = $(this);
+							let detailCostCenter = $detailRow.data('cost-center');
+							if (detailCostCenter === costCenter) {
+								let display = $detailRow.css('display');
+								let isVisible = $detailRow.is(':visible');
+								let offset = $detailRow.offset();
+								console.log('[Expense Head Click] Matched row check - ID:', detailCostCenter, 'Display:', display, 'Visible:', isVisible, 'Offset:', offset);
+								
+								// Force visibility
+								if (!isVisible || display === 'none') {
+									console.log('[Expense Head Click] Forcing visibility for row:', detailCostCenter);
+									$detailRow.css({
+										'display': 'table-row',
+										'visibility': 'visible',
+										'opacity': '1'
+									}).show();
+								}
+							}
+						});
+						
+						// Scroll to detail table if it exists
+						let $detailTable = $('#detail-table');
+						if ($detailTable.length && matchedCount > 0) {
+							console.log('[Expense Head Click] Scrolling to detail table');
+							$('html, body').animate({
+								scrollTop: $detailTable.offset().top - 100
+							}, 500);
+						}
+					}, 100);
+				}
+			});
+			
+			console.log('[Expense Head Handlers] Click handlers setup complete');
+		}
+		
+		setup_period_row_handlers() {
+			let me = this;
+			console.log('[Period Row Handlers] Setting up click handlers...');
+			
+			// Remove existing handlers to avoid duplicates
+			$('.period-row').off('click');
+			
+			$('.period-row').on('click', function() {
+				let $row = $(this);
+				let period = $row.data('period');
+				let costCenter = $row.data('cost-center');
+				let $icon = $row.find('.period-expand-icon');
+				let $invoiceDetailsRow = $row.next('.invoice-details-row');
+				
+				console.log('[Period Row Click] Period:', period, 'Cost Center:', costCenter);
+				
+				if ($row.hasClass('expanded')) {
+					// Collapse
+					console.log('[Period Row Click] Collapsing...');
+					$row.removeClass('expanded');
+					$icon.removeClass('fa-chevron-down').addClass('fa-chevron-right');
+					$invoiceDetailsRow.remove();
+				} else {
+					// Expand - fetch and show invoice details
+					console.log('[Period Row Click] Expanding...');
+					
+					// Collapse other expanded period rows
+					$('.period-row.expanded').each(function() {
+						$(this).removeClass('expanded');
+						$(this).find('.period-expand-icon').removeClass('fa-chevron-down').addClass('fa-chevron-right');
+						$(this).next('.invoice-details-row').remove();
+					});
+					
+					// Expand this row
+					$row.addClass('expanded');
+					$icon.removeClass('fa-chevron-right').addClass('fa-chevron-down');
+					
+					// Show loading state
+					let loadingRow = $(`
+						<tr class="invoice-details-row">
+							<td colspan="4" style="background-color: #f8f9fa; padding: 20px;">
+								<div class="text-center">
+									<i class="fa fa-spinner fa-spin"></i> Loading invoice details...
+								</div>
+							</td>
+						</tr>
+					`);
+					$row.after(loadingRow);
+					
+					// Fetch invoice details
+					frappe.call({
+						method: 'tif_customization.tif_customization.page.procurement_expense.procurement_expense.get_invoice_details_by_period',
+						args: {
+							filters: {
+								period: period,
+								cost_center: costCenter,
+								period_type: me.filters.period_type || 'monthly'
+							}
+						},
+						callback: function(r) {
+							loadingRow.remove();
+							
+							if (r.exc || r.message.error) {
+								console.error('[Period Row Click] Error fetching invoice details:', r.exc || r.message.error);
+								let errorRow = $(`
+									<tr class="invoice-details-row">
+										<td colspan="4" style="background-color: #fff3cd; padding: 20px; color: #856404;">
+											<div class="text-center">
+												<i class="fa fa-exclamation-triangle"></i> Error loading invoice details. Please try again.
+											</div>
+										</td>
+									</tr>
+								`);
+								$row.after(errorRow);
+								return;
+							}
+							
+							let invoiceData = r.message.data || [];
+							console.log('[Period Row Click] Received invoice data:', invoiceData.length, 'date groups');
+							
+							if (invoiceData.length === 0) {
+								let noDataRow = $(`
+									<tr class="invoice-details-row">
+										<td colspan="4" style="background-color: #f8f9fa; padding: 20px;">
+											<div class="text-center text-muted">
+												No invoice details found for this period.
+											</div>
+										</td>
+									</tr>
+								`);
+								$row.after(noDataRow);
+								return;
+							}
+							
+							// Build invoice details HTML
+							let detailsHtml = '';
+							
+							invoiceData.forEach((dateGroup) => {
+								let date = dateGroup.date;
+								let invoices = dateGroup.invoices || [];
+								
+								detailsHtml += `
+									<tr class="invoice-details-row date-group-header">
+										<td colspan="4" style="background-color: #e9ecef; padding: 10px; font-weight: bold; border-left: 4px solid #007bff;">
+											<i class="fa fa-calendar"></i> ${date} (${invoices.length} invoice${invoices.length !== 1 ? 's' : ''})
+										</td>
+									</tr>
+								`;
+								
+								invoices.forEach((invoice) => {
+									let invoiceName = invoice.invoice_name || '-';
+									let supplier = invoice.supplier || '-';
+									let grandTotal = parseFloat(invoice.grand_total || 0);
+									let postingDate = invoice.posting_date || invoice.transaction_date || '-';
+									let billNo = invoice.bill_no || '-';
+									let billDate = invoice.bill_date || '-';
+									let status = invoice.status || '-';
+									let payments = invoice.payments || [];
+									
+									detailsHtml += `
+										<tr class="invoice-details-row invoice-row">
+											<td style="padding-left: 40px; background-color: #ffffff;">
+												<div style="margin-bottom: 5px;">
+													<strong>
+														<a href="/app/purchase-invoice/${invoiceName}" target="_blank" style="color: #007bff;">
+															${invoiceName}
+														</a>
+													</strong>
+												</div>
+												<div style="font-size: 11px; color: #666;">
+													Posting: ${postingDate} | Bill: ${billNo} ${billDate ? '(' + billDate + ')' : ''} | Status: ${status}
+												</div>
+											</td>
+											<td style="background-color: #ffffff;">
+												${supplier}
+											</td>
+											<td class="text-right" style="background-color: #ffffff;">
+												${format_currency_value(grandTotal)}
+											</td>
+											<td style="background-color: #ffffff;">
+												${payments.length > 0 ? `
+													<div style="font-size: 11px;">
+														${payments.map(p => `
+															<div style="margin-bottom: 3px;">
+																<a href="/app/payment-entry/${p.payment_entry}" target="_blank" style="color: #28a745;">
+																	${p.payment_entry}
+																</a>
+																(${p.payment_date || '-'}) - ${format_currency_value(parseFloat(p.payment_amount || p.paid_amount || 0))}
+																<br>
+																<span style="color: #666; font-size: 10px;">${p.mode_of_payment || 'Not Specified'}</span>
+															</div>
+														`).join('')}
+													</div>
+												` : '<span class="text-muted">No payments</span>'}
+											</td>
+										</tr>
+									`;
+								});
+							});
+							
+							let detailsRow = $(detailsHtml);
+							$row.after(detailsRow);
+							
+							// Scroll to the expanded row
+							setTimeout(() => {
+								$('html, body').animate({
+									scrollTop: $row.offset().top - 100
+								}, 300);
+							}, 100);
+						},
+						error: function(r) {
+							loadingRow.remove();
+							console.error('[Period Row Click] API call failed:', r);
+							let errorRow = $(`
+								<tr class="invoice-details-row">
+									<td colspan="4" style="background-color: #f8d7da; padding: 20px; color: #721c24;">
+										<div class="text-center">
+											<i class="fa fa-exclamation-circle"></i> Failed to load invoice details. Please refresh and try again.
+										</div>
+									</td>
+								</tr>
+							`);
+							$row.after(errorRow);
+						}
+					});
+				}
+			});
+			
+			console.log('[Period Row Handlers] Click handlers setup complete');
 		}
 		
 		render_detail_table() {
@@ -663,20 +1037,76 @@ if (typeof window.ProcurementExpense === 'undefined') {
 			let tbody = $('#detail-tbody');
 			tbody.empty();
 			
+			console.log('[Render Detail Table] Expense data length:', expense_data.length);
+			
 			if (expense_data.length === 0) {
+				console.log('[Render Detail Table] No expense data found');
 				tbody.append('<tr><td colspan="4" class="text-center">No data found</td></tr>');
 			} else {
-				expense_data.forEach(row => {
+				// Remove duplicates by grouping by period and cost_center
+				let uniqueData = {};
+				expense_data.forEach((row, index) => {
+					let period = row.period || '-';
+					let cost_center = row.cost_center || (row.cost_center_name || '-');
+					let key = `${period}_${cost_center}`;
+					
+					if (index < 3) {
+						console.log('[Render Detail Table] Sample row', index, '- Period:', period, 'Cost Center ID:', row.cost_center, 'Cost Center Name:', row.cost_center_name);
+					}
+					
+					if (!uniqueData[key]) {
+						uniqueData[key] = {
+							period: period,
+							cost_center: cost_center,
+							cost_center_name: row.cost_center_name || row.cost_center || '-',
+							po_amount: 0,
+							po_count: 0
+						};
+					}
+					// Sum amounts and counts for duplicates
+					uniqueData[key].po_amount += parseFloat(row.po_amount || 0);
+					uniqueData[key].po_count += parseInt(row.po_count || 0);
+				});
+				
+				// Convert to array and sort
+				let sortedData = Object.values(uniqueData).sort((a, b) => {
+					if (a.period !== b.period) {
+						return a.period.localeCompare(b.period);
+					}
+					return (a.cost_center_name || a.cost_center).localeCompare(b.cost_center_name || b.cost_center);
+				});
+				
+				console.log('[Render Detail Table] Unique rows after deduplication:', sortedData.length);
+				console.log('[Render Detail Table] Sample unique data (first 3):', sortedData.slice(0, 3).map(r => ({ period: r.period, cost_center_id: r.cost_center, cost_center_name: r.cost_center_name })));
+				
+				// Render rows (visible by default, will be filtered when cost center is clicked)
+				sortedData.forEach((row, index) => {
+					let cost_center_key = row.cost_center || (row.cost_center_name || '-');
+					let cost_center_name = row.cost_center_name || row.cost_center || '-';
+					let period = row.period || '-';
+					
+					if (index < 3) {
+						console.log('[Render Detail Table] Rendering row', index, '- Cost Center Key:', cost_center_key, 'Cost Center Name:', cost_center_name, 'Period:', period);
+					}
+					
 					let tr = $(`
-						<tr>
-							<td>${row.period || '-'}</td>
-							<td>${row.cost_center_name || row.cost_center || '-'}</td>
+						<tr class="period-row" data-cost-center="${cost_center_key}" data-cost-center-name="${cost_center_name}" data-period="${period}" style="cursor: pointer;">
+							<td>
+								<i class="fa fa-chevron-right period-expand-icon" style="margin-right: 8px; transition: transform 0.2s;"></i>
+								${period}
+							</td>
+							<td>${cost_center_name}</td>
 							<td class="text-right">${format_currency_value(row.po_amount || 0)}</td>
 							<td class="text-right">${format_number_value(row.po_count || 0)}</td>
 						</tr>
 					`);
 					tbody.append(tr);
 				});
+				
+				console.log('[Render Detail Table] Total rows rendered:', tbody.find('tr').length);
+				
+				// Setup period row click handlers
+				me.setup_period_row_handlers();
 			}
 		}
 		
