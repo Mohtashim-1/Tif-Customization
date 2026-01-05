@@ -29,6 +29,7 @@ def get_procurement_expense_data(filters=None):
 		department_data = get_department_wise_data(filters)
 		payment_result = get_payment_entry_details(filters)
 		item_payment_data = get_item_payment_details(filters)
+		department_payment_data = get_department_payment_data(filters)
 		
 		# Handle payment_data structure (can be dict with summary/details or list)
 		if isinstance(payment_result, dict) and 'summary' in payment_result:
@@ -51,6 +52,7 @@ def get_procurement_expense_data(filters=None):
 			'payment_data': payment_data,
 			'not_specified_details': not_specified_details,
 			'item_payment_data': item_payment_data,
+			'department_payment_data': department_payment_data,
 			'voucher_wise_details': voucher_wise_details,
 			'period_type': period_type,
 			'mr_count': mr_po_counts.get('mr_count', 0),
@@ -353,6 +355,8 @@ def get_summary_data(filters):
 			cc = row.get("cost_center")
 			if cc and cc != "Not Set":
 				name = None
+				parent_cost_center = None
+				parent_cost_center_name = None
 
 				# try Department (name is usually docname)
 				try:
@@ -366,10 +370,22 @@ def get_summary_data(filters):
 						name = frappe.db.get_value("Cost Center", cc, "cost_center_name")
 					except Exception:
 						pass
+				
+				# Get parent cost center (department)
+				try:
+					parent_cost_center = frappe.db.get_value("Cost Center", cc, "parent_cost_center")
+					if parent_cost_center:
+						parent_cost_center_name = frappe.db.get_value("Cost Center", parent_cost_center, "cost_center_name")
+				except Exception:
+					pass
 
 				row["cost_center_name"] = name or cc
+				row["parent_cost_center"] = parent_cost_center or None
+				row["parent_cost_center_name"] = parent_cost_center_name or None
 			else:
 				row["cost_center_name"] = "Not Set"
+				row["parent_cost_center"] = None
+				row["parent_cost_center_name"] = None
 
 		result.sort(key=lambda x: x.get('po_amount', 0), reverse=True)
 		return result
@@ -446,18 +462,7 @@ def get_department_wise_data(filters=None):
 		cost_centers = filters.get('cost_centers', []) or []
 		
 		# Build department filter - get from custom_department or cost center
-		pi_dept_expr = "COALESCE(NULLIF(pi.custom_department, ''), 'Not Set')"
 		has_custom_dept = frappe.db.has_column('Purchase Invoice', 'custom_department')
-		
-		if not has_custom_dept:
-			# If no custom_department, try to get from Cost Center's parent
-			pi_dept_expr = """
-				COALESCE(
-					NULLIF((SELECT parent_cost_center FROM `tabCost Center` WHERE name = pii.cost_center), ''),
-					NULLIF((SELECT department FROM `tabCost Center` WHERE name = pii.cost_center), ''),
-					'Not Set'
-				)
-			"""
 		
 		dept_filter_sql = ""
 		dept_filter_params = {}
@@ -469,6 +474,14 @@ def get_department_wise_data(filters=None):
 		# Get PI amount expression
 		pi_amt_expr = _get_pi_amount_expr()
 		
+		# Build department expression - use JOIN instead of subquery to avoid alias issues
+		if has_custom_dept:
+			pi_dept_expr = "COALESCE(NULLIF(pi.custom_department, ''), NULLIF(cc.parent_cost_center, ''), 'Not Set')"
+			join_clause = "LEFT JOIN `tabCost Center` cc ON cc.name = COALESCE(NULLIF(pii.cost_center, ''), NULLIF(pi.cost_center, ''))"
+		else:
+			pi_dept_expr = "COALESCE(NULLIF(cc.parent_cost_center, ''), 'Not Set')"
+			join_clause = "LEFT JOIN `tabCost Center` cc ON cc.name = COALESCE(NULLIF(pii.cost_center, ''), NULLIF(pi.cost_center, ''))"
+		
 		query = f"""
 			SELECT
 				{pi_dept_expr} AS department,
@@ -476,6 +489,7 @@ def get_department_wise_data(filters=None):
 				COUNT(DISTINCT pi.name) AS po_count
 			FROM `tabPurchase Invoice` pi
 			JOIN `tabPurchase Invoice Item` pii ON pii.parent = pi.name
+			{join_clause}
 			WHERE pi.docstatus = 1
 			AND COALESCE(pi.posting_date, DATE(pi.creation)) BETWEEN %(from_date)s AND %(to_date)s
 			{dept_filter_sql}
@@ -1390,4 +1404,465 @@ def get_period_date_range(period, period_type='monthly'):
 		# Fallback to current month
 		today_date = today()
 		return get_first_day(today_date), get_last_day(today_date)
+
+@frappe.whitelist()
+def get_department_payment_data(filters=None):
+	"""Get payment data grouped by department cost centers (parent cost centers)"""
+	try:
+		if isinstance(filters, str):
+			import json
+			filters = json.loads(filters)
+		elif not filters:
+			filters = {}
+		
+		from_date = filters.get('from_date')
+		to_date = filters.get('to_date')
+		
+		# Define the department cost centers (parent cost centers)
+		# These are the actual cost center names in the database
+		department_cost_centers = [
+			'CEE',                    # ID: 1 - CEE - TIF
+			'QPS',                    # ID: 2 - QPS - TIF
+			'TPS',                    # ID: 3 - TPS - TIF
+			'FINANCE',                # ID: 5 - FINANCE - TIF
+			'ADMIN',                  # ID: 8 - ADMIN - TIF
+			'MARKETING',              # ID: 9 - MARKETING - TIF
+			'HEAD OFFICE',            # ID: 10 - HEAD OFFICE - TIF
+			'HR',                     # ID: 011 - HR - TIF
+			# Note: The following may need to be added if they exist:
+			# 'MEHMOODABAD CENTER',
+			# 'Regional Office',
+			# 'INFORMATION TECHNOLOGY'
+		]
+		
+		# Get all cost center IDs for these department names
+		dept_cost_center_map = {}  # Maps dept_name -> cc_id
+		dept_cost_center_ids = []
+		all_dept_cc_ids = set()  # All department CC IDs including children
+		
+		print(f"[Department Payment Debug] Looking for {len(department_cost_centers)} department cost centers")
+		
+		# First, let's see what cost centers exist that might match
+		all_ccs = frappe.db.sql("""
+			SELECT name, cost_center_name, parent_cost_center
+			FROM `tabCost Center`
+			WHERE cost_center_name LIKE '%TIF%'
+			ORDER BY cost_center_name
+		""", as_dict=True)
+		print(f"[Department Payment Debug] Found {len(all_ccs)} cost centers with 'TIF' in name")
+		if len(all_ccs) > 0 and len(all_ccs) <= 50:
+			print(f"[Department Payment Debug] Sample cost centers:")
+			for cc in all_ccs[:10]:
+				print(f"  - {cc.cost_center_name} (ID: {cc.name}, Parent: {cc.parent_cost_center})")
+		
+		for dept_name in department_cost_centers:
+			try:
+				# Try exact match first
+				cc_id = frappe.db.get_value('Cost Center', {'cost_center_name': dept_name}, 'name')
+				if not cc_id:
+					# Try case-insensitive match
+					cc_id = frappe.db.sql("""
+						SELECT name FROM `tabCost Center`
+						WHERE LOWER(cost_center_name) = LOWER(%s)
+						LIMIT 1
+					""", dept_name, as_dict=True)
+					if cc_id:
+						cc_id = cc_id[0].name
+				
+				if cc_id:
+					dept_cost_center_map[dept_name] = cc_id
+					dept_cost_center_ids.append(cc_id)
+					all_dept_cc_ids.add(cc_id)
+					print(f"[Department Payment Debug] Found: {dept_name} -> {cc_id}")
+					
+					# Get all child cost centers recursively
+					child_ccs = frappe.db.sql("""
+						SELECT name FROM `tabCost Center`
+						WHERE lft >= (SELECT lft FROM `tabCost Center` WHERE name = %s)
+						AND rgt <= (SELECT rgt FROM `tabCost Center` WHERE name = %s)
+					""", (cc_id, cc_id), as_dict=True)
+					
+					for child in child_ccs:
+						all_dept_cc_ids.add(child.name)
+					print(f"[Department Payment Debug]   - Found {len(child_ccs)} child cost centers")
+				else:
+					print(f"[Department Payment Debug] NOT FOUND: {dept_name}")
+					# Try to find similar names
+					similar = frappe.db.sql("""
+						SELECT name, cost_center_name FROM `tabCost Center`
+						WHERE cost_center_name LIKE %s
+						LIMIT 5
+					""", f"%{dept_name.replace(' - TIF', '')}%", as_dict=True)
+					if similar:
+						print(f"[Department Payment Debug]   Similar cost centers found:")
+						for s in similar:
+							print(f"     - {s.cost_center_name} (ID: {s.name})")
+			except Exception as e:
+				print(f"[Department Payment Debug] Error getting cost center for {dept_name}: {str(e)}")
+				pass
+		
+		print(f"[Department Payment Debug] Total department IDs found: {len(dept_cost_center_ids)}")
+		print(f"[Department Payment Debug] Department map: {dept_cost_center_map}")
+		
+		if not dept_cost_center_ids:
+			print(f"[Department Payment Debug] WARNING: No department cost centers found! Returning empty data.")
+			# Return empty data for all departments
+			return [{
+				'department': dept_name,
+				'department_id': None,
+				'payment_amount': 0,
+				'payment_count': 0,
+				'invoice_count': 0
+			} for dept_name in department_cost_centers]
+		
+		# Check if custom_department column exists
+		has_custom_dept = frappe.db.has_column('Purchase Invoice', 'custom_department')
+		
+		# Build cost center expression
+		if has_custom_dept:
+			cc_expr = "COALESCE(NULLIF(pii.cost_center, ''), NULLIF(pi.cost_center, ''), NULLIF(pi.custom_department, ''))"
+		else:
+			cc_expr = "COALESCE(NULLIF(pii.cost_center, ''), NULLIF(pi.cost_center, ''))"
+		
+		# Query Payment Entries linked to Purchase Invoices
+		# Get individual payment entries and match to departments in Python (more reliable)
+		query = f"""
+			SELECT 
+				pe.name AS payment_entry,
+				per.allocated_amount AS payment_amount,
+				per.reference_name AS invoice_name,
+				{cc_expr} AS invoice_cost_center,
+				pe.cost_center AS payment_cost_center
+			FROM `tabPayment Entry` pe
+			INNER JOIN `tabPayment Entry Reference` per ON per.parent = pe.name
+			INNER JOIN `tabPurchase Invoice` pi ON pi.name = per.reference_name
+			INNER JOIN `tabPurchase Invoice Item` pii ON pii.parent = pi.name
+			WHERE pe.docstatus = 1
+			AND pi.docstatus = 1
+			AND pe.payment_type = 'Pay'
+			AND per.reference_doctype = 'Purchase Invoice'
+			AND pe.posting_date BETWEEN %(from_date)s AND %(to_date)s
+			AND (COALESCE({cc_expr}, NULLIF(pe.cost_center, '')) IS NOT NULL
+				AND COALESCE({cc_expr}, NULLIF(pe.cost_center, '')) != ''
+				AND COALESCE({cc_expr}, NULLIF(pe.cost_center, '')) != 'Not Set')
+		"""
+		
+		params = {
+			'from_date': from_date,
+			'to_date': to_date
+		}
+		
+		payment_entries = frappe.db.sql(query, params, as_dict=True)
+		
+		# Debug: Check if we're getting payment entries
+		print(f"[Department Payment Debug] Total payment entries found: {len(payment_entries)}")
+		if payment_entries:
+			print(f"[Department Payment Debug] Sample payment entry: {payment_entries[0]}")
+		else:
+			print(f"[Department Payment Debug] WARNING: No payment entries found!")
+			print(f"[Department Payment Debug] Query: {query}")
+			print(f"[Department Payment Debug] Params: {params}")
+		
+		# Group by cost center in Python
+		cost_center_payments = {}
+		for pe in payment_entries:
+			# Use invoice cost center first, fallback to payment entry cost center
+			cc = pe.get('invoice_cost_center') or pe.get('payment_cost_center')
+			if not cc or cc == 'Not Set':
+				continue
+			
+			if cc not in cost_center_payments:
+				cost_center_payments[cc] = {
+					'cost_center': cc,
+					'payment_amount': 0,
+					'payment_count': 0,
+					'invoice_count': set()
+				}
+			
+			cost_center_payments[cc]['payment_amount'] += flt(pe.get('payment_amount', 0))
+			cost_center_payments[cc]['payment_count'] += 1
+			if pe.get('invoice_name'):
+				cost_center_payments[cc]['invoice_count'].add(pe.get('invoice_name'))
+		
+		# Convert to list format for processing
+		results = []
+		for cc, data in cost_center_payments.items():
+			results.append({
+				'invoice_cost_center': cc,
+				'payment_amount': data['payment_amount'],
+				'payment_count': data['payment_count'],
+				'invoice_count': len(data['invoice_count'])
+			})
+		
+		# Debug logging
+		print(f"[Department Payment Debug] Found {len(results)} unique cost centers with payments")
+		print(f"[Department Payment Debug] Total payment amount across all cost centers: {sum(r.get('payment_amount', 0) for r in results)}")
+		if results:
+			print(f"[Department Payment Debug] Top 5 cost centers by amount:")
+			sorted_results = sorted(results, key=lambda x: x.get('payment_amount', 0), reverse=True)
+			for r in sorted_results[:5]:
+				print(f"  - {r.get('invoice_cost_center')}: {r.get('payment_amount', 0)}")
+		print(f"[Department Payment Debug] Department map: {dept_cost_center_map}")
+		print(f"[Department Payment Debug] Department IDs: {dept_cost_center_ids}")
+		if results:
+			print(f"[Department Payment Debug] Sample row: {results[0]}")
+		print(f"[Department Payment Debug] Query: {query}")
+		print(f"[Department Payment Debug] Params: {params}")
+		
+		# Map each payment to its department
+		department_data = {}
+		
+		for row in results:
+			invoice_cc_id = row.get('invoice_cost_center')
+			if not invoice_cc_id:
+				continue
+			
+			print(f"[Department Payment Debug] Processing row - CC: {invoice_cc_id}, Amount: {row.get('payment_amount', 0)}")
+			
+			# First, try quick check if invoice_cc_id is directly a department
+			department_name = None
+			department_id = None
+			cc_doc = None
+			cc_name = None
+			parent_cc_id = None
+			
+			# Quick check: is this cost center ID directly a department?
+			if invoice_cc_id in dept_cost_center_ids:
+				for dept_name, dept_id in dept_cost_center_map.items():
+					if dept_id == invoice_cc_id:
+						department_name = dept_name
+						department_id = dept_id
+						break
+			
+			# Quick check: is this cost center a child of any department?
+			if not department_name and invoice_cc_id in all_dept_cc_ids:
+				# Find which department this cost center belongs to using SQL
+				try:
+					dept_ancestor = frappe.db.sql("""
+						SELECT dept.name, dept.cost_center_name
+						FROM `tabCost Center` dept
+						INNER JOIN `tabCost Center` child ON 
+							child.lft >= dept.lft AND child.rgt <= dept.rgt
+						WHERE child.name = %s
+						AND dept.name IN %s
+						ORDER BY dept.lft
+						LIMIT 1
+					""", (invoice_cc_id, tuple(dept_cost_center_ids)), as_dict=True)
+					
+					if dept_ancestor:
+						dept_cc_id = dept_ancestor[0].name
+						for dept_name, dept_id in dept_cost_center_map.items():
+							if dept_id == dept_cc_id:
+								department_name = dept_name
+								department_id = dept_id
+								break
+				except Exception as e:
+					print(f"[Department Payment Debug] Error finding department ancestor for {invoice_cc_id}: {str(e)}")
+			
+			# Quick check: is this cost center name directly a department?
+			if not department_name and invoice_cc_id in department_cost_centers:
+				department_name = invoice_cc_id
+				department_id = dept_cost_center_map.get(invoice_cc_id)
+			
+			# If not found, get cost center details and traverse
+			if not department_name:
+				# Get cost center details - try by ID first, then by name
+				try:
+					if frappe.db.exists('Cost Center', invoice_cc_id):
+						cc_doc = frappe.get_doc('Cost Center', invoice_cc_id)
+						cc_name = cc_doc.cost_center_name
+						parent_cc_id = cc_doc.parent_cost_center
+					else:
+						# Try to get by name
+						cc_id_by_name = frappe.db.get_value('Cost Center', {'cost_center_name': invoice_cc_id}, ['name', 'cost_center_name', 'parent_cost_center'], as_dict=True)
+						if cc_id_by_name:
+							cc_doc = frappe.get_doc('Cost Center', cc_id_by_name.name)
+							cc_name = cc_id_by_name.cost_center_name
+							parent_cc_id = cc_id_by_name.parent_cost_center
+							invoice_cc_id = cc_id_by_name.name  # Update to use the actual ID
+				except Exception as e:
+					print(f"[Department Payment Debug] Error getting cost center {invoice_cc_id}: {str(e)}")
+					cc_doc = None
+			
+			# Determine which department this payment belongs to (if not already found)
+			if cc_doc and not department_name:
+				cost_center_name = cc_doc.cost_center_name
+				parent_cc_id = cc_doc.parent_cost_center
+				
+				# Priority 1: Check if the cost center itself is a department
+				if invoice_cc_id in dept_cost_center_ids:
+					for dept_name, dept_id in dept_cost_center_map.items():
+						if dept_id == invoice_cc_id:
+							department_name = dept_name
+							department_id = dept_id
+							break
+				# Priority 2: Check if cost center name matches any department name (exact or contains)
+				elif cost_center_name:
+					# Try exact match first
+					if cost_center_name in department_cost_centers:
+						department_name = cost_center_name
+						department_id = dept_cost_center_map.get(cost_center_name)
+					else:
+						# Try partial match - check if department name is in cost center name or vice versa
+						for dept_name in department_cost_centers:
+							# Remove " - TIF" suffix for comparison
+							dept_base = dept_name.replace(' - TIF', '').strip()
+							cc_base = cost_center_name.replace(' - TIF', '').strip()
+							if dept_base in cc_base or cc_base in dept_base or dept_base == cc_base:
+								department_name = dept_name
+								department_id = dept_cost_center_map.get(dept_name)
+								break
+				# Priority 3: Check if the parent cost center is a department
+				elif parent_cc_id and parent_cc_id in dept_cost_center_ids:
+					for dept_name, dept_id in dept_cost_center_map.items():
+						if dept_id == parent_cc_id:
+							department_name = dept_name
+							department_id = dept_id
+							break
+				# Priority 4: Traverse up the tree to find department
+				else:
+					try:
+						current_cc_id = invoice_cc_id
+						max_depth = 15  # Increased depth
+						depth = 0
+						
+						while current_cc_id and depth < max_depth:
+							# Check if current is a department (by ID) - direct match
+							if current_cc_id in dept_cost_center_ids:
+								for dept_name, dept_id in dept_cost_center_map.items():
+									if dept_id == current_cc_id:
+										department_name = dept_name
+										department_id = dept_id
+										break
+								if department_name:
+									break
+							
+							# Check if current is a child of any department (using all_dept_cc_ids)
+							if not department_name and current_cc_id in all_dept_cc_ids:
+								# Find which department this cost center belongs to
+								# Use SQL to find the department ancestor efficiently
+								dept_ancestor = frappe.db.sql("""
+									SELECT dept.name, dept.cost_center_name
+									FROM `tabCost Center` dept
+									INNER JOIN `tabCost Center` child ON 
+										child.lft >= dept.lft AND child.rgt <= dept.rgt
+									WHERE child.name = %s
+									AND dept.name IN %s
+									ORDER BY dept.lft
+									LIMIT 1
+								""", (current_cc_id, tuple(dept_cost_center_ids)), as_dict=True)
+								
+								if dept_ancestor:
+									dept_cc_id = dept_ancestor[0].name
+									for dept_name, dept_id in dept_cost_center_map.items():
+										if dept_id == dept_cc_id:
+											department_name = dept_name
+											department_id = dept_id
+											break
+								if department_name:
+									break
+							
+							# Also check if current cost center name matches a department
+							if not department_name:
+								try:
+									current_cc_name = frappe.db.get_value('Cost Center', current_cc_id, 'cost_center_name')
+									if current_cc_name:
+										# Try exact match
+										if current_cc_name in department_cost_centers:
+											department_name = current_cc_name
+											department_id = dept_cost_center_map.get(current_cc_name)
+											if department_name:
+												break
+										# Try partial match (remove " - TIF" suffix)
+										else:
+											cc_base = current_cc_name.replace(' - TIF', '').strip()
+											for dept_name in department_cost_centers:
+												dept_base = dept_name.replace(' - TIF', '').strip()
+												if dept_base == cc_base or dept_base in cc_base or cc_base in dept_base:
+													department_name = dept_name
+													department_id = dept_cost_center_map.get(dept_name)
+													break
+											if department_name:
+												break
+								except:
+									pass
+							
+							# Get parent
+							try:
+								parent = frappe.db.get_value('Cost Center', current_cc_id, 'parent_cost_center')
+								if not parent or parent == current_cc_id:
+									break
+								current_cc_id = parent
+								depth += 1
+							except:
+								break
+					except Exception as e:
+						print(f"[Department Payment Debug] Error in traversal for {invoice_cc_id}: {str(e)}")
+						pass
+			elif not department_name:
+				# If cost center doc not found and not already matched, try direct name match
+				if invoice_cc_id in department_cost_centers:
+					department_name = invoice_cc_id
+					department_id = dept_cost_center_map.get(invoice_cc_id)
+				# Also try matching the original value as a name
+				elif invoice_cc_id in dept_cost_center_map.values():
+					# invoice_cc_id is actually a department ID
+					for dept_name, dept_id in dept_cost_center_map.items():
+						if dept_id == invoice_cc_id:
+							department_name = dept_name
+							department_id = dept_id
+							break
+			
+			# Only process if we found a matching department
+			if department_name:
+				print(f"[Department Payment Debug] Matched to department: {department_name}, Amount: {row.get('payment_amount', 0)}")
+				if department_name not in department_data:
+					department_data[department_name] = {
+						'department': department_name,
+						'department_id': department_id,
+						'payment_amount': 0,
+						'payment_count': 0,
+						'invoice_count': 0
+					}
+				
+				department_data[department_name]['payment_amount'] += flt(row.get('payment_amount', 0))
+				department_data[department_name]['payment_count'] += row.get('payment_count', 0)
+				department_data[department_name]['invoice_count'] += row.get('invoice_count', 0)
+			else:
+				# Debug: log unmatched rows
+				print(f"[Department Payment Debug] Unmatched row - CC ID: {invoice_cc_id}, CC Name: {cc_name if cc_doc else 'N/A'}, Parent: {parent_cc_id}, Payment Amount: {row.get('payment_amount', 0)}")
+		
+		# Convert to list and ensure all departments are included (even with 0 amounts)
+		result = []
+		for dept_name in department_cost_centers:
+			if dept_name in department_data:
+				result.append(department_data[dept_name])
+			else:
+				# Include department even if no payments
+				result.append({
+					'department': dept_name,
+					'department_id': dept_cost_center_map.get(dept_name),
+					'payment_amount': 0,
+					'payment_count': 0,
+					'invoice_count': 0
+				})
+		
+		# Sort by payment amount descending
+		result.sort(key=lambda x: x.get('payment_amount', 0), reverse=True)
+		
+		# Debug logging
+		print(f"[Department Payment Debug] Final result: {len(result)} departments, Total amount: {sum(r.get('payment_amount', 0) for r in result)}")
+		print(f"[Department Payment Debug] Department data keys: {list(department_data.keys())}")
+		print(f"[Department Payment Debug] Final result data:")
+		for r in result:
+			print(f"  - {r.get('department')}: {r.get('payment_amount', 0)}")
+		
+		return result
+		
+	except Exception as e:
+		print(f"[Department Payment Debug] ERROR in get_department_payment_data: {str(e)}")
+		import traceback
+		print(f"[Department Payment Debug] Traceback: {traceback.format_exc()}")
+		frappe.log_error(f"Error in get_department_payment_data: {str(e)}", "Procurement Expense Error")
+		return []
 

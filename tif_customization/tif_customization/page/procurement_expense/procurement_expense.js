@@ -216,6 +216,21 @@ if (typeof window.ProcurementExpense === 'undefined') {
 						</div>
 					</div>
 					
+					<!-- Department Wise Expense Chart -->
+					<div class="row" style="margin-bottom: 20px;">
+						<div class="col-md-12">
+							<div class="panel panel-default">
+								<div class="panel-heading">
+									<h5>Department Wise Expense (Payment Entry)</h5>
+									<p style="margin: 5px 0 0 0; font-size: 11px; color: #666;">Payment amounts grouped by department cost centers</p>
+								</div>
+								<div class="panel-body">
+									<canvas id="chart-department-expense" style="height: 400px;"></canvas>
+								</div>
+							</div>
+						</div>
+					</div>
+					
 					<!-- Payment Entry Charts -->
 					<div class="row" style="margin-bottom: 20px;">
 						<div class="col-md-6">
@@ -576,6 +591,14 @@ if (typeof window.ProcurementExpense === 'undefined') {
 					
 					if (r.message && !r.message.error) {
 						me.data = r.message;
+						
+					console.log('[Load Data] Full data received:', me.data);
+					console.log('[Load Data] Department payment data:', me.data.department_payment_data);
+					if (me.data.department_payment_data && me.data.department_payment_data.length > 0) {
+						console.log('[Load Data] Department payment data details:', JSON.stringify(me.data.department_payment_data, null, 2));
+						console.log('[Load Data] First department item:', me.data.department_payment_data[0]);
+					}
+						
 						me.render_kpis();
 						me.render_summary_table();
 						me.render_detail_table();
@@ -583,6 +606,7 @@ if (typeof window.ProcurementExpense === 'undefined') {
 						me.setup_period_row_handlers();
 					me.render_payment_table();
 					me.render_charts();
+					me.render_department_expense_chart();
 					me.render_payment_charts();
 					me.render_item_payment_charts();
 					me.render_voucher_wise_details();
@@ -1555,41 +1579,121 @@ if (typeof window.ProcurementExpense === 'undefined') {
 				}, 1100);
 			}
 			
-			// Monthly Comparison Chart (Grouped Bar)
-			if (expense_data.length > 0) {
-				let period_data = {};
-				let cost_center_data = {};
+			// Monthly Comparison Chart (Department-wise with Cost Centers)
+			if (summary.length > 0) {
+				// Group cost centers by department
+				let department_data = {};
+				let cost_center_to_dept = {};
 				
-				expense_data.forEach(row => {
-					if (!period_data[row.period]) {
-						period_data[row.period] = {};
-					}
-					let cc = row.cost_center_name || row.cost_center || 'Other';
-					if (!period_data[row.period][cc]) {
-						period_data[row.period][cc] = 0;
-					}
-					period_data[row.period][cc] += row.po_amount || 0;
+				// First pass: map cost centers to departments using parent_cost_center
+				// Only include cost centers that have a parent (child cost centers)
+				console.log('[Chart] Processing summary data for department chart. Total rows:', summary.length);
+				summary.forEach((row, index) => {
+					let cc_id = row.cost_center || '';
+					let cc_name = row.cost_center_name || row.cost_center || 'Not Set';
+					let amount = parseFloat(row.po_amount || 0);
+					let parent_cc_id = row.parent_cost_center || null;
+					let parent_cc_name = row.parent_cost_center_name || null;
 					
-					if (!cost_center_data[cc]) {
-						cost_center_data[cc] = true;
+					if (index < 5) {
+						console.log('[Chart] Row', index, '- CC:', cc_name, 'Parent ID:', parent_cc_id, 'Parent Name:', parent_cc_name);
 					}
+					
+					// Skip cost centers without a parent (they are departments themselves, not child cost centers)
+					if (!parent_cc_id || !parent_cc_name) {
+						if (index < 5) {
+							console.log('[Chart] Skipping row', index, '- no parent');
+						}
+						return; // Skip this row
+					}
+					
+					// Use parent_cost_center_name as department (this is the parent cost center/department)
+					let dept_name = parent_cc_name;
+					let dept_id = parent_cc_id;
+					
+					if (!department_data[dept_name]) {
+						department_data[dept_name] = {
+							department: dept_name,
+							department_id: dept_id,
+							cost_centers: {},
+							total_amount: 0
+						};
+					}
+					
+					// Add this child cost center to its parent department
+					department_data[dept_name].cost_centers[cc_name] = {
+						name: cc_name,
+						amount: amount,
+						id: cc_id
+					};
+					department_data[dept_name].total_amount += amount;
+					
+					cost_center_to_dept[cc_name] = dept_name;
 				});
 				
-				let periods = Object.keys(period_data).sort();
-				let cost_centers = Object.keys(cost_center_data).slice(0, 5); // Top 5 cost centers
+				console.log('[Chart] Department data after processing:', Object.keys(department_data).length, 'departments');
+				console.log('[Chart] Sample departments:', Object.keys(department_data).slice(0, 5));
 				
-				let colors = ['rgba(245, 87, 108, 0.8)', 'rgba(102, 126, 234, 0.8)', 'rgba(67, 233, 123, 0.8)', 
-							  'rgba(255, 193, 7, 0.8)', 'rgba(156, 39, 176, 0.8)'];
-				let borderColors = ['#f5576c', '#667eea', '#43e97b', '#ffc107', '#9c27b0'];
+				// Sort departments by total amount
+				let departments = Object.keys(department_data).sort((a, b) => {
+					return department_data[b].total_amount - department_data[a].total_amount;
+				}).slice(0, 10); // Top 10 departments
 				
-				let datasets = cost_centers.map((cc, idx) => ({
-					label: cc.substring(0, 20),
-					data: periods.map(p => period_data[p][cc] || 0),
-					backgroundColor: colors[idx],
-					borderColor: borderColors[idx],
-					borderWidth: 2,
-					borderRadius: 6
-				}));
+				// Get all unique cost centers across departments (for consistent coloring)
+				let all_cost_centers = [];
+				departments.forEach(dept => {
+					Object.keys(department_data[dept].cost_centers).forEach(cc_name => {
+						if (!all_cost_centers.includes(cc_name)) {
+							all_cost_centers.push(cc_name);
+						}
+					});
+				});
+				
+				// Limit to top cost centers per department to avoid clutter
+				let max_cost_centers_per_dept = 5;
+				departments.forEach(dept => {
+					let cost_centers = Object.values(department_data[dept].cost_centers);
+					cost_centers.sort((a, b) => b.amount - a.amount);
+					department_data[dept].cost_centers_array = cost_centers.slice(0, max_cost_centers_per_dept);
+				});
+				
+				// Get all unique cost center names for datasets
+				let unique_cost_centers = new Set();
+				departments.forEach(dept => {
+					department_data[dept].cost_centers_array.forEach(cc => {
+						unique_cost_centers.add(cc.name);
+					});
+				});
+				
+				unique_cost_centers = Array.from(unique_cost_centers).slice(0, 8); // Max 8 cost centers for readability
+				
+				// Generate colors
+				let colors = [
+					'rgba(245, 87, 108, 0.8)', 'rgba(102, 126, 234, 0.8)', 'rgba(67, 233, 123, 0.8)', 
+					'rgba(255, 193, 7, 0.8)', 'rgba(156, 39, 176, 0.8)', 'rgba(233, 30, 99, 0.8)',
+					'rgba(0, 188, 212, 0.8)', 'rgba(255, 152, 0, 0.8)'
+				];
+				let borderColors = [
+					'#f5576c', '#667eea', '#43e97b', '#ffc107', '#9c27b0', '#e91e63',
+					'#00bcd4', '#ff9800'
+				];
+				
+				// Create datasets - one dataset per cost center
+				let datasets = unique_cost_centers.map((cc_name, idx) => {
+					let data = departments.map(dept => {
+						let cc_data = department_data[dept].cost_centers[cc_name];
+						return cc_data ? cc_data.amount : 0;
+					});
+					
+					return {
+						label: cc_name.length > 25 ? cc_name.substring(0, 22) + '...' : cc_name,
+						data: data,
+						backgroundColor: colors[idx % colors.length],
+						borderColor: borderColors[idx % borderColors.length],
+						borderWidth: 2,
+						borderRadius: 6
+					};
+				});
 				
 				if (me.charts.monthly_comparison) {
 					try {
@@ -1605,7 +1709,7 @@ if (typeof window.ProcurementExpense === 'undefined') {
 							me.charts.monthly_comparison = new Chart(ctx, {
 								type: 'bar',
 								data: {
-									labels: periods,
+									labels: departments.map(dept => dept.length > 20 ? dept.substring(0, 17) + '...' : dept),
 									datasets: datasets
 								},
 								options: {
@@ -1812,6 +1916,153 @@ if (typeof window.ProcurementExpense === 'undefined') {
 					}
 				}, 1700);
 			}
+		}
+		
+		render_department_expense_chart() {
+			let me = this;
+			let dept_payment_data = me.data.department_payment_data || [];
+			
+			console.log('[Department Expense Chart] Starting render...');
+			console.log('[Department Expense Chart] Raw data:', dept_payment_data);
+			console.log('[Department Expense Chart] Data length:', dept_payment_data.length);
+			
+			// Wait for Chart.js to be available
+			if (typeof Chart === 'undefined') {
+				console.log('[Department Expense Chart] Chart.js not available, retrying...');
+				setTimeout(() => me.render_department_expense_chart(), 200);
+				return;
+			}
+			
+			if (dept_payment_data.length === 0) {
+				console.warn('[Department Expense Chart] No department payment data available');
+				return;
+			}
+			
+			// Prepare data
+			let labels = dept_payment_data.map(d => d.department || 'Not Set');
+			let amounts = dept_payment_data.map(d => d.payment_amount || 0);
+			let payment_counts = dept_payment_data.map(d => d.payment_count || 0);
+			let invoice_counts = dept_payment_data.map(d => d.invoice_count || 0);
+			
+			console.log('[Department Expense Chart] Labels:', labels);
+			console.log('[Department Expense Chart] Amounts:', amounts);
+			console.log('[Department Expense Chart] Total amount:', amounts.reduce((a, b) => a + b, 0));
+			console.log('[Department Expense Chart] Non-zero amounts:', amounts.filter(a => a > 0).length);
+			
+			// Colors array
+			let colors = [
+				'rgba(245, 87, 108, 0.8)', 'rgba(102, 126, 234, 0.8)', 'rgba(67, 233, 123, 0.8)',
+				'rgba(255, 193, 7, 0.8)', 'rgba(156, 39, 176, 0.8)', 'rgba(233, 30, 99, 0.8)',
+				'rgba(0, 188, 212, 0.8)', 'rgba(255, 152, 0, 0.8)', 'rgba(76, 175, 80, 0.8)',
+				'rgba(63, 81, 181, 0.8)', 'rgba(121, 85, 72, 0.8)', 'rgba(158, 158, 158, 0.8)'
+			];
+			let borderColors = [
+				'#f5576c', '#667eea', '#43e97b', '#ffc107', '#9c27b0',
+				'#e91e63', '#00bcd4', '#ff9800', '#4caf50', '#3f51b5',
+				'#795548', '#9e9e9e'
+			];
+			
+			// Destroy existing chart if it exists
+			if (me.charts.department_expense) {
+				try {
+					me.charts.department_expense.destroy();
+				} catch(e) {}
+			}
+			
+			setTimeout(() => {
+				try {
+					let canvas = document.getElementById('chart-department-expense');
+					if (!canvas) {
+						console.error('[Department Expense Chart] Canvas element not found!');
+						return;
+					}
+					
+					console.log('[Department Expense Chart] Creating chart with', labels.length, 'departments');
+					let ctx = canvas.getContext('2d');
+					me.charts.department_expense = new Chart(ctx, {
+						type: 'bar',
+						data: {
+							labels: labels,
+							datasets: [{
+								label: 'Payment Amount',
+								data: amounts,
+								backgroundColor: colors.slice(0, labels.length),
+								borderColor: borderColors.slice(0, labels.length),
+								borderWidth: 2,
+								borderRadius: 6
+							}]
+						},
+						options: {
+							responsive: true,
+							maintainAspectRatio: false,
+							animation: {
+								duration: 2000,
+								easing: 'easeInOutBounce',
+								delay: (context) => {
+									if (context.type === 'data' && context.mode === 'default') {
+										return context.dataIndex * 100;
+									}
+									return 0;
+								}
+							},
+							plugins: {
+								legend: {
+									display: true,
+									position: 'top',
+									labels: {
+										font: { size: 12, weight: 'bold' },
+										padding: 15
+									}
+								},
+								tooltip: {
+									backgroundColor: 'rgba(0, 0, 0, 0.8)',
+									padding: 12,
+									titleFont: { size: 14, weight: 'bold' },
+									bodyFont: { size: 13 },
+									callbacks: {
+										label: function(context) {
+											let index = context.dataIndex;
+											let amount = format_currency_value(context.parsed.y);
+											let paymentCount = payment_counts[index] || 0;
+											let invoiceCount = invoice_counts[index] || 0;
+											return [
+												`Payment Amount: ${amount}`,
+												`Payment Count: ${format_number_value(paymentCount)}`,
+												`Invoice Count: ${format_number_value(invoiceCount)}`
+											];
+										}
+									}
+								}
+							},
+							scales: {
+								y: {
+									beginAtZero: true,
+									grid: { color: 'rgba(0, 0, 0, 0.05)', lineWidth: 1 },
+									ticks: {
+										callback: function(value) {
+											return format_currency_value(value);
+										},
+										font: { size: 11 }
+									}
+								},
+								x: {
+									grid: { display: false },
+									ticks: { 
+										font: { size: 11 },
+										maxRotation: 45,
+										minRotation: 45
+									}
+								}
+							}
+						}
+					});
+					
+					console.log('[Department Expense Chart] Chart created successfully');
+				} catch(e) {
+					console.error('[Department Expense Chart] Error creating chart:', e);
+					console.error('[Department Expense Chart] Error stack:', e.stack);
+				}
+			}, 2000);
 		}
 		
 		render_payment_charts() {
