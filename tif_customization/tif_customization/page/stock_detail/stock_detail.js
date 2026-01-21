@@ -1652,7 +1652,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 		
 		// Summary KPIs at the top
 		const summaryHtml = `
-			<h4 style="margin-bottom: 15px;">Key Performance Indicators (KPIs)</h4>
+			<h4 style="margin-bottom: 15px;">Overall Stock Summary</h4>
 			<div class="row" style="margin-bottom: 30px; display: flex; flex-wrap: nowrap;">
 				<div style="flex: 1; padding: 0 8px;">
 					<div class="kpi-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
@@ -1738,7 +1738,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 			}
 			
 			itemsHtml = `
-				<h5 style="margin-bottom: 15px; margin-top: 30px; font-weight: bold; color: #495057;">Individual Item Balance KPIs</h5>
+				<h5 style="margin-bottom: 15px; margin-top: 30px; font-weight: bold; color: #495057;">Book Wise Count</h5>
 				<div class="row" style="margin-bottom: 20px;">
 					${kpiData.items.map((item, index) => {
 						const balance = item.available_stock || 0;
