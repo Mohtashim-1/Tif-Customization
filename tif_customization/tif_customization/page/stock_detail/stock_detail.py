@@ -2,15 +2,32 @@ import frappe
 from frappe import _
 from frappe.utils import flt, cint
 
-# Specific items to filter for (from user requirements) - All 23 items are item codes
+# Specific items to filter for (from user requirements) - All items are item codes
 SPECIFIC_ITEM_CODES = [
     'MQHWB-01/U/12', 'MQHWB-02/U/10', 'MQHWB-03/U/9', 'MQHWB-04/U/7', 'MQHWB-05/U/5',
     'MQHWB-06/U/2', 'MQHWB-07/U/7', 'MQHTG-01U6', 'MQHTG-02U6', 'MQHTG-03U5',
     'MQHTG-04U4', 'MQHTG-05U1', 'MQHWB-01S1', 'MQHWB-02S1', 'MQHWB-03S1',
     'MQHWB-01E1', 'MQHWB-02E1', 'MB-U1', 'Noorani Qaida', 'Noorani Qaida Workbook',
     'Noorani Qaida Teacher Guide', 'Tarjamat ul Quran-e-Majeed-6 Class-Punjab Edition',
-    'Tarjamat ul Quran-e-Majeed-7 Class-Punjab Edition'
+    'Tarjamat ul Quran-e-Majeed-7 Class-Punjab Edition',
+    # Additional items added
+    'MQH KP Urdu Textbook Class 6', 'MQH KP Urdu Textbook Class 7', 'MQH KP Urdu Textbook Class 8',
+    'MQH KP Urdu Textbook Class 9', 'MQH KP Urdu Textbook Class 10', 'MQH KP Urdu Textbook Class 11',
+    'MQH KP Urdu Textbook Class 12', 'TIF Profile Version-1/2024', 'TPS Para'
 ]
+
+# TPS Department items (TPS Para, Noorani Qaida, Noorani Qaida Workbook)
+TPS_ITEM_CODES = [
+    'TPS Para',
+    'Noorani Qaida',
+    'Noorani Qaida Workbook'
+]
+
+def get_item_department(item_code):
+    """Determine if an item belongs to TPS or QPS department"""
+    if item_code in TPS_ITEM_CODES:
+        return 'TPS'
+    return 'QPS'
 
 def get_context(context):
     context.title = "Stock Detail Report"
@@ -1362,6 +1379,26 @@ def calculate_kpis_for_specific_items(data, filters=None):
             "total_amount": sum(flt(item.get("total_amount", 0)) for item in items_kpi)
         }
         
+        # Calculate department-wise item counts and totals
+        tps_items = [item for item in items_kpi if get_item_department(item.get("item_code", "")) == "TPS"]
+        qps_items = [item for item in items_kpi if get_item_department(item.get("item_code", "")) == "QPS"]
+        
+        # TPS totals
+        totals["tps_item_count"] = len(tps_items)
+        totals["tps_opening_stock"] = sum(flt(item.get("opening_stock", 0)) for item in tps_items)
+        totals["tps_available_stock"] = sum(flt(item.get("available_stock", 0)) for item in tps_items)
+        totals["tps_delivered"] = sum(flt(item.get("delivered", 0)) for item in tps_items)
+        totals["tps_received_vendor"] = sum(flt(item.get("received_vendor", 0)) for item in tps_items)
+        totals["tps_book_return"] = sum(flt(item.get("book_return", 0)) for item in tps_items)
+        
+        # QPS totals
+        totals["qps_item_count"] = len(qps_items)
+        totals["qps_opening_stock"] = sum(flt(item.get("opening_stock", 0)) for item in qps_items)
+        totals["qps_available_stock"] = sum(flt(item.get("available_stock", 0)) for item in qps_items)
+        totals["qps_delivered"] = sum(flt(item.get("delivered", 0)) for item in qps_items)
+        totals["qps_received_vendor"] = sum(flt(item.get("received_vendor", 0)) for item in qps_items)
+        totals["qps_book_return"] = sum(flt(item.get("book_return", 0)) for item in qps_items)
+        
         # Get pending dispatches count (submitted Sales Orders pending delivery)
         pending_dispatches_count = get_pending_dispatches_count()
         totals["pending_dispatches_count"] = pending_dispatches_count
@@ -1395,6 +1432,18 @@ def calculate_kpis_for_specific_items(data, filters=None):
             "sales_invoice_count": 0,
             "sales_invoice_total_qty": 0,
             "sales_invoice_total_amount": 0,
+            "tps_item_count": 0,
+            "tps_opening_stock": 0,
+            "tps_available_stock": 0,
+            "tps_delivered": 0,
+            "tps_received_vendor": 0,
+            "tps_book_return": 0,
+            "qps_item_count": 0,
+            "qps_opening_stock": 0,
+            "qps_available_stock": 0,
+            "qps_delivered": 0,
+            "qps_received_vendor": 0,
+            "qps_book_return": 0,
             "items": []
         }
 
@@ -1415,50 +1464,80 @@ def get_pending_dispatches_count():
         return 0
 
 def get_sales_invoice_stats(filters=None):
-    """Get Sales Invoice count, total quantity, and total amount filtered by date range"""
+    """Get Sales Invoice count, total quantity, and total amount filtered by date range and specific book items only"""
     try:
         if filters is None:
             filters = {}
         
-        # Build date filter
+        # Build date filter using positional parameters
         date_filter = ""
-        sql_params = {}
+        date_params = []
         
         if filters.get('from_date') and filters.get('to_date'):
-            date_filter = "AND si.posting_date BETWEEN %(from_date)s AND %(to_date)s"
-            sql_params['from_date'] = filters.get('from_date')
-            sql_params['to_date'] = filters.get('to_date')
+            date_filter = "AND si.posting_date BETWEEN %s AND %s"
+            date_params = [filters.get('from_date'), filters.get('to_date')]
         elif filters.get('from_date'):
-            date_filter = "AND si.posting_date >= %(from_date)s"
-            sql_params['from_date'] = filters.get('from_date')
+            date_filter = "AND si.posting_date >= %s"
+            date_params = [filters.get('from_date')]
         elif filters.get('to_date'):
-            date_filter = "AND si.posting_date <= %(to_date)s"
-            sql_params['to_date'] = filters.get('to_date')
+            date_filter = "AND si.posting_date <= %s"
+            date_params = [filters.get('to_date')]
         
-        result = frappe.db.sql(f"""
+        # Create item code filter - only include specific book items
+        # Use placeholders for SQL IN clause (same pattern as other functions in this file)
+        item_code_placeholders = ','.join(['%s'] * len(SPECIFIC_ITEM_CODES))
+        item_filter = f"AND sii.item_code IN ({item_code_placeholders})"
+        
+        # Query to get stats for book items only
+        # Count distinct invoices that have at least one book item
+        # Sum quantity and amount only for book items (sii.base_amount is the item amount, not invoice total)
+        query = f"""
             SELECT 
                 COUNT(DISTINCT si.name) as invoice_count,
                 COALESCE(SUM(sii.qty), 0) as total_qty,
-                COALESCE(SUM(si.base_grand_total), 0) as total_amount
+                COALESCE(SUM(sii.base_amount), 0) as total_amount
             FROM `tabSales Invoice` si
-            LEFT JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
+            INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
             WHERE si.docstatus = 1
             {date_filter}
-        """, sql_params, as_dict=True)
+            {item_filter}
+        """
+        
+        # Combine date params with item codes for the query (all positional parameters)
+        query_params = date_params + list(SPECIFIC_ITEM_CODES)
+        
+        # Debug logging
+        print(f"[get_sales_invoice_stats] Filters: {filters}")
+        print(f"[get_sales_invoice_stats] Date filter: {date_filter}")
+        print(f"[get_sales_invoice_stats] Date params: {date_params}")
+        print(f"[get_sales_invoice_stats] Query params count: {len(query_params)}")
+        print(f"[get_sales_invoice_stats] Query: {query}")
+        
+        result = frappe.db.sql(query, tuple(query_params), as_dict=True)
+        
+        print(f"[get_sales_invoice_stats] Query result: {result}")
         
         if result and len(result) > 0:
-            return {
+            stats = {
                 "invoice_count": cint(result[0].get('invoice_count', 0)),
                 "total_qty": flt(result[0].get('total_qty', 0)),
                 "total_amount": flt(result[0].get('total_amount', 0))
             }
+            print(f"[get_sales_invoice_stats] Returning stats: {stats}")
+            return stats
+        
+        print(f"[get_sales_invoice_stats] No results found, returning zeros")
         return {
             "invoice_count": 0,
             "total_qty": 0,
             "total_amount": 0
         }
     except Exception as e:
-        frappe.log_error(f"Error getting sales invoice stats: {str(e)}", "Sales Invoice Stats Error")
+        error_msg = f"Error getting sales invoice stats: {str(e)}"
+        print(f"[get_sales_invoice_stats] ERROR: {error_msg}")
+        frappe.log_error(error_msg, "Sales Invoice Stats Error")
+        import traceback
+        print(f"[get_sales_invoice_stats] Traceback: {traceback.format_exc()}")
         return {
             "invoice_count": 0,
             "total_qty": 0,

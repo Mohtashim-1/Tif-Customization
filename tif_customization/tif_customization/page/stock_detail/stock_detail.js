@@ -306,7 +306,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 			}
 			.table th {
 				background: #2d5a27;
-				color: white;
+				color: black;
 				text-align: center;
 				vertical-align: middle;
 				font-weight: bold;
@@ -388,11 +388,13 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 	
 	// Set default dates to current month
 	const { fromDate: defaultFromDate, toDate: defaultToDate } = getCurrentMonthDates();
-	$('#from-date').val(defaultFromDate);
-	$('#to-date').val(defaultToDate);
 	
-	// Load data and populate tables
-	loadStockData();
+	// Set default date values immediately (before event listeners are set up)
+	// The values will be set once the DOM elements are available
+	setTimeout(function() {
+		$('#from-date').val(defaultFromDate);
+		$('#to-date').val(defaultToDate);
+	}, 100);
 	
 	function loadStockData() {
 		// Hide all warehouse sections by default
@@ -1355,6 +1357,23 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 		
 		// Load filter options
 		loadFilterOptions();
+		
+		// Automatically apply filters with current month dates on page load
+		// This ensures the report shows current month data immediately without requiring manual filter application
+		setTimeout(function() {
+			// Get current month dates to ensure we have the latest values
+			const { fromDate: currentFromDate, toDate: currentToDate } = getCurrentMonthDates();
+			
+			// Ensure date fields have values before applying filters
+			if (!$('#from-date').val()) {
+				$('#from-date').val(currentFromDate);
+			}
+			if (!$('#to-date').val()) {
+				$('#to-date').val(currentToDate);
+			}
+			// Apply filters to load current month data
+			applyFilters();
+		}, 200);
 	}, 500);
 	
 	function loadStockDataFallback() {
@@ -1655,45 +1674,112 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 			<h4 style="margin-bottom: 15px;">Overall Stock Summary</h4>
 			<div class="row" style="margin-bottom: 30px; display: flex; flex-wrap: nowrap;">
 				<div style="flex: 1; padding: 0 8px;">
-					<div class="kpi-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+					<div class="kpi-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: black; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
 						<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Total Items</h5>
 						<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${kpiData.total_items || 0}</h2>
-						<p style="margin: 5px 0 0 0; font-size: 12px; opacity: 0.8;">Items Tracked</p>
+						<p style="margin: 5px 0 0 0;color: black; font-size: 12px; opacity: 0.8;">Items Tracked</p>
 					</div>
 				</div>
 				<div style="flex: 1; padding: 0 8px;">
-					<div class="kpi-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+					<div class="kpi-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: black; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
 						<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Total Opening Stock</h5>
 						<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${formatNumber(kpiData.total_opening_stock || 0)}</h2>
-						<p style="margin: 5px 0 0 0; font-size: 12px; opacity: 0.8;">Units</p>
+						<p style="margin: 5px 0 0 0; font-size: 12px;color: black; opacity: 0.8;">Units</p>
 					</div>
 				</div>
 				<div style="flex: 1; padding: 0 8px;">
-					<div class="kpi-card" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+					<div class="kpi-card" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: black; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
 						<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Total Available Stock</h5>
 						<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${formatNumber(kpiData.total_available_stock || 0)}</h2>
-						<p style="margin: 5px 0 0 0; font-size: 12px; opacity: 0.8;">Units</p>
+						<p style="margin: 5px 0 0 0; font-size: 12px;color: black; opacity: 0.8;">Units</p>
 					</div>
 				</div>
 				<div style="flex: 1; padding: 0 8px;">
-					<div class="kpi-card" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+					<div class="kpi-card" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: black; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
 						<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Total Delivered</h5>
 						<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${formatNumber(kpiData.total_delivered || 0)}</h2>
-						<p style="margin: 5px 0 0 0; font-size: 12px; opacity: 0.8;">Units</p>
+						<p style="margin: 5px 0 0 0; font-size: 12px;color: black; opacity: 0.8;">Units</p>
 					</div>
 				</div>
 				<div style="flex: 1; padding: 0 8px;">
-					<div class="kpi-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+					<div class="kpi-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: black; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
 						<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Pending Dispatches</h5>
 						<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${formatNumber(kpiData.pending_dispatches_count || 0)}</h2>
-						<p style="margin: 5px 0 0 0; font-size: 12px; opacity: 0.8;">Sales Orders</p>
+						<p style="margin: 5px 0 0 0; font-size: 12px;color: black; opacity: 0.8;">Sales Orders</p>
 					</div>
 				</div>
 				<div style="flex: 1; padding: 0 8px;">
-					<div class="kpi-card" style="background: linear-gradient(135deg, #30cfd0 0%, #330867 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+					<div class="kpi-card" style="background: linear-gradient(135deg, #30cfd0 0%, #330867 100%); color: black; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
 						<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Sales Invoices</h5>
 						<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${formatNumber(kpiData.sales_invoice_count || 0)}</h2>
-						<p style="margin: 5px 0 0 0; font-size: 12px; opacity: 0.8;">${formatNumber(kpiData.sales_invoice_total_qty || 0)} Qty | ${formatCurrency(kpiData.sales_invoice_total_amount || 0)}</p>
+						<p style="margin: 5px 0 0 0; font-size: 12px;color: black;	 opacity: 0.8;">${formatNumber(kpiData.sales_invoice_total_qty || 0)} Qty | ${formatCurrency(kpiData.sales_invoice_total_amount || 0)}</p>
+					</div>
+				</div>
+			</div>
+			
+			<!-- Department-wise Item Count and Totals KPIs -->
+			<h4 style="margin-bottom: 15px; margin-top: 30px;">Department-wise Summary</h4>
+			<div class="row" style="margin-bottom: 30px; display: flex; flex-wrap: wrap;">
+				<!-- TPS Department -->
+				<div style="flex: 1; padding: 0 8px; min-width: 300px;">
+					<div class="kpi-card" style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); color: black; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 15px;">
+						<h5 style="margin: 0 0 15px 0; font-size: 16px; font-weight: bold; opacity: 0.95;">TPS Department</h5>
+						<div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+							<span style="font-size: 13px; opacity: 0.9;">Item Count:</span>
+							<strong style="font-size: 13px;">${formatNumber(kpiData.tps_item_count || 0)}</strong>
+						</div>
+						<div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+							<span style="font-size: 13px; opacity: 0.9;">Opening Stock:</span>
+							<strong style="font-size: 13px;">${formatNumber(kpiData.tps_opening_stock || 0)}</strong>
+						</div>
+						<div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+							<span style="font-size: 13px; opacity: 0.9;">Available Stock:</span>
+							<strong style="font-size: 13px;">${formatNumber(kpiData.tps_available_stock || 0)}</strong>
+						</div>
+						<div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+							<span style="font-size: 13px; opacity: 0.9;">Delivered:</span>
+							<strong style="font-size: 13px;">${formatNumber(kpiData.tps_delivered || 0)}</strong>
+						</div>
+						<div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+							<span style="font-size: 13px; opacity: 0.9;">Received Vendor:</span>
+							<strong style="font-size: 13px;">${formatNumber(kpiData.tps_received_vendor || 0)}</strong>
+						</div>
+						<div style="display: flex; justify-content: space-between;">
+							<span style="font-size: 13px; opacity: 0.9;">Book Return:</span>
+							<strong style="font-size: 13px;">${formatNumber(kpiData.tps_book_return || 0)}</strong>
+						</div>
+						<p style="margin: 10px 0 0 0; font-size: 11px;color: black; opacity: 0.8; border-top: 1px solid rgba(0,0,0,0.1); padding-top: 8px;">Includes: TPS Para, Noorani Qaida, Noorani Qaida Workbook</p>
+					</div>
+				</div>
+				<!-- QPS Department -->
+				<div style="flex: 1; padding: 0 8px; min-width: 300px;">
+					<div class="kpi-card" style="background: linear-gradient(135deg, #4ecdc4 0%, #44a08d 100%); color: black; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 15px;">
+						<h5 style="margin: 0 0 15px 0; font-size: 16px; font-weight: bold; opacity: 0.95;">QPS Department</h5>
+						<div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+							<span style="font-size: 13px; opacity: 0.9;">Item Count:</span>
+							<strong style="font-size: 13px;">${formatNumber(kpiData.qps_item_count || 0)}</strong>
+						</div>
+						<div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+							<span style="font-size: 13px; opacity: 0.9;">Opening Stock:</span>
+							<strong style="font-size: 13px;">${formatNumber(kpiData.qps_opening_stock || 0)}</strong>
+						</div>
+						<div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+							<span style="font-size: 13px; opacity: 0.9;">Available Stock:</span>
+							<strong style="font-size: 13px;">${formatNumber(kpiData.qps_available_stock || 0)}</strong>
+						</div>
+						<div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+							<span style="font-size: 13px; opacity: 0.9;">Delivered:</span>
+							<strong style="font-size: 13px;">${formatNumber(kpiData.qps_delivered || 0)}</strong>
+						</div>
+						<div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+							<span style="font-size: 13px; opacity: 0.9;">Received Vendor:</span>
+							<strong style="font-size: 13px;">${formatNumber(kpiData.qps_received_vendor || 0)}</strong>
+						</div>
+						<div style="display: flex; justify-content: space-between;">
+							<span style="font-size: 13px; opacity: 0.9;">Book Return:</span>
+							<strong style="font-size: 13px;">${formatNumber(kpiData.qps_book_return || 0)}</strong>
+						</div>
+						<p style="margin: 10px 0 0 0; font-size: 11px;color: black; opacity: 0.8; border-top: 1px solid rgba(0,0,0,0.1); padding-top: 8px;">Includes: All Other Items</p>
 					</div>
 				</div>
 			</div>
@@ -1759,11 +1845,11 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 						
 						return `
 							<div class="col-md-2" style="margin-bottom: 10px;">
-								<div class="kpi-card" style="background: ${colorGradient}; color: white; padding: 12px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); min-height: 100px;">
-									<h6 style="margin: 0 0 5px 0; font-size: 10px; opacity: 0.95; font-weight: bold; line-height: 1.2;">${itemCode}</h6>
-									<p style="margin: 0 0 8px 0; font-size: 9px; opacity: 0.9; line-height: 1.1; height: 20px; overflow: hidden;">${itemName}</p>
+								<div class="kpi-card" style="background: ${colorGradient}; color: black; padding: 12px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); min-height: 100px;">
+									<h6 style="margin: 0 0 5px 0; font-size: 12px; color: black; opacity: 0.95; font-weight: bold; line-height: 1.2;">${itemCode}</h6>
+									<p style="margin: 0 0 8px 0; font-size: 12px; color: black; opacity: 0.9; line-height: 1.1; height: 20px; overflow: hidden;">${itemName}</p>
 									<h2 style="margin: 0; font-size: 22px; font-weight: bold; text-align: center;">${formatNumber(balance)}</h2>
-									<p style="margin: 5px 0 0 0; font-size: 9px; opacity: 0.85; text-align: center;">Available Stock</p>
+									<p style="margin: 5px 0 0 0; font-size: 12px;color: black; opacity: 0.85; text-align: center;">Available Stock</p>
 								</div>
 							</div>
 						`;
