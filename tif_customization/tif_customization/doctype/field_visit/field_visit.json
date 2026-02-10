@@ -12,14 +12,17 @@
   "training_month",
   "training_quarter",
   "training_session_category",
+  "column_break_gwcl",
   "training_school_category",
   "training_date",
   "training_trainer_name",
   "training_entry_filled_by",
+  "column_break_dsuk",
   "training_city",
   "training_province",
   "training_venue_name",
   "training_no_of_participants",
+  "column_break_puuj",
   "training_no_of_schools_attended",
   "section_break_me",
   "me_timestamp",
@@ -34,6 +37,7 @@
   "me_province",
   "me_school_name",
   "me_meeting_with_person_name",
+  "column_break_zems",
   "me_designation_meeting_with",
   "me_contact_no_meeting_with",
   "me_activity_status",
@@ -42,6 +46,7 @@
   "me_teachers_training_session",
   "me_number_of_teachers_mqh",
   "me_used_teachers_guide",
+  "column_break_rmvs",
   "me_mqh_book_version",
   "me_classes_per_week",
   "me_class_duration",
@@ -49,6 +54,7 @@
   "me_student_behavior_changes",
   "me_changes_made",
   "me_details_of_changes_made",
+  "column_break_vwur",
   "me_new_school_address",
   "me_new_person_name",
   "me_new_person_designation",
@@ -56,11 +62,16 @@
   "me_new_person_email",
   "me_assessment_taken_from",
   "me_school_closed",
+  "section_break_marketing",
   "timestamp",
   "month",
   "quarter",
   "visit_by",
   "marketing_visit_category",
+  "column_break_ajxr",
+  "status",
+  "amended_from",
+  "reasons_if_not_agreed",
   "frequency_of_visits",
   "visit_date",
   "visiting_starting_time",
@@ -74,10 +85,7 @@
   "designation",
   "contact_number",
   "marketing_material_provided",
-  "reference",
-  "status",
-  "reasons_if_not_agreed",
-  "amended_from"
+  "reference"
  ],
  "fields": [
   {
@@ -85,12 +93,13 @@
    "fieldtype": "Section Break"
   },
   {
-  "fieldname": "type",
-  "fieldtype": "Select",
-  "label": "Type",
-  "options": "\nMarketing\nM&E\nTraining",
-  "reqd": 1
- },
+   "fieldname": "type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Type",
+   "options": "\nMarketing\nM&E\nTraining",
+   "reqd": 1
+  },
   {
    "depends_on": "eval:doc.type == 'Training'",
    "fieldname": "section_break_training",
@@ -290,6 +299,7 @@
    "label": "Reason of Above"
   },
   {
+   "default": "0",
    "depends_on": "eval:doc.type == 'M&E'",
    "fieldname": "me_teachers_training_session",
    "fieldtype": "Check",
@@ -302,6 +312,7 @@
    "label": "Number of Teachers designated for MQH"
   },
   {
+   "default": "0",
    "depends_on": "eval:doc.type == 'M&E'",
    "fieldname": "me_used_teachers_guide",
    "fieldtype": "Check",
@@ -326,6 +337,7 @@
    "label": "Duration of Class"
   },
   {
+   "default": "0",
    "depends_on": "eval:doc.type == 'M&E'",
    "fieldname": "me_took_assessment",
    "fieldtype": "Check",
@@ -386,10 +398,17 @@
    "label": "From whom have you taken assessment?"
   },
   {
+   "default": "0",
    "depends_on": "eval:doc.type == 'M&E'",
    "fieldname": "me_school_closed",
    "fieldtype": "Check",
    "label": "School Closed"
+  },
+  {
+   "depends_on": "eval:doc.type == 'Marketing'",
+   "fieldname": "section_break_marketing",
+   "fieldtype": "Section Break",
+   "label": "Marketing"
   },
   {
    "depends_on": "eval:doc.type == 'Marketing'",
@@ -499,6 +518,7 @@
    "label": "Contact Number"
   },
   {
+   "default": "0",
    "depends_on": "eval:doc.type == 'Marketing'",
    "fieldname": "marketing_material_provided",
    "fieldtype": "Check",
@@ -532,13 +552,41 @@
    "print_hide": 1,
    "read_only": 1,
    "search_index": 1
+  },
+  {
+   "fieldname": "column_break_gwcl",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_dsuk",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_puuj",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_zems",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_rmvs",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_vwur",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_ajxr",
+   "fieldtype": "Column Break"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-02-11 02:22:13.824377",
+ "modified": "2026-02-11 03:14:06.352938",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Field Visit",
