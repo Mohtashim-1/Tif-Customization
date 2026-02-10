@@ -1,0 +1,566 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-02-11 02:22:13.824377",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_1abl",
+  "type",
+  "section_break_training",
+  "training_timestamp",
+  "training_month",
+  "training_quarter",
+  "training_session_category",
+  "training_school_category",
+  "training_date",
+  "training_trainer_name",
+  "training_entry_filled_by",
+  "training_city",
+  "training_province",
+  "training_venue_name",
+  "training_no_of_participants",
+  "training_no_of_schools_attended",
+  "section_break_me",
+  "me_timestamp",
+  "me_month",
+  "me_quarter",
+  "me_visit_by",
+  "me_visit_date",
+  "me_starting_date",
+  "me_starting_time",
+  "me_city",
+  "me_area",
+  "me_province",
+  "me_school_name",
+  "me_meeting_with_person_name",
+  "me_designation_meeting_with",
+  "me_contact_no_meeting_with",
+  "me_activity_status",
+  "me_mqh_book_status",
+  "me_reason_of_above",
+  "me_teachers_training_session",
+  "me_number_of_teachers_mqh",
+  "me_used_teachers_guide",
+  "me_mqh_book_version",
+  "me_classes_per_week",
+  "me_class_duration",
+  "me_took_assessment",
+  "me_student_behavior_changes",
+  "me_changes_made",
+  "me_details_of_changes_made",
+  "me_new_school_address",
+  "me_new_person_name",
+  "me_new_person_designation",
+  "me_new_person_mobile_number",
+  "me_new_person_email",
+  "me_assessment_taken_from",
+  "me_school_closed",
+  "timestamp",
+  "month",
+  "quarter",
+  "visit_by",
+  "marketing_visit_category",
+  "frequency_of_visits",
+  "visit_date",
+  "visiting_starting_time",
+  "visit_ending_time",
+  "city",
+  "area",
+  "province",
+  "school_type",
+  "school_name",
+  "meeting_with",
+  "designation",
+  "contact_number",
+  "marketing_material_provided",
+  "reference",
+  "status",
+  "reasons_if_not_agreed",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_1abl",
+   "fieldtype": "Section Break"
+  },
+  {
+  "fieldname": "type",
+  "fieldtype": "Select",
+  "label": "Type",
+  "options": "\nMarketing\nM&E\nTraining",
+  "reqd": 1
+ },
+  {
+   "depends_on": "eval:doc.type == 'Training'",
+   "fieldname": "section_break_training",
+   "fieldtype": "Section Break",
+   "label": "Training"
+  },
+  {
+   "depends_on": "eval:doc.type == 'Training'",
+   "fieldname": "training_timestamp",
+   "fieldtype": "Datetime",
+   "label": "Timestamp"
+  },
+  {
+   "depends_on": "eval:doc.type == 'Training'",
+   "fieldname": "training_month",
+   "fieldtype": "Select",
+   "label": "Month",
+   "options": "\nJanuary\nFebruary\nMarch\nApril\nMay\nJune\nJuly\nAugust\nSeptember\nOctober\nNovember\nDecember"
+  },
+  {
+   "depends_on": "eval:doc.type == 'Training'",
+   "fieldname": "training_quarter",
+   "fieldtype": "Select",
+   "label": "Quarter",
+   "options": "\nQ1\nQ2\nQ3\nQ4"
+  },
+  {
+   "depends_on": "eval:doc.type == 'Training'",
+   "fieldname": "training_session_category",
+   "fieldtype": "Data",
+   "label": "Session Category"
+  },
+  {
+   "depends_on": "eval:doc.type == 'Training'",
+   "fieldname": "training_school_category",
+   "fieldtype": "Data",
+   "label": "School Category"
+  },
+  {
+   "depends_on": "eval:doc.type == 'Training'",
+   "fieldname": "training_date",
+   "fieldtype": "Date",
+   "label": "Date"
+  },
+  {
+   "depends_on": "eval:doc.type == 'Training'",
+   "fieldname": "training_trainer_name",
+   "fieldtype": "Data",
+   "label": "Name of Trainer"
+  },
+  {
+   "depends_on": "eval:doc.type == 'Training'",
+   "fieldname": "training_entry_filled_by",
+   "fieldtype": "Data",
+   "label": "Entry Filled up by"
+  },
+  {
+   "depends_on": "eval:doc.type == 'Training'",
+   "fieldname": "training_city",
+   "fieldtype": "Data",
+   "label": "City"
+  },
+  {
+   "depends_on": "eval:doc.type == 'Training'",
+   "fieldname": "training_province",
+   "fieldtype": "Data",
+   "label": "Province"
+  },
+  {
+   "depends_on": "eval:doc.type == 'Training'",
+   "fieldname": "training_venue_name",
+   "fieldtype": "Data",
+   "label": "Venue Name"
+  },
+  {
+   "depends_on": "eval:doc.type == 'Training'",
+   "fieldname": "training_no_of_participants",
+   "fieldtype": "Int",
+   "label": "No. of participants"
+  },
+  {
+   "depends_on": "eval:doc.type == 'Training'",
+   "fieldname": "training_no_of_schools_attended",
+   "fieldtype": "Int",
+   "label": "No. of Schools Attended"
+  },
+  {
+   "depends_on": "eval:doc.type == 'M&E'",
+   "fieldname": "section_break_me",
+   "fieldtype": "Section Break",
+   "label": "Monitoring & Evaluation"
+  },
+  {
+   "depends_on": "eval:doc.type == 'M&E'",
+   "fieldname": "me_timestamp",
+   "fieldtype": "Datetime",
+   "label": "Timestamp"
+  },
+  {
+   "depends_on": "eval:doc.type == 'M&E'",
+   "fieldname": "me_month",
+   "fieldtype": "Select",
+   "label": "Month",
+   "options": "\nJanuary\nFebruary\nMarch\nApril\nMay\nJune\nJuly\nAugust\nSeptember\nOctober\nNovember\nDecember"
+  },
+  {
+   "depends_on": "eval:doc.type == 'M&E'",
+   "fieldname": "me_quarter",
+   "fieldtype": "Select",
+   "label": "Quarter",
+   "options": "\nQ1\nQ2\nQ3\nQ4"
+  },
+  {
+   "depends_on": "eval:doc.type == 'M&E'",
+   "fieldname": "me_visit_by",
+   "fieldtype": "Data",
+   "label": "Visit By"
+  },
+  {
+   "depends_on": "eval:doc.type == 'M&E'",
+   "fieldname": "me_visit_date",
+   "fieldtype": "Date",
+   "label": "Visit Date"
+  },
+  {
+   "depends_on": "eval:doc.type == 'M&E'",
+   "fieldname": "me_starting_date",
+   "fieldtype": "Date",
+   "label": "Starting Date"
+  },
+  {
+   "depends_on": "eval:doc.type == 'M&E'",
+   "fieldname": "me_starting_time",
+   "fieldtype": "Time",
+   "label": "Starting Time"
+  },
+  {
+   "depends_on": "eval:doc.type == 'M&E'",
+   "fieldname": "me_city",
+   "fieldtype": "Data",
+   "label": "City"
+  },
+  {
+   "depends_on": "eval:doc.type == 'M&E'",
+   "fieldname": "me_area",
+   "fieldtype": "Data",
+   "label": "Area"
+  },
+  {
+   "depends_on": "eval:doc.type == 'M&E'",
+   "fieldname": "me_province",
+   "fieldtype": "Data",
+   "label": "Province"
+  },
+  {
+   "depends_on": "eval:doc.type == 'M&E'",
+   "fieldname": "me_school_name",
+   "fieldtype": "Data",
+   "label": "Name of School"
+  },
+  {
+   "depends_on": "eval:doc.type == 'M&E'",
+   "fieldname": "me_meeting_with_person_name",
+   "fieldtype": "Data",
+   "label": "Meeting With Person Name"
+  },
+  {
+   "depends_on": "eval:doc.type == 'M&E'",
+   "fieldname": "me_designation_meeting_with",
+   "fieldtype": "Data",
+   "label": "Designation Meeting With"
+  },
+  {
+   "depends_on": "eval:doc.type == 'M&E'",
+   "fieldname": "me_contact_no_meeting_with",
+   "fieldtype": "Data",
+   "label": "Contact No Meeting With"
+  },
+  {
+   "depends_on": "eval:doc.type == 'M&E'",
+   "fieldname": "me_activity_status",
+   "fieldtype": "Select",
+   "label": "Active / Inactive",
+   "options": "\nActive\nInactive"
+  },
+  {
+   "depends_on": "eval:doc.type == 'M&E'",
+   "fieldname": "me_mqh_book_status",
+   "fieldtype": "Select",
+   "label": "Mutalae Quran Hakeem Book Status",
+   "options": "\nGood\nAverage\nPoor\nNot Available"
+  },
+  {
+   "depends_on": "eval:doc.type == 'M&E'",
+   "fieldname": "me_reason_of_above",
+   "fieldtype": "Small Text",
+   "label": "Reason of Above"
+  },
+  {
+   "depends_on": "eval:doc.type == 'M&E'",
+   "fieldname": "me_teachers_training_session",
+   "fieldtype": "Check",
+   "label": "Has any Teachers Training Session Occurred in School?"
+  },
+  {
+   "depends_on": "eval:doc.type == 'M&E'",
+   "fieldname": "me_number_of_teachers_mqh",
+   "fieldtype": "Int",
+   "label": "Number of Teachers designated for MQH"
+  },
+  {
+   "depends_on": "eval:doc.type == 'M&E'",
+   "fieldname": "me_used_teachers_guide",
+   "fieldtype": "Check",
+   "label": "Did you use the Teacher's Guide of MQH for Teaching?"
+  },
+  {
+   "depends_on": "eval:doc.type == 'M&E'",
+   "fieldname": "me_mqh_book_version",
+   "fieldtype": "Data",
+   "label": "Which version of Mutalae Quran-e-Hakeem Book Taught?"
+  },
+  {
+   "depends_on": "eval:doc.type == 'M&E'",
+   "fieldname": "me_classes_per_week",
+   "fieldtype": "Int",
+   "label": "How many classes allocated per week for MQH?"
+  },
+  {
+   "depends_on": "eval:doc.type == 'M&E'",
+   "fieldname": "me_class_duration",
+   "fieldtype": "Data",
+   "label": "Duration of Class"
+  },
+  {
+   "depends_on": "eval:doc.type == 'M&E'",
+   "fieldname": "me_took_assessment",
+   "fieldtype": "Check",
+   "label": "Did you take assessment?"
+  },
+  {
+   "depends_on": "eval:doc.type == 'M&E'",
+   "fieldname": "me_student_behavior_changes",
+   "fieldtype": "Small Text",
+   "label": "What kind of changes you noticed in student behavior?"
+  },
+  {
+   "depends_on": "eval:doc.type == 'M&E'",
+   "fieldname": "me_changes_made",
+   "fieldtype": "Small Text",
+   "label": "What changes have been Made?"
+  },
+  {
+   "depends_on": "eval:doc.type == 'M&E'",
+   "fieldname": "me_details_of_changes_made",
+   "fieldtype": "Small Text",
+   "label": "Details of Changes Made"
+  },
+  {
+   "depends_on": "eval:doc.type == 'M&E'",
+   "fieldname": "me_new_school_address",
+   "fieldtype": "Data",
+   "label": "New School Address"
+  },
+  {
+   "depends_on": "eval:doc.type == 'M&E'",
+   "fieldname": "me_new_person_name",
+   "fieldtype": "Data",
+   "label": "New Person Name"
+  },
+  {
+   "depends_on": "eval:doc.type == 'M&E'",
+   "fieldname": "me_new_person_designation",
+   "fieldtype": "Data",
+   "label": "New Person Designation"
+  },
+  {
+   "depends_on": "eval:doc.type == 'M&E'",
+   "fieldname": "me_new_person_mobile_number",
+   "fieldtype": "Data",
+   "label": "New Person Mobile Number"
+  },
+  {
+   "depends_on": "eval:doc.type == 'M&E'",
+   "fieldname": "me_new_person_email",
+   "fieldtype": "Data",
+   "label": "New Person Email"
+  },
+  {
+   "depends_on": "eval:doc.type == 'M&E'",
+   "fieldname": "me_assessment_taken_from",
+   "fieldtype": "Data",
+   "label": "From whom have you taken assessment?"
+  },
+  {
+   "depends_on": "eval:doc.type == 'M&E'",
+   "fieldname": "me_school_closed",
+   "fieldtype": "Check",
+   "label": "School Closed"
+  },
+  {
+   "depends_on": "eval:doc.type == 'Marketing'",
+   "fieldname": "timestamp",
+   "fieldtype": "Datetime",
+   "label": "Timestamp"
+  },
+  {
+   "depends_on": "eval:doc.type == 'Marketing'",
+   "fieldname": "month",
+   "fieldtype": "Select",
+   "label": "Month",
+   "options": "\nJanuary\nFebruary\nMarch\nApril\nMay\nJune\nJuly\nAugust\nSeptember\nOctober\nNovember\nDecember"
+  },
+  {
+   "depends_on": "eval:doc.type == 'Marketing'",
+   "fieldname": "quarter",
+   "fieldtype": "Select",
+   "label": "Quarter",
+   "options": "\nQ1\nQ2\nQ3\nQ4"
+  },
+  {
+   "depends_on": "eval:doc.type == 'Marketing'",
+   "fieldname": "visit_by",
+   "fieldtype": "Data",
+   "label": "Visit By"
+  },
+  {
+   "depends_on": "eval:doc.type == 'Marketing'",
+   "fieldname": "marketing_visit_category",
+   "fieldtype": "Select",
+   "label": "Marketing Visit Category",
+   "options": "\nNew\nFollowup & Other Visits\nTPS Visits"
+  },
+  {
+   "depends_on": "eval:doc.type == 'Marketing'",
+   "fieldname": "frequency_of_visits",
+   "fieldtype": "Select",
+   "label": "Frequency of Visits",
+   "options": "\nDaily\nWeekly\nMonthly\nQuarterly\nYearly\nOther"
+  },
+  {
+   "depends_on": "eval:doc.type == 'Marketing'",
+   "fieldname": "visit_date",
+   "fieldtype": "Date",
+   "label": "Visit Date"
+  },
+  {
+   "depends_on": "eval:doc.type == 'Marketing'",
+   "fieldname": "visiting_starting_time",
+   "fieldtype": "Time",
+   "label": "Visiting Starting Time"
+  },
+  {
+   "depends_on": "eval:doc.type == 'Marketing'",
+   "fieldname": "visit_ending_time",
+   "fieldtype": "Time",
+   "label": "Visit Ending Time"
+  },
+  {
+   "depends_on": "eval:doc.type == 'Marketing'",
+   "fieldname": "city",
+   "fieldtype": "Data",
+   "label": "City"
+  },
+  {
+   "depends_on": "eval:doc.type == 'Marketing'",
+   "fieldname": "area",
+   "fieldtype": "Data",
+   "label": "Area"
+  },
+  {
+   "depends_on": "eval:doc.type == 'Marketing'",
+   "fieldname": "province",
+   "fieldtype": "Data",
+   "label": "Province"
+  },
+  {
+   "depends_on": "eval:doc.type == 'Marketing'",
+   "fieldname": "school_type",
+   "fieldtype": "Select",
+   "label": "School Type",
+   "options": "\nPublic\nPrivate\nOther"
+  },
+  {
+   "depends_on": "eval:doc.type == 'Marketing'",
+   "fieldname": "school_name",
+   "fieldtype": "Data",
+   "label": "School Name"
+  },
+  {
+   "depends_on": "eval:doc.type == 'Marketing'",
+   "fieldname": "meeting_with",
+   "fieldtype": "Data",
+   "label": "Meeting With"
+  },
+  {
+   "depends_on": "eval:doc.type == 'Marketing'",
+   "fieldname": "designation",
+   "fieldtype": "Data",
+   "label": "Designation"
+  },
+  {
+   "depends_on": "eval:doc.type == 'Marketing'",
+   "fieldname": "contact_number",
+   "fieldtype": "Data",
+   "label": "Contact Number"
+  },
+  {
+   "depends_on": "eval:doc.type == 'Marketing'",
+   "fieldname": "marketing_material_provided",
+   "fieldtype": "Check",
+   "label": "Does Marketing Material Provided"
+  },
+  {
+   "depends_on": "eval:doc.type == 'Marketing'",
+   "fieldname": "reference",
+   "fieldtype": "Data",
+   "label": "Reference"
+  },
+  {
+   "depends_on": "eval:doc.type == 'Marketing'",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "\nAgreed\nNot Agreed\nPending"
+  },
+  {
+   "depends_on": "eval:doc.type == 'Marketing'",
+   "fieldname": "reasons_if_not_agreed",
+   "fieldtype": "Small Text",
+   "label": "Reasons If Not Agreed"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Field Visit",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-02-11 02:22:13.824377",
+ "modified_by": "Administrator",
+ "module": "Tif Customization",
+ "name": "Field Visit",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
