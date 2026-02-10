@@ -34,6 +34,8 @@ if (typeof window.CourierDashboard === 'undefined') {
 	make() {
 		this.setup_filters();
 		this.setup_layout();
+		this.bind_detail_toggles();
+		this.bind_cost_center_details();
 		this.load_filter_options();
 		this.load_data();
 	}
@@ -101,6 +103,19 @@ if (typeof window.CourierDashboard === 'undefined') {
 			me.update_transaction_table();
 		});
 	}
+
+	bind_detail_toggles() {
+		// Use event delegation to handle dynamically rendered rows
+		this.page.main.off('click', '.toggle-details').on('click', '.toggle-details', function() {
+			let targetId = $(this).data('target');
+			let $detailsRow = $('#' + targetId);
+			if ($detailsRow.length) {
+				$detailsRow.toggle();
+				let isVisible = $detailsRow.is(':visible');
+				$(this).text(isVisible ? 'Hide' : 'Details');
+			}
+		});
+	}
 	
 	setup_layout() {
 		let me = this;
@@ -128,6 +143,7 @@ if (typeof window.CourierDashboard === 'undefined') {
 									<th>No. of Delivery Notes</th>
 									<th>Books Sent</th>
 									<th>Avg. Cost / Book</th>
+									<th>Details</th>
 								</tr>
 							</thead>
 							<tbody id="cost-center-tbody">
@@ -376,7 +392,54 @@ if (typeof window.CourierDashboard === 'undefined') {
 		
 		$('#kpi-cards').html(kpi_html);
 	}
-	
+
+	bind_cost_center_details() {
+		let me = this;
+		this.page.main.off('click', '.toggle-cc-details').on('click', '.toggle-cc-details', function() {
+			let targetId = $(this).data('target');
+			let costCenter = $(this).data('cost-center');
+			let $detailsRow = $('#' + targetId);
+			
+			if (!$detailsRow.length) {
+				return;
+			}
+			
+			let isVisible = $detailsRow.is(':visible');
+			if (isVisible) {
+				$detailsRow.hide();
+				$(this).text('Details');
+				return;
+			}
+			
+			$detailsRow.show();
+			$(this).text('Hide');
+			
+			// Load details only once
+			if ($detailsRow.data('loaded')) {
+				return;
+			}
+			
+			let $content = $detailsRow.find('.cc-details-content');
+			$content.html('<p class="text-muted">Loading delivery notes...</p>');
+			
+			frappe.call({
+				method: 'tif_customization.tif_customization.page.courier_report.courier_report.get_delivery_notes_for_cost_center',
+				args: {
+					filters: me.filters,
+					cost_center: costCenter
+				},
+				callback: function(r) {
+					let rows = r.message || [];
+					$content.html(me.render_cost_center_details_table(rows));
+					$detailsRow.data('loaded', true);
+				},
+				error: function() {
+					$content.html('<p class="text-danger">Failed to load delivery note details.</p>');
+				}
+			});
+		});
+	}
+
 	render_cost_center_table() {
 		let me = this;
 		let summary = me.data.cost_center_summary || [];
@@ -385,11 +448,12 @@ if (typeof window.CourierDashboard === 'undefined') {
 		tbody.empty();
 		
 		if (summary.length === 0) {
-			tbody.append('<tr><td colspan="6" class="text-center">No data available</td></tr>');
+			tbody.append('<tr><td colspan="7" class="text-center">No data available</td></tr>');
 			return;
 		}
 		
-		summary.forEach(row => {
+		summary.forEach((row, index) => {
+			let detailId = `cc-details-${me.make_safe_id(row.cost_center || index)}`;
 			let tr = $(`
 				<tr>
 					<td>${row.cost_center || '-'}</td>
@@ -398,10 +462,71 @@ if (typeof window.CourierDashboard === 'undefined') {
 					<td class="text-right">${format_number_value(row.dn_count || 0)}</td>
 					<td class="text-right">${format_number_value(row.books_sent || 0)}</td>
 					<td class="text-right">${format_currency_value(row.avg_cost_per_book || 0)}</td>
+					<td><button type="button" class="btn btn-xs btn-default toggle-cc-details" data-target="${detailId}" data-cost-center="${row.cost_center || ''}">Details</button></td>
 				</tr>
 			`);
 			tbody.append(tr);
+			tbody.append(`
+				<tr class="details-row" id="${detailId}" style="display: none;">
+					<td colspan="7">
+						<div class="cc-details-content" style="background: #f8f9fa; padding: 10px; border-radius: 4px;"></div>
+					</td>
+				</tr>
+			`);
 		});
+	}
+
+	render_cost_center_details_table(rows) {
+		if (!rows || rows.length === 0) {
+			return '<p class="text-muted" style="margin: 0;">No delivery notes found for this cost center.</p>';
+		}
+		
+		let totalBooks = rows.reduce((acc, r) => acc + flt(r.total_books || 0), 0);
+		let totalAmount = rows.reduce((acc, r) => acc + flt(r.total_amount || 0), 0);
+		
+		let bodyRows = rows.map(row => {
+			let transportCharges = row.custom_delivery_mode === 'Transport' ? format_currency_value(row.transport_charges || 0) : '-';
+			let totalAmountValue = format_currency_value(row.total_amount || 0);
+			return `
+				<tr>
+					<td>${row.posting_date || '-'}</td>
+					<td><a href="/app/delivery-note/${row.delivery_note_no}" target="_blank">${row.delivery_note_no || '-'}</a></td>
+					<td>${row.customer_name || row.customer || '-'}</td>
+					<td class="text-right">${format_number_value(row.total_books || 0)}</td>
+					<td class="text-right">${totalAmountValue}</td>
+					<td>${row.custom_delivery_mode || '-'}</td>
+					<td class="text-right">${transportCharges}</td>
+					<td>${row.created_by_name || row.created_by || '-'}</td>
+				</tr>
+			`;
+		}).join('');
+		
+		return `
+			<div style="margin-bottom: 10px;">
+				<strong>Delivery Notes:</strong> ${format_number_value(rows.length)} |
+				<strong>Total Books:</strong> ${format_number_value(totalBooks)} |
+				<strong>Total Amount:</strong> ${format_currency_value(totalAmount)}
+			</div>
+			<div class="table-responsive">
+				<table class="table table-bordered table-condensed" style="margin: 0; font-size: 12px;">
+					<thead>
+						<tr>
+							<th>Posting Date</th>
+							<th>Delivery Note</th>
+							<th>Customer</th>
+							<th class="text-right">Books</th>
+							<th class="text-right">Total Amount</th>
+							<th>Mode</th>
+							<th class="text-right">Transport</th>
+							<th>Created By</th>
+						</tr>
+					</thead>
+					<tbody>
+						${bodyRows}
+					</tbody>
+				</table>
+			</div>
+		`;
 	}
 	
 	render_charts() {
@@ -849,10 +974,12 @@ if (typeof window.CourierDashboard === 'undefined') {
 						<th>Expense Amount</th>
 						<th>Remarks</th>
 						<th>Created By</th>
+						<th>Details</th>
 					</tr>
 				`);
 				
-				jv_data.forEach(row => {
+				jv_data.forEach((row, index) => {
+					let detailId = `jv-details-${me.make_safe_id(row.jv_number || index)}`;
 					let tr = $(`
 						<tr>
 							<td>${row.posting_date || '-'}</td>
@@ -861,13 +988,15 @@ if (typeof window.CourierDashboard === 'undefined') {
 							<td class="text-right">${format_currency_value(row.expense_amount || 0)}</td>
 							<td>${row.remarks || '-'}</td>
 							<td>${row.created_by_name || row.created_by || '-'}</td>
+							<td><button type="button" class="btn btn-xs btn-default toggle-details" data-target="${detailId}">Details</button></td>
 						</tr>
 					`);
 					tbody.append(tr);
+					tbody.append(me.render_details_row(detailId, me.build_jv_details(row), 7));
 				});
 				
 				if (jv_data.length === 0) {
-					tbody.append('<tr><td colspan="6" class="text-center">No journal entries found</td></tr>');
+					tbody.append('<tr><td colspan="7" class="text-center">No journal entries found</td></tr>');
 				}
 			} else {
 				// Combined view - show both
@@ -882,11 +1011,13 @@ if (typeof window.CourierDashboard === 'undefined') {
 						<th>Transport Charges</th>
 						<th>Remarks</th>
 						<th>Created By</th>
+						<th>Details</th>
 					</tr>
 				`);
 				
 				// Add JVs
-				jv_data.forEach(row => {
+				jv_data.forEach((row, index) => {
+					let detailId = `jv-details-${me.make_safe_id(row.jv_number || index)}`;
 					let tr = $(`
 						<tr>
 							<td><span class="label label-primary">JV</span></td>
@@ -898,14 +1029,17 @@ if (typeof window.CourierDashboard === 'undefined') {
 							<td>-</td>
 							<td>${row.remarks || '-'}</td>
 							<td>${row.created_by_name || row.created_by || '-'}</td>
+							<td><button type="button" class="btn btn-xs btn-default toggle-details" data-target="${detailId}">Details</button></td>
 						</tr>
 					`);
 					tbody.append(tr);
+					tbody.append(me.render_details_row(detailId, me.build_jv_details(row), 10));
 				});
 				
 				// Add DNs
 				let dn_data = me.data.delivery_notes || [];
-				dn_data.forEach(row => {
+				dn_data.forEach((row, index) => {
+					let detailId = `dn-details-${me.make_safe_id(row.delivery_note_no || index)}`;
 					let transportCharges = '';
 					if (row.custom_delivery_mode === 'Transport' && row.transport_charges) {
 						transportCharges = format_currency_value(row.transport_charges || 0);
@@ -922,14 +1056,17 @@ if (typeof window.CourierDashboard === 'undefined') {
 							<td>${row.cost_center || '-'}</td>
 							<td class="text-right">${format_number_value(row.total_books || 0)} books</td>
 							<td class="text-right">${transportCharges}</td>
+							<td>-</td>
 							<td>${row.created_by_name || row.created_by || '-'}</td>
+							<td><button type="button" class="btn btn-xs btn-default toggle-details" data-target="${detailId}">Details</button></td>
 						</tr>
 					`);
 					tbody.append(tr);
+					tbody.append(me.render_details_row(detailId, me.build_dn_details(row), 10));
 				});
 				
 				if (jv_data.length === 0 && dn_data.length === 0) {
-					tbody.append('<tr><td colspan="9" class="text-center">No transactions found</td></tr>');
+					tbody.append('<tr><td colspan="10" class="text-center">No transactions found</td></tr>');
 				}
 			}
 		} else if (view_type === 'dn') {
@@ -946,10 +1083,12 @@ if (typeof window.CourierDashboard === 'undefined') {
 					<th>Total Books</th>
 					<th>Transport Charges</th>
 					<th>Created By</th>
+					<th>Details</th>
 				</tr>
 			`);
 			
-			dn_data.forEach(row => {
+			dn_data.forEach((row, index) => {
+				let detailId = `dn-details-${me.make_safe_id(row.delivery_note_no || index)}`;
 				let deliveryMode = row.custom_delivery_mode || '-';
 				let transportCharges = '';
 				if (row.custom_delivery_mode === 'Transport' && row.transport_charges) {
@@ -968,15 +1107,160 @@ if (typeof window.CourierDashboard === 'undefined') {
 						<td class="text-right">${format_number_value(row.total_books || 0)}</td>
 						<td class="text-right">${transportCharges}</td>
 						<td>${row.created_by_name || row.created_by || '-'}</td>
+						<td><button type="button" class="btn btn-xs btn-default toggle-details" data-target="${detailId}">Details</button></td>
 					</tr>
 				`);
 				tbody.append(tr);
+				tbody.append(me.render_details_row(detailId, me.build_dn_details(row), 9));
 			});
 			
 			if (dn_data.length === 0) {
-				tbody.append('<tr><td colspan="8" class="text-center">No delivery notes found</td></tr>');
+				tbody.append('<tr><td colspan="9" class="text-center">No delivery notes found</td></tr>');
 			}
 		}
+	}
+
+	make_safe_id(value) {
+		return String(value || '').replace(/[^a-zA-Z0-9_-]/g, '-');
+	}
+
+	render_details_row(detailId, html, colSpan) {
+		return $(`
+			<tr class="details-row" id="${detailId}" style="display: none;">
+				<td colspan="${colSpan}">
+					<div style="background: #f8f9fa; padding: 10px; border-radius: 4px;">
+						${html}
+					</div>
+				</td>
+			</tr>
+		`);
+	}
+
+	build_jv_details(row) {
+		let deliveryNote = row.delivery_note_no ? `<a href="/app/delivery-note/${row.delivery_note_no}" target="_blank">${row.delivery_note_no}</a>` : '-';
+		let party = row.party ? `${row.party_type || ''} ${row.party}`.trim() : '-';
+		return `
+			<table class="table table-bordered table-condensed" style="margin: 0; font-size: 12px;">
+				<tbody>
+					<tr>
+						<td><strong>JV Number</strong></td>
+						<td>${row.jv_number || '-'}</td>
+						<td><strong>Posting Date</strong></td>
+						<td>${row.posting_date || '-'}</td>
+					</tr>
+					<tr>
+						<td><strong>Account</strong></td>
+						<td>${row.account || '-'}</td>
+						<td><strong>Cost Center</strong></td>
+						<td>${row.cost_center || '-'}</td>
+					</tr>
+					<tr>
+						<td><strong>Party</strong></td>
+						<td>${party}</td>
+						<td><strong>Linked Delivery Note</strong></td>
+						<td>${deliveryNote}</td>
+					</tr>
+					<tr>
+						<td><strong>Debit</strong></td>
+						<td>${format_currency_value(row.debit_amount || 0)}</td>
+						<td><strong>Credit</strong></td>
+						<td>${format_currency_value(row.credit_amount || 0)}</td>
+					</tr>
+					<tr>
+						<td><strong>Remarks</strong></td>
+						<td colspan="3">${row.remarks || '-'}</td>
+					</tr>
+				</tbody>
+			</table>
+		`;
+	}
+
+	build_dn_details(row) {
+		let items = row.items || [];
+		let items_html = '<em>No items</em>';
+		if (items.length > 0) {
+			let item_rows = items.map(item => {
+				return `
+					<tr>
+						<td>${item.item_code || '-'}</td>
+						<td>${item.item_name || '-'}</td>
+						<td class="text-right">${format_number_value(item.qty || 0)}</td>
+						<td class="text-right">${format_currency_value(item.rate || 0)}</td>
+						<td class="text-right">${format_currency_value(item.amount || 0)}</td>
+					</tr>
+				`;
+			}).join('');
+			items_html = `
+				<table class="table table-bordered table-condensed" style="margin: 0; font-size: 12px;">
+					<thead>
+						<tr>
+							<th>Item Code</th>
+							<th>Item Name</th>
+							<th class="text-right">Qty</th>
+							<th class="text-right">Rate</th>
+							<th class="text-right">Amount</th>
+						</tr>
+					</thead>
+					<tbody>
+						${item_rows}
+					</tbody>
+				</table>
+			`;
+		}
+		
+		let totalAmount = row.total_amount || 0;
+		let transportCharges = row.custom_delivery_mode === 'Transport' ? format_currency_value(row.transport_charges || 0) : '-';
+		
+		return `
+			<table class="table table-bordered table-condensed" style="margin-bottom: 10px; font-size: 12px;">
+				<tbody>
+					<tr>
+						<td><strong>Delivery Note</strong></td>
+						<td>${row.delivery_note_no || '-'}</td>
+						<td><strong>Posting Date</strong></td>
+						<td>${row.posting_date || '-'}</td>
+					</tr>
+					<tr>
+						<td><strong>Customer</strong></td>
+						<td>${row.customer_name || row.customer || '-'}</td>
+						<td><strong>Cost Center</strong></td>
+						<td>${row.cost_center || '-'}</td>
+					</tr>
+					<tr>
+						<td><strong>Delivery Mode</strong></td>
+						<td>${row.custom_delivery_mode || '-'}</td>
+						<td><strong>Courier</strong></td>
+						<td>${row.custom_courier || '-'}</td>
+					</tr>
+					<tr>
+						<td><strong>Courier Service</strong></td>
+						<td>${row.custom_courier_service || '-'}</td>
+						<td><strong>Payment Mode</strong></td>
+						<td>${row.custom_courier_mode_of_payment || '-'}</td>
+					</tr>
+					<tr>
+						<td><strong>Delivery Rate</strong></td>
+						<td>${format_currency_value(row.custom_delivery_rate || 0)}</td>
+						<td><strong>Total Weight</strong></td>
+						<td>${format_number_value(row.custom_total_delivery_weightage || 0)}</td>
+					</tr>
+					<tr>
+						<td><strong>Total Books</strong></td>
+						<td>${format_number_value(row.total_books || 0)}</td>
+						<td><strong>Transport Charges</strong></td>
+						<td>${transportCharges}</td>
+					</tr>
+					<tr>
+						<td><strong>Total Amount</strong></td>
+						<td>${format_currency_value(totalAmount || 0)}</td>
+						<td><strong>Created By</strong></td>
+						<td>${row.created_by_name || row.created_by || '-'}</td>
+					</tr>
+				</tbody>
+			</table>
+			<div><strong>Items</strong></div>
+			${items_html}
+		`;
 	}
 	
 	render_book_movement() {

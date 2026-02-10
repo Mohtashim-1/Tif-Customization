@@ -87,6 +87,104 @@ def get_courier_report_data(filters=None):
 		frappe.log_error(f"get_courier_report_data error: {error_msg}", "Courier Report Error")
 		return {'error': str(e)}
 
+@frappe.whitelist()
+def get_delivery_notes_for_cost_center(filters=None, cost_center=None):
+	"""Get delivery notes list for a specific cost center for detail view"""
+	try:
+		if isinstance(filters, str):
+			import json
+			filters = json.loads(filters)
+		elif not filters:
+			filters = {}
+		
+		from_date = filters.get('from_date')
+		to_date = filters.get('to_date')
+		
+		if not from_date or not to_date:
+			# Fallback to last 30 days if dates are missing
+			from_date = add_days(today(), -30)
+			to_date = today()
+		
+		cost_center_filter = ""
+		params = {
+			'from_date': from_date,
+			'to_date': to_date
+		}
+		
+		if cost_center and cost_center != 'Not Set':
+			cost_center_filter = "AND (dni.cost_center = %(cost_center)s OR dn.cost_center = %(cost_center)s)"
+			params['cost_center'] = cost_center
+		elif cost_center == 'Not Set':
+			cost_center_filter = "AND ((dni.cost_center IS NULL OR dni.cost_center = '') AND (dn.cost_center IS NULL OR dn.cost_center = ''))"
+		
+		query = f"""
+			SELECT 
+				dn.posting_date,
+				dn.name AS delivery_note_no,
+				dn.customer,
+				COALESCE(SUM(dni.qty), 0) AS total_books,
+				dn.custom_delivery_mode,
+				dn.custom_courier,
+				dn.custom_courier_service,
+				dn.custom_delivery_rate,
+				dn.custom_courier_mode_of_payment,
+				dn.custom_total_delivery_weightage,
+				dn.net_total,
+				dn.grand_total,
+				dn.owner AS created_by,
+				COALESCE((
+					SELECT SUM(tc.amount)
+					FROM `tabTransport Charges` tc
+					WHERE tc.parent = dn.name 
+					AND tc.parenttype = 'Delivery Note' 
+					AND tc.parentfield = 'custom_transport_charges'
+				), 0) AS transport_charges
+			FROM `tabDelivery Note` dn
+			JOIN `tabDelivery Note Item` dni ON dni.parent = dn.name
+			WHERE dn.docstatus = 1
+			AND dn.posting_date BETWEEN %(from_date)s AND %(to_date)s
+			{cost_center_filter}
+			GROUP BY dn.name
+			ORDER BY dn.posting_date DESC, dn.name DESC
+		"""
+		
+		results = frappe.db.sql(query, params, as_dict=True)
+		
+		# Fetch items for all delivery notes in one go
+		dn_names = [row.delivery_note_no for row in results if row.get('delivery_note_no')]
+		items_by_dn = {}
+		if dn_names:
+			items = frappe.db.sql("""
+				SELECT parent, item_code, item_name, qty, rate, amount
+				FROM `tabDelivery Note Item`
+				WHERE parent IN %(dn_names)s
+				ORDER BY parent, idx
+			""", {'dn_names': tuple(dn_names)}, as_dict=True)
+			for item in items:
+				parent = item.get('parent')
+				items_by_dn.setdefault(parent, []).append({
+					'item_code': item.get('item_code'),
+					'item_name': item.get('item_name'),
+					'qty': flt(item.get('qty', 0)),
+					'rate': flt(item.get('rate', 0)),
+					'amount': flt(item.get('amount', 0))
+				})
+		
+		for row in results:
+			row['total_books'] = flt(row.get('total_books', 0))
+			row['transport_charges'] = flt(row.get('transport_charges', 0))
+			row['created_by_name'] = frappe.db.get_value('User', row['created_by'], 'full_name') or row['created_by']
+			row['customer_name'] = frappe.db.get_value('Customer', row['customer'], 'customer_name') or row['customer']
+			row['items'] = items_by_dn.get(row.get('delivery_note_no'), [])
+			row['total_amount'] = flt(row.get('grand_total') or row.get('net_total') or 0)
+			if not row['total_amount'] and row['items']:
+				row['total_amount'] = sum(flt(i.get('amount', 0)) for i in row['items'])
+		
+		return results
+	except Exception as e:
+		frappe.log_error(f"Error in get_delivery_notes_for_cost_center: {str(e)}", "Courier Report Error")
+		return []
+
 def get_kpi_data(filters):
 	"""Get KPI summary data"""
 	try:
@@ -273,7 +371,7 @@ def get_cost_center_summary(filters):
 			cost_center_list = "', '".join(cost_centers)
 			cost_center_filter = f"AND jea.cost_center IN ('{cost_center_list}')"
 			# For DNs: show specified cost centers OR DNs without cost center
-			dn_cost_center_filter = f"AND (dn.cost_center IN ('{cost_center_list}') OR dn.cost_center IS NULL OR dn.cost_center = '')"
+			dn_cost_center_filter = f"AND (dni.cost_center IN ('{cost_center_list}') OR dni.cost_center IS NULL OR dni.cost_center = '')"
 		
 		# Get expense by cost center - Use Delivery Note posting date instead of JV posting date
 		expense_query = f"""
@@ -302,7 +400,7 @@ def get_cost_center_summary(filters):
 		# Show all DNs, including those without cost center (grouped as 'Not Set')
 		dn_query = f"""
 			SELECT 
-				COALESCE(dn.cost_center, 'Not Set') AS cost_center,
+				COALESCE(dni.cost_center, dn.cost_center, 'Not Set') AS cost_center,
 				COUNT(DISTINCT dn.name) AS dn_count,
 				COALESCE(SUM(dni.qty), 0) AS books_sent
 			FROM `tabDelivery Note` dn
@@ -310,7 +408,7 @@ def get_cost_center_summary(filters):
 			WHERE dn.docstatus = 1
 			AND dn.posting_date BETWEEN %(from_date)s AND %(to_date)s
 			{dn_cost_center_filter if cost_centers else ''}
-			GROUP BY COALESCE(dn.cost_center, 'Not Set')
+			GROUP BY COALESCE(dni.cost_center, dn.cost_center, 'Not Set')
 		"""
 		
 		dn_data = frappe.db.sql(dn_query, {
@@ -402,7 +500,15 @@ def get_journal_entries(filters):
 			SELECT 
 				COALESCE(dn.posting_date, je.posting_date) AS posting_date,
 				je.name AS jv_number,
+				je.cheque_no AS delivery_note_no,
 				jea.cost_center,
+				jea.account,
+				jea.party,
+				jea.party_type,
+				jea.reference_type,
+				jea.reference_name,
+				jea.debit AS debit_amount,
+				jea.credit AS credit_amount,
 				(jea.debit - jea.credit) AS expense_amount,
 				je.remark AS remarks,
 				je.owner AS created_by
@@ -431,6 +537,8 @@ def get_journal_entries(filters):
 		# Format created_by to show user name
 		for row in results:
 			row['expense_amount'] = flt(row['expense_amount'])
+			row['debit_amount'] = flt(row.get('debit_amount', 0))
+			row['credit_amount'] = flt(row.get('credit_amount', 0))
 			row['created_by_name'] = frappe.db.get_value('User', row['created_by'], 'full_name') or row['created_by']
 		
 		return results
@@ -450,7 +558,7 @@ def get_delivery_notes(filters):
 		if cost_centers:
 			cost_center_list = "', '".join(cost_centers)
 			# Show DNs with specified cost centers OR DNs without cost center (NULL)
-			cost_center_filter = f"AND (dn.cost_center IN ('{cost_center_list}') OR dn.cost_center IS NULL OR dn.cost_center = '')"
+			cost_center_filter = f"AND (dni.cost_center IN ('{cost_center_list}') OR dni.cost_center IS NULL OR dni.cost_center = '')"
 		
 		customer_filter = ""
 		if customer:
@@ -461,10 +569,17 @@ def get_delivery_notes(filters):
 				dn.posting_date,
 				dn.name AS delivery_note_no,
 				dn.customer,
-				COALESCE(dn.cost_center, 'Not Set') AS cost_center,
+				COALESCE(dni.cost_center, dn.cost_center, 'Not Set') AS cost_center,
 				COALESCE(SUM(dni.qty), 0) AS total_books,
 				dn.owner AS created_by,
 				dn.custom_delivery_mode,
+				dn.custom_courier,
+				dn.custom_courier_service,
+				dn.custom_delivery_rate,
+				dn.custom_courier_mode_of_payment,
+				dn.custom_total_delivery_weightage,
+				dn.net_total,
+				dn.grand_total,
 				COALESCE((
 					SELECT SUM(tc.amount)
 					FROM `tabTransport Charges` tc
@@ -478,7 +593,7 @@ def get_delivery_notes(filters):
 			AND dn.posting_date BETWEEN %(from_date)s AND %(to_date)s
 			{cost_center_filter}
 			{customer_filter}
-			GROUP BY dn.name
+			GROUP BY dn.name, COALESCE(dni.cost_center, dn.cost_center, 'Not Set')
 			ORDER BY dn.posting_date DESC, dn.name DESC
 		"""
 		
@@ -491,6 +606,26 @@ def get_delivery_notes(filters):
 		
 		results = frappe.db.sql(query, params, as_dict=True)
 		
+		# Fetch items for all delivery notes in one go
+		dn_names = [row.delivery_note_no for row in results if row.get('delivery_note_no')]
+		items_by_dn = {}
+		if dn_names:
+			items = frappe.db.sql("""
+				SELECT parent, item_code, item_name, qty, rate, amount
+				FROM `tabDelivery Note Item`
+				WHERE parent IN %(dn_names)s
+				ORDER BY parent, idx
+			""", {'dn_names': tuple(dn_names)}, as_dict=True)
+			for item in items:
+				parent = item.get('parent')
+				items_by_dn.setdefault(parent, []).append({
+					'item_code': item.get('item_code'),
+					'item_name': item.get('item_name'),
+					'qty': flt(item.get('qty', 0)),
+					'rate': flt(item.get('rate', 0)),
+					'amount': flt(item.get('amount', 0))
+				})
+		
 		# Format created_by to show user name - show all delivery notes including those without cost center
 		filtered_results = []
 		for row in results:
@@ -498,6 +633,10 @@ def get_delivery_notes(filters):
 			row['transport_charges'] = flt(row.get('transport_charges', 0))
 			row['created_by_name'] = frappe.db.get_value('User', row['created_by'], 'full_name') or row['created_by']
 			row['customer_name'] = frappe.db.get_value('Customer', row['customer'], 'customer_name') or row['customer']
+			row['items'] = items_by_dn.get(row.get('delivery_note_no'), [])
+			row['total_amount'] = flt(row.get('grand_total') or row.get('net_total') or 0)
+			if not row['total_amount'] and row['items']:
+				row['total_amount'] = sum(flt(i.get('amount', 0)) for i in row['items'])
 			filtered_results.append(row)
 		
 		return filtered_results
@@ -1220,42 +1359,7 @@ def get_item_category_expense(filters):
 		if customer:
 			customer_filter = "AND dn.customer = %(customer)s"
 		
-		# Get courier expenses from Journal Entries grouped by item category
-		# First, get the category for each delivery note based on its items
-		# Then sum expenses by category
-		query = f"""
-			SELECT 
-				dn_cat.category,
-				COUNT(DISTINCT dn_cat.dn_name) AS delivery_note_count,
-				COALESCE(SUM(dn_cat.expense), 0) AS expense_amount
-			FROM (
-				SELECT DISTINCT
-					dn.name AS dn_name,
-					CASE 
-						WHEN EXISTS (
-							SELECT 1 FROM `tabDelivery Note Item` dni2
-							JOIN `tabItem` i2 ON i2.item_code = dni2.item_code
-							WHERE dni2.parent = dn.name
-							AND (i2.item_group LIKE '%%Book%%' OR i2.item_group LIKE '%%MQH%%' OR i2.item_group LIKE '%%Qaida%%')
-						) THEN 'Books'
-						ELSE 'General Courier Expense'
-					END AS category,
-					COALESCE(SUM(jea.debit - jea.credit), 0) AS expense
-				FROM `tabJournal Entry Account` jea
-				JOIN `tabJournal Entry` je ON je.name = jea.parent
-				LEFT JOIN `tabDelivery Note` dn ON dn.name = je.cheque_no
-				WHERE je.docstatus = 1
-				AND COALESCE(dn.posting_date, je.posting_date) BETWEEN %(from_date)s AND %(to_date)s
-				AND (jea.account LIKE '%%Courier%%' OR jea.account LIKE '%%Courier Expense%%')
-				AND dn.name IS NOT NULL
-				{cost_center_filter}
-				{customer_filter}
-				GROUP BY dn.name
-			) AS dn_cat
-			GROUP BY dn_cat.category
-			ORDER BY expense_amount DESC
-		"""
-		
+		# Get courier expenses by delivery note
 		params = {
 			'from_date': from_date,
 			'to_date': to_date
@@ -1263,9 +1367,25 @@ def get_item_category_expense(filters):
 		if customer:
 			params['customer'] = customer
 		
-		courier_results = frappe.db.sql(query, params, as_dict=True)
+		courier_query = f"""
+			SELECT 
+				dn.name AS dn_name,
+				COALESCE(SUM(jea.debit - jea.credit), 0) AS expense
+			FROM `tabJournal Entry Account` jea
+			JOIN `tabJournal Entry` je ON je.name = jea.parent
+			LEFT JOIN `tabDelivery Note` dn ON dn.name = je.cheque_no
+			WHERE je.docstatus = 1
+			AND dn.name IS NOT NULL
+			AND dn.posting_date BETWEEN %(from_date)s AND %(to_date)s
+			AND (jea.account LIKE '%%Courier%%' OR jea.account LIKE '%%Courier Expense%%')
+			{cost_center_filter}
+			{customer_filter}
+			GROUP BY dn.name
+		"""
 		
-		# Get transport charges by item category
+		courier_results = frappe.db.sql(courier_query, params, as_dict=True)
+		
+		# Get transport charges by delivery note
 		cost_center_filter_transport = ""
 		if cost_centers:
 			cost_center_list = "', '".join(cost_centers)
@@ -1277,81 +1397,77 @@ def get_item_category_expense(filters):
 		
 		transport_query = f"""
 			SELECT 
-				dn_cat.category,
-				COUNT(DISTINCT dn_cat.dn_name) AS delivery_note_count,
-				COALESCE(SUM(dn_cat.expense), 0) AS expense_amount
-			FROM (
-				SELECT DISTINCT
-					dn.name AS dn_name,
-					CASE 
-						WHEN EXISTS (
-							SELECT 1 FROM `tabDelivery Note Item` dni2
-							JOIN `tabItem` i2 ON i2.item_code = dni2.item_code
-							WHERE dni2.parent = dn.name
-							AND (i2.item_group LIKE '%%Book%%' OR i2.item_group LIKE '%%MQH%%' OR i2.item_group LIKE '%%Qaida%%')
-						) THEN 'Books'
-						ELSE 'General Courier Expense'
-					END AS category,
-					COALESCE(SUM(tc.amount), 0) AS expense
-				FROM `tabDelivery Note` dn
-				JOIN `tabTransport Charges` tc ON tc.parent = dn.name 
-					AND tc.parenttype = 'Delivery Note' 
-					AND tc.parentfield = 'custom_transport_charges'
-				WHERE dn.docstatus = 1
-				AND dn.posting_date BETWEEN %(from_date)s AND %(to_date)s
-				AND dn.custom_delivery_mode = 'Transport'
-				{cost_center_filter_transport}
-				{customer_filter_transport}
-				GROUP BY dn.name
-			) AS dn_cat
-			GROUP BY dn_cat.category
-			ORDER BY expense_amount DESC
+				dn.name AS dn_name,
+				COALESCE(SUM(tc.amount), 0) AS expense
+			FROM `tabDelivery Note` dn
+			JOIN `tabTransport Charges` tc ON tc.parent = dn.name 
+				AND tc.parenttype = 'Delivery Note' 
+				AND tc.parentfield = 'custom_transport_charges'
+			WHERE dn.docstatus = 1
+			AND dn.posting_date BETWEEN %(from_date)s AND %(to_date)s
+			AND dn.custom_delivery_mode = 'Transport'
+			{cost_center_filter_transport}
+			{customer_filter_transport}
+			GROUP BY dn.name
 		"""
 		
 		transport_results = frappe.db.sql(transport_query, params, as_dict=True)
 		
-		# Combine courier and transport expenses by category
-		category_dict = {}
+		# Map expenses by delivery note
+		courier_expense_by_dn = {row.get('dn_name'): flt(row.get('expense', 0)) for row in courier_results}
+		transport_expense_by_dn = {row.get('dn_name'): flt(row.get('expense', 0)) for row in transport_results}
 		
-		# Process courier results
-		for row in courier_results:
-			category = row.get('category') or 'General Courier Expense'
-			if category not in category_dict:
-				category_dict[category] = {
-					'delivery_note_count': 0,
-					'expense_amount': 0
-				}
-			category_dict[category]['delivery_note_count'] += cint(row.get('delivery_note_count', 0))
-			category_dict[category]['expense_amount'] += flt(row.get('expense_amount', 0))
+		dn_names = set(courier_expense_by_dn.keys()) | set(transport_expense_by_dn.keys())
+		if not dn_names:
+			return [
+				{'category': 'Books', 'delivery_note_count': 0, 'expense_amount': 0},
+				{'category': 'General Courier Expense', 'delivery_note_count': 0, 'expense_amount': 0}
+			]
 		
-		# Process transport results
-		for row in transport_results:
-			category = row.get('category') or 'General Courier Expense'
-			if category not in category_dict:
-				category_dict[category] = {
-					'delivery_note_count': 0,
-					'expense_amount': 0
-				}
-			category_dict[category]['delivery_note_count'] += cint(row.get('delivery_note_count', 0))
-			category_dict[category]['expense_amount'] += flt(row.get('expense_amount', 0))
+		# Get category for each delivery note
+		dn_category_results = frappe.db.sql("""
+			SELECT 
+				dn.name AS dn_name,
+				CASE 
+					WHEN EXISTS (
+						SELECT 1 FROM `tabDelivery Note Item` dni2
+						JOIN `tabItem` i2 ON i2.item_code = dni2.item_code
+						WHERE dni2.parent = dn.name
+						AND (i2.item_group LIKE '%%Book%%' OR i2.item_group LIKE '%%MQH%%' OR i2.item_group LIKE '%%Qaida%%')
+					) THEN 'Books'
+					ELSE 'General Courier Expense'
+				END AS category
+			FROM `tabDelivery Note` dn
+			WHERE dn.name IN %(dn_names)s
+		""", {'dn_names': tuple(dn_names)}, as_dict=True)
 		
-		# Convert to list format
-		results = []
-		for category in ['Books', 'General Courier Expense']:
-			if category in category_dict:
-				results.append({
-					'category': category,
-					'delivery_note_count': category_dict[category]['delivery_note_count'],
-					'expense_amount': flt(category_dict[category]['expense_amount'])
-				})
-			else:
-				results.append({
-					'category': category,
-					'delivery_note_count': 0,
-					'expense_amount': 0
-				})
+		category_by_dn = {row.get('dn_name'): row.get('category') for row in dn_category_results}
 		
-		return results
+		# Aggregate by category with unique DN count and combined expense
+		category_dict = {
+			'Books': {'delivery_note_count': 0, 'expense_amount': 0},
+			'General Courier Expense': {'delivery_note_count': 0, 'expense_amount': 0}
+		}
+		
+		for dn_name in dn_names:
+			category = category_by_dn.get(dn_name) or 'General Courier Expense'
+			total_expense = flt(courier_expense_by_dn.get(dn_name, 0)) + flt(transport_expense_by_dn.get(dn_name, 0))
+			category_dict.setdefault(category, {'delivery_note_count': 0, 'expense_amount': 0})
+			category_dict[category]['delivery_note_count'] += 1
+			category_dict[category]['expense_amount'] += total_expense
+		
+		return [
+			{
+				'category': 'Books',
+				'delivery_note_count': category_dict.get('Books', {}).get('delivery_note_count', 0),
+				'expense_amount': flt(category_dict.get('Books', {}).get('expense_amount', 0))
+			},
+			{
+				'category': 'General Courier Expense',
+				'delivery_note_count': category_dict.get('General Courier Expense', {}).get('delivery_note_count', 0),
+				'expense_amount': flt(category_dict.get('General Courier Expense', {}).get('expense_amount', 0))
+			}
+		]
 	except Exception as e:
 		frappe.log_error(f"Error in get_item_category_expense: {str(e)}", "Courier Report Error")
 		return [
@@ -1374,4 +1490,3 @@ def get_customers():
 	except Exception as e:
 		frappe.log_error(f"Error in get_customers: {str(e)}", "Courier Report Error")
 		return []
-
