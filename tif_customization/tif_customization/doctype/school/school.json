@@ -1,12 +1,13 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "format:SR-{####}",
+ "autoname": "naming_series:naming_series",
  "creation": "2025-08-02 11:00:39.480134",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
   "school_as",
+  "naming_series",
   "school_name",
   "territory",
   "school_type",
@@ -25,6 +26,14 @@
   "inter_board_code",
   "cambridge_board_code",
   "trust_private_registration_code",
+  "section_break_ciol",
+  "tps",
+  "contact_person",
+  "column_break_mazx",
+  "cee",
+  "contact_number",
+  "column_break_dlno",
+  "qps",
   "section_break_shcx",
   "books",
   "training_type_allowed",
@@ -57,8 +66,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "School As",
-   "options": "PERSON\nSCHOOL VISIT\nFUNDRAISING",
-   "reqd": 1
+   "options": "\nPERSON\nSCHOOL VISIT\nFUNDRAISING"
   },
   {
    "fieldname": "school_name",
@@ -78,8 +86,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "School Type",
-   "options": "GOVT\nPVT",
-   "reqd": 1
+   "options": "\nGOVT\nPVT"
   },
   {
    "description": "School Group",
@@ -92,8 +99,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Category",
-   "options": "INDIVIDUAL\nCHAIN OF SCHOOL",
-   "reqd": 1
+   "options": "\nINDIVIDUAL\nCHAIN OF SCHOOL"
   },
   {
    "depends_on": "eval:doc.category=='CHAIN OF SCHOOL'",
@@ -156,7 +162,7 @@
    "fieldname": "type_of_institution",
    "fieldtype": "Select",
    "label": "Type of Institution",
-   "options": "MATRIC\nINTERBOARD\nCAMBRIDGE"
+   "options": "\nMATRIC\nINTERBOARD\nCAMBRIDGE"
   },
   {
    "fieldname": "school_level",
@@ -296,16 +302,62 @@
   {
    "fieldname": "section_break_shcx",
    "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "section_break_ciol",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "tps",
+   "fieldtype": "Select",
+   "label": "TPS",
+   "options": "TPS is associated with this school\nTPS is not associated with this school"
+  },
+  {
+   "fieldname": "column_break_mazx",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "cee",
+   "fieldtype": "Select",
+   "label": "CEE",
+   "options": "CEE is associated with this school\nCEE is not associated with this school"
+  },
+  {
+   "fieldname": "column_break_dlno",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "qps",
+   "fieldtype": "Select",
+   "label": "QPS",
+   "options": "QPS is associated with this school\nQPS is not associated with this school"
+  },
+  {
+   "fieldname": "contact_person",
+   "fieldtype": "Data",
+   "label": "Contact Person"
+  },
+  {
+   "fieldname": "contact_number",
+   "fieldtype": "Data",
+   "label": "Contact Number"
+  },
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Series",
+   "options": "S-"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-08-21 03:48:15.432887",
- "modified_by": "shoaibmohtashim973@gmail.com",
+ "modified": "2026-02-14 11:01:55.656405",
+ "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "School",
- "naming_rule": "Expression",
+ "naming_rule": "By \"Naming Series\" field",
  "owner": "Administrator",
  "permissions": [
   {
@@ -328,6 +380,7 @@
   }
  ],
  "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []
