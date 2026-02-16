@@ -17,7 +17,13 @@ frappe.pages['field-staff-visit-mo'].on_page_load = function(wrapper) {
 						<label>Year</label>
 						<select id="fs-year" class="form-control"></select>
 					</div>
-					<div class="col-md-6" style="margin-top: 24px;">
+					<div class="col-md-3">
+						<label>User</label>
+						<select id="fs-user" class="form-control">
+							<option value="">All Users</option>
+						</select>
+					</div>
+					<div class="col-md-3" style="margin-top: 24px;">
 						<button class="btn btn-primary" id="fs-apply">Apply</button>
 						<button class="btn btn-secondary" id="fs-reset">Reset</button>
 						<button class="btn btn-info" id="fs-print"><i class="fa fa-print"></i> Print</button>
@@ -65,14 +71,42 @@ frappe.pages['field-staff-visit-mo'].on_page_load = function(wrapper) {
 		build_select($('#fs-year'), years, selectedYear);
 	}
 
-	function load_report(month, year) {
+	function build_user_select(selectedUser) {
+		frappe.call({
+			method: 'frappe.client.get_list',
+			args: {
+				doctype: 'User',
+				fields: ['name', 'full_name'],
+				filters: { enabled: 1 },
+				limit_page_length: 500,
+				order_by: 'full_name asc'
+			},
+			callback: function(r) {
+				const users = r.message || [];
+				const $user = $('#fs-user');
+				$user.empty();
+				$user.append('<option value="">All Users</option>');
+				users.forEach(u => {
+					const label = u.full_name ? `${u.full_name} (${u.name})` : u.name;
+					const option = $(`<option value="${frappe.utils.escape_html(u.name)}">${frappe.utils.escape_html(label)}</option>`);
+					if (u.name === selectedUser) {
+						option.attr('selected', 'selected');
+					}
+					$user.append(option);
+				});
+			}
+		});
+	}
+
+	function load_report(month, year, user) {
 		$('#fs-report').html('<p class="text-muted">Loading report...</p>');
 		frappe.call({
 			method: 'tif_customization.tif_customization.page.field_staff_visit_mo.field_staff_visit_mo.get_report_data',
 			args: {
 				filters: {
 					month: month,
-					year: year
+					year: year,
+					user: user || ''
 				}
 			},
 			callback: function(r) {
@@ -230,13 +264,15 @@ frappe.pages['field-staff-visit-mo'].on_page_load = function(wrapper) {
 		const year = now.getFullYear();
 		build_select($('#fs-month'), months, month);
 		build_years(year);
-		load_report(month, year);
+		$('#fs-user').val('');
+		load_report(month, year, '');
 	}
 
 	$('#fs-apply').on('click', function() {
 		const month = parseInt($('#fs-month').val(), 10);
 		const year = parseInt($('#fs-year').val(), 10);
-		load_report(month, year);
+		const user = $('#fs-user').val() || '';
+		load_report(month, year, user);
 	});
 
 	$('#fs-reset').on('click', function() {
@@ -247,5 +283,6 @@ frappe.pages['field-staff-visit-mo'].on_page_load = function(wrapper) {
 		window.print();
 	});
 
+	build_user_select('');
 	reset_filters();
 }

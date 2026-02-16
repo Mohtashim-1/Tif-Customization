@@ -15,19 +15,21 @@ def get_report_data(filters=None):
 
         month = int(filters.get("month") or 0) or getdate().month
         year = int(filters.get("year") or 0) or getdate().year
+        user = (filters.get("user") or "").strip() or None
 
         from_date = get_first_day(f"{year}-{month:02d}-01")
         to_date = get_last_day(from_date)
 
-        marketing = _get_marketing_visits(from_date, to_date)
-        me_visits = _get_me_visits(from_date, to_date)
-        training = _get_training_sessions(from_date, to_date)
+        marketing = _get_marketing_visits(from_date, to_date, user)
+        me_visits = _get_me_visits(from_date, to_date, user)
+        training = _get_training_sessions(from_date, to_date, user)
 
         return {
             "month": month,
             "year": year,
             "from_date": str(from_date),
             "to_date": str(to_date),
+            "user": user,
             "marketing": marketing,
             "me": me_visits,
             "training": training,
@@ -37,7 +39,7 @@ def get_report_data(filters=None):
         return {"error": str(e)}
 
 
-def _get_marketing_visits(from_date, to_date):
+def _get_marketing_visits(from_date, to_date, user=None):
     rows = frappe.db.sql(
         """
         SELECT
@@ -48,9 +50,10 @@ def _get_marketing_visits(from_date, to_date):
         WHERE docstatus < 2
         AND type = 'Marketing'
         AND COALESCE(visit_date, DATE(timestamp)) BETWEEN %(from_date)s AND %(to_date)s
+        AND (%(user)s IS NULL OR %(user)s = '' OR COALESCE(visit_by, owner) = %(user)s)
         GROUP BY COALESCE(province, 'Not Set'), COALESCE(marketing_visit_category, 'Unspecified')
         """,
-        {"from_date": from_date, "to_date": to_date},
+        {"from_date": from_date, "to_date": to_date, "user": user},
         as_dict=True,
     )
 
@@ -89,7 +92,7 @@ def _get_marketing_visits(from_date, to_date):
     return {"rows": result_rows, "totals": totals}
 
 
-def _get_me_visits(from_date, to_date):
+def _get_me_visits(from_date, to_date, user=None):
     rows = frappe.db.sql(
         """
         SELECT
@@ -100,9 +103,10 @@ def _get_me_visits(from_date, to_date):
         WHERE docstatus < 2
         AND type = 'M&E'
         AND COALESCE(me_visit_date, me_starting_date, DATE(me_timestamp)) BETWEEN %(from_date)s AND %(to_date)s
+        AND (%(user)s IS NULL OR %(user)s = '' OR COALESCE(me_visit_by, owner) = %(user)s)
         GROUP BY COALESCE(me_province, 'Not Set'), COALESCE(me_activity_status, 'Unspecified')
         """,
-        {"from_date": from_date, "to_date": to_date},
+        {"from_date": from_date, "to_date": to_date, "user": user},
         as_dict=True,
     )
 
@@ -132,7 +136,7 @@ def _get_me_visits(from_date, to_date):
     return {"rows": result_rows, "totals": totals}
 
 
-def _get_training_sessions(from_date, to_date):
+def _get_training_sessions(from_date, to_date, user=None):
     rows = frappe.db.sql(
         """
         SELECT
@@ -143,9 +147,10 @@ def _get_training_sessions(from_date, to_date):
         WHERE docstatus < 2
         AND type = 'Training'
         AND COALESCE(training_date, DATE(training_timestamp)) BETWEEN %(from_date)s AND %(to_date)s
+        AND (%(user)s IS NULL OR %(user)s = '' OR COALESCE(training_entry_filled_by, owner) = %(user)s)
         GROUP BY COALESCE(training_province, 'Not Set')
         """,
-        {"from_date": from_date, "to_date": to_date},
+        {"from_date": from_date, "to_date": to_date, "user": user},
         as_dict=True,
     )
 
