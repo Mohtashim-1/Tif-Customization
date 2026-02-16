@@ -202,6 +202,7 @@ if (typeof window.CourierDashboard === 'undefined') {
 							<div class="chart-container" style="background: white; padding: 15px; border-radius: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
 								<h5>Item Category Expense (Count & Amount)</h5>
 								<div id="chart-item-category-expense"></div>
+								<div id="item-category-drilldown-links" style="margin-top: 10px;"></div>
 								<div class="table-responsive" style="margin-top: 15px;">
 									<table class="table table-bordered table-striped" style="font-size: 12px;">
 										<thead>
@@ -214,6 +215,26 @@ if (typeof window.CourierDashboard === 'undefined') {
 										<tbody id="item-category-expense-tbody">
 										</tbody>
 									</table>
+								</div>
+								<div id="item-category-drilldown-section" style="display:none; margin-top: 15px;">
+									<h6 style="margin-bottom: 10px;">Category Drilldown: <span id="item-category-drilldown-title"></span></h6>
+									<div class="table-responsive">
+										<table class="table table-bordered table-condensed" style="font-size: 12px;">
+											<thead>
+												<tr>
+													<th>Posting Date</th>
+													<th>Delivery Note</th>
+													<th>Customer</th>
+													<th>Cost Center</th>
+													<th class="text-right">Books</th>
+													<th class="text-right">Courier Expense</th>
+													<th class="text-right">Transport Charges</th>
+													<th class="text-right">Total Expense</th>
+												</tr>
+											</thead>
+											<tbody id="item-category-drilldown-tbody"></tbody>
+										</table>
+									</div>
 								</div>
 							</div>
 						</div>
@@ -927,23 +948,101 @@ if (typeof window.CourierDashboard === 'undefined') {
 				let tbody = $('#item-category-expense-tbody');
 				tbody.empty();
 				valid_data.forEach(row => {
+					let category = row.category || '-';
+					let safeCategory = frappe.utils.escape_html(category);
 					let tr = $(`
 						<tr>
-							<td><strong>${row.category || '-'}</strong></td>
+							<td><a href="#" class="item-category-drilldown" data-category="${safeCategory}"><strong>${safeCategory}</strong></a></td>
 							<td class="text-right">${format_number_value(row.delivery_note_count || 0)}</td>
 							<td class="text-right">${format_currency_value(row.expense_amount || 0)}</td>
 						</tr>
 					`);
 					tbody.append(tr);
 				});
+				
+				// Build clickable drilldown links like "Books (28 DNs): 98.8%"
+				let totalExpenseAmount = valid_data.reduce((acc, d) => acc + flt(d.expense_amount || 0), 0);
+				let linksHtml = valid_data.map(row => {
+					let category = row.category || '-';
+					let dnCount = cint(row.delivery_note_count || 0);
+					let expense = flt(row.expense_amount || 0);
+					let percentage = totalExpenseAmount > 0 ? ((expense / totalExpenseAmount) * 100) : 0;
+					return `
+						<div style="margin-bottom: 4px;">
+							<a href="#" class="item-category-drilldown" data-category="${frappe.utils.escape_html(category)}">
+								${frappe.utils.escape_html(category)} (${format_number_value(dnCount)} DNs): ${percentage.toFixed(1)}%
+							</a>
+						</div>
+					`;
+				}).join('');
+				$('#item-category-drilldown-links').html(linksHtml || '');
 			} else {
 				$('#chart-item-category-expense').html('<p class="text-muted">No data available</p>');
 				$('#item-category-expense-tbody').html('<tr><td colspan="3" class="text-center">No data available</td></tr>');
+				$('#item-category-drilldown-links').html('');
+				$('#item-category-drilldown-section').hide();
 			}
 		} else {
 			$('#chart-item-category-expense').html('<p class="text-muted">No data available</p>');
 			$('#item-category-expense-tbody').html('<tr><td colspan="3" class="text-center">No data available</td></tr>');
+			$('#item-category-drilldown-links').html('');
+			$('#item-category-drilldown-section').hide();
 		}
+		
+		me.bind_item_category_drilldown();
+	}
+
+	bind_item_category_drilldown() {
+		let me = this;
+		this.page.main.off('click', '.item-category-drilldown').on('click', '.item-category-drilldown', function(e) {
+			e.preventDefault();
+			let category = $(this).data('category');
+			if (!category) return;
+			me.load_item_category_drilldown(category);
+		});
+	}
+
+	load_item_category_drilldown(category) {
+		let me = this;
+		$('#item-category-drilldown-title').text(category);
+		$('#item-category-drilldown-section').show();
+		$('#item-category-drilldown-tbody').html('<tr><td colspan="8" class="text-center text-muted">Loading...</td></tr>');
+
+		frappe.call({
+			method: 'tif_customization.tif_customization.page.courier_report.courier_report.get_item_category_drilldown',
+			args: {
+				filters: me.filters,
+				category: category
+			},
+			callback: function(r) {
+				let rows = r.message || [];
+				let tbody = $('#item-category-drilldown-tbody');
+				tbody.empty();
+
+				if (!rows.length) {
+					tbody.html('<tr><td colspan="8" class="text-center text-muted">No delivery notes found.</td></tr>');
+					return;
+				}
+
+				rows.forEach(row => {
+					tbody.append(`
+						<tr>
+							<td>${row.posting_date || '-'}</td>
+							<td><a href="/app/delivery-note/${row.delivery_note_no}" target="_blank">${row.delivery_note_no || '-'}</a></td>
+							<td>${row.customer_name || row.customer || '-'}</td>
+							<td>${row.cost_center || '-'}</td>
+							<td class="text-right">${format_number_value(row.total_books || 0)}</td>
+							<td class="text-right">${format_currency_value(row.courier_expense || 0)}</td>
+							<td class="text-right">${format_currency_value(row.transport_expense || 0)}</td>
+							<td class="text-right"><strong>${format_currency_value(row.total_expense || 0)}</strong></td>
+						</tr>
+					`);
+				});
+			},
+			error: function() {
+				$('#item-category-drilldown-tbody').html('<tr><td colspan="8" class="text-center text-danger">Failed to load drilldown data.</td></tr>');
+			}
+		});
 	}
 	
 	render_transaction_table() {
