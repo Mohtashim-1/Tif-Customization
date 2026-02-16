@@ -1,0 +1,71 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-02-16 16:20:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "work_type",
+  "activity",
+  "column_break_qg5h",
+  "status",
+  "start_time",
+  "end_time"
+ ],
+ "fields": [
+  {
+   "fieldname": "work_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Work Type",
+   "options": "Field Visit\nFollow-up Call\nMeeting\nTraining\nDocumentation\nPlanning\nOther",
+   "reqd": 1
+  },
+  {
+   "fieldname": "activity",
+   "fieldtype": "Small Text",
+   "in_list_view": 1,
+   "label": "Daily Activity",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_qg5h",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Done",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Done\nIn Progress\nPending"
+  },
+  {
+   "fieldname": "start_time",
+   "fieldtype": "Time",
+   "in_list_view": 1,
+   "label": "Start Time"
+  },
+  {
+   "fieldname": "end_time",
+   "fieldtype": "Time",
+   "in_list_view": 1,
+   "label": "End Time"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-02-16 16:20:00.000000",
+ "modified_by": "Administrator",
+ "module": "Tif Customization",
+ "name": "Reporting Staff Report",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
