@@ -162,14 +162,16 @@
   {
    "depends_on": "eval:doc.type == 'Training'",
    "fieldname": "training_city",
-   "fieldtype": "Data",
-   "label": "City"
+   "fieldtype": "Link",
+   "label": "City",
+   "options": "City"
   },
   {
    "depends_on": "eval:doc.type == 'Training'",
    "fieldname": "training_province",
-   "fieldtype": "Data",
-   "label": "Province"
+   "fieldtype": "Select",
+   "label": "Province",
+   "options": "Punjab\nSindh\nKhyber Pakhtunkhwa\nBalochistan\nAzad Jammu & Kashmir\nGilgit-Baltistan\nIslamabad Capital Territory"
   },
   {
    "depends_on": "eval:doc.type == 'Training'",
@@ -242,20 +244,23 @@
   {
    "depends_on": "eval:doc.type == 'M&E'",
    "fieldname": "me_city",
-   "fieldtype": "Data",
-   "label": "City"
+   "fieldtype": "Link",
+   "label": "City",
+   "options": "City"
   },
   {
    "depends_on": "eval:doc.type == 'M&E'",
    "fieldname": "me_area",
-   "fieldtype": "Data",
-   "label": "Area"
+   "fieldtype": "Link",
+   "label": "Area",
+   "options": "Area"
   },
   {
    "depends_on": "eval:doc.type == 'M&E'",
    "fieldname": "me_province",
-   "fieldtype": "Data",
-   "label": "Province"
+   "fieldtype": "Select",
+   "label": "Province",
+   "options": "Punjab\nSindh\nKhyber Pakhtunkhwa\nBalochistan\nAzad Jammu & Kashmir\nGilgit-Baltistan\nIslamabad Capital Territory"
   },
   {
    "depends_on": "eval:doc.type == 'M&E'",
@@ -474,20 +479,23 @@
   {
    "depends_on": "eval:doc.type == 'Marketing'",
    "fieldname": "city",
-   "fieldtype": "Data",
-   "label": "City"
+   "fieldtype": "Link",
+   "label": "City",
+   "options": "City"
   },
   {
    "depends_on": "eval:doc.type == 'Marketing'",
    "fieldname": "area",
-   "fieldtype": "Data",
-   "label": "Area"
+   "fieldtype": "Link",
+   "label": "Area",
+   "options": "Area"
   },
   {
    "depends_on": "eval:doc.type == 'Marketing'",
    "fieldname": "province",
-   "fieldtype": "Data",
-   "label": "Province"
+   "fieldtype": "Select",
+   "label": "Province",
+   "options": "Punjab\nSindh\nKhyber Pakhtunkhwa\nBalochistan\nAzad Jammu & Kashmir\nGilgit-Baltistan\nIslamabad Capital Territory"
   },
   {
    "depends_on": "eval:doc.type == 'Marketing'",
@@ -599,7 +607,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-02-16 16:41:37.620725",
+ "modified": "2026-02-16 16:58:39.033830",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Field Visit",
