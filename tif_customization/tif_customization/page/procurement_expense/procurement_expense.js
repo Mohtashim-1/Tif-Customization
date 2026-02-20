@@ -1508,8 +1508,34 @@ if (typeof window.ProcurementExpense === 'undefined') {
 			}
 			// Summary Pie Chart by Department/Cost Center
 			if (summary.length > 0) {
-				let labels = summary.map(s => (s.cost_center_name || s.cost_center).substring(0, 30));
-				let values = summary.map(s => s.po_amount || 0);
+				// Chart should show department/group nodes only (like profitability group view),
+				// not all leaf cost centers.
+				const hierarchyRows = me.build_summary_hierarchy(summary);
+				let chartSummary = [];
+
+				if (hierarchyRows.length) {
+					const roots = hierarchyRows.filter((r) => !r.parent_id);
+					if (roots.length === 1) {
+						chartSummary = hierarchyRows.filter((r) => r.parent_id === roots[0].node_id);
+					}
+					if (!chartSummary.length) {
+						chartSummary = roots;
+					}
+				}
+
+				chartSummary = (chartSummary || []).filter((r) => (r.node_id || "").toString() !== "Not Set");
+
+				// Fallback to raw summary if hierarchy group nodes are not available.
+				if (!chartSummary.length) {
+					chartSummary = summary.map((s) => ({
+						name: s.cost_center_name || s.cost_center || "Not Set",
+						po_amount: s.po_amount || 0,
+						po_count: s.po_count || 0,
+					}));
+				}
+
+				let labels = chartSummary.map(s => (s.name || s.cost_center_name || s.cost_center).substring(0, 30));
+				let values = chartSummary.map(s => s.po_amount || 0);
 				
 				if (me.charts.summary_pie) {
 					try {
@@ -1603,7 +1629,7 @@ if (typeof window.ProcurementExpense === 'undefined') {
 													let value = format_currency_value(context.parsed);
 													let total = context.dataset.data.reduce((a, b) => a + b, 0);
 													let percentage = ((context.parsed / total) * 100).toFixed(1);
-													let poCount = summary[context.dataIndex]?.po_count || 0;
+													let poCount = chartSummary[context.dataIndex]?.po_count || 0;
 													return [
 														`${label}: ${value}`,
 														`Percentage: ${percentage}%`,

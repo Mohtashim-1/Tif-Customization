@@ -1,6 +1,6 @@
 import frappe
 from frappe.utils import getdate, flt, cint
-from datetime import date, timedelta
+from datetime import date
 import datetime
 
 
@@ -36,56 +36,17 @@ def get_accrued_leaves(
 	allocation_to_date: date,
 	reference_date: date,
 ) -> float:
-	"""Calculates accrued leaves up to reference_date with pro-rata current payroll period."""
+	"""Calculates accrued leaves by payroll cycles (26th-to-25th)."""
 	if reference_date < allocation_from_date:
 		return 0.0
 
 	effective_reference_date = min(reference_date, allocation_to_date)
 	months_total = payroll_months_between(allocation_from_date, allocation_to_date) or 1
 	leave_per_period = flt(total_leaves) / months_total
-
-	# Determine current 26th-to-25th payroll period for reference date.
-	if effective_reference_date.day >= 26:
-		current_period_start = date(
-			effective_reference_date.year, effective_reference_date.month, 26
-		)
-	else:
-		if effective_reference_date.month == 1:
-			current_period_start = date(effective_reference_date.year - 1, 12, 26)
-		else:
-			current_period_start = date(
-				effective_reference_date.year, effective_reference_date.month - 1, 26
-			)
-
-	if current_period_start.month == 12:
-		next_period_start = date(current_period_start.year + 1, 1, 26)
-	else:
-		next_period_start = date(current_period_start.year, current_period_start.month + 1, 26)
-	current_period_end = next_period_start - timedelta(days=1)
-
-	# Fully completed payroll periods before current period.
-	full_periods = payroll_months_between(
-		allocation_from_date, current_period_start - timedelta(days=1)
-	)
-	full_periods = max(0, min(full_periods, months_total))
-
-	# Pro-rate leaves for elapsed days in current period.
-	period_segment_start = max(current_period_start, allocation_from_date)
-	period_segment_end = min(current_period_end, allocation_to_date)
-
-	if period_segment_end < period_segment_start:
-		partial_ratio = 0
-	else:
-		elapsed_segment_end = min(effective_reference_date, period_segment_end)
-		if elapsed_segment_end < period_segment_start:
-			partial_ratio = 0
-		else:
-			elapsed_days = (elapsed_segment_end - period_segment_start).days + 1
-			total_days = (period_segment_end - period_segment_start).days + 1
-			partial_ratio = elapsed_days / total_days if total_days else 0
-
-	accrued = (full_periods * leave_per_period) + (leave_per_period * partial_ratio)
-	return min(flt(total_leaves), accrued)
+	months_passed = payroll_months_between(allocation_from_date, effective_reference_date)
+	months_passed = max(0, min(months_passed, months_total))
+	accrued = months_passed * leave_per_period
+	return min(flt(total_leaves), flt(accrued))
 
 
 def is_accrual_restricted_employee(employee: str) -> bool:
