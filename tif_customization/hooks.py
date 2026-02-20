@@ -43,7 +43,10 @@ app_license = "mit"
 # page_js = {"page" : "public/js/file.js"}
 
 # include js in doctype views
-doctype_js = {"Delivery Note" : "public/js/delivery_note.js"}
+doctype_js = {
+	"Delivery Note": "public/js/delivery_note.js",
+	"Leave Application": "public/js/leave_application.js",
+}
 
 # include js in page
 page_js = {
@@ -192,10 +195,9 @@ doc_events = {
 
 # Overriding Methods
 # ------------------------------
-#
-# override_whitelisted_methods = {
-# 	"frappe.desk.doctype.event.event.get_events": "tif_customization.event.get_events"
-# }
+override_whitelisted_methods = {
+	"hrms.hr.doctype.leave_application.leave_application.get_leave_details": "tif_customization.tif_customization.doctype.leave_application.leave_application.get_leave_details"
+}
 #
 # each overriding function accepts a `data` argument;
 # generated from the base implementation of the doctype dashboard,
@@ -260,4 +262,3 @@ doc_events = {
 # default_log_clearing_doctypes = {
 # 	"Logging DocType Name": 30  # days to retain logs
 # }
-

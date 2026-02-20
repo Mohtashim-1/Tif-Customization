@@ -350,6 +350,26 @@ def get_summary_data(filters):
 
 		# Convert to list + attach names
 		result = list(summary_dict.values())
+		cost_center_ids = [
+			row.get("cost_center")
+			for row in result
+			if row.get("cost_center") and row.get("cost_center") != "Not Set"
+		]
+		cost_center_meta = {}
+		if cost_center_ids:
+			# Load complete ancestry metadata for all involved cost centers.
+			pending_ids = set(cost_center_ids)
+			while pending_ids:
+				meta_rows = frappe.get_all(
+					"Cost Center",
+					filters={"name": ["in", list(pending_ids)]},
+					fields=["name", "cost_center_name", "parent_cost_center", "lft"],
+				)
+				pending_ids = set()
+				for meta in meta_rows:
+					cost_center_meta[meta.name] = meta
+					if meta.parent_cost_center and meta.parent_cost_center not in cost_center_meta:
+						pending_ids.add(meta.parent_cost_center)
 
 		for row in result:
 			cc = row.get("cost_center")
@@ -357,6 +377,7 @@ def get_summary_data(filters):
 				name = None
 				parent_cost_center = None
 				parent_cost_center_name = None
+				lft = None
 
 				# try Department (name is usually docname)
 				try:
@@ -366,28 +387,68 @@ def get_summary_data(filters):
 
 				# try Cost Center
 				if not name:
-					try:
-						name = frappe.db.get_value("Cost Center", cc, "cost_center_name")
-					except Exception:
-						pass
+					meta = cost_center_meta.get(cc)
+					if meta:
+						name = meta.cost_center_name
+						parent_cost_center = meta.parent_cost_center
+						lft = meta.lft
+					else:
+						try:
+							name = frappe.db.get_value("Cost Center", cc, "cost_center_name")
+						except Exception:
+							pass
 				
 				# Get parent cost center (department)
-				try:
-					parent_cost_center = frappe.db.get_value("Cost Center", cc, "parent_cost_center")
-					if parent_cost_center:
-						parent_cost_center_name = frappe.db.get_value("Cost Center", parent_cost_center, "cost_center_name")
-				except Exception:
-					pass
+				if not parent_cost_center:
+					try:
+						parent_cost_center = frappe.db.get_value("Cost Center", cc, "parent_cost_center")
+					except Exception:
+						pass
+
+				if parent_cost_center:
+					parent_meta = cost_center_meta.get(parent_cost_center)
+					if parent_meta:
+						parent_cost_center_name = parent_meta.cost_center_name
+					else:
+						try:
+							parent_cost_center_name = frappe.db.get_value("Cost Center", parent_cost_center, "cost_center_name")
+						except Exception:
+							pass
 
 				row["cost_center_name"] = name or cc
 				row["parent_cost_center"] = parent_cost_center or None
 				row["parent_cost_center_name"] = parent_cost_center_name or None
+				row["lft"] = lft
+
+				# Build full ancestry chain for tree rendering (root -> leaf).
+				ancestry = []
+				seen = set()
+				current_cc = cc
+				while current_cc and current_cc not in seen:
+					seen.add(current_cc)
+					meta = cost_center_meta.get(current_cc)
+					if not meta:
+						break
+					ancestry.append(
+						{
+							"id": meta.name,
+							"name": meta.cost_center_name or meta.name,
+							"parent_id": meta.parent_cost_center,
+							"lft": meta.lft,
+						}
+					)
+					current_cc = meta.parent_cost_center
+
+				ancestry.reverse()
+				row["ancestry"] = ancestry
 			else:
 				row["cost_center_name"] = "Not Set"
 				row["parent_cost_center"] = None
 				row["parent_cost_center_name"] = None
+				row["lft"] = None
+				row["ancestry"] = []
 
-		result.sort(key=lambda x: x.get('po_amount', 0), reverse=True)
+		result.sort(key=lambda x: (x.get("lft") is None, x.get("lft") or 0, x.get("cost_center_name") or ""))
 		return result
 
 	except Exception as e:
@@ -1865,4 +1926,3 @@ def get_department_payment_data(filters=None):
 		print(f"[Department Payment Debug] Traceback: {traceback.format_exc()}")
 		frappe.log_error(f"Error in get_department_payment_data: {str(e)}", "Procurement Expense Error")
 		return []
-

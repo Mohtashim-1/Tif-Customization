@@ -692,6 +692,214 @@ if (typeof window.ProcurementExpense === 'undefined') {
 			
 			$('#kpi-section').html(kpi_html);
 		}
+
+		build_summary_hierarchy(summary) {
+			const nodes = new Map();
+
+			const ensure_node = (id, name) => {
+				if (!id) return null;
+				if (!nodes.has(id)) {
+					nodes.set(id, {
+						id: id,
+						name: name || id,
+						parent_id: null,
+						children: [],
+						lft: null,
+						direct_amount: 0,
+						direct_count: 0,
+						total_amount: 0,
+						total_count: 0,
+						has_direct_data: false,
+						descendant_cost_centers: [],
+					});
+				}
+				const node = nodes.get(id);
+				if (!node.name && name) node.name = name;
+				return node;
+			};
+
+			(summary || []).forEach((row) => {
+				const ancestry = Array.isArray(row.ancestry) ? row.ancestry : [];
+
+				if (ancestry.length) {
+					let prevId = null;
+					ancestry.forEach((entry) => {
+						const id = entry.id;
+						const name = entry.name || entry.id;
+						const node = ensure_node(id, name);
+						node.lft = entry.lft ?? node.lft;
+
+						if (prevId && prevId !== id) {
+							node.parent_id = prevId;
+						}
+						prevId = id;
+					});
+
+					const leaf = ensure_node(
+						row.cost_center || ancestry[ancestry.length - 1].id,
+						row.cost_center_name || ancestry[ancestry.length - 1].name
+					);
+					leaf.lft = row.lft ?? leaf.lft;
+					leaf.direct_amount += flt(row.po_amount || 0);
+					leaf.direct_count += cint(row.po_count || 0);
+					leaf.has_direct_data = true;
+					return;
+				}
+
+				const cc_id = row.cost_center || row.cost_center_name || "Not Set";
+				const cc_name = row.cost_center_name || row.cost_center || "Not Set";
+				const parent_id = row.parent_cost_center;
+				const parent_name = row.parent_cost_center_name || row.parent_cost_center;
+
+				const node = ensure_node(cc_id, cc_name);
+				node.lft = row.lft ?? node.lft;
+				node.direct_amount += flt(row.po_amount || 0);
+				node.direct_count += cint(row.po_count || 0);
+				node.has_direct_data = true;
+
+				if (parent_id && parent_id !== cc_id) {
+					node.parent_id = parent_id;
+					ensure_node(parent_id, parent_name || parent_id);
+				}
+			});
+
+			nodes.forEach((node) => {
+				if (node.parent_id && nodes.has(node.parent_id)) {
+					nodes.get(node.parent_id).children.push(node);
+				}
+			});
+
+			const compute_totals = (node, stack = new Set()) => {
+				if (stack.has(node.id)) return { amount: 0, count: 0 };
+				stack.add(node.id);
+
+				let amount = node.direct_amount;
+				let count = node.direct_count;
+
+				node.children.forEach((child) => {
+					const child_totals = compute_totals(child, stack);
+					amount += child_totals.amount;
+					count += child_totals.count;
+				});
+
+				node.total_amount = amount;
+				node.total_count = count;
+				stack.delete(node.id);
+				return { amount, count };
+			};
+
+			const collect_descendants = (node, stack = new Set()) => {
+				if (stack.has(node.id)) return [];
+				stack.add(node.id);
+
+				let ids = node.has_direct_data ? [node.id] : [];
+				node.children.forEach((child) => {
+					ids = ids.concat(collect_descendants(child, stack));
+				});
+
+				node.descendant_cost_centers = [...new Set(ids)];
+				stack.delete(node.id);
+				return node.descendant_cost_centers;
+			};
+
+			const roots = [];
+			nodes.forEach((node) => {
+				if (!node.parent_id || !nodes.has(node.parent_id)) {
+					roots.push(node);
+				}
+			});
+
+			const sort_nodes = (list) => {
+				list.sort((a, b) => {
+					if (a.lft != null && b.lft != null) return a.lft - b.lft;
+					if (a.lft != null) return -1;
+					if (b.lft != null) return 1;
+					return (a.name || "").localeCompare(b.name || "");
+				});
+				list.forEach((node) => sort_nodes(node.children));
+			};
+
+			roots.forEach((root) => compute_totals(root));
+			roots.forEach((root) => collect_descendants(root));
+			sort_nodes(roots);
+
+			const flattened = [];
+			const flatten = (node, depth) => {
+				flattened.push({
+					node_id: node.id,
+					parent_id: node.parent_id || "",
+					name: node.name || node.id,
+					depth: depth,
+					po_amount: node.total_amount,
+					po_count: node.total_count,
+					has_children: node.children.length > 0,
+					cost_centers: node.descendant_cost_centers || [],
+				});
+				node.children.forEach((child) => flatten(child, depth + 1));
+			};
+
+			roots.forEach((root) => flatten(root, 0));
+			return flattened;
+		}
+
+		apply_summary_tree_visibility() {
+			const openMap = {};
+			$('#summary-tbody tr.expense-head-row').each(function() {
+				const $row = $(this);
+				const nodeId = $row.data('node-id');
+				openMap[nodeId] = !!$row.data('open');
+			});
+
+			const shouldShow = (nodeId) => {
+				let $row = $(`#summary-tbody tr.expense-head-row[data-node-id="${nodeId}"]`);
+				if (!$row.length) return true;
+				let parentId = $row.data('parent-id');
+				while (parentId) {
+					if (!openMap[parentId]) return false;
+					$row = $(`#summary-tbody tr.expense-head-row[data-node-id="${parentId}"]`);
+					parentId = $row.length ? $row.data('parent-id') : null;
+				}
+				return true;
+			};
+
+			$('#summary-tbody tr.expense-head-row').each(function() {
+				const $row = $(this);
+				const nodeId = $row.data('node-id');
+				if (shouldShow(nodeId)) {
+					$row.show();
+				} else {
+					$row.hide();
+				}
+			});
+		}
+
+		filter_detail_rows_by_cost_centers(costCenterList) {
+			const selected = new Set((costCenterList || []).filter(Boolean));
+			let matchedCount = 0;
+
+			if (!selected.size) {
+				$('#detail-tbody tr[data-cost-center]').show();
+				return;
+			}
+
+			$('#detail-tbody tr[data-cost-center]').each(function() {
+				const $detailRow = $(this);
+				const detailCostCenter = $detailRow.data('cost-center');
+				if (selected.has(detailCostCenter)) {
+					$detailRow.css('display', 'table-row');
+					matchedCount++;
+				} else {
+					$detailRow.css('display', 'none');
+				}
+			});
+
+			const $detailTable = $('#detail-table');
+			if ($detailTable.length && matchedCount > 0) {
+				$('html, body').animate({
+					scrollTop: $detailTable.offset().top - 100
+				}, 300);
+			}
+		}
 		
 		render_summary_table() {
 			let me = this;
@@ -705,26 +913,53 @@ if (typeof window.ProcurementExpense === 'undefined') {
 				console.log('[Render Summary Table] No summary data found');
 				tbody.append('<tr><td colspan="3" class="text-center">No data found</td></tr>');
 			} else {
-				summary.forEach((row, index) => {
-					let cost_center_key = row.cost_center || (row.cost_center_name || '-');
-					let cost_center_name = row.cost_center_name || row.cost_center || '-';
-					
-					if (index < 3) {
-						console.log('[Render Summary Table] Sample row', index, '- Cost Center ID:', row.cost_center, 'Cost Center Name:', cost_center_name, 'Key:', cost_center_key);
+				const hierarchy_rows = me.build_summary_hierarchy(summary);
+				let totalAmount = 0;
+				let totalCount = 0;
+
+				hierarchy_rows.forEach((row) => {
+					const indent_px = row.depth * 18;
+					const label = frappe.utils.escape_html(row.name || '-');
+					const defaultOpen = row.depth === 0;
+					const icon_class = row.has_children
+						? (defaultOpen ? 'fa-chevron-down' : 'fa-chevron-right')
+						: 'fa-circle';
+					const icon_style = row.has_children
+						? 'margin-right: 8px; transition: transform 0.2s;'
+						: 'margin-right: 10px; font-size: 8px; color: #9aa0a6;';
+
+					if (row.depth === 0) {
+						totalAmount += flt(row.po_amount || 0);
+						totalCount += cint(row.po_count || 0);
 					}
-					
+
 					let tr = $(`
-						<tr class="expense-head-row" data-cost-center="${cost_center_key}" data-cost-center-name="${cost_center_name}" style="cursor: pointer;">
+						<tr class="expense-head-row ${row.depth === 0 ? 'summary-root-row' : ''}" data-node-id="${row.node_id}" data-parent-id="${row.parent_id}" style="cursor: pointer;">
 							<td>
-								<i class="fa fa-chevron-right expand-icon" style="margin-right: 8px; transition: transform 0.2s;"></i>
-								${cost_center_name}
+								<span style="padding-left: ${indent_px}px;">
+									<i class="fa ${icon_class} expand-icon" style="${icon_style}"></i>
+									${label}
+								</span>
 							</td>
 							<td class="text-right">${format_currency_value(row.po_amount || 0)}</td>
 							<td class="text-right">${format_number_value(row.po_count || 0)}</td>
 						</tr>
 					`);
+					tr.data('cost-centers-list', row.cost_centers || []);
+					tr.data('has-children', row.has_children);
+					tr.data('open', defaultOpen);
 					tbody.append(tr);
 				});
+
+				tbody.append(`
+					<tr class="summary-total-row">
+						<td><strong>Total</strong></td>
+						<td class="text-right"><strong>${format_currency_value(totalAmount)}</strong></td>
+						<td class="text-right"><strong>${format_number_value(totalCount)}</strong></td>
+					</tr>
+				`);
+
+				me.apply_summary_tree_visibility();
 				
 				console.log('[Render Summary Table] Total rows rendered:', tbody.find('tr').length);
 			}
@@ -732,136 +967,27 @@ if (typeof window.ProcurementExpense === 'undefined') {
 		
 		setup_expense_head_handlers() {
 			let me = this;
-			console.log('[Expense Head Handlers] Setting up click handlers...');
-			console.log('[Expense Head Handlers] Found expense head rows:', $('.expense-head-row').length);
-			console.log('[Expense Head Handlers] Found detail rows:', $('#detail-tbody tr[data-cost-center]').length);
-			
-			// Add click handlers for expand/collapse (called after both tables are rendered)
+			console.log('[Expense Head Handlers] Setting up hierarchy click handlers...');
+
 			$('.expense-head-row').off('click').on('click', function() {
-				let $row = $(this);
-				let costCenter = $row.data('cost-center');
-				let costCenterName = $row.data('cost-center-name');
-				let $icon = $row.find('.expand-icon');
-				
-				console.log('[Expense Head Click] Cost Center ID:', costCenter);
-				console.log('[Expense Head Click] Cost Center Name:', costCenterName);
-				console.log('[Expense Head Click] Is expanded:', $row.hasClass('expanded'));
-				
-				// Toggle icon
-				if ($row.hasClass('expanded')) {
-					console.log('[Expense Head Click] Collapsing...');
-					$row.removeClass('expanded');
-					$icon.removeClass('fa-chevron-down').addClass('fa-chevron-right');
-					// Show all detail rows
-					let detailRowsCount = $('#detail-tbody tr[data-cost-center]').length;
-					console.log('[Expense Head Click] Showing all detail rows. Count:', detailRowsCount);
-					$('#detail-tbody tr[data-cost-center]').show();
-				} else {
-					console.log('[Expense Head Click] Expanding...');
-					// Collapse all other rows
-					$('.expense-head-row').removeClass('expanded');
-					$('.expand-icon').removeClass('fa-chevron-down').addClass('fa-chevron-right');
-					
-					// Expand this row
-					$row.addClass('expanded');
-					$icon.removeClass('fa-chevron-right').addClass('fa-chevron-down');
-					
-					// Hide all detail rows first, then show only this cost center's rows
-					// Match by both cost_center ID and cost_center_name for better matching
-					let matchedCount = 0;
-					let totalDetailRows = $('#detail-tbody tr[data-cost-center]').length;
-					console.log('[Expense Head Click] Total detail rows to check:', totalDetailRows);
-					
-					// Helper function to normalize cost center names for comparison
-					function normalizeName(name) {
-						if (!name) return '';
-						// Remove common prefixes/suffixes and extra spaces
-						return name.toString().trim().toLowerCase();
+				const $row = $(this);
+				const $icon = $row.find('.expand-icon');
+				const hasChildren = !!$row.data('has-children');
+				const targetCostCenters = new Set(($row.data('cost-centers-list') || []).filter(Boolean));
+				const isOpen = !!$row.data('open');
+
+				if (hasChildren) {
+					$row.data('open', !isOpen);
+					if (!isOpen) {
+						$icon.removeClass('fa-chevron-right').addClass('fa-chevron-down');
+					} else {
+						$icon.removeClass('fa-chevron-down').addClass('fa-chevron-right');
 					}
-					
-					// Extract name parts for flexible matching
-					// The summary name might be just "Other Expenses" while detail might be "17113 - Other Expenses - TIF"
-					let costCenterNameOnly = costCenterName;
-					let costCenterIdNameOnly = '';
-					
-					// Extract name from cost center ID (e.g., "17113 - Other Expenses - TIF" -> "Other Expenses")
-					if (costCenter && costCenter.includes(' - ')) {
-						let parts = costCenter.split(' - ');
-						if (parts.length > 1) {
-							costCenterIdNameOnly = parts.slice(1).join(' - ').replace(/ - TIF$/, '').trim();
-						}
-					}
-					
-					console.log('[Expense Head Click] Searching for - ID:', costCenter, 'Name:', costCenterName, 'ID Name Only:', costCenterIdNameOnly);
-					
-					$('#detail-tbody tr[data-cost-center]').each(function() {
-						let $detailRow = $(this);
-						let detailCostCenter = $detailRow.data('cost-center');
-						let detailCostCenterName = $detailRow.data('cost-center-name');
-						
-						let isMatch = false;
-						
-						// Match by exact ID only (most reliable and precise)
-						// This ensures we only show the specific cost center, not all with similar names
-						if (detailCostCenter === costCenter) {
-							isMatch = true;
-							console.log('[Expense Head Click] ✓ Match by exact ID:', detailCostCenter);
-						}
-						
-						if (isMatch) {
-							console.log('[Expense Head Click] >>> SHOWING ROW - ID:', detailCostCenter, 'Name:', detailCostCenterName);
-							$detailRow.css('display', 'table-row'); // Force table-row display
-							$detailRow.removeClass('hidden').removeAttr('hidden');
-							matchedCount++;
-							console.log('[Expense Head Click] Row display after show:', $detailRow.css('display'), 'isVisible:', $detailRow.is(':visible'));
-						} else {
-							$detailRow.css('display', 'none');
-						}
-					});
-					
-					console.log('[Expense Head Click] Matched rows:', matchedCount);
-					
-					// Verify and ensure rows are visible
-					setTimeout(function() {
-						let visibleRows = $('#detail-tbody tr[data-cost-center]').filter(':visible').length;
-						let totalRows = $('#detail-tbody tr[data-cost-center]').length;
-						console.log('[Expense Head Click] Visible rows after filtering:', visibleRows, 'out of', totalRows);
-						
-						// Log all matched rows to verify they exist
-						$('#detail-tbody tr[data-cost-center]').each(function() {
-							let $detailRow = $(this);
-							let detailCostCenter = $detailRow.data('cost-center');
-							if (detailCostCenter === costCenter) {
-								let display = $detailRow.css('display');
-								let isVisible = $detailRow.is(':visible');
-								let offset = $detailRow.offset();
-								console.log('[Expense Head Click] Matched row check - ID:', detailCostCenter, 'Display:', display, 'Visible:', isVisible, 'Offset:', offset);
-								
-								// Force visibility
-								if (!isVisible || display === 'none') {
-									console.log('[Expense Head Click] Forcing visibility for row:', detailCostCenter);
-									$detailRow.css({
-										'display': 'table-row',
-										'visibility': 'visible',
-										'opacity': '1'
-									}).show();
-								}
-							}
-						});
-						
-						// Scroll to detail table if it exists
-						let $detailTable = $('#detail-table');
-						if ($detailTable.length && matchedCount > 0) {
-							console.log('[Expense Head Click] Scrolling to detail table');
-							$('html, body').animate({
-								scrollTop: $detailTable.offset().top - 100
-							}, 500);
-						}
-					}, 100);
+					me.apply_summary_tree_visibility();
 				}
+
+				me.filter_detail_rows_by_cost_centers([...targetCostCenters]);
 			});
-			
-			console.log('[Expense Head Handlers] Click handlers setup complete');
 		}
 		
 		setup_period_row_handlers() {
