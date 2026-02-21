@@ -1,4 +1,6 @@
 import json
+import csv
+from io import StringIO
 from datetime import date, datetime, time
 
 import frappe
@@ -112,6 +114,24 @@ def download_report_excel(filters=None):
 	frappe.response["filename"] = "field_staff_report.xlsx"
 	frappe.response["filecontent"] = xlsx_file.getvalue()
 	frappe.response["type"] = "binary"
+
+
+@frappe.whitelist()
+def download_report_csv(filters=None):
+	report = get_report_data(filters=filters)
+	columns = report.get("columns", [])
+	labels = report.get("labels", {})
+	rows = report.get("rows", [])
+
+	buffer = StringIO()
+	writer = csv.writer(buffer)
+	writer.writerow([labels.get(col, col) for col in columns])
+	for row in rows:
+		writer.writerow([_excel_value(row.get(col)) for col in columns])
+
+	frappe.response["filename"] = "field_staff_report.csv"
+	frappe.response["filecontent"] = buffer.getvalue()
+	frappe.response["type"] = "csv"
 
 
 def _parse_filters(filters):

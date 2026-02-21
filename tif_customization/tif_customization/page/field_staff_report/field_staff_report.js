@@ -41,7 +41,15 @@ class FieldStaffReportPage {
 					<div class="d-flex align-items-center justify-content-between mb-2">
 						<h5 class="mb-0">${__("Field Visit Reporting")}</h5>
 						<div>
-							<button class="btn btn-sm btn-success fsr-export-excel">${__("Export Excel")}</button>
+							<div class="btn-group">
+								<button class="btn btn-sm btn-success dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+									${__("Export")}
+								</button>
+								<div class="dropdown-menu dropdown-menu-right">
+									<a class="dropdown-item fsr-export-excel" href="#">${__("Export Excel")}</a>
+									<a class="dropdown-item fsr-export-csv" href="#">${__("Export CSV")}</a>
+								</div>
+							</div>
 							<span class="text-muted fsr-count ml-2"></span>
 						</div>
 					</div>
@@ -107,7 +115,14 @@ class FieldStaffReportPage {
 
 	bind_actions() {
 		this.body.find(".fsr-apply").on("click", () => this.load_data());
-		this.body.find(".fsr-export-excel").on("click", () => this.export_excel());
+		this.body.find(".fsr-export-excel").on("click", (e) => {
+			e.preventDefault();
+			this.export_excel();
+		});
+		this.body.find(".fsr-export-csv").on("click", (e) => {
+			e.preventDefault();
+			this.export_csv();
+		});
 		this.body.find(".fsr-reset").on("click", () => {
 			this.set_filters({
 				from_date: this.get_month_start(),
@@ -160,6 +175,12 @@ class FieldStaffReportPage {
 	export_excel() {
 		const filters = encodeURIComponent(JSON.stringify(this.get_filter_values()));
 		const url = `/api/method/tif_customization.tif_customization.page.field_staff_report.field_staff_report.download_report_excel?filters=${filters}`;
+		window.open(url, "_blank");
+	}
+
+	export_csv() {
+		const filters = encodeURIComponent(JSON.stringify(this.get_filter_values()));
+		const url = `/api/method/tif_customization.tif_customization.page.field_staff_report.field_staff_report.download_report_csv?filters=${filters}`;
 		window.open(url, "_blank");
 	}
 
