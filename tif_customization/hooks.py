@@ -85,10 +85,11 @@ page_js = {
 # ----------
 
 # add methods and filters to jinja environment
-# jinja = {
-# 	"methods": "tif_customization.utils.jinja_methods",
-# 	"filters": "tif_customization.utils.jinja_filters"
-# }
+jinja = {
+	"methods": [
+		"tif_customization.tif_customization.doctype.leave_application.leave_application.get_leave_allocation_for_print"
+	]
+}
 
 # Installation
 # ------------

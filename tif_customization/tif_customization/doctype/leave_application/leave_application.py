@@ -193,3 +193,12 @@ def get_leave_details(employee, date, for_salary_slip=False):
 		"leave_balance": leave_allocation,
 		"lwps": lwp,
 	}
+
+
+def get_leave_allocation_for_print(employee, date):
+	"""Jinja-safe helper for Print Format to fetch leave allocation rows."""
+	if not employee:
+		return {}
+
+	response = get_leave_details(employee=employee, date=date)
+	return (response or {}).get("leave_allocation", {})
