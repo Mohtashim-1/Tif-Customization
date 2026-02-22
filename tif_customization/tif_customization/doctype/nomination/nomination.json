@@ -1,0 +1,219 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:employee",
+ "creation": "2026-02-23 02:49:52.144403",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "employee",
+  "column_break_vzvt",
+  "first_name",
+  "column_break_iepj",
+  "last_name",
+  "column_break_ftng",
+  "department",
+  "column_break_cush",
+  "designation",
+  "next_of_kin_section",
+  "next_of_kin_first_name",
+  "column_break_zzaa",
+  "next_of_kin_last_name",
+  "column_break_ubvo",
+  "relationship",
+  "column_break_byik",
+  "cnic",
+  "witnesses_section",
+  "w_1_name",
+  "w_1_cnic",
+  "column_break_ctmg",
+  "w_1_address",
+  "witnesses_2_section",
+  "w_2_name",
+  "w_2_cnic",
+  "column_break_tiax",
+  "w_2_address",
+  "section_break_tasa",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_tasa",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Nomination",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "employee",
+   "fieldtype": "Link",
+   "label": "Employee",
+   "options": "Employee",
+   "unique": 1
+  },
+  {
+   "fetch_from": "employee.department",
+   "fieldname": "department",
+   "fieldtype": "Data",
+   "label": "Department"
+  },
+  {
+   "fetch_from": "employee.designation",
+   "fieldname": "designation",
+   "fieldtype": "Data",
+   "label": "Designation"
+  },
+  {
+   "fieldname": "column_break_ftng",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_cush",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_vzvt",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "next_of_kin_section",
+   "fieldtype": "Section Break",
+   "label": "Next of Kin"
+  },
+  {
+   "fieldname": "next_of_kin_first_name",
+   "fieldtype": "Data",
+   "label": "Next of Kin First Name"
+  },
+  {
+   "fieldname": "column_break_zzaa",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "next_of_kin_last_name",
+   "fieldtype": "Data",
+   "label": "Next of Kin Last Name"
+  },
+  {
+   "fieldname": "column_break_ubvo",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "relationship",
+   "fieldtype": "Link",
+   "label": "Relationship",
+   "options": "Relation"
+  },
+  {
+   "fieldname": "cnic",
+   "fieldtype": "Data",
+   "label": "CNIC"
+  },
+  {
+   "fieldname": "column_break_byik",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "witnesses_section",
+   "fieldtype": "Section Break",
+   "label": "Witnesses 1"
+  },
+  {
+   "fieldname": "w_1_name",
+   "fieldtype": "Data",
+   "label": "Name"
+  },
+  {
+   "fieldname": "w_1_cnic",
+   "fieldtype": "Data",
+   "label": "CNIC"
+  },
+  {
+   "fieldname": "column_break_ctmg",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "w_1_address",
+   "fieldtype": "Small Text",
+   "label": "Address"
+  },
+  {
+   "fieldname": "witnesses_2_section",
+   "fieldtype": "Section Break",
+   "label": "Witnesses 2"
+  },
+  {
+   "fieldname": "w_2_name",
+   "fieldtype": "Data",
+   "label": "Name"
+  },
+  {
+   "fieldname": "w_2_cnic",
+   "fieldtype": "Data",
+   "label": "CNIC"
+  },
+  {
+   "fieldname": "column_break_tiax",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "w_2_address",
+   "fieldtype": "Small Text",
+   "label": "Address"
+  },
+  {
+   "fetch_from": "employee.first_name",
+   "fieldname": "first_name",
+   "fieldtype": "Data",
+   "label": "First Name"
+  },
+  {
+   "fieldname": "column_break_iepj",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fetch_from": "employee.last_name",
+   "fieldname": "last_name",
+   "fieldtype": "Data",
+   "label": "Last Name"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-02-23 03:05:44.844600",
+ "modified_by": "Administrator",
+ "module": "Tif Customization",
+ "name": "Nomination",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
