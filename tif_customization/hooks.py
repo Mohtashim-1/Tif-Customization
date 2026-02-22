@@ -46,6 +46,7 @@ app_license = "mit"
 doctype_js = {
 	"Delivery Note": "public/js/delivery_note.js",
 	"Leave Application": "public/js/leave_application.js",
+	"Loan Application": "tif_customization/doctype/loan_application/loan_application.js",
 }
 
 # include js in page
@@ -165,6 +166,9 @@ doc_events = {
     },
     "Purchase Receipt": {
         "on_submit": "tif_customization.tif_customization.doctype.purchase_receipt.purchase_receipt.on_submit"
+    },
+    "Loan Application": {
+        "validate": "tif_customization.tif_customization.doctype.loan_application.loan_application.populate_previous_loan_and_leave_details"
     }
 }
 

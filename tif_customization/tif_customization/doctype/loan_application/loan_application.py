@@ -1,0 +1,209 @@
+import frappe
+from frappe.utils import flt, nowdate
+
+from hrms.hr.doctype.leave_application.leave_application import (
+	get_leave_details as hrms_get_leave_details,
+)
+from lending.loan_management.doctype.loan_repayment.loan_repayment import (
+	get_pending_principal_amount,
+)
+from tif_customization.tif_customization.doctype.leave_application.leave_application import (
+	get_leave_details as custom_get_leave_details,
+)
+
+
+def populate_previous_loan_and_leave_details(doc, method=None):
+	"""Populate custom previous loan and leave fields on Loan Application."""
+	if doc.doctype != "Loan Application":
+		return
+
+	_set_previous_loan_details(doc)
+	_set_leave_details(doc)
+	_set_current_salary(doc)
+
+
+def _set_previous_loan_details(doc):
+	if not doc.applicant or not doc.applicant_type:
+		doc.custom_previous_loan = "No"
+		doc.custom_details_of_previous_loan = "Applicant is not selected."
+		return
+
+	filters = {
+		"applicant_type": doc.applicant_type,
+		"applicant": doc.applicant,
+		"docstatus": 1,
+	}
+	if doc.company:
+		filters["company"] = doc.company
+
+	loans = frappe.get_all(
+		"Loan",
+		filters=filters,
+		fields=[
+			"name",
+			"loan_application",
+			"loan_product",
+			"status",
+			"posting_date",
+			"loan_amount",
+			"total_principal_paid",
+			"total_payment",
+			"disbursed_amount",
+			"total_interest_payable",
+			"debit_adjustment_amount",
+			"credit_adjustment_amount",
+			"written_off_amount",
+			"refund_amount",
+		],
+		order_by="posting_date desc, creation desc",
+	)
+
+	# Exclude loan created from the same loan application during edits.
+	if doc.name and not str(doc.name).startswith("new-"):
+		loans = [loan for loan in loans if loan.get("loan_application") != doc.name]
+
+	if not loans:
+		doc.custom_previous_loan = "No"
+		doc.custom_details_of_previous_loan = "No previous loan record found."
+		return
+
+	lines = []
+	total_returned = 0.0
+	total_pending = 0.0
+
+	for idx, loan in enumerate(loans, start=1):
+		returned_amount = flt(loan.get("total_principal_paid"))
+		pending_amount = max(flt(get_pending_principal_amount(frappe._dict(loan))), 0.0)
+
+		total_returned += returned_amount
+		total_pending += pending_amount
+
+		lines.append(
+			f"{idx}. Loan {loan.get('name')} | Product: {loan.get('loan_product') or '-'} | "
+			f"Status: {loan.get('status') or '-'} | Amount: {flt(loan.get('loan_amount')):.2f} | "
+			f"Returned: {returned_amount:.2f} | Pending: {pending_amount:.2f}"
+		)
+
+	lines.append(
+		f"Total Previous Loans: {len(loans)} | Total Returned: {total_returned:.2f} | "
+		f"Total Pending: {total_pending:.2f}"
+	)
+
+	doc.custom_previous_loan = "Yes"
+	doc.custom_details_of_previous_loan = "\n".join(lines)
+
+
+def _set_leave_details(doc):
+	employee = _resolve_employee(doc.applicant_type, doc.applicant)
+	if not employee:
+		return
+
+	reference_date = doc.posting_date or nowdate()
+	leave_allocation = _get_leave_allocation(employee, reference_date)
+
+	if not leave_allocation:
+		doc.custom_leaves_availed = "No leave allocation found."
+		return
+
+	lines = []
+	for leave_type, details in sorted(leave_allocation.items()):
+		lines.append(
+			f"{leave_type}: Remaining {flt(details.get('remaining_leaves')):.2f}, "
+			f"Taken {flt(details.get('leaves_taken')):.2f}, "
+			f"Pending Approval {flt(details.get('leaves_pending_approval')):.2f}"
+		)
+
+	doc.custom_leaves_availed = "\n".join(lines)
+
+
+def _resolve_employee(applicant_type, applicant):
+	if not applicant:
+		return None
+
+	if applicant_type == "Employee":
+		return applicant
+
+	# Fallback: some forms may have applicant type mismatched while employee id is selected.
+	if str(applicant).startswith("HR-EMP-") and frappe.db.exists("Employee", applicant):
+		return applicant
+
+	return None
+
+
+def _get_leave_allocation(employee, reference_date):
+	leave_response = custom_get_leave_details(employee, reference_date) or {}
+	leave_allocation = leave_response.get("leave_allocation") or {}
+	if leave_allocation:
+		return leave_allocation
+
+	# Fallback to stock HRMS API in case override context is not active in this execution path.
+	leave_response = hrms_get_leave_details(employee, reference_date) or {}
+	return leave_response.get("leave_allocation") or {}
+
+
+def _set_current_salary(doc):
+	employee = _resolve_employee(doc.applicant_type, doc.applicant)
+	if not employee:
+		return
+
+	reference_date = doc.posting_date or nowdate()
+	doc.custom_current_salary = _get_current_salary(employee, doc.company, reference_date)
+
+
+def _get_current_salary(employee, company=None, reference_date=None):
+	reference_date = reference_date or nowdate()
+	ssa_filters = {
+		"employee": employee,
+		"docstatus": 1,
+		"from_date": ("<=", reference_date),
+	}
+	if company:
+		ssa_filters["company"] = company
+
+	salary = frappe.db.get_value(
+		"Salary Structure Assignment",
+		ssa_filters,
+		"base",
+		order_by="from_date desc, modified desc",
+	)
+	if salary:
+		return flt(salary)
+
+	# Fallback to latest submitted salary slip gross salary.
+	slip_filters = {
+		"employee": employee,
+		"docstatus": 1,
+	}
+	if company:
+		slip_filters["company"] = company
+
+	salary = frappe.db.get_value(
+		"Salary Slip",
+		slip_filters,
+		"base_gross_pay",
+		order_by="end_date desc, modified desc",
+	)
+	return flt(salary) if salary else 0.0
+
+
+@frappe.whitelist()
+def get_loan_applicant_leave_summary(applicant_type, applicant, posting_date=None):
+	employee = _resolve_employee(applicant_type, applicant)
+	if not employee:
+		return {"summary": "", "current_salary": 0.0}
+
+	reference_date = posting_date or nowdate()
+	current_salary = _get_current_salary(employee, reference_date=reference_date)
+	leave_allocation = _get_leave_allocation(employee, reference_date)
+	if not leave_allocation:
+		return {"summary": "No leave allocation found.", "current_salary": current_salary}
+
+	lines = []
+	for leave_type, details in sorted(leave_allocation.items()):
+		lines.append(
+			f"{leave_type}: Remaining {flt(details.get('remaining_leaves')):.2f}, "
+			f"Taken {flt(details.get('leaves_taken')):.2f}, "
+			f"Pending Approval {flt(details.get('leaves_pending_approval')):.2f}"
+		)
+
+	return {"summary": "\n".join(lines), "current_salary": current_salary}
