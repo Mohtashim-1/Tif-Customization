@@ -1840,14 +1840,19 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 						}
 						
 						const colorGradient = colorGradients[index % colorGradients.length];
-						const itemName = (item.item_name || item.item_code || 'Unknown').substring(0, 30);
-						const itemCode = item.item_code || '-';
+						const itemCode = (item.item_code || '-').substring(0, 30);
+						const rawItemName = item.item_name || '';
+						const itemName = (
+							rawItemName && rawItemName !== item.item_code
+								? rawItemName
+								: ''
+						).substring(0, 30);
 						
 						return `
 							<div class="col-md-2" style="margin-bottom: 10px;">
 								<div class="kpi-card" style="background: ${colorGradient}; color: black; padding: 12px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); min-height: 100px;">
 									<h6 style="margin: 0 0 5px 0; font-size: 12px; color: black; opacity: 0.95; font-weight: bold; line-height: 1.2;">${itemCode}</h6>
-									<p style="margin: 0 0 8px 0; font-size: 12px; color: black; opacity: 0.9; line-height: 1.1; height: 20px; overflow: hidden;">${itemName}</p>
+									<p style="margin: 0 0 8px 0; font-size: 12px; color: black; opacity: 0.9; line-height: 1.1; height: 20px; overflow: hidden;">${itemName || '&nbsp;'}</p>
 									<h2 style="margin: 0; font-size: 22px; font-weight: bold; text-align: center;">${formatNumber(balance)}</h2>
 									<p style="margin: 5px 0 0 0; font-size: 12px;color: black; opacity: 0.85; text-align: center;">Available Stock</p>
 								</div>
@@ -1861,17 +1866,17 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 				<div class="table-responsive">
 					<table class="table table-bordered table-striped" style="background: white;">
 						<thead>
-							<tr style="background-color: #f8f9fa;">
-								<th>Item Code</th>
-								<th>Item Name</th>
-								<th class="text-right">Opening Stock</th>
-								<th class="text-right">Available Stock</th>
-								<th class="text-right">Delivered</th>
-								<th class="text-right">Received Vendor</th>
-								<th class="text-right">Book Return</th>
-								<th class="text-right">Demand Received</th>
-								<th class="text-right">Books Sale</th>
-								<th class="text-right">Total Amount</th>
+							<tr style="background-color: #ffffff;">
+								<th style="background: #ffffff; color: #000;">Item Code</th>
+								<th style="background: #ffffff; color: #000;">Item Name</th>
+								<th class="text-right" style="background: #ffffff; color: #000;">Opening Stock</th>
+								<th class="text-right" style="background: #ffffff; color: #000;">Available Stock</th>
+								<th class="text-right" style="background: #ffffff; color: #000;">Delivered</th>
+								<th class="text-right" style="background: #ffffff; color: #000;">Received Vendor</th>
+								<th class="text-right" style="background: #ffffff; color: #000;">Book Return</th>
+								<th class="text-right" style="background: #ffffff; color: #000;">Demand Received</th>
+								<th class="text-right" style="background: #ffffff; color: #000;">Books Sale</th>
+								<th class="text-right" style="background: #ffffff; color: #000;">Total Amount</th>
 							</tr>
 						</thead>
 						<tbody>

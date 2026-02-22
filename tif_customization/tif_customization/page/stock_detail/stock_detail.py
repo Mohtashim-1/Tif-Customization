@@ -7,21 +7,14 @@ SPECIFIC_ITEM_CODES = [
     'MQHWB-01/U/12', 'MQHWB-02/U/10', 'MQHWB-03/U/9', 'MQHWB-04/U/7', 'MQHWB-05/U/5',
     'MQHWB-06/U/2', 'MQHWB-07/U/7', 'MQHTG-01U6', 'MQHTG-02U6', 'MQHTG-03U5',
     'MQHTG-04U4', 'MQHTG-05U1', 'MQHWB-01S1', 'MQHWB-02S1', 'MQHWB-03S1',
-    'MQHWB-01E1', 'MQHWB-02E1', 'MB-U1', 'Noorani Qaida', 'Noorani Qaida Workbook',
-    'Noorani Qaida Teacher Guide', 'Tarjamat ul Quran-e-Majeed-6 Class-Punjab Edition',
-    'Tarjamat ul Quran-e-Majeed-7 Class-Punjab Edition',
+    'MQHWB-01E1', 'MQHWB-02E1', 'MB-U1', 'NQ1', 'NQW', 'NQTG', 'TQM6PE', 'TQM7PE',
     # Additional items added
-    'MQH KP Urdu Textbook Class 6', 'MQH KP Urdu Textbook Class 7', 'MQH KP Urdu Textbook Class 8',
-    'MQH KP Urdu Textbook Class 9', 'MQH KP Urdu Textbook Class 10', 'MQH KP Urdu Textbook Class 11',
-    'MQH KP Urdu Textbook Class 12', 'TIF Profile Version-1/2024', 'TPS Para'
+    'MQKPUT6', 'MQKPUT7', 'MQKPUT8', 'MQKPUT9', 'MQKPUT10', 'MQKPUT11',
+    'MQKPUT12', 'TIFPV24', 'Para'
 ]
 
 # TPS Department items (TPS Para, Noorani Qaida, Noorani Qaida Workbook)
-TPS_ITEM_CODES = [
-    'TPS Para',
-    'Noorani Qaida',
-    'Noorani Qaida Workbook'
-]
+TPS_ITEM_CODES = ['Para', 'NQ1', 'NQW']
 
 def get_item_department(item_code):
     """Determine if an item belongs to TPS or QPS department"""
