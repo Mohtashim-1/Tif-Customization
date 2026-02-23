@@ -1715,6 +1715,13 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 						<p style="margin: 5px 0 0 0; font-size: 12px;color: black;	 opacity: 0.8;">${formatNumber(kpiData.sales_invoice_total_qty || 0)} Qty | ${formatCurrency(kpiData.sales_invoice_total_amount || 0)}</p>
 					</div>
 				</div>
+				<div style="flex: 1; padding: 0 8px;">
+					<div class="kpi-card return-books-kpi" style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); color: black; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;" onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 4px 8px rgba(0,0,0,0.2)';" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 2px 4px rgba(0,0,0,0.1)';">
+						<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Return Books</h5>
+						<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${formatNumber(kpiData.total_book_return || 0)}</h2>
+						<p style="margin: 5px 0 0 0; font-size: 12px;color: black; opacity: 0.8;">Total Books Returned</p>
+					</div>
+				</div>
 			</div>
 			
 			<!-- Department-wise Item Count and Totals KPIs -->
@@ -1748,7 +1755,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 							<span style="font-size: 13px; opacity: 0.9;">Book Return:</span>
 							<strong style="font-size: 13px;">${formatNumber(kpiData.tps_book_return || 0)}</strong>
 						</div>
-						<p style="margin: 10px 0 0 0; font-size: 11px;color: black; opacity: 0.8; border-top: 1px solid rgba(0,0,0,0.1); padding-top: 8px;">Includes: TPS Para, Noorani Qaida, Noorani Qaida Workbook</p>
+						<p style="margin: 10px 0 0 0; font-size: 11px;color: black; opacity: 0.8; border-top: 1px solid rgba(0,0,0,0.1); padding-top: 8px;">Includes: TPS Para, Noorani Qaida, Noorani Qaida Workbook, Panj Para 26-30, Panj Para 1-5, NQTG</p>
 					</div>
 				</div>
 				<!-- QPS Department -->
@@ -1823,10 +1830,31 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 				console.log('[DEBUG] MQHWB-01/U/12 KPI data:', mqhwb01Items[0]);
 			}
 			
+			// Filter out "Para" from Book Wise Count
+			const filteredItems = kpiData.items.filter(item => item.item_code !== 'Para');
+			
+			// Find Panj Para items
+			const panjPara2630 = kpiData.items.find(item => 
+				item.item_code && (
+					item.item_code.includes('Panj Para 26-30') || 
+					item.item_code.includes('Panj Para 26') ||
+					item.item_code.includes('PP26-30') ||
+					item.item_name && item.item_name.includes('Panj Para 26-30')
+				)
+			);
+			const panjPara15 = kpiData.items.find(item => 
+				item.item_code && (
+					item.item_code.includes('Panj Para 1-5') || 
+					item.item_code.includes('Panj Para 1') ||
+					item.item_code.includes('PP1-5') ||
+					item.item_name && item.item_name.includes('Panj Para 1-5')
+				)
+			);
+			
 			itemsHtml = `
 				<h5 style="margin-bottom: 15px; margin-top: 30px; font-weight: bold; color: #495057;">Book Wise Count</h5>
 				<div class="row" style="margin-bottom: 20px;">
-					${kpiData.items.map((item, index) => {
+					${filteredItems.map((item, index) => {
 						const balance = item.available_stock || 0;
 						
 						// Debug for MQHWB-01/U/12
@@ -1859,6 +1887,44 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 							</div>
 						`;
 					}).join('')}
+					${panjPara2630 ? `
+						<div class="col-md-2" style="margin-bottom: 10px;">
+							<div class="kpi-card" style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); color: black; padding: 12px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); min-height: 100px;">
+								<h6 style="margin: 0 0 5px 0; font-size: 12px; color: black; opacity: 0.95; font-weight: bold; line-height: 1.2;">${(panjPara2630.item_code || 'Panj Para 26-30').substring(0, 30)}</h6>
+								<p style="margin: 0 0 8px 0; font-size: 12px; color: black; opacity: 0.9; line-height: 1.1; height: 20px; overflow: hidden;">Panj Para 26-30</p>
+								<h2 style="margin: 0; font-size: 22px; font-weight: bold; text-align: center;">${formatNumber(panjPara2630.available_stock || 0)}</h2>
+								<p style="margin: 5px 0 0 0; font-size: 12px;color: black; opacity: 0.85; text-align: center;">Available Stock</p>
+							</div>
+						</div>
+					` : `
+						<div class="col-md-2" style="margin-bottom: 10px;">
+							<div class="kpi-card" style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); color: black; padding: 12px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); min-height: 100px;">
+								<h6 style="margin: 0 0 5px 0; font-size: 12px; color: black; opacity: 0.95; font-weight: bold; line-height: 1.2;">Panj Para 26-30</h6>
+								<p style="margin: 0 0 8px 0; font-size: 12px; color: black; opacity: 0.9; line-height: 1.1; height: 20px; overflow: hidden;">&nbsp;</p>
+								<h2 style="margin: 0; font-size: 22px; font-weight: bold; text-align: center;">${formatNumber(0)}</h2>
+								<p style="margin: 5px 0 0 0; font-size: 12px;color: black; opacity: 0.85; text-align: center;">Available Stock</p>
+							</div>
+						</div>
+					`}
+					${panjPara15 ? `
+						<div class="col-md-2" style="margin-bottom: 10px;">
+							<div class="kpi-card" style="background: linear-gradient(135deg, #4ecdc4 0%, #44a08d 100%); color: black; padding: 12px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); min-height: 100px;">
+								<h6 style="margin: 0 0 5px 0; font-size: 12px; color: black; opacity: 0.95; font-weight: bold; line-height: 1.2;">${(panjPara15.item_code || 'Panj Para 1-5').substring(0, 30)}</h6>
+								<p style="margin: 0 0 8px 0; font-size: 12px; color: black; opacity: 0.9; line-height: 1.1; height: 20px; overflow: hidden;">Panj Para 1-5</p>
+								<h2 style="margin: 0; font-size: 22px; font-weight: bold; text-align: center;">${formatNumber(panjPara15.available_stock || 0)}</h2>
+								<p style="margin: 5px 0 0 0; font-size: 12px;color: black; opacity: 0.85; text-align: center;">Available Stock</p>
+							</div>
+						</div>
+					` : `
+						<div class="col-md-2" style="margin-bottom: 10px;">
+							<div class="kpi-card" style="background: linear-gradient(135deg, #4ecdc4 0%, #44a08d 100%); color: black; padding: 12px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); min-height: 100px;">
+								<h6 style="margin: 0 0 5px 0; font-size: 12px; color: black; opacity: 0.95; font-weight: bold; line-height: 1.2;">Panj Para 1-5</h6>
+								<p style="margin: 0 0 8px 0; font-size: 12px; color: black; opacity: 0.9; line-height: 1.1; height: 20px; overflow: hidden;">&nbsp;</p>
+								<h2 style="margin: 0; font-size: 22px; font-weight: bold; text-align: center;">${formatNumber(0)}</h2>
+								<p style="margin: 5px 0 0 0; font-size: 12px;color: black; opacity: 0.85; text-align: center;">Available Stock</p>
+							</div>
+						</div>
+					`}
 				</div>
 				
 				<!-- Detailed Table for Individual Items -->
@@ -1880,7 +1946,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 							</tr>
 						</thead>
 						<tbody>
-							${kpiData.items.map(item => `
+							${filteredItems.map(item => `
 								<tr>
 									<td><strong>${item.item_code || '-'}</strong></td>
 									<td>${item.item_name || '-'}</td>
@@ -1894,18 +1960,46 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 									<td class="text-right">${formatNumber(item.total_amount || 0)}</td>
 								</tr>
 							`).join('')}
+							${panjPara2630 ? `
+								<tr>
+									<td><strong>${panjPara2630.item_code || 'Panj Para 26-30'}</strong></td>
+									<td>${panjPara2630.item_name || 'Panj Para 26-30'}</td>
+									<td class="text-right">${formatNumber(panjPara2630.opening_stock || 0)}</td>
+									<td class="text-right"><strong style="color: #28a745;">${formatNumber(panjPara2630.available_stock || 0)}</strong></td>
+									<td class="text-right">${formatNumber(panjPara2630.delivered || 0)}</td>
+									<td class="text-right">${formatNumber(panjPara2630.received_vendor || 0)}</td>
+									<td class="text-right">${formatNumber(panjPara2630.book_return || 0)}</td>
+									<td class="text-right">${formatNumber(panjPara2630.demand_received || 0)}</td>
+									<td class="text-right">${formatNumber(panjPara2630.books_sale || 0)}</td>
+									<td class="text-right">${formatNumber(panjPara2630.total_amount || 0)}</td>
+								</tr>
+							` : ''}
+							${panjPara15 ? `
+								<tr>
+									<td><strong>${panjPara15.item_code || 'Panj Para 1-5'}</strong></td>
+									<td>${panjPara15.item_name || 'Panj Para 1-5'}</td>
+									<td class="text-right">${formatNumber(panjPara15.opening_stock || 0)}</td>
+									<td class="text-right"><strong style="color: #28a745;">${formatNumber(panjPara15.available_stock || 0)}</strong></td>
+									<td class="text-right">${formatNumber(panjPara15.delivered || 0)}</td>
+									<td class="text-right">${formatNumber(panjPara15.received_vendor || 0)}</td>
+									<td class="text-right">${formatNumber(panjPara15.book_return || 0)}</td>
+									<td class="text-right">${formatNumber(panjPara15.demand_received || 0)}</td>
+									<td class="text-right">${formatNumber(panjPara15.books_sale || 0)}</td>
+									<td class="text-right">${formatNumber(panjPara15.total_amount || 0)}</td>
+								</tr>
+							` : ''}
 						</tbody>
 						<tfoot>
 							<tr style="background-color: #e9ecef; font-weight: bold;">
 								<td colspan="2"><strong>Total</strong></td>
-								<td class="text-right"><strong>${formatNumber(kpiData.items.reduce((sum, item) => sum + (parseFloat(item.opening_stock) || 0), 0))}</strong></td>
-								<td class="text-right"><strong>${formatNumber(kpiData.items.reduce((sum, item) => sum + (parseFloat(item.available_stock) || 0), 0))}</strong></td>
-								<td class="text-right"><strong>${formatNumber(kpiData.items.reduce((sum, item) => sum + (parseFloat(item.delivered) || 0), 0))}</strong></td>
-								<td class="text-right"><strong>${formatNumber(kpiData.items.reduce((sum, item) => sum + (parseFloat(item.received_vendor) || 0), 0))}</strong></td>
-								<td class="text-right"><strong>${formatNumber(kpiData.items.reduce((sum, item) => sum + (parseFloat(item.book_return) || 0), 0))}</strong></td>
-								<td class="text-right"><strong>${formatNumber(kpiData.items.reduce((sum, item) => sum + (parseFloat(item.demand_received) || 0), 0))}</strong></td>
-								<td class="text-right"><strong>${formatNumber(kpiData.items.reduce((sum, item) => sum + (parseFloat(item.books_sale) || 0), 0))}</strong></td>
-								<td class="text-right"><strong>${formatNumber(kpiData.items.reduce((sum, item) => sum + (parseFloat(item.total_amount) || 0), 0))}</strong></td>
+								<td class="text-right"><strong>${formatNumber(filteredItems.reduce((sum, item) => sum + (parseFloat(item.opening_stock) || 0), 0) + (panjPara2630 ? (parseFloat(panjPara2630.opening_stock) || 0) : 0) + (panjPara15 ? (parseFloat(panjPara15.opening_stock) || 0) : 0))}</strong></td>
+								<td class="text-right"><strong>${formatNumber(filteredItems.reduce((sum, item) => sum + (parseFloat(item.available_stock) || 0), 0) + (panjPara2630 ? (parseFloat(panjPara2630.available_stock) || 0) : 0) + (panjPara15 ? (parseFloat(panjPara15.available_stock) || 0) : 0))}</strong></td>
+								<td class="text-right"><strong>${formatNumber(filteredItems.reduce((sum, item) => sum + (parseFloat(item.delivered) || 0), 0) + (panjPara2630 ? (parseFloat(panjPara2630.delivered) || 0) : 0) + (panjPara15 ? (parseFloat(panjPara15.delivered) || 0) : 0))}</strong></td>
+								<td class="text-right"><strong>${formatNumber(filteredItems.reduce((sum, item) => sum + (parseFloat(item.received_vendor) || 0), 0) + (panjPara2630 ? (parseFloat(panjPara2630.received_vendor) || 0) : 0) + (panjPara15 ? (parseFloat(panjPara15.received_vendor) || 0) : 0))}</strong></td>
+								<td class="text-right"><strong>${formatNumber(filteredItems.reduce((sum, item) => sum + (parseFloat(item.book_return) || 0), 0) + (panjPara2630 ? (parseFloat(panjPara2630.book_return) || 0) : 0) + (panjPara15 ? (parseFloat(panjPara15.book_return) || 0) : 0))}</strong></td>
+								<td class="text-right"><strong>${formatNumber(filteredItems.reduce((sum, item) => sum + (parseFloat(item.demand_received) || 0), 0) + (panjPara2630 ? (parseFloat(panjPara2630.demand_received) || 0) : 0) + (panjPara15 ? (parseFloat(panjPara15.demand_received) || 0) : 0))}</strong></td>
+								<td class="text-right"><strong>${formatNumber(filteredItems.reduce((sum, item) => sum + (parseFloat(item.books_sale) || 0), 0) + (panjPara2630 ? (parseFloat(panjPara2630.books_sale) || 0) : 0) + (panjPara15 ? (parseFloat(panjPara15.books_sale) || 0) : 0))}</strong></td>
+								<td class="text-right"><strong>${formatNumber(filteredItems.reduce((sum, item) => sum + (parseFloat(item.total_amount) || 0), 0) + (panjPara2630 ? (parseFloat(panjPara2630.total_amount) || 0) : 0) + (panjPara15 ? (parseFloat(panjPara15.total_amount) || 0) : 0))}</strong></td>
 							</tr>
 						</tfoot>
 					</table>
@@ -1914,6 +2008,25 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 		}
 		
 		kpiSection.html(summaryHtml + itemsHtml);
+		
+		// Add click handler for Return Books KPI
+		$('.return-books-kpi').on('click', function() {
+			// Get current date filters
+			const fromDate = $('#from-date').val() || frappe.datetime.month_start();
+			const toDate = $('#to-date').val() || frappe.datetime.get_today();
+			
+			// Get current company (default company from user defaults)
+			const company = frappe.defaults.get_user_default("Company") || '';
+			
+			// Build URL with filters
+			let reportUrl = `/app/query-report/School Return Report?from_date=${encodeURIComponent(fromDate)}&to_date=${encodeURIComponent(toDate)}`;
+			if (company) {
+				reportUrl += `&company=${encodeURIComponent(company)}`;
+			}
+			
+			// Open the report in a new window/tab
+			window.open(reportUrl, '_blank');
+		});
 	}
 	
 	function populateHeadOfficeTable(data) {
