@@ -98,28 +98,26 @@
   },
   {
    "hidden": 0,
-   "is_query_report": 0,
+   "is_query_report": 1,
    "label": "Cash Book",
    "link_count": 0,
    "link_to": "Cash Book",
    "link_type": "Report",
    "onboard": 0,
-   "report_ref_doctype": "GL Entry",
    "type": "Link"
   },
   {
    "hidden": 0,
-   "is_query_report": 0,
+   "is_query_report": 1,
    "label": "Bank Book",
    "link_count": 0,
    "link_to": "Bank Book",
    "link_type": "Report",
    "onboard": 0,
-   "report_ref_doctype": "GL Entry",
    "type": "Link"
   }
  ],
- "modified": "2026-02-28 03:13:01.820522",
+ "modified": "2026-02-28 03:39:09.261905",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Accounts Addon",

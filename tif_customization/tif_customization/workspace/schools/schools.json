@@ -16,7 +16,7 @@
    "hidden": 0,
    "is_query_report": 0,
    "label": "Reports",
-   "link_count": 2,
+   "link_count": 3,
    "link_type": "DocType",
    "onboard": 0,
    "type": "Card Break"
@@ -40,9 +40,19 @@
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "School Analytics",
+   "link_count": 0,
+   "link_to": "school-analytics",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
   }
  ],
- "modified": "2026-02-28 03:15:13.758987",
+ "modified": "2026-02-28 03:46:11.767587",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Schools",
