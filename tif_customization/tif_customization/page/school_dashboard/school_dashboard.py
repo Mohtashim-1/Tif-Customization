@@ -5,13 +5,21 @@ from frappe.utils import flt
 
 @frappe.whitelist()
 def get_dashboard_data(
-    school=None, status=None, tps=None, qps=None, cee=None, workshop_status=None
+    school=None,
+    school_name=None,
+    status=None,
+    tps=None,
+    qps=None,
+    cee=None,
+    workshop_status=None,
 ):
     """Return KPI and school-wise data for School Dashboard."""
     try:
         filters = {"docstatus": ["<", 2]}
         if school:
             filters["name"] = school
+        if school_name:
+            filters["school_name"] = ["like", f"%{school_name.strip()}%"]
         if status:
             filters["status"] = status
         if tps:

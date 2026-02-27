@@ -5,13 +5,16 @@ frappe.pages["school-dashboard"].on_page_load = function (wrapper) {
 		single_column: true,
 	});
 
-	new SchoolDashboard(page).make();
+	new frappe.tif_customization.SchoolDashboard(page).make();
 };
 
-class SchoolDashboard {
+frappe.tif_customization = frappe.tif_customization || {};
+
+frappe.tif_customization.SchoolDashboard = class SchoolDashboard {
 	constructor(page) {
 		this.page = page;
 		this.school_filter = null;
+		this.school_name_filter = null;
 		this.status_filter = null;
 		this.tps_filter = null;
 		this.qps_filter = null;
@@ -35,11 +38,18 @@ class SchoolDashboard {
 			change: () => this.load_data(),
 		});
 
+		this.school_name_filter = this.page.add_field({
+			label: __("School Name"),
+			fieldtype: "Data",
+			fieldname: "school_name",
+			change: () => this.load_data(),
+		});
+
 		this.status_filter = this.page.add_field({
 			label: __("Status"),
 			fieldtype: "Select",
 			fieldname: "status",
-			options: ["", "ACTIVE", "INACTIVE"],
+			options: "\nACTIVE\nINACTIVE",
 			change: () => this.load_data(),
 		});
 
@@ -47,7 +57,7 @@ class SchoolDashboard {
 			label: __("TPS"),
 			fieldtype: "Select",
 			fieldname: "tps",
-			options: ["", "Yes", "No"],
+			options: "\nYes\nNo",
 			change: () => this.load_data(),
 		});
 
@@ -55,7 +65,7 @@ class SchoolDashboard {
 			label: __("QPS"),
 			fieldtype: "Select",
 			fieldname: "qps",
-			options: ["", "Yes", "No"],
+			options: "\nYes\nNo",
 			change: () => this.load_data(),
 		});
 
@@ -63,7 +73,7 @@ class SchoolDashboard {
 			label: __("CEE"),
 			fieldtype: "Select",
 			fieldname: "cee",
-			options: ["", "Yes", "No"],
+			options: "\nYes\nNo",
 			change: () => this.load_data(),
 		});
 
@@ -71,7 +81,7 @@ class SchoolDashboard {
 			label: __("Workshop Status"),
 			fieldtype: "Select",
 			fieldname: "workshop_status",
-			options: ["", "In Process", "Not Interested", "Agreed", "Unknown"],
+			options: "\nIn Process\nNot Interested\nAgreed\nUnknown",
 			change: () => this.load_data(),
 		});
 
@@ -105,7 +115,8 @@ class SchoolDashboard {
 			</div>
 		`;
 
-		$(this.page.body).html(html);
+		$(this.page.body).find(".school-dashboard-wrap").remove();
+		$(this.page.body).append(html);
 	}
 
 	bind_events() {
@@ -120,6 +131,7 @@ class SchoolDashboard {
 
 	load_data() {
 		const school = this.school_filter ? this.school_filter.get_value() : "";
+		const school_name = this.school_name_filter ? this.school_name_filter.get_value() : "";
 		const status = this.status_filter ? this.status_filter.get_value() : "";
 		const tps = this.tps_filter ? this.tps_filter.get_value() : "";
 		const qps = this.qps_filter ? this.qps_filter.get_value() : "";
@@ -130,7 +142,7 @@ class SchoolDashboard {
 
 		frappe.call({
 			method: "tif_customization.tif_customization.page.school_dashboard.school_dashboard.get_dashboard_data",
-			args: { school, status, tps, qps, cee, workshop_status },
+			args: { school, school_name, status, tps, qps, cee, workshop_status },
 			callback: (r) => {
 				const data = r.message || {};
 				if (data.error) {
