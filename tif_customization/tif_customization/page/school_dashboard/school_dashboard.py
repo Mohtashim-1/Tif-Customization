@@ -4,29 +4,38 @@ from frappe.utils import flt
 
 
 @frappe.whitelist()
-def get_dashboard_data(school=None):
+def get_dashboard_data(
+    school=None, status=None, tps=None, qps=None, cee=None, workshop_status=None
+):
     """Return KPI and school-wise data for School Dashboard."""
     try:
         filters = {"docstatus": ["<", 2]}
         if school:
             filters["name"] = school
-
-        total_schools = frappe.db.count("School", filters)
-        active_schools = frappe.db.count("School", {**filters, "status": "ACTIVE"})
-        tps_schools = frappe.db.count(
-            "School",
-            {**filters, "tps": "TPS is associated with this school"},
-        )
-        qps_schools = frappe.db.count(
-            "School",
-            {**filters, "qps": "QPS is associated with this school"},
-        )
-        cee_schools = frappe.db.count(
-            "School",
-            {**filters, "cee": "CEE is associated with this school"},
-        )
+        if status:
+            filters["status"] = status
+        if tps:
+            filters["tps"] = (
+                "TPS is associated with this school" if tps == "Yes" else ["!=", "TPS is associated with this school"]
+            )
+        if qps:
+            filters["qps"] = (
+                "QPS is associated with this school" if qps == "Yes" else ["!=", "QPS is associated with this school"]
+            )
+        if cee:
+            filters["cee"] = (
+                "CEE is associated with this school" if cee == "Yes" else ["!=", "CEE is associated with this school"]
+            )
 
         rows = _get_school_rows(filters)
+        if workshop_status:
+            rows = [r for r in rows if (r.get("workshop_status") or "") == workshop_status]
+
+        total_schools = len(rows)
+        active_schools = sum(1 for r in rows if r.get("status") == "ACTIVE")
+        tps_schools = sum(1 for r in rows if r.get("tps") == "TPS is associated with this school")
+        qps_schools = sum(1 for r in rows if r.get("qps") == "QPS is associated with this school")
+        cee_schools = sum(1 for r in rows if r.get("cee") == "CEE is associated with this school")
 
         qaida_guide_dispatch = sum(flt(r.get("qaida_guide_dispatch", 0)) for r in rows)
         mqh_dispatch = sum(flt(r.get("mqh_dispatch", 0)) for r in rows)

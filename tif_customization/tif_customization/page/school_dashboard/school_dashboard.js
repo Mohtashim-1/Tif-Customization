@@ -12,6 +12,11 @@ class SchoolDashboard {
 	constructor(page) {
 		this.page = page;
 		this.school_filter = null;
+		this.status_filter = null;
+		this.tps_filter = null;
+		this.qps_filter = null;
+		this.cee_filter = null;
+		this.workshop_status_filter = null;
 	}
 
 	make() {
@@ -27,6 +32,46 @@ class SchoolDashboard {
 			fieldtype: "Link",
 			fieldname: "school",
 			options: "School",
+			change: () => this.load_data(),
+		});
+
+		this.status_filter = this.page.add_field({
+			label: __("Status"),
+			fieldtype: "Select",
+			fieldname: "status",
+			options: ["", "ACTIVE", "INACTIVE"],
+			change: () => this.load_data(),
+		});
+
+		this.tps_filter = this.page.add_field({
+			label: __("TPS"),
+			fieldtype: "Select",
+			fieldname: "tps",
+			options: ["", "Yes", "No"],
+			change: () => this.load_data(),
+		});
+
+		this.qps_filter = this.page.add_field({
+			label: __("QPS"),
+			fieldtype: "Select",
+			fieldname: "qps",
+			options: ["", "Yes", "No"],
+			change: () => this.load_data(),
+		});
+
+		this.cee_filter = this.page.add_field({
+			label: __("CEE"),
+			fieldtype: "Select",
+			fieldname: "cee",
+			options: ["", "Yes", "No"],
+			change: () => this.load_data(),
+		});
+
+		this.workshop_status_filter = this.page.add_field({
+			label: __("Workshop Status"),
+			fieldtype: "Select",
+			fieldname: "workshop_status",
+			options: ["", "In Process", "Not Interested", "Agreed", "Unknown"],
 			change: () => this.load_data(),
 		});
 
@@ -75,10 +120,17 @@ class SchoolDashboard {
 
 	load_data() {
 		const school = this.school_filter ? this.school_filter.get_value() : "";
+		const status = this.status_filter ? this.status_filter.get_value() : "";
+		const tps = this.tps_filter ? this.tps_filter.get_value() : "";
+		const qps = this.qps_filter ? this.qps_filter.get_value() : "";
+		const cee = this.cee_filter ? this.cee_filter.get_value() : "";
+		const workshop_status = this.workshop_status_filter
+			? this.workshop_status_filter.get_value()
+			: "";
 
 		frappe.call({
 			method: "tif_customization.tif_customization.page.school_dashboard.school_dashboard.get_dashboard_data",
-			args: { school },
+			args: { school, status, tps, qps, cee, workshop_status },
 			callback: (r) => {
 				const data = r.message || {};
 				if (data.error) {
