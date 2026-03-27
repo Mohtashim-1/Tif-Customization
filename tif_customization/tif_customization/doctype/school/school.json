@@ -19,6 +19,7 @@
   "column_break_xevd",
   "no_of_students",
   "status",
+  "remarks",
   "type_of_institution",
   "school_level",
   "board_affiliation",
@@ -114,12 +115,19 @@
    "label": "No of Students"
   },
   {
-   "default": "ACTIVE",
+   "default": "Active",
    "fieldname": "status",
    "fieldtype": "Select",
    "label": "Status",
-   "options": "ACTIVE\nINACTIVE",
+   "options": "Active\nPending\nClosed\nNot Interested",
+   "in_list_view": 1,
    "reqd": 1
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "in_list_view": 1,
+   "label": "Remarks"
   },
   {
    "fieldname": "section",

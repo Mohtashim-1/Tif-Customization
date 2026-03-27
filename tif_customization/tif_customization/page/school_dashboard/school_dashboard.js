@@ -49,7 +49,7 @@ frappe.tif_customization.SchoolDashboard = class SchoolDashboard {
 			label: __("Status"),
 			fieldtype: "Select",
 			fieldname: "status",
-			options: "\nACTIVE\nINACTIVE",
+			options: "\nActive\nPending\nClosed\nNot Interested",
 			change: () => this.load_data(),
 		});
 
@@ -97,7 +97,8 @@ frappe.tif_customization.SchoolDashboard = class SchoolDashboard {
 						<thead>
 							<tr>
 								<th>School Name</th>
-								<th>Active</th>
+								<th>Status</th>
+								<th>Remarks</th>
 								<th>TPS</th>
 								<th>QPS</th>
 								<th>CEE</th>
@@ -108,7 +109,7 @@ frappe.tif_customization.SchoolDashboard = class SchoolDashboard {
 							</tr>
 						</thead>
 						<tbody id="school-dashboard-tbody">
-							<tr><td colspan="9" class="text-center text-muted">Loading...</td></tr>
+							<tr><td colspan="10" class="text-center text-muted">Loading...</td></tr>
 						</tbody>
 					</table>
 				</div>
@@ -190,7 +191,7 @@ frappe.tif_customization.SchoolDashboard = class SchoolDashboard {
 	render_rows(rows) {
 		if (!rows.length) {
 			$("#school-dashboard-tbody").html(
-				`<tr><td colspan="9" class="text-center text-muted">No data found.</td></tr>`
+				`<tr><td colspan="10" class="text-center text-muted">No data found.</td></tr>`
 			);
 			return;
 		}
@@ -205,7 +206,8 @@ frappe.tif_customization.SchoolDashboard = class SchoolDashboard {
 				const tps = this.as_yes_no(row.tps, "TPS is associated with this school");
 				const qps = this.as_yes_no(row.qps, "QPS is associated with this school");
 				const cee = this.as_yes_no(row.cee, "CEE is associated with this school");
-				const active = (row.status || "") === "ACTIVE" ? "Yes" : "No";
+				const status = frappe.utils.escape_html(row.status || "-");
+				const remarks = frappe.utils.escape_html(row.remarks || "-");
 
 				return `
 					<tr>
@@ -214,7 +216,8 @@ frappe.tif_customization.SchoolDashboard = class SchoolDashboard {
 								${school_name || "-"}
 							</a>
 						</td>
-						<td>${active}</td>
+						<td>${status}</td>
+						<td>${remarks}</td>
 						<td>${tps}</td>
 						<td>${qps}</td>
 						<td>${cee}</td>

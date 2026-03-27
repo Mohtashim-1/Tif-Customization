@@ -21,7 +21,9 @@ def get_dashboard_data(
         if school_name:
             filters["school_name"] = ["like", f"%{school_name.strip()}%"]
         if status:
-            filters["status"] = status
+            normalized_status = (status or "").strip().upper()
+            if normalized_status:
+                filters["status"] = ["in", [_title_case_status(normalized_status), normalized_status]]
         if tps:
             filters["tps"] = (
                 "TPS is associated with this school" if tps == "Yes" else ["!=", "TPS is associated with this school"]
@@ -40,7 +42,7 @@ def get_dashboard_data(
             rows = [r for r in rows if (r.get("workshop_status") or "") == workshop_status]
 
         total_schools = len(rows)
-        active_schools = sum(1 for r in rows if r.get("status") == "ACTIVE")
+        active_schools = sum(1 for r in rows if _is_active_status(r.get("status")))
         tps_schools = sum(1 for r in rows if r.get("tps") == "TPS is associated with this school")
         qps_schools = sum(1 for r in rows if r.get("qps") == "QPS is associated with this school")
         cee_schools = sum(1 for r in rows if r.get("cee") == "CEE is associated with this school")
@@ -76,6 +78,7 @@ def _get_school_rows(filters):
             "name",
             "school_name",
             "status",
+            "remarks",
             "tps",
             "qps",
             "cee",
@@ -110,6 +113,7 @@ def _get_school_rows(filters):
                 "school": doc.get("name"),
                 "school_name": school_name,
                 "status": doc.get("status"),
+                "remarks": doc.get("remarks"),
                 "tps": doc.get("tps"),
                 "qps": doc.get("qps"),
                 "cee": doc.get("cee"),
@@ -200,3 +204,13 @@ def _map_workshop_status(marketing_status):
     if status == "agreed":
         return "Agreed"
     return "Unknown"
+
+
+def _is_active_status(status):
+    return (status or "").strip().upper() == "ACTIVE"
+
+
+def _title_case_status(status):
+    if status == "NOT INTERESTED":
+        return "Not Interested"
+    return status.title()
