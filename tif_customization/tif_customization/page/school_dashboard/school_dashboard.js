@@ -15,11 +15,15 @@ frappe.tif_customization.SchoolDashboard = class SchoolDashboard {
 		this.page = page;
 		this.school_filter = null;
 		this.school_name_filter = null;
+		this.field_officer_name_filter = null;
 		this.status_filter = null;
 		this.tps_filter = null;
 		this.qps_filter = null;
 		this.cee_filter = null;
 		this.workshop_status_filter = null;
+		this.include_upcoming_trainings_filter = null;
+
+		this.debounced_load = frappe.utils.debounce(() => this.load_data(), 300);
 	}
 
 	make() {
@@ -45,11 +49,19 @@ frappe.tif_customization.SchoolDashboard = class SchoolDashboard {
 			change: () => this.load_data(),
 		});
 
+		this.field_officer_name_filter = this.page.add_field({
+			label: __("Field Officer Name"),
+			fieldtype: "Data",
+			fieldname: "field_officer_name",
+			change: () => this.load_data(),
+		});
+
 		this.status_filter = this.page.add_field({
 			label: __("Status"),
 			fieldtype: "Select",
 			fieldname: "status",
-			options: "\nActive\nPending\nClosed\nNot Interested",
+			options:
+				"\nActive\nInactive\nClosed\nIn Process\nNot Interested\nDirect Requirement Received",
 			change: () => this.load_data(),
 		});
 
@@ -85,6 +97,13 @@ frappe.tif_customization.SchoolDashboard = class SchoolDashboard {
 			change: () => this.load_data(),
 		});
 
+		this.include_upcoming_trainings_filter = this.page.add_field({
+			label: __("Upcoming Trainings"),
+			fieldtype: "Check",
+			fieldname: "include_upcoming_trainings",
+			change: () => this.load_data(),
+		});
+
 		this.page.set_primary_action(__("Refresh"), () => this.load_data(), "refresh");
 	}
 
@@ -97,7 +116,9 @@ frappe.tif_customization.SchoolDashboard = class SchoolDashboard {
 						<thead>
 							<tr>
 								<th>School Name</th>
+								<th>Field Officer</th>
 								<th>Status</th>
+								<th>Services</th>
 								<th>Remarks</th>
 								<th>TPS</th>
 								<th>QPS</th>
@@ -109,10 +130,11 @@ frappe.tif_customization.SchoolDashboard = class SchoolDashboard {
 							</tr>
 						</thead>
 						<tbody id="school-dashboard-tbody">
-							<tr><td colspan="10" class="text-center text-muted">Loading...</td></tr>
+							<tr><td colspan="12" class="text-center text-muted">Loading...</td></tr>
 						</tbody>
 					</table>
 				</div>
+				<div id="upcoming-trainings-section" style="margin-top: 16px; display: none;"></div>
 			</div>
 		`;
 
@@ -121,18 +143,34 @@ frappe.tif_customization.SchoolDashboard = class SchoolDashboard {
 	}
 
 	bind_events() {
-		const me = this;
 		$(this.page.body).on("click", ".school-open-link", function () {
 			const school = $(this).data("school");
 			if (school) {
 				frappe.set_route("Form", "School", school);
 			}
 		});
+
+		$(this.page.body).on("click", ".school-remarks-link", (e) => {
+			const school = $(e.currentTarget).data("school");
+			const school_name = $(e.currentTarget).data("schoolName");
+			if (school) this.open_remarks_dialog(school, school_name);
+		});
+
+		// Make text search feel like "search", not "filter-on-blur"
+		if (this.school_name_filter && this.school_name_filter.$input) {
+			this.school_name_filter.$input.on("input", () => this.debounced_load());
+		}
+		if (this.field_officer_name_filter && this.field_officer_name_filter.$input) {
+			this.field_officer_name_filter.$input.on("input", () => this.debounced_load());
+		}
 	}
 
 	load_data() {
 		const school = this.school_filter ? this.school_filter.get_value() : "";
 		const school_name = this.school_name_filter ? this.school_name_filter.get_value() : "";
+		const field_officer_name = this.field_officer_name_filter
+			? this.field_officer_name_filter.get_value()
+			: "";
 		const status = this.status_filter ? this.status_filter.get_value() : "";
 		const tps = this.tps_filter ? this.tps_filter.get_value() : "";
 		const qps = this.qps_filter ? this.qps_filter.get_value() : "";
@@ -140,10 +178,23 @@ frappe.tif_customization.SchoolDashboard = class SchoolDashboard {
 		const workshop_status = this.workshop_status_filter
 			? this.workshop_status_filter.get_value()
 			: "";
+		const include_upcoming_trainings = this.include_upcoming_trainings_filter
+			? this.include_upcoming_trainings_filter.get_value()
+			: 0;
 
 		frappe.call({
 			method: "tif_customization.tif_customization.page.school_dashboard.school_dashboard.get_dashboard_data",
-			args: { school, school_name, status, tps, qps, cee, workshop_status },
+			args: {
+				school,
+				school_name,
+				field_officer_name,
+				status,
+				tps,
+				qps,
+				cee,
+				workshop_status,
+				include_upcoming_trainings,
+			},
 			callback: (r) => {
 				const data = r.message || {};
 				if (data.error) {
@@ -152,6 +203,7 @@ frappe.tif_customization.SchoolDashboard = class SchoolDashboard {
 				}
 				this.render_kpis(data.kpis || {});
 				this.render_rows(data.rows || []);
+				this.render_upcoming_trainings(data.upcoming_trainings || [], include_upcoming_trainings);
 			},
 			error: () => {
 				frappe.msgprint(__("Failed to load school dashboard data."));
@@ -163,6 +215,14 @@ frappe.tif_customization.SchoolDashboard = class SchoolDashboard {
 		const card_data = [
 			{ label: "Total Schools", value: kpis.total_schools || 0 },
 			{ label: "Active Schools", value: kpis.active_schools || 0 },
+			{ label: "Inactive Schools", value: kpis.inactive_schools || 0 },
+			{ label: "Closed Schools", value: kpis.closed_schools || 0 },
+			{ label: "In Process Schools", value: kpis.in_process_schools || 0 },
+			{ label: "Not Interested", value: kpis.not_interested_schools || 0 },
+			{
+				label: "Direct Requirement Received",
+				value: kpis.direct_requirement_received_schools || 0,
+			},
 			{ label: "TPS Schools", value: kpis.tps_schools || 0 },
 			{ label: "QPS Schools", value: kpis.qps_schools || 0 },
 			{ label: "CEE Schools", value: kpis.cee_schools || 0 },
@@ -171,6 +231,10 @@ frappe.tif_customization.SchoolDashboard = class SchoolDashboard {
 			{ label: "Workshop In Process", value: kpis.workshop_in_process || 0 },
 			{ label: "Workshop Not Interested", value: kpis.workshop_not_interested || 0 },
 		];
+
+		if (typeof kpis.upcoming_trainings !== "undefined") {
+			card_data.unshift({ label: "Upcoming Trainings", value: kpis.upcoming_trainings || 0 });
+		}
 
 		const html = card_data
 			.map(
@@ -191,7 +255,7 @@ frappe.tif_customization.SchoolDashboard = class SchoolDashboard {
 	render_rows(rows) {
 		if (!rows.length) {
 			$("#school-dashboard-tbody").html(
-				`<tr><td colspan="10" class="text-center text-muted">No data found.</td></tr>`
+				`<tr><td colspan="12" class="text-center text-muted">No data found.</td></tr>`
 			);
 			return;
 		}
@@ -206,8 +270,15 @@ frappe.tif_customization.SchoolDashboard = class SchoolDashboard {
 				const tps = this.as_yes_no(row.tps, "TPS is associated with this school");
 				const qps = this.as_yes_no(row.qps, "QPS is associated with this school");
 				const cee = this.as_yes_no(row.cee, "CEE is associated with this school");
-				const status = frappe.utils.escape_html(row.status || "-");
-				const remarks = frappe.utils.escape_html(row.remarks || "-");
+				const status = frappe.utils.escape_html(row.status_display || row.status || "-");
+				const services = frappe.utils.escape_html(row.services || "-");
+				const field_officer =
+					frappe.utils.escape_html(row.field_officer_name || "") ||
+					frappe.utils.escape_html(row.field_officer || "-");
+				const latest_remark = (row.latest_remark || "").trim();
+				const remark_short = latest_remark
+					? frappe.utils.escape_html(frappe.utils.ellipsis(latest_remark, 80))
+					: "-";
 
 				return `
 					<tr>
@@ -216,8 +287,14 @@ frappe.tif_customization.SchoolDashboard = class SchoolDashboard {
 								${school_name || "-"}
 							</a>
 						</td>
+						<td>${field_officer || "-"}</td>
 						<td>${status}</td>
-						<td>${remarks}</td>
+						<td>${services}</td>
+						<td>
+							<a href="javascript:void(0)" class="school-remarks-link" data-school="${frappe.utils.escape_html(row.school || "")}" data-school-name="${school_name}">
+								${remark_short}
+							</a>
+						</td>
 						<td>${tps}</td>
 						<td>${qps}</td>
 						<td>${cee}</td>
@@ -231,6 +308,139 @@ frappe.tif_customization.SchoolDashboard = class SchoolDashboard {
 			.join("");
 
 		$("#school-dashboard-tbody").html(html);
+	}
+
+	render_upcoming_trainings(rows, include_upcoming_trainings) {
+		const show = !!cint(include_upcoming_trainings);
+		if (!show) {
+			$("#upcoming-trainings-section").hide().empty();
+			return;
+		}
+
+		const body = rows.length
+			? `
+				<div class="table-responsive" style="background: #fff; border: 1px solid #d1d8dd; border-radius: 8px;">
+					<table class="table table-bordered" style="margin-bottom: 0;">
+						<thead>
+							<tr>
+								<th>Date</th>
+								<th>Session Category</th>
+								<th>Trainer</th>
+								<th>City</th>
+								<th>Province</th>
+								<th>Venue</th>
+								<th class="text-right">Participants</th>
+								<th class="text-right">Schools</th>
+							</tr>
+						</thead>
+						<tbody>
+							${rows
+								.map((r) => {
+									const date = frappe.utils.escape_html(r.training_date || "-");
+									const category = frappe.utils.escape_html(r.training_session_category || "-");
+									const trainer = frappe.utils.escape_html(r.training_trainer_name || "-");
+									const city = frappe.utils.escape_html(r.training_city || "-");
+									const province = frappe.utils.escape_html(r.training_province || "-");
+									const venue = frappe.utils.escape_html(r.training_venue_name || "-");
+									const participants = this.format_number(r.training_no_of_participants || 0);
+									const schools = this.format_number(r.training_no_of_schools_attended || 0);
+									return `
+										<tr>
+											<td>${date}</td>
+											<td>${category}</td>
+											<td>${trainer}</td>
+											<td>${city}</td>
+											<td>${province}</td>
+											<td>${venue}</td>
+											<td class="text-right">${participants}</td>
+											<td class="text-right">${schools}</td>
+										</tr>
+									`;
+								})
+								.join("")}
+						</tbody>
+					</table>
+				</div>
+			`
+			: `<div class="text-muted">No upcoming trainings found.</div>`;
+
+		const html = `
+			<div style="padding: 12px; border: 1px solid #d1d8dd; border-radius: 8px; background: #f8f9fa;">
+				<div style="font-size: 16px; font-weight: 600; margin-bottom: 8px;">Upcoming Trainings</div>
+				${body}
+			</div>
+		`;
+
+		$("#upcoming-trainings-section").html(html).show();
+	}
+
+	open_remarks_dialog(school, school_name) {
+		const dialog = new frappe.ui.Dialog({
+			title: __("Remarks: {0}", [school_name || school]),
+			fields: [
+				{
+					fieldname: "history_html",
+					fieldtype: "HTML",
+				},
+				{
+					fieldname: "new_remark",
+					label: __("Add Remark"),
+					fieldtype: "Small Text",
+					reqd: 1,
+				},
+			],
+			primary_action_label: __("Add"),
+			primary_action: () => {
+				const values = dialog.get_values();
+				if (!values || !values.new_remark) return;
+				frappe.call({
+					method: "tif_customization.tif_customization.page.school_dashboard.school_dashboard.add_school_remark",
+					args: { school, remark: values.new_remark },
+					callback: () => {
+						dialog.set_value("new_remark", "");
+						this.refresh_remarks_history(dialog, school);
+						this.load_data();
+					},
+				});
+			},
+		});
+
+		dialog.show();
+		this.refresh_remarks_history(dialog, school);
+	}
+
+	refresh_remarks_history(dialog, school) {
+		const $wrapper = $(dialog.fields_dict.history_html.wrapper);
+		$wrapper.html(`<div class="text-muted">Loading...</div>`);
+
+		frappe.call({
+			method: "tif_customization.tif_customization.page.school_dashboard.school_dashboard.get_school_remarks",
+			args: { school },
+			callback: (r) => {
+				const rows = r.message || [];
+				if (!rows.length) {
+					$wrapper.html(`<div class="text-muted">No remarks yet.</div>`);
+					return;
+				}
+				const html = rows
+					.map((row) => {
+						const by = frappe.utils.escape_html(row.owner || "");
+						const when = row.creation ? frappe.datetime.str_to_user(row.creation) : "";
+						const content = frappe.utils.escape_html(row.content || "");
+						return `
+							<div style="padding: 8px 0; border-bottom: 1px solid #eee;">
+								<div class="text-muted small">${by} • ${frappe.utils.escape_html(when)}</div>
+								<div>${content || "-"}</div>
+							</div>
+						`;
+					})
+					.join("");
+				$wrapper.html(`<div style="max-height: 320px; overflow: auto;">${html}</div>`);
+			},
+			error: () => {
+				$wrapper.html(`<div class="text-danger">Failed to load remarks.</div>`);
+			},
+		});
 	}
 
 	as_yes_no(value, expected) {

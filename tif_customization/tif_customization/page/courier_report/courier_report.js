@@ -226,7 +226,8 @@ if (typeof window.CourierDashboard === 'undefined') {
 													<th>Delivery Note</th>
 													<th>Customer</th>
 													<th>Cost Center</th>
-													<th class="text-right">Books</th>
+													<th class="text-right">Qty</th>
+													<th>Books</th>
 													<th class="text-right">Courier Expense</th>
 													<th class="text-right">Transport Charges</th>
 													<th class="text-right">Total Expense</th>
@@ -1006,7 +1007,7 @@ if (typeof window.CourierDashboard === 'undefined') {
 		let me = this;
 		$('#item-category-drilldown-title').text(category);
 		$('#item-category-drilldown-section').show();
-		$('#item-category-drilldown-tbody').html('<tr><td colspan="8" class="text-center text-muted">Loading...</td></tr>');
+		$('#item-category-drilldown-tbody').html('<tr><td colspan="9" class="text-center text-muted">Loading...</td></tr>');
 
 		frappe.call({
 			method: 'tif_customization.tif_customization.page.courier_report.courier_report.get_item_category_drilldown',
@@ -1020,7 +1021,7 @@ if (typeof window.CourierDashboard === 'undefined') {
 				tbody.empty();
 
 				if (!rows.length) {
-					tbody.html('<tr><td colspan="8" class="text-center text-muted">No delivery notes found.</td></tr>');
+					tbody.html('<tr><td colspan="9" class="text-center text-muted">No delivery notes found.</td></tr>');
 					return;
 				}
 
@@ -1032,6 +1033,7 @@ if (typeof window.CourierDashboard === 'undefined') {
 							<td>${row.customer_name || row.customer || '-'}</td>
 							<td>${row.cost_center || '-'}</td>
 							<td class="text-right">${format_number_value(row.total_books || 0)}</td>
+							<td style="font-size: 11px; max-width: 300px;">${row.books_details || '-'}</td>
 							<td class="text-right">${format_currency_value(row.courier_expense || 0)}</td>
 							<td class="text-right">${format_currency_value(row.transport_expense || 0)}</td>
 							<td class="text-right"><strong>${format_currency_value(row.total_expense || 0)}</strong></td>
@@ -1040,7 +1042,7 @@ if (typeof window.CourierDashboard === 'undefined') {
 				});
 			},
 			error: function() {
-				$('#item-category-drilldown-tbody').html('<tr><td colspan="8" class="text-center text-danger">Failed to load drilldown data.</td></tr>');
+				$('#item-category-drilldown-tbody').html('<tr><td colspan="9" class="text-center text-danger">Failed to load drilldown data.</td></tr>');
 			}
 		});
 	}

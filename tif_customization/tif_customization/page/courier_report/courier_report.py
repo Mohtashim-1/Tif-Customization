@@ -1412,7 +1412,7 @@ def get_item_category_drilldown(filters=None, category=None):
 				dn.posting_date,
 				dn.name AS delivery_note_no,
 				dn.customer,
-				COALESCE(dn.cost_center, 'Not Set') AS cost_center,
+				COALESCE(dn.custom_supply_chain_cost_center, dn.cost_center, 'Not Set') AS cost_center,
 				COALESCE(SUM(dni.qty), 0) AS total_books
 			FROM `tabDelivery Note` dn
 			LEFT JOIN `tabDelivery Note Item` dni ON dni.parent = dn.name
@@ -1428,6 +1428,32 @@ def get_item_category_drilldown(filters=None, category=None):
 			row['transport_expense'] = flt(transport_expense_by_dn.get(dn_name, 0))
 			row['total_expense'] = flt(row['courier_expense']) + flt(row['transport_expense'])
 			row['customer_name'] = frappe.db.get_value('Customer', row.get('customer'), 'customer_name') or row.get('customer')
+			
+			# Get book details (items) for this delivery note
+			book_details = frappe.db.sql("""
+				SELECT 
+					dni.item_code,
+					dni.item_name,
+					dni.qty,
+					dni.rate
+				FROM `tabDelivery Note Item` dni
+				WHERE dni.parent = %(dn_name)s
+				ORDER BY dni.idx
+			""", {'dn_name': dn_name}, as_dict=True)
+			
+			# Format book details as a string
+			book_details_list = []
+			for item in book_details:
+				item_code = item.get('item_code', '')
+				item_name = item.get('item_name', '')
+				qty = flt(item.get('qty', 0))
+				if item_code:
+					if item_name and item_name != item_code:
+						book_details_list.append(f"{item_code} - {item_name} ({qty})")
+					else:
+						book_details_list.append(f"{item_code} ({qty})")
+			
+			row['books_details'] = '<br>'.join(book_details_list) if book_details_list else '-'
 
 		return dn_rows
 	except Exception as e:

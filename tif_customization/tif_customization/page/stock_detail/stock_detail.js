@@ -305,7 +305,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 				width: 100%;
 			}
 			.table th {
-				background: #2d5a27;
+				background: #ffffff;
 				color: black;
 				text-align: center;
 				vertical-align: middle;
@@ -1830,8 +1830,18 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 				console.log('[DEBUG] MQHWB-01/U/12 KPI data:', mqhwb01Items[0]);
 			}
 			
-			// Filter out "Para" from Book Wise Count
-			const filteredItems = kpiData.items.filter(item => item.item_code !== 'Para');
+			// Filter out "Para" and Panj Para items from the main Book Wise Count list
+			// (Panj Para items are rendered separately to keep them grouped at the bottom)
+			const filteredItems = kpiData.items.filter(item => {
+				const itemCode = item.item_code || '';
+				const itemName = item.item_name || '';
+				
+				if (itemCode === 'Para') return false;
+				if (itemCode.includes('Panj Para 26-30') || itemName.includes('Panj Para 26-30')) return false;
+				if (itemCode.includes('Panj Para 1-5') || itemName.includes('Panj Para 1-5')) return false;
+				
+				return true;
+			});
 			
 			// Find Panj Para items
 			const panjPara2630 = kpiData.items.find(item => 

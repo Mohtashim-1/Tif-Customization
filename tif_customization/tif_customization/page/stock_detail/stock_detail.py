@@ -10,11 +10,11 @@ SPECIFIC_ITEM_CODES = [
     'MQHWB-01E1', 'MQHWB-02E1', 'MB-U1', 'NQ1', 'NQW', 'NQTG', 'TQM6PE', 'TQM7PE',
     # Additional items added
     'MQKPUT6', 'MQKPUT7', 'MQKPUT8', 'MQKPUT9', 'MQKPUT10', 'MQKPUT11',
-    'MQKPUT12', 'TIFPV24', 'Para'
+    'MQKPUT12', 'TIFPV24', 'Panj Para 26-30', 'Panj Para 1-5', 'Para'
 ]
 
 # TPS Department items (TPS Para, Noorani Qaida, Noorani Qaida Workbook)
-TPS_ITEM_CODES = ['Para', 'NQ1', 'NQW']
+TPS_ITEM_CODES = ['Para', 'NQ1', 'NQW', 'NQTG', 'Panj Para 26-30', 'Panj Para 1-5']
 
 def get_item_department(item_code):
     """Determine if an item belongs to TPS or QPS department"""

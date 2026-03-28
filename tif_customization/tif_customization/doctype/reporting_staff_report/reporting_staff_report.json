@@ -1,7 +1,7 @@
 {
  "actions": [],
  "allow_rename": 1,
- "creation": "2026-02-16 16:20:00.000000",
+ "creation": "2026-02-16 16:20:00",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
@@ -19,7 +19,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Work Type",
-   "options": "Field Visit\nFollow-up Call\nMeeting\nTraining\nDocumentation\nPlanning\nOther",
+   "options": "Field Visit\nFollow-up Call\nMeeting\nTraining\nDocumentation\nPlanning\nIT\nOther",
    "reqd": 1
   },
   {
@@ -43,13 +43,13 @@
   },
   {
    "fieldname": "start_time",
-   "fieldtype": "Time",
+   "fieldtype": "Datetime",
    "in_list_view": 1,
    "label": "Start Time"
   },
   {
    "fieldname": "end_time",
-   "fieldtype": "Time",
+   "fieldtype": "Datetime",
    "in_list_view": 1,
    "label": "End Time"
   }
@@ -58,7 +58,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-02-16 16:20:00.000000",
+ "modified": "2026-03-03 12:52:29.921390",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Reporting Staff Report",
