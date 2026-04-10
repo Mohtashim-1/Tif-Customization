@@ -104,6 +104,10 @@ frappe.tif_customization.SchoolDashboard = class SchoolDashboard {
 			change: () => this.load_data(),
 		});
 
+		this.page.add_action_item(__("New Upcoming Training"), () => {
+			frappe.new_doc("Upcoming Training");
+		});
+
 		this.page.set_primary_action(__("Refresh"), () => this.load_data(), "refresh");
 	}
 

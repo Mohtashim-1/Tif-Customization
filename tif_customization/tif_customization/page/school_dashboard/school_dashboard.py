@@ -88,11 +88,11 @@ def get_dashboard_data(
         if include_upcoming_trainings:
             upcoming_trainings = _get_upcoming_trainings()
             upcoming_trainings_count = frappe.db.count(
-                "Field Visit",
+                "Upcoming Training",
                 {
                     "docstatus": ["<", 2],
-                    "type": "Training",
                     "training_date": [">=", nowdate()],
+                    "status": ["!=", "Cancelled"],
                 },
             )
 
@@ -383,11 +383,11 @@ def _get_latest_remark_map(school_docnames):
 
 def _get_upcoming_trainings():
     return frappe.get_all(
-        "Field Visit",
+        "Upcoming Training",
         filters={
             "docstatus": ["<", 2],
-            "type": "Training",
             "training_date": [">=", nowdate()],
+            "status": ["!=", "Cancelled"],
         },
         fields=[
             "name",

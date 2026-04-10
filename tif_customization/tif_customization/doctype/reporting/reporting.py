@@ -15,7 +15,7 @@ class Reporting(Document):
 
 def _can_view_all_reports():
 	user_roles = set(frappe.get_roles(frappe.session.user))
-	return "System Manager" in user_roles or "COO" in user_roles
+	return bool(user_roles & {"System Manager", "COO", "Staff Reporting Manager"})
 
 
 @frappe.whitelist()
