@@ -192,17 +192,28 @@ frappe.pages["donation-collection-"].on_page_load = function (wrapper) {
 					const quarterStartMonth = Math.floor((month - 1) / 3) * 3 + 1;
 					fromDate = new Date(year, quarterStartMonth - 1, 1);
 					toDate = new Date(year, quarterStartMonth + 2, 0);
+				} else if (this.filters.period_type === "half_yearly") {
+					// Full fiscal year Jul -> Jun (both H1 and H2 shown as columns)
+					if (month >= 7) {
+						fromDate = new Date(year, 6, 1);      // Jul 1 current year
+						toDate = new Date(year + 1, 5, 30);   // Jun 30 next year
+					} else {
+						fromDate = new Date(year - 1, 6, 1);  // Jul 1 previous year
+						toDate = new Date(year, 5, 30);        // Jun 30 current year
+					}
 				} else if (this.filters.period_type === "yearly") {
+					// Fiscal yearly block: Jul -> Jun
+					if (month >= 7) {
+						fromDate = new Date(year, 6, 1); // Jul 1 current year
+						toDate = new Date(year + 1, 5, 30); // Jun 30 next year
+					} else {
+						fromDate = new Date(year - 1, 6, 1); // Jul 1 previous year
+						toDate = new Date(year, 5, 30); // Jun 30 current year
+					}
+				} else {
+					// Fallback
 					fromDate = new Date(year, 0, 1);
 					toDate = new Date(year, 11, 31);
-				} else {
-					if (month <= 6) {
-						fromDate = new Date(year, 0, 1);
-						toDate = new Date(year, 5, 30);
-					} else {
-						fromDate = new Date(year, 6, 1);
-						toDate = new Date(year, 11, 31);
-					}
 				}
 
 				this.filters.from_date = frappe.datetime.obj_to_str(fromDate);
