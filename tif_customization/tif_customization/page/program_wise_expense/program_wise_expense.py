@@ -246,7 +246,7 @@ def _sum_rows(rows):
 	for row in rows:
 		total["total"] += flt(row.get("total"))
 		for d in DEPARTMENTS:
-			key = d["key"]
+			key = d["key"]	
 			total["by_department"][key] += flt((row.get("by_department") or {}).get(key))
 	return total
 
