@@ -1,5 +1,6 @@
 from datetime import date
 
+import calendar
 import frappe
 from frappe.utils import flt, getdate, nowdate
 
@@ -20,7 +21,7 @@ SECTIONS = [
 			{"label": "Training & Workshop Refreshment", "patterns": ["training", "refreshment"]},
 			{"label": "Entertainment & Other Refreshment", "patterns": ["entertainment", "refreshment"]},
 			{"label": "Marketing & Promotions & other activities", "patterns": ["marketing", "promotion"]},
-			{"label": "Events & Marketing Activities (Main)", "patterns": ["event", "marketing"]},
+			{"label": "Events & Marketing Activities (Main)", "patterns": ["event"]},
 			{"label": "TIF Giveaways", "patterns": ["giveaway"]},
 			{"label": "Software Online Fee (Yearly)", "patterns": ["software", "online fee", "subscription"]},
 			{"label": "Core Employee Skill Development", "patterns": ["skill development", "employee training"]},
@@ -57,7 +58,7 @@ SECTIONS = [
 			{"label": "Printing, Photocopies & Stationery", "patterns": ["printing", "photocopy", "stationery"]},
 			{"label": "Postage & Courier Charges", "patterns": ["postage", "courier"]},
 			{"label": "Marketing & Promotions & other activities", "patterns": ["marketing", "promotion"]},
-			{"label": "Events & Marketing Activities (Main)", "patterns": ["event", "marketing"]},
+			{"label": "Events & Marketing Activities (Main)", "patterns": ["event"]},
 			{"label": "Website Maintenance Expense", "patterns": ["website", "hosting", "domain"]},
 			{"label": "Software Online Fee (Yearly)", "patterns": ["software", "online fee", "subscription"]},
 			{"label": "IT & Computer Expenses", "patterns": ["computer", "it expense"]},
@@ -198,3 +199,101 @@ def _matches_patterns(entry, patterns):
 		return False
 	text = f"{entry.get('account_name', '')} {entry.get('account_id', '')}".lower()
 	return any(p in text for p in patterns)
+
+
+def _get_row_patterns(section_label, row_label):
+	section_label = (section_label or "").strip()
+	row_label = (row_label or "").strip()
+	for section in SECTIONS:
+		if (section.get("label") or "").strip() != section_label:
+			continue
+		for row in section.get("rows") or []:
+			if (row.get("label") or "").strip() == row_label:
+				return [p.lower().strip() for p in (row.get("patterns") or []) if p]
+	return []
+
+
+@frappe.whitelist()
+def get_drilldown_entries(section_label, row_label, month_key=None):
+	"""
+	Return GL Entries matching a row's patterns for either a given month (YYYY-MM) or the current FY.
+	"""
+	patterns = _get_row_patterns(section_label, row_label)
+	if not patterns:
+		frappe.throw(f"Unknown row: {section_label} / {row_label}")
+
+	today = getdate(nowdate())
+	fy_start_year = today.year if today.month >= 7 else today.year - 1
+	fy_start = date(fy_start_year, 7, 1)
+	fy_end = date(fy_start_year + 1, 6, 30)
+
+	from_date = fy_start
+	to_date = fy_end
+	month_key = (month_key or "").strip()
+	if month_key:
+		try:
+			year_str, month_str = month_key.split("-", 1)
+			year = int(year_str)
+			month = int(month_str)
+			from_date = date(year, month, 1)
+			to_date = date(year, month, calendar.monthrange(year, month)[1])
+		except Exception:
+			frappe.throw(f"Invalid month_key: {month_key}")
+
+	# Avoid pulling data for future months beyond current month
+	if from_date > date(today.year, today.month, 1):
+		return {"entries": [], "total": 0.0, "from_date": str(from_date), "to_date": str(to_date), "truncated": False}
+
+	text_expr = "LOWER(CONCAT(COALESCE(acc.account_name, ''), ' ', COALESCE(gle.account, '')))"
+	like_clauses = []
+	params = {"from_date": str(from_date), "to_date": str(min(to_date, today))}
+	for idx, token in enumerate(patterns):
+		param_key = f"p{idx}"
+		like_clauses.append(f"{text_expr} LIKE %({param_key})s")
+		params[param_key] = f"%{token}%"
+
+	where_patterns = " OR ".join(like_clauses) if like_clauses else "1=0"
+
+	limit = 2000
+	params["limit"] = limit + 1
+	rows = frappe.db.sql(
+		f"""
+		SELECT
+			gle.posting_date,
+			gle.voucher_type,
+			gle.voucher_no,
+			gle.account,
+			acc.account_name,
+			gle.cost_center,
+			gle.party_type,
+			gle.party,
+			gle.debit,
+			gle.credit,
+			( COALESCE(gle.debit, 0) - COALESCE(gle.credit, 0) ) AS amount,
+			gle.remarks
+		FROM `tabGL Entry` gle
+		LEFT JOIN `tabAccount` acc ON acc.name = gle.account
+		WHERE gle.docstatus < 2
+		AND IFNULL(gle.is_cancelled, 0) = 0
+		AND gle.posting_date BETWEEN %(from_date)s AND %(to_date)s
+		AND ( {where_patterns} )
+		ORDER BY gle.posting_date ASC, gle.voucher_type ASC, gle.voucher_no ASC, gle.name ASC
+		LIMIT %(limit)s
+		""",
+		params,
+		as_dict=True,
+	)
+
+	truncated = len(rows) > limit
+	rows = rows[:limit]
+	total = sum(flt(r.get("amount")) for r in rows)
+
+	return {
+		"section_label": section_label,
+		"row_label": row_label,
+		"from_date": str(from_date),
+		"to_date": str(min(to_date, today)),
+		"entries": rows,
+		"total": total,
+		"truncated": truncated,
+	}

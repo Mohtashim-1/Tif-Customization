@@ -32,22 +32,25 @@ def get_report_data(reference_date=None):
 		as_dict=True,
 	)
 
-	commitment_rows = frappe.db.sql(
-		"""
-		SELECT
-			COALESCE(dn.donor_name, dc.parent, 'Walk-in / Unknown') AS donor_name,
-			COALESCE(dc.parent, '') AS donor_id,
-			SUM(COALESCE(dc.commitment_amount, 0)) AS budgeted_amount
-		FROM `tabDonor Commitment` dc
-		LEFT JOIN `tabDonor` dn ON dn.name = dc.parent
-		WHERE COALESCE(dc.status, 'Active') != 'Cancelled'
-		  AND dc.from_date <= %(to_date)s
-		  AND dc.to_date >= %(from_date)s
-		GROUP BY donor_name, donor_id
-		""",
-		{"from_date": str(fy_from), "to_date": str(fy_to)},
-		as_dict=True,
-	)
+	try:
+		commitment_rows = frappe.db.sql(
+			"""
+			SELECT
+				COALESCE(dn.donor_name, dc.parent, 'Walk-in / Unknown') AS donor_name,
+				COALESCE(dc.parent, '') AS donor_id,
+				SUM(COALESCE(dc.commitment_amount, 0)) AS budgeted_amount
+			FROM `tabDonor Commitment` dc
+			LEFT JOIN `tabDonor` dn ON dn.name = dc.parent
+			WHERE COALESCE(dc.status, 'Active') != 'Cancelled'
+			  AND dc.from_date <= %(to_date)s
+			  AND dc.to_date >= %(from_date)s
+			GROUP BY donor_name, donor_id
+			""",
+			{"from_date": str(fy_from), "to_date": str(fy_to)},
+			as_dict=True,
+		)
+	except Exception:
+		commitment_rows = []
 
 	commitments = {}
 	for row in commitment_rows:

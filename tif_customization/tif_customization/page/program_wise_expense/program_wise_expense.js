@@ -131,15 +131,26 @@ frappe.pages["program-wise-expense"].on_page_load = function (wrapper) {
 							? "total-row"
 							: "";
 
+					const drillable = baseRow.row_type === "data";
 					let quarterCells = "";
 					quarters.forEach((quarter) => {
 						const row = (quarter.rows || [])[rowIndex] || {};
-						quarterCells += `<td class="text-right">${this.format_amount(row.total || 0)}</td>`;
+						quarterCells += this.render_amount_cell(row.total || 0, {
+							drillable,
+							row_index: rowIndex,
+							quarter,
+							department_key: null,
+						});
 						departments.forEach((d, idx) => {
 							const extraClass = idx === departments.length - 1 ? "quarter-end-col" : "";
-							quarterCells += `<td class="text-right ${extraClass}">${this.format_amount(
-								(row.by_department || {})[d.key] || 0
-							)}</td>`;
+							const cellHtml = this.render_amount_cell(((row.by_department || {})[d.key] || 0), {
+								drillable,
+								row_index: rowIndex,
+								quarter,
+								department_key: d.key,
+								extra_class: extraClass,
+							});
+							quarterCells += cellHtml;
 						});
 					});
 
@@ -168,10 +179,165 @@ frappe.pages["program-wise-expense"].on_page_load = function (wrapper) {
 				`;
 
 				target.html(html);
+				this.bind_drilldown_events(target);
 			}
 
 			format_amount(value) {
 				return format_currency(value || 0, frappe.defaults.get_default("currency"));
+			}
+
+			render_amount_cell(value, { drillable, row_index, quarter, department_key, extra_class }) {
+				const display = this.format_amount(value || 0);
+				const numeric = Math.abs(value || 0) >= 0.0001;
+				const cls = `text-right ${extra_class || ""}`.trim();
+
+				if (!drillable || !numeric) {
+					return `<td class="${cls}">${display}</td>`;
+				}
+
+				const from_date = quarter.from_date;
+				const to_date = quarter.is_current_quarter ? quarter.effective_to_date : quarter.to_date;
+				const dept = department_key || "";
+
+				return `
+					<td class="${cls}">
+						<a
+							href="#"
+							class="pwe-drilldown-link"
+							data-row-index="${row_index}"
+							data-from="${frappe.utils.escape_html(from_date || "")}"
+							data-to="${frappe.utils.escape_html(to_date || "")}"
+							data-dept="${frappe.utils.escape_html(dept)}"
+						>${display}</a>
+					</td>
+				`;
+			}
+
+			bind_drilldown_events(target) {
+				target.off("click.program-expense", ".pwe-drilldown-link");
+				target.on("click.program-expense", ".pwe-drilldown-link", (e) => {
+					e.preventDefault();
+					const $link = $(e.currentTarget);
+					this.open_drilldown({
+						row_index: $link.attr("data-row-index"),
+						from_date: $link.attr("data-from"),
+						to_date: $link.attr("data-to"),
+						department_key: $link.attr("data-dept") || "",
+					});
+				});
+			}
+
+			open_drilldown({ row_index, from_date, to_date, department_key }) {
+				frappe.call({
+					method:
+						"tif_customization.tif_customization.page.program_wise_expense.program_wise_expense.get_drilldown_entries",
+					args: {
+						row_index,
+						from_date,
+						to_date,
+						department_key: department_key || null,
+					},
+					freeze: true,
+					freeze_message: "Loading entries...",
+					callback: (r) => {
+						const data = r.message || {};
+						this.show_drilldown_dialog(data);
+					},
+				});
+			}
+
+			show_drilldown_dialog(data) {
+				const entries = data.entries || [];
+				const toFloat = (value) => {
+					if (value === null || value === undefined) return 0;
+					if (typeof value === "number") return value;
+					const parsed = parseFloat(value);
+					return Number.isFinite(parsed) ? parsed : 0;
+				};
+
+				const debitTotal = entries.reduce((acc, e) => acc + toFloat(e.debit), 0);
+				const creditTotal = entries.reduce((acc, e) => acc + toFloat(e.credit), 0);
+				const amountTotalShown = entries.reduce((acc, e) => acc + toFloat(e.amount), 0);
+
+				const titleParts = [
+					data.row_label || "Drilldown",
+					data.department_key ? `Dept: ${data.department_key}` : "",
+					data.from_date && data.to_date ? `${data.from_date} to ${data.to_date}` : "",
+				].filter(Boolean);
+
+				const truncatedNote = data.truncated
+					? `<div class="text-muted small" style="margin-bottom:8px;">Showing first 2000 GL entries (truncated).</div>`
+					: "";
+
+				const rowsHtml = entries
+					.map((e) => {
+						const voucher =
+							e.voucher_type && e.voucher_no
+								? frappe.utils.get_form_link(e.voucher_type, e.voucher_no, true)
+								: frappe.utils.escape_html(e.voucher_no || "");
+						const party = [e.party_type, e.party].filter(Boolean).join(": ");
+						return `
+							<tr>
+								<td>${frappe.utils.escape_html(e.posting_date || "")}</td>
+								<td>${voucher}</td>
+								<td>${frappe.utils.escape_html(e.account_name || e.account || "")}</td>
+								<td>${frappe.utils.escape_html(e.cost_center_name || e.cost_center || "")}</td>
+								<td>${frappe.utils.escape_html(party)}</td>
+								<td class="text-right">${this.format_amount(e.debit)}</td>
+								<td class="text-right">${this.format_amount(e.credit)}</td>
+								<td class="text-right">${this.format_amount(e.amount)}</td>
+								<td>${frappe.utils.escape_html(e.remarks || "")}</td>
+							</tr>
+						`;
+					})
+					.join("");
+
+				const summaryHtml = `
+					<div style="margin-bottom:8px;">
+						<div><strong>Voucher Count:</strong> ${frappe.utils.escape_html(String(data.voucher_count || 0))}</div>
+						<div><strong>Total Amount:</strong> ${this.format_amount(data.total_amount || 0)}</div>
+					</div>
+				`;
+
+				const html = `
+					${summaryHtml}
+					${truncatedNote}
+					<div class="table-responsive">
+						<table class="table table-bordered table-hover pwe-drilldown-table">
+							<thead>
+								<tr>
+									<th style="width: 110px;">Date</th>
+									<th style="width: 170px;">Voucher</th>
+									<th>Account</th>
+									<th>Cost Center</th>
+									<th style="width: 160px;">Party</th>
+									<th class="text-right" style="width: 110px;">Debit</th>
+									<th class="text-right" style="width: 110px;">Credit</th>
+									<th class="text-right" style="width: 110px;">Amount</th>
+									<th>Remarks</th>
+								</tr>
+							</thead>
+							<tbody>
+								${rowsHtml}
+								<tr class="pwe-drilldown-total-row">
+									<td colspan="5"><strong>Total (Shown)</strong></td>
+									<td class="text-right"><strong>${this.format_amount(debitTotal)}</strong></td>
+									<td class="text-right"><strong>${this.format_amount(creditTotal)}</strong></td>
+									<td class="text-right"><strong>${this.format_amount(amountTotalShown)}</strong></td>
+									<td></td>
+								</tr>
+							</tbody>
+						</table>
+					</div>
+				`;
+
+				const d = new frappe.ui.Dialog({
+					title: titleParts.join(" — "),
+					size: "extra-large",
+					fields: [{ fieldtype: "HTML", fieldname: "html" }],
+				});
+				d.fields_dict.html.$wrapper.html(html);
+				d.show();
 			}
 
 			inject_styles() {
@@ -190,6 +356,20 @@ frappe.pages["program-wise-expense"].on_page_load = function (wrapper) {
 						.statement-table th {
 							font-size: 12px;
 							vertical-align: middle;
+						}
+						.statement-table td.text-right {
+							min-width: 140px;
+							white-space: nowrap;
+						}
+						.statement-table td.text-right .currency,
+						.statement-table td.text-right .currency-amount {
+							white-space: nowrap;
+							display: inline;
+						}
+						.statement-table td:first-child,
+						.statement-table th:first-child {
+							min-width: 260px;
+							white-space: normal;
 						}
 						.wide-matrix {
 							min-width: 2200px;
@@ -218,6 +398,12 @@ frappe.pages["program-wise-expense"].on_page_load = function (wrapper) {
 							height: 8px;
 							border-left: 0;
 							border-right: 0;
+						}
+						.statement-table a.pwe-drilldown-link {
+							text-decoration: underline;
+						}
+						.pwe-drilldown-total-row td {
+							background: #f8fafc;
 						}
 						@media print {
 							@page {

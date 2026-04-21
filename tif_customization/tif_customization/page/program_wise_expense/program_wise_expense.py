@@ -256,3 +256,147 @@ def _current_section(rows):
 		if row.get("row_type") == "section":
 			return row.get("label")
 	return None
+
+
+def _row_config_by_index(row_index):
+	try:
+		row_index = int(row_index)
+	except Exception:
+		frappe.throw("Invalid row_index")
+
+	idx = -1
+	for cfg in REPORT_ROWS:
+		row_type = cfg.get("row_type")
+		idx += 1
+		if idx == row_index:
+			return cfg
+
+	frappe.throw("Invalid row_index")
+
+
+def _dept_keywords(department_key):
+	if not department_key:
+		return []
+	for d in DEPARTMENTS:
+		if d.get("key") == department_key:
+			return [k.lower().strip() for k in (d.get("keywords") or []) if k]
+	frappe.throw(f"Invalid department_key: {department_key}")
+
+
+@frappe.whitelist()
+def get_drilldown_entries(row_index, from_date, to_date, department_key=None):
+	"""
+	Return GL Entries (voucher-wise lines) matching an expense head (row_index) within a date range.
+	Optional department_key filters by Cost Center keywords for that department.
+	"""
+	cfg = _row_config_by_index(row_index)
+	if cfg.get("row_type") != "data":
+		frappe.throw("Drilldown is available only for expense head rows.")
+
+	patterns = [p.lower().strip() for p in (cfg.get("patterns") or []) if p]
+	exclude_patterns = [p.lower().strip() for p in (cfg.get("exclude_patterns") or []) if p]
+	if not patterns:
+		frappe.throw("No patterns configured for this row.")
+
+	dept_keywords = _dept_keywords((department_key or "").strip() or None)
+
+	from_date = str(getdate(from_date))
+	to_date = str(getdate(to_date))
+
+	account_text_expr = "LOWER(CONCAT(COALESCE(acc.account_name, ''), ' ', COALESCE(gle.account, '')))"
+	cost_center_text_expr = "LOWER(CONCAT(COALESCE(cc.cost_center_name, ''), ' ', COALESCE(gle.cost_center, '')))"
+
+	params = {"from_date": from_date, "to_date": to_date}
+
+	like_clauses = []
+	for idx, token in enumerate(patterns):
+		key = f"p{idx}"
+		like_clauses.append(f"{account_text_expr} LIKE %({key})s")
+		params[key] = f"%{token}%"
+	where_patterns = " OR ".join(like_clauses) if like_clauses else "1=0"
+
+	where_exclude = ""
+	if exclude_patterns:
+		ex = []
+		for idx, token in enumerate(exclude_patterns):
+			key = f"ex{idx}"
+			ex.append(f"{account_text_expr} LIKE %({key})s")
+			params[key] = f"%{token}%"
+		where_exclude = f" AND NOT ( {' OR '.join(ex)} ) "
+
+	where_dept = ""
+	if dept_keywords:
+		de = []
+		for idx, token in enumerate(dept_keywords):
+			key = f"d{idx}"
+			de.append(f"{cost_center_text_expr} LIKE %({key})s")
+			params[key] = f"%{token}%"
+		where_dept = f" AND ( {' OR '.join(de)} ) "
+
+	where_sql = f"( {where_patterns} ) {where_exclude} {where_dept}"
+
+	# Accurate totals even if the entries list is truncated
+	summary = frappe.db.sql(
+		f"""
+		SELECT
+			COUNT(DISTINCT CONCAT(COALESCE(gle.voucher_type, ''), '::', COALESCE(gle.voucher_no, ''))) AS voucher_count,
+			SUM(COALESCE(gle.debit, 0) - COALESCE(gle.credit, 0)) AS total_amount
+		FROM `tabGL Entry` gle
+		LEFT JOIN `tabAccount` acc ON acc.name = gle.account
+		LEFT JOIN `tabCost Center` cc ON cc.name = gle.cost_center
+		WHERE gle.docstatus < 2
+		AND IFNULL(gle.is_cancelled, 0) = 0
+		AND gle.posting_date BETWEEN %(from_date)s AND %(to_date)s
+		AND {where_sql}
+		""",
+		params,
+		as_dict=True,
+	)
+	summary = (summary or [{}])[0] or {}
+
+	limit = 2000
+	params["limit"] = limit + 1
+	entries = frappe.db.sql(
+		f"""
+		SELECT
+			gle.posting_date,
+			gle.voucher_type,
+			gle.voucher_no,
+			gle.account,
+			acc.account_name,
+			gle.cost_center,
+			cc.cost_center_name,
+			gle.party_type,
+			gle.party,
+			gle.debit,
+			gle.credit,
+			( COALESCE(gle.debit, 0) - COALESCE(gle.credit, 0) ) AS amount,
+			gle.remarks
+		FROM `tabGL Entry` gle
+		LEFT JOIN `tabAccount` acc ON acc.name = gle.account
+		LEFT JOIN `tabCost Center` cc ON cc.name = gle.cost_center
+		WHERE gle.docstatus < 2
+		AND IFNULL(gle.is_cancelled, 0) = 0
+		AND gle.posting_date BETWEEN %(from_date)s AND %(to_date)s
+		AND {where_sql}
+		ORDER BY gle.posting_date ASC, gle.voucher_type ASC, gle.voucher_no ASC, gle.name ASC
+		LIMIT %(limit)s
+		""",
+		params,
+		as_dict=True,
+	)
+
+	truncated = len(entries) > limit
+	entries = entries[:limit]
+
+	return {
+		"row_index": int(row_index),
+		"row_label": cfg.get("label"),
+		"from_date": from_date,
+		"to_date": to_date,
+		"department_key": department_key,
+		"voucher_count": int(summary.get("voucher_count") or 0),
+		"total_amount": flt(summary.get("total_amount") or 0),
+		"truncated": truncated,
+		"entries": entries,
+	}
