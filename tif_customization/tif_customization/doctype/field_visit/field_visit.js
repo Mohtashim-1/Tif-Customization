@@ -64,6 +64,43 @@ function set_fields_visibility(frm) {
 		'me_school_closed'
 	];
 
+	const other_fields = [
+		'me_timestamp',
+		'me_month',
+		'me_quarter',
+		'me_visit_by',
+		'me_visit_date',
+		'me_starting_date',
+		'me_starting_time',
+		'me_city',
+		'me_area',
+		'me_province',
+		'me_school_name',
+		'me_meeting_with_person_name',
+		'me_designation_meeting_with',
+		'me_contact_no_meeting_with',
+		'me_activity_status',
+		'me_mqh_book_status',
+		'me_reason_of_above',
+		'me_teachers_training_session',
+		'me_number_of_teachers_mqh',
+		'me_used_teachers_guide',
+		'me_mqh_book_version',
+		'me_classes_per_week',
+		'me_class_duration',
+		'me_took_assessment',
+		'me_student_behavior_changes',
+		'me_changes_made',
+		'me_details_of_changes_made',
+		'me_new_school_address',
+		'me_new_person_name',
+		'me_new_person_designation',
+		'me_new_person_mobile_number',
+		'me_new_person_email',
+		'me_assessment_taken_from',
+		'me_school_closed'
+	];
+
 	const training_fields = [
 		'training_timestamp',
 		'training_month',
@@ -94,6 +131,9 @@ function set_fields_visibility(frm) {
 		me_fields.forEach(field => frm.set_df_property(field, 'hidden', 0));
 	} else if (type === 'Training') {
 		training_fields.forEach(field => frm.set_df_property(field, 'hidden', 0));
+	}
+	else if (type === 'Other') {
+		other_fields.forEach(field => frm.set_df_property(field, 'hidden', 0));
 	}
 }
 

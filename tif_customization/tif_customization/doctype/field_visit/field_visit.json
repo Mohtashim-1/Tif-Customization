@@ -100,7 +100,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Type",
-   "options": "\nMarketing\nM&E\nTraining",
+   "options": "\nMarketing\nM&E\nTraining\nOther",
    "reqd": 1
   },
   {
@@ -192,222 +192,222 @@
    "label": "No. of Schools Attended"
   },
   {
-   "depends_on": "eval:doc.type == 'M&E'",
+   "depends_on": "eval:doc.type == 'M&E' || doc.type == 'Other'",
    "fieldname": "section_break_me",
    "fieldtype": "Section Break",
    "label": "Monitoring & Evaluation"
   },
   {
-   "depends_on": "eval:doc.type == 'M&E'",
+   "depends_on": "eval:doc.type == 'M&E' || doc.type == 'Other'",
    "fieldname": "me_timestamp",
    "fieldtype": "Datetime",
    "label": "Timestamp"
   },
   {
-   "depends_on": "eval:doc.type == 'M&E'",
+   "depends_on": "eval:doc.type == 'M&E' || doc.type == 'Other'",
    "fieldname": "me_month",
    "fieldtype": "Select",
    "label": "Month",
    "options": "\nJanuary\nFebruary\nMarch\nApril\nMay\nJune\nJuly\nAugust\nSeptember\nOctober\nNovember\nDecember"
   },
   {
-   "depends_on": "eval:doc.type == 'M&E'",
+   "depends_on": "eval:doc.type == 'M&E' || doc.type == 'Other'",
    "fieldname": "me_quarter",
    "fieldtype": "Select",
    "label": "Quarter",
    "options": "\nQ1\nQ2\nQ3\nQ4"
   },
   {
-   "depends_on": "eval:doc.type == 'M&E'",
+   "depends_on": "eval:doc.type == 'M&E' || doc.type == 'Other'",
    "fieldname": "me_visit_by",
    "fieldtype": "Data",
    "label": "Visit By"
   },
   {
-   "depends_on": "eval:doc.type == 'M&E'",
+   "depends_on": "eval:doc.type == 'M&E' || doc.type == 'Other'",
    "fieldname": "me_visit_date",
    "fieldtype": "Date",
    "label": "Visit Date"
   },
   {
-   "depends_on": "eval:doc.type == 'M&E'",
+   "depends_on": "eval:doc.type == 'M&E' || doc.type == 'Other'",
    "fieldname": "me_starting_date",
    "fieldtype": "Date",
    "label": "Starting Date"
   },
   {
-   "depends_on": "eval:doc.type == 'M&E'",
+   "depends_on": "eval:doc.type == 'M&E' || doc.type == 'Other'",
    "fieldname": "me_starting_time",
    "fieldtype": "Time",
    "label": "Starting Time"
   },
   {
-   "depends_on": "eval:doc.type == 'M&E'",
+   "depends_on": "eval:doc.type == 'M&E' || doc.type == 'Other'",
    "fieldname": "me_city",
    "fieldtype": "Link",
    "label": "City",
    "options": "City"
   },
   {
-   "depends_on": "eval:doc.type == 'M&E'",
+   "depends_on": "eval:doc.type == 'M&E' || doc.type == 'Other'",
    "fieldname": "me_area",
    "fieldtype": "Link",
    "label": "Area",
    "options": "Area"
   },
   {
-   "depends_on": "eval:doc.type == 'M&E'",
+   "depends_on": "eval:doc.type == 'M&E' || doc.type == 'Other'",
    "fieldname": "me_province",
    "fieldtype": "Select",
    "label": "Province",
    "options": "Punjab\nSindh\nKhyber Pakhtunkhwa\nBalochistan\nAzad Jammu & Kashmir\nGilgit-Baltistan\nIslamabad Capital Territory"
   },
   {
-   "depends_on": "eval:doc.type == 'M&E'",
+   "depends_on": "eval:doc.type == 'M&E' || doc.type == 'Other'",
    "fieldname": "me_school_name",
    "fieldtype": "Data",
    "label": "Name of School"
   },
   {
-   "depends_on": "eval:doc.type == 'M&E'",
+   "depends_on": "eval:doc.type == 'M&E' || doc.type == 'Other'",
    "fieldname": "me_meeting_with_person_name",
    "fieldtype": "Data",
    "label": "Meeting With Person Name"
   },
   {
-   "depends_on": "eval:doc.type == 'M&E'",
+   "depends_on": "eval:doc.type == 'M&E' || doc.type == 'Other'",
    "fieldname": "me_designation_meeting_with",
    "fieldtype": "Data",
    "label": "Designation Meeting With"
   },
   {
-   "depends_on": "eval:doc.type == 'M&E'",
+   "depends_on": "eval:doc.type == 'M&E' || doc.type == 'Other'",
    "fieldname": "me_contact_no_meeting_with",
    "fieldtype": "Data",
    "label": "Contact No Meeting With"
   },
   {
-   "depends_on": "eval:doc.type == 'M&E'",
+   "depends_on": "eval:doc.type == 'M&E' || doc.type == 'Other'",
    "fieldname": "me_activity_status",
    "fieldtype": "Select",
    "label": "Active / Inactive",
    "options": "\nActive\nInactive"
   },
   {
-   "depends_on": "eval:doc.type == 'M&E'",
+   "depends_on": "eval:doc.type == 'M&E' || doc.type == 'Other'",
    "fieldname": "me_mqh_book_status",
    "fieldtype": "Select",
    "label": "Mutalae Quran Hakeem Book Status",
    "options": "\nGood\nAverage\nPoor\nNot Available"
   },
   {
-   "depends_on": "eval:doc.type == 'M&E'",
+   "depends_on": "eval:doc.type == 'M&E' || doc.type == 'Other'",
    "fieldname": "me_reason_of_above",
    "fieldtype": "Small Text",
    "label": "Reason of Above"
   },
   {
    "default": "0",
-   "depends_on": "eval:doc.type == 'M&E'",
+   "depends_on": "eval:doc.type == 'M&E' || doc.type == 'Other'",
    "fieldname": "me_teachers_training_session",
    "fieldtype": "Check",
    "label": "Has any Teachers Training Session Occurred in School?"
   },
   {
-   "depends_on": "eval:doc.type == 'M&E'",
+   "depends_on": "eval:doc.type == 'M&E' || doc.type == 'Other'",
    "fieldname": "me_number_of_teachers_mqh",
    "fieldtype": "Int",
    "label": "Number of Teachers designated for MQH"
   },
   {
    "default": "0",
-   "depends_on": "eval:doc.type == 'M&E'",
+   "depends_on": "eval:doc.type == 'M&E' || doc.type == 'Other'",
    "fieldname": "me_used_teachers_guide",
    "fieldtype": "Check",
    "label": "Did you use the Teacher's Guide of MQH for Teaching?"
   },
   {
-   "depends_on": "eval:doc.type == 'M&E'",
+   "depends_on": "eval:doc.type == 'M&E' || doc.type == 'Other'",
    "fieldname": "me_mqh_book_version",
    "fieldtype": "Data",
    "label": "Which version of Mutalae Quran-e-Hakeem Book Taught?"
   },
   {
-   "depends_on": "eval:doc.type == 'M&E'",
+   "depends_on": "eval:doc.type == 'M&E' || doc.type == 'Other'",
    "fieldname": "me_classes_per_week",
    "fieldtype": "Int",
    "label": "How many classes allocated per week for MQH?"
   },
   {
-   "depends_on": "eval:doc.type == 'M&E'",
+   "depends_on": "eval:doc.type == 'M&E' || doc.type == 'Other'",
    "fieldname": "me_class_duration",
    "fieldtype": "Data",
    "label": "Duration of Class"
   },
   {
    "default": "0",
-   "depends_on": "eval:doc.type == 'M&E'",
+   "depends_on": "eval:doc.type == 'M&E' || doc.type == 'Other'",
    "fieldname": "me_took_assessment",
    "fieldtype": "Check",
    "label": "Did you take assessment?"
   },
   {
-   "depends_on": "eval:doc.type == 'M&E'",
+   "depends_on": "eval:doc.type == 'M&E' || doc.type == 'Other'",
    "fieldname": "me_student_behavior_changes",
    "fieldtype": "Small Text",
    "label": "What kind of changes you noticed in student behavior?"
   },
   {
-   "depends_on": "eval:doc.type == 'M&E'",
+   "depends_on": "eval:doc.type == 'M&E' || doc.type == 'Other'",
    "fieldname": "me_changes_made",
    "fieldtype": "Small Text",
    "label": "What changes have been Made?"
   },
   {
-   "depends_on": "eval:doc.type == 'M&E'",
+   "depends_on": "eval:doc.type == 'M&E' || doc.type == 'Other'",
    "fieldname": "me_details_of_changes_made",
    "fieldtype": "Small Text",
    "label": "Details of Changes Made"
   },
   {
-   "depends_on": "eval:doc.type == 'M&E'",
+   "depends_on": "eval:doc.type == 'M&E' || doc.type == 'Other'",
    "fieldname": "me_new_school_address",
    "fieldtype": "Data",
    "label": "New School Address"
   },
   {
-   "depends_on": "eval:doc.type == 'M&E'",
+   "depends_on": "eval:doc.type == 'M&E' || doc.type == 'Other'",
    "fieldname": "me_new_person_name",
    "fieldtype": "Data",
    "label": "New Person Name"
   },
   {
-   "depends_on": "eval:doc.type == 'M&E'",
+   "depends_on": "eval:doc.type == 'M&E' || doc.type == 'Other'",
    "fieldname": "me_new_person_designation",
    "fieldtype": "Data",
    "label": "New Person Designation"
   },
   {
-   "depends_on": "eval:doc.type == 'M&E'",
+   "depends_on": "eval:doc.type == 'M&E' || doc.type == 'Other'",
    "fieldname": "me_new_person_mobile_number",
    "fieldtype": "Data",
    "label": "New Person Mobile Number"
   },
   {
-   "depends_on": "eval:doc.type == 'M&E'",
+   "depends_on": "eval:doc.type == 'M&E' || doc.type == 'Other'",
    "fieldname": "me_new_person_email",
    "fieldtype": "Data",
    "label": "New Person Email"
   },
   {
-   "depends_on": "eval:doc.type == 'M&E'",
+   "depends_on": "eval:doc.type == 'M&E' || doc.type == 'Other'",
    "fieldname": "me_assessment_taken_from",
    "fieldtype": "Data",
    "label": "From whom have you taken assessment?"
   },
   {
    "default": "0",
-   "depends_on": "eval:doc.type == 'M&E'",
+   "depends_on": "eval:doc.type == 'M&E' || doc.type == 'Other'",
    "fieldname": "me_school_closed",
    "fieldtype": "Check",
    "label": "School Closed"
@@ -607,7 +607,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-02-16 16:58:39.033830",
+ "modified": "2026-04-28 01:49:42.730551",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Field Visit",
