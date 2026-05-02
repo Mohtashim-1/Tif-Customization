@@ -1,11 +1,22 @@
 /**
- * Attendance & Leave Dashboard — `/app/hr-dashboard`
- * Data: Employee Attendance (monthly summaries) + Leave Application.
+ * HR Dashboard — `/app/hr-dashboard`
+ * Attendance, leave, workforce (hiring / attrition / employment type).
  */
+
+/** Distinct series colors (avoid single teal / low contrast) */
+const TIF_HR_PALETTE = {
+	donut: ["#4f46e5", "#ea580c", "#059669", "#e11d48", "#7c3aed", "#0891b2", "#ca8a04", "#db2777", "#65a30d"],
+	lines4: ["#2563eb", "#ea580c", "#059669", "#dc2626"],
+	present: ["#1d4ed8"],
+	incidents: ["#ea580c", "#059669", "#dc2626"],
+	hires: ["#2563eb", "#dc2626"],
+	deptPair: ["#6366f1", "#f97316"],
+};
+
 frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 	const page = frappe.ui.make_app_page({
 		parent: wrapper,
-		title: "Attendance & Leave Dashboard",
+		title: "HR — Attendance & Workforce",
 		single_column: true,
 	});
 
@@ -37,8 +48,8 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 				this.page.main.html(`
 					<div class="tif-attdash">
 						<p class="text-muted" style="font-size:12px;margin:0 0 10px">
-							KPIs and charts use <strong>Employee Attendance</strong> (monthly records). Months overlapping the date range are included.
-							Leave widgets use <strong>Leave Application</strong> by leave start date.
+							<strong>Attendance</strong> uses <strong>Employee Attendance</strong> (monthly rows). <strong>Leave</strong> uses <strong>Leave Application</strong>.
+							<strong>Workforce</strong> uses <strong>Employee</strong> (hiring, attrition, gender, grade, branch, designation, department, employment type) with Company / Branch / Department only — not the Employee filter.
 						</p>
 						<div class="tif-attdash__cards">
 							<div class="tif-card" data-card="attendance_records">
@@ -83,10 +94,74 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 							</div>
 						</div>
 
+						<p class="text-muted" style="font-size:12px;margin:16px 0 8px">
+							<strong>Workforce</strong> — hiring &amp; attrition (Employee master)
+						</p>
+						<div class="tif-attdash__cards">
+							<div class="tif-card" data-card="active_headcount">
+								<div class="tif-card__label">Active headcount</div>
+								<div class="tif-card__value">—</div>
+								<div class="tif-card__hint">Current Active</div>
+							</div>
+							<div class="tif-card" data-card="new_hires">
+								<div class="tif-card__label">New hires</div>
+								<div class="tif-card__value">—</div>
+								<div class="tif-card__hint">Joining in range</div>
+							</div>
+							<div class="tif-card" data-card="left_employees">
+								<div class="tif-card__label">Attrition (exits)</div>
+								<div class="tif-card__value">—</div>
+								<div class="tif-card__hint">Left in range</div>
+							</div>
+							<div class="tif-card" data-card="attrition_rate">
+								<div class="tif-card__label">Attrition rate</div>
+								<div class="tif-card__value">—</div>
+								<div class="tif-card__hint">Exits ÷ active × 100</div>
+							</div>
+						</div>
+
 						<div class="tif-attdash__grid">
 							<div class="tif-panel tif-panel--span2">
-								<div class="tif-panel__title">Monthly attendance metrics (Employee Attendance)</div>
-								<div id="tif-attdash-monthly"></div>
+								<div class="tif-panel__title">Hiring vs attrition (monthly counts)</div>
+								<div id="tif-attdash-hire-attr"></div>
+							</div>
+							<div class="tif-panel">
+								<div class="tif-panel__title">Active headcount by employment type</div>
+								<div id="tif-attdash-emp-type"></div>
+							</div>
+							<div class="tif-panel">
+								<div class="tif-panel__title">Gender (active employees)</div>
+								<div id="tif-dash-wf-gender"></div>
+							</div>
+							<div class="tif-panel">
+								<div class="tif-panel__title">Grade (active)</div>
+								<div id="tif-dash-wf-grade"></div>
+							</div>
+							<div class="tif-panel">
+								<div class="tif-panel__title">Branch — Employee master (active)</div>
+								<div id="tif-dash-wf-ebranch"></div>
+							</div>
+							<div class="tif-panel tif-panel--span2">
+								<div class="tif-panel__title">Designation (active count)</div>
+								<div id="tif-dash-wf-desig"></div>
+							</div>
+							<div class="tif-panel tif-panel--span2">
+								<div class="tif-panel__title">Department (active count)</div>
+								<div id="tif-dash-wf-dept"></div>
+							</div>
+							<div class="tif-panel tif-panel--span2">
+								<div class="tif-panel__title">Monthly attendance (Employee Attendance)</div>
+								<p class="tif-panel__hint">Present days and incidents use separate charts so small values stay readable.</p>
+								<div class="tif-attdash__split-charts">
+									<div class="tif-attdash__split-cell">
+										<div class="tif-chart-subtitle">Present days</div>
+										<div id="tif-attdash-monthly-present"></div>
+									</div>
+									<div class="tif-attdash__split-cell">
+										<div class="tif-chart-subtitle">Absents, lates &amp; half days</div>
+										<div id="tif-attdash-monthly-incidents"></div>
+									</div>
+								</div>
 							</div>
 							<div class="tif-panel">
 								<div class="tif-panel__title">Totals distribution</div>
@@ -148,6 +223,10 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 					.tif-panel__title{font-size:13px;font-weight:600;margin-bottom:8px}
 					.tif-panel--span2{grid-column:1 / -1}
 					.tif-attdash .apexcharts-canvas{margin:0 auto}
+					.tif-panel__hint{font-size:11px;color:var(--text-muted);margin:0 0 10px;line-height:1.4}
+					.tif-attdash__split-charts{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+					@media (max-width:960px){.tif-attdash__split-charts{grid-template-columns:1fr}}
+					.tif-chart-subtitle{font-size:12px;font-weight:600;margin-bottom:6px;color:var(--text-muted)}
 					@media (min-width: 1400px){
 						.tif-attdash__grid{grid-template-columns:repeat(3,minmax(300px,1fr))}
 						.tif-panel--span2{grid-column:1 / -1}
@@ -258,6 +337,23 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 				return s || "—";
 			}
 
+			_apexMode() {
+				return frappe.boot?.sysdefaults?.theme === "dark" ? "dark" : "light";
+			}
+
+			/** Horizontal bar category axis — reduce ellipsis truncation on long names */
+			_xaxisCategoriesNoTrim(labels) {
+				return {
+					categories: labels,
+					labels: {
+						trim: false,
+						hideOverlappingLabels: false,
+						maxHeight: 400,
+						style: { fontSize: "11px" },
+					},
+				};
+			}
+
 			load_apexcharts() {
 				if (this.apex_loaded || window.ApexCharts) {
 					this.apex_loaded = true;
@@ -342,26 +438,52 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 				this.set_card("total_half_days", data.total_half_days, true);
 				this.set_card("approved_leave_days", data.approved_leave_days, true);
 				this.set_card("pending_leave_applications", data.pending_leave_applications);
+
+				this.set_card("active_headcount", data.active_headcount);
+				this.set_card("new_hires", data.new_hires);
+				this.set_card("left_employees", data.left_employees);
+				const arEl = this.page.main.find('.tif-card[data-card="attrition_rate"] .tif-card__value')[0];
+				if (arEl) {
+					const v = data.attrition_rate;
+					arEl.textContent =
+						v === null || v === undefined || v === ""
+							? "—"
+							: `${Number(v).toFixed(2)}%`;
+				}
 			}
 
 			render_charts(data) {
-				const theme = {
-					mode: frappe.boot?.sysdefaults?.theme || "light",
-					palette: "palette4",
+				const mode = this._apexMode();
+				const donutOpts = {
+					chart: { type: "donut", height: 300, toolbar: { show: false } },
+					theme: { mode },
+					colors: TIF_HR_PALETTE.donut,
+					stroke: { width: 2, colors: ["var(--card-bg, #fff)"] },
+					plotOptions: {
+						pie: {
+							donut: {
+								size: "62%",
+								labels: { show: true, name: { fontSize: "12px" }, value: { fontSize: "13px", fontWeight: 600 } },
+							},
+						},
+					},
 				};
 
 				{
-					const d = data.monthly_attendance_trend || {};
-					const chart = this.ensure_chart("monthly", "#tif-attdash-monthly", {
-						chart: { type: "area", height: 340, stacked: false, toolbar: { show: true } },
-						theme,
-						noData: { text: "No Employee Attendance rows in range" },
-						stroke: { width: 2, curve: "smooth" },
+					const d = data.hiring_attrition_trend || {};
+					const chart = this.ensure_chart("hire_attr", "#tif-attdash-hire-attr", {
+						chart: { type: "line", height: 300, toolbar: { show: false }, zoom: { enabled: false } },
+						theme: { mode },
+						colors: TIF_HR_PALETTE.hires,
+						grid: { borderColor: "#e2e8f0", strokeDashArray: 4, xaxis: { lines: { show: true } }, yaxis: { lines: { show: true } } },
+						noData: { text: "No workforce movement in range" },
+						stroke: { width: 3, curve: "smooth" },
+						markers: { size: 4, strokeWidth: 2, hover: { size: 6 } },
 						xaxis: { categories: d.labels || [] },
 						series: d.series || [],
 						dataLabels: { enabled: false },
-						legend: { position: "top" },
-						yaxis: { labels: { formatter: (v) => (v % 1 === 0 ? String(v) : v.toFixed(1)) } },
+						legend: { position: "top", fontWeight: 500 },
+						yaxis: { labels: { formatter: (v) => (Number.isFinite(v) ? String(Math.round(v)) : "") } },
 					});
 					if (chart) {
 						chart.updateOptions({ xaxis: { categories: d.labels || [] } }, false, true);
@@ -370,22 +492,213 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 				}
 
 				{
+					const d = data.headcount_by_employment_type || {};
+					const chart = this.ensure_chart("emp_type", "#tif-attdash-emp-type", {
+						...donutOpts,
+						noData: { text: "No employment type data" },
+						labels: d.labels || [],
+						series: d.values || [],
+						legend: { position: "bottom", fontWeight: 500 },
+					});
+					if (chart) {
+						chart.updateOptions({ labels: d.labels || [] }, false, true);
+						chart.updateSeries(d.values || [], true);
+					}
+				}
+
+				{
+					const d = data.headcount_by_gender || {};
+					const chart = this.ensure_chart("wf_gender", "#tif-dash-wf-gender", {
+						...donutOpts,
+						noData: { text: "No gender data" },
+						labels: d.labels || [],
+						series: d.values || [],
+						legend: { position: "bottom", fontWeight: 500 },
+					});
+					if (chart) {
+						chart.updateOptions({ labels: d.labels || [] }, false, true);
+						chart.updateSeries(d.values || [], true);
+					}
+				}
+
+				{
+					const d = data.headcount_by_grade || {};
+					const labels = d.labels || [];
+					const values = d.values || [];
+					const chart = this.ensure_chart("wf_grade", "#tif-dash-wf-grade", {
+						chart: {
+							type: "bar",
+							height: Math.max(280, labels.length * 32),
+							toolbar: { show: false },
+						},
+						theme: { mode },
+						colors: ["#4f46e5"],
+						grid: { borderColor: "#e2e8f0", strokeDashArray: 4 },
+						noData: { text: "No grade field / data" },
+						plotOptions: { bar: { horizontal: true, borderRadius: 4, barHeight: "72%" } },
+						xaxis: this._xaxisCategoriesNoTrim(labels),
+						series: [{ name: "Employees", data: values }],
+						dataLabels: { enabled: true, style: { fontSize: "11px", fontWeight: 600 } },
+					});
+					if (chart) {
+						chart.updateOptions({ xaxis: this._xaxisCategoriesNoTrim(labels) }, false, true);
+						chart.updateSeries([{ name: "Employees", data: values }], true);
+					}
+				}
+
+				{
+					const d = data.headcount_by_employee_branch || {};
+					const labels = d.labels || [];
+					const values = d.values || [];
+					const chart = this.ensure_chart("wf_ebr", "#tif-dash-wf-ebranch", {
+						chart: {
+							type: "bar",
+							height: Math.max(280, labels.length * 32),
+							toolbar: { show: false },
+						},
+						theme: { mode },
+						colors: ["#0891b2"],
+						grid: { borderColor: "#e2e8f0", strokeDashArray: 4 },
+						noData: { text: "No branch data" },
+						plotOptions: { bar: { horizontal: true, borderRadius: 4, barHeight: "72%" } },
+						xaxis: this._xaxisCategoriesNoTrim(labels),
+						series: [{ name: "Employees", data: values }],
+						dataLabels: { enabled: false },
+					});
+					if (chart) {
+						chart.updateOptions({ xaxis: this._xaxisCategoriesNoTrim(labels) }, false, true);
+						chart.updateSeries([{ name: "Employees", data: values }], true);
+					}
+				}
+
+				{
+					const d = data.headcount_by_designation || {};
+					const labels = d.labels || [];
+					const values = d.values || [];
+					const chart = this.ensure_chart("wf_des", "#tif-dash-wf-desig", {
+						chart: {
+							type: "bar",
+							height: Math.max(360, labels.length * 30),
+							toolbar: { show: false },
+						},
+						theme: { mode },
+						colors: ["#7c3aed"],
+						grid: { borderColor: "#e2e8f0", strokeDashArray: 4 },
+						noData: { text: "No designation data" },
+						plotOptions: { bar: { horizontal: true, borderRadius: 4, barHeight: "70%" } },
+						xaxis: this._xaxisCategoriesNoTrim(labels),
+						series: [{ name: "Employees", data: values }],
+						dataLabels: { enabled: false },
+					});
+					if (chart) {
+						chart.updateOptions({ xaxis: this._xaxisCategoriesNoTrim(labels) }, false, true);
+						chart.updateSeries([{ name: "Employees", data: values }], true);
+					}
+				}
+
+				{
+					const d = data.headcount_by_department || {};
+					const labels = d.labels || [];
+					const values = d.values || [];
+					const chart = this.ensure_chart("wf_dep", "#tif-dash-wf-dept", {
+						chart: {
+							type: "bar",
+							height: Math.max(380, labels.length * 30),
+							toolbar: { show: false },
+						},
+						theme: { mode },
+						colors: ["#ea580c"],
+						grid: { borderColor: "#e2e8f0", strokeDashArray: 4 },
+						noData: { text: "No department data" },
+						plotOptions: { bar: { horizontal: true, borderRadius: 4, barHeight: "70%" } },
+						xaxis: this._xaxisCategoriesNoTrim(labels),
+						series: [{ name: "Employees", data: values }],
+						dataLabels: { enabled: false },
+					});
+					if (chart) {
+						chart.updateOptions({ xaxis: this._xaxisCategoriesNoTrim(labels) }, false, true);
+						chart.updateSeries([{ name: "Employees", data: values }], true);
+					}
+				}
+
+				{
+					const d = data.monthly_attendance_trend || {};
+					const labels = d.labels || [];
+					const seriesList = d.series || [];
+					const presentSeries = seriesList.find((s) => (s.name || "").toLowerCase().includes("present")) || {
+						name: "Present Days",
+						data: [],
+					};
+					const incidentSeries = seriesList.filter((s) => !(s.name || "").toLowerCase().includes("present"));
+
+					const chP = this.ensure_chart("monthly_p", "#tif-attdash-monthly-present", {
+						chart: { type: "area", height: 280, toolbar: { show: false }, zoom: { enabled: false } },
+						theme: { mode },
+						colors: TIF_HR_PALETTE.present,
+						grid: { borderColor: "#e2e8f0", strokeDashArray: 4 },
+						noData: { text: "No present-day data" },
+						stroke: { width: 2, curve: "smooth" },
+						fill: {
+							type: "gradient",
+							gradient: { shadeIntensity: 0.35, opacityFrom: 0.45, opacityTo: 0.05, stops: [0, 90, 100] },
+						},
+						xaxis: { categories: labels },
+						series: [presentSeries],
+						dataLabels: { enabled: false },
+						legend: { show: false },
+						yaxis: { labels: { formatter: (v) => (v % 1 === 0 ? String(v) : v.toFixed(1)) } },
+					});
+					if (chP) {
+						chP.updateOptions({ xaxis: { categories: labels } }, false, true);
+						chP.updateSeries([presentSeries], true);
+					}
+
+					const zeroPad = labels.map(() => 0);
+					const incidentFallback = [
+						{ name: "Absents", data: zeroPad },
+						{ name: "Lates", data: zeroPad },
+						{ name: "Half Days", data: zeroPad },
+					];
+					const chI = this.ensure_chart("monthly_i", "#tif-attdash-monthly-incidents", {
+						chart: { type: "line", height: 280, toolbar: { show: false }, zoom: { enabled: false } },
+						theme: { mode },
+						colors: TIF_HR_PALETTE.incidents,
+						grid: { borderColor: "#e2e8f0", strokeDashArray: 4 },
+						noData: { text: "No incident rows (absents / lates / half days)" },
+						stroke: { width: 2, curve: "smooth" },
+						markers: { size: 4, strokeWidth: 2 },
+						xaxis: { categories: labels },
+						series: incidentSeries.length ? incidentSeries : incidentFallback,
+						dataLabels: { enabled: false },
+						legend: { position: "top", fontWeight: 500 },
+						yaxis: { labels: { formatter: (v) => (v % 1 === 0 ? String(v) : v.toFixed(1)) }, min: 0 },
+					});
+					if (chI) {
+						chI.updateOptions({ xaxis: { categories: labels } }, false, true);
+						chI.updateSeries(incidentSeries.length ? incidentSeries : incidentFallback, true);
+					}
+				}
+
+				{
 					const d = data.metrics_distribution || {};
 					const chart = this.ensure_chart("dist", "#tif-attdash-dist", {
-						chart: { type: "donut", height: 300, toolbar: { show: false } },
-						theme,
+						...donutOpts,
 						noData: { text: "No data" },
 						labels: d.labels || [],
 						series: d.values || [],
-						legend: { position: "bottom" },
+						legend: { position: "bottom", fontWeight: 500 },
 						plotOptions: {
 							pie: {
 								donut: {
+									size: "62%",
 									labels: {
 										show: true,
+										name: { fontSize: "12px" },
+										value: { fontSize: "13px", fontWeight: 600 },
 										total: {
 											show: true,
 											label: "Σ metrics",
+											fontWeight: 600,
 										},
 									},
 								},
@@ -401,12 +714,11 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 				{
 					const d = data.leave_status_breakdown || {};
 					const chart = this.ensure_chart("leave_stat", "#tif-attdash-leave-status", {
-						chart: { type: "donut", height: 300, toolbar: { show: false } },
-						theme,
+						...donutOpts,
 						noData: { text: "No leave applications in range" },
 						labels: d.labels || [],
 						series: d.values || [],
-						legend: { position: "bottom" },
+						legend: { position: "bottom", fontWeight: 500 },
 					});
 					if (chart) {
 						chart.updateOptions({ labels: d.labels || [] }, false, true);
@@ -418,20 +730,22 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 					const d = data.department_absents_lates || {};
 					const labels = d.labels || [];
 					const chart = this.ensure_chart("dept", "#tif-attdash-dept", {
-						chart: { type: "bar", height: 320, stacked: false, toolbar: { show: false } },
-						theme,
+						chart: { type: "bar", height: Math.max(320, labels.length * 28), stacked: false, toolbar: { show: false } },
+						theme: { mode },
+						colors: TIF_HR_PALETTE.deptPair,
+						grid: { borderColor: "#e2e8f0", strokeDashArray: 4 },
 						noData: { text: "No department data" },
-						plotOptions: { bar: { horizontal: true, borderRadius: 4 } },
-						xaxis: { categories: labels },
+						plotOptions: { bar: { horizontal: true, borderRadius: 4, barHeight: "68%" } },
+						xaxis: this._xaxisCategoriesNoTrim(labels),
 						series: [
 							{ name: "Absents", data: d.absents || [] },
 							{ name: "Lates", data: d.lates || [] },
 						],
 						dataLabels: { enabled: false },
-						legend: { position: "top" },
+						legend: { position: "top", fontWeight: 500 },
 					});
 					if (chart) {
-						chart.updateOptions({ xaxis: { categories: labels } }, false, true);
+						chart.updateOptions({ xaxis: this._xaxisCategoriesNoTrim(labels) }, false, true);
 						chart.updateSeries(
 							[
 								{ name: "Absents", data: d.absents || [] },
@@ -446,15 +760,17 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 					const d = data.branch_breakdown || {};
 					const chart = this.ensure_chart("branch", "#tif-attdash-branch", {
 						chart: { type: "bar", height: 300, toolbar: { show: false } },
-						theme,
+						theme: { mode },
+						colors: ["#0d9488"],
+						grid: { borderColor: "#e2e8f0", strokeDashArray: 4 },
 						noData: { text: "No branch data" },
-						plotOptions: { bar: { borderRadius: 6 } },
-						xaxis: { categories: d.labels || [], labels: { rotate: -35 } },
+						plotOptions: { bar: { borderRadius: 6, columnWidth: "72%" } },
+						xaxis: { categories: d.labels || [], labels: { rotate: -35, trim: false, style: { fontSize: "11px" } } },
 						series: [{ name: "Present days", data: d.values || [] }],
 						dataLabels: { enabled: false },
 					});
 					if (chart) {
-						chart.updateOptions({ xaxis: { categories: d.labels || [] } }, false, true);
+						chart.updateOptions({ xaxis: { categories: d.labels || [], labels: { rotate: -35, trim: false } } }, false, true);
 						chart.updateSeries([{ name: "Present days", data: d.values || [] }], true);
 					}
 				}
@@ -462,13 +778,17 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 				{
 					const d = data.leave_trend || {};
 					const chart = this.ensure_chart("leave_tr", "#tif-attdash-leave-trend", {
-						chart: { type: "line", height: 300, toolbar: { show: false } },
-						theme,
+						chart: { type: "line", height: 300, toolbar: { show: false }, zoom: { enabled: false } },
+						theme: { mode },
+						colors: ["#2563eb", "#ca8a04"],
+						grid: { borderColor: "#e2e8f0", strokeDashArray: 4 },
 						noData: { text: "No approved leave in range" },
-						stroke: { width: 3, curve: "smooth" },
+						stroke: { width: 2, curve: "smooth" },
+						markers: { size: 4, strokeWidth: 2 },
 						xaxis: { categories: d.labels || [] },
 						series: d.series || [],
 						dataLabels: { enabled: false },
+						legend: { position: "top", fontWeight: 500 },
 					});
 					if (chart) {
 						chart.updateOptions({ xaxis: { categories: d.labels || [] } }, false, true);
@@ -479,12 +799,11 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 				{
 					const d = data.leaves_by_type || {};
 					const chart = this.ensure_chart("leave_type", "#tif-attdash-leave-type", {
-						chart: { type: "donut", height: 300, toolbar: { show: false } },
-						theme,
+						...donutOpts,
 						noData: { text: "No data" },
 						labels: d.labels || [],
 						series: d.values || [],
-						legend: { position: "bottom" },
+						legend: { position: "bottom", fontWeight: 500 },
 					});
 					if (chart) {
 						chart.updateOptions({ labels: d.labels || [] }, false, true);
@@ -497,16 +816,18 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 					const labels = rows.map((r) => r.employee_name || "—");
 					const values = rows.map((r) => r.value || 0);
 					const chart = this.ensure_chart("top_l", "#tif-attdash-top-lates", {
-						chart: { type: "bar", height: Math.max(280, rows.length * 28), toolbar: { show: false } },
-						theme,
+						chart: { type: "bar", height: Math.max(300, rows.length * 30), toolbar: { show: false } },
+						theme: { mode },
+						colors: ["#ea580c"],
+						grid: { borderColor: "#e2e8f0", strokeDashArray: 4 },
 						noData: { text: "No data" },
-						plotOptions: { bar: { horizontal: true, borderRadius: 4 } },
-						xaxis: { categories: labels },
+						plotOptions: { bar: { horizontal: true, borderRadius: 4, barHeight: "72%" } },
+						xaxis: this._xaxisCategoriesNoTrim(labels),
 						series: [{ name: "Total lates", data: values }],
-						dataLabels: { enabled: true },
+						dataLabels: { enabled: true, style: { fontSize: "11px", fontWeight: 600 } },
 					});
 					if (chart) {
-						chart.updateOptions({ xaxis: { categories: labels } }, false, true);
+						chart.updateOptions({ xaxis: this._xaxisCategoriesNoTrim(labels) }, false, true);
 						chart.updateSeries([{ name: "Total lates", data: values }], true);
 					}
 				}
@@ -516,16 +837,18 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 					const labels = rows.map((r) => r.employee_name || "—");
 					const values = rows.map((r) => r.value || 0);
 					const chart = this.ensure_chart("top_a", "#tif-attdash-top-abs", {
-						chart: { type: "bar", height: Math.max(280, rows.length * 28), toolbar: { show: false } },
-						theme,
+						chart: { type: "bar", height: Math.max(300, rows.length * 30), toolbar: { show: false } },
+						theme: { mode },
+						colors: ["#dc2626"],
+						grid: { borderColor: "#e2e8f0", strokeDashArray: 4 },
 						noData: { text: "No data" },
-						plotOptions: { bar: { horizontal: true, borderRadius: 4 } },
-						xaxis: { categories: labels },
+						plotOptions: { bar: { horizontal: true, borderRadius: 4, barHeight: "72%" } },
+						xaxis: this._xaxisCategoriesNoTrim(labels),
 						series: [{ name: "Total absents", data: values }],
-						dataLabels: { enabled: true },
+						dataLabels: { enabled: true, style: { fontSize: "11px", fontWeight: 600 } },
 					});
 					if (chart) {
-						chart.updateOptions({ xaxis: { categories: labels } }, false, true);
+						chart.updateOptions({ xaxis: this._xaxisCategoriesNoTrim(labels) }, false, true);
 						chart.updateSeries([{ name: "Total absents", data: values }], true);
 					}
 				}

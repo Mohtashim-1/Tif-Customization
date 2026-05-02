@@ -1,10 +1,10 @@
-"""Attendance & Leave dashboard — aggregates `Employee Attendance` and Leave Application."""
+"""Attendance & Leave dashboard — Employee Attendance, Leave Application, and workforce (Employee)."""
 
 import calendar
 import json
 
 import frappe
-from frappe.utils import add_months, cint, flt, get_first_day, getdate, nowdate
+from frappe.utils import add_months, cint, flt, get_first_day, get_last_day, getdate, nowdate
 
 
 EA_DOCTYPE = "Employee Attendance"
@@ -62,6 +62,21 @@ def get_dashboard_data(filters=None):
 	data["pending_leave_applications"] = _pending_leave_count(from_date, to_date, company=company, branch=branch, department=department, employee=employee)
 	data["approved_leave_days"] = _approved_leave_days_sum(from_date, to_date, company=company, branch=branch, department=department, employee=employee)
 
+	# Workforce (Employee master): same Company / Branch / Department — not scoped by single Employee link
+	data["active_headcount"] = _count_active_employees(company, branch, department)
+	data["new_hires"] = _count_new_hires(from_date, to_date, company, branch, department)
+	data["left_employees"] = _count_left_employees(from_date, to_date, company, branch, department)
+	hc = max(cint(data["active_headcount"]), 1)
+	data["attrition_rate"] = flt(data["left_employees"]) / flt(hc) * 100.0
+	data["hiring_attrition_trend"] = _hiring_attrition_trend(from_date, to_date, company, branch, department)
+	data["headcount_by_employment_type"] = _headcount_by_employment_type(company, branch, department, limit=12)
+	# Active headcount distributions (Employee master)
+	data["headcount_by_gender"] = _active_employee_group_count("gender", company, branch, department, limit=10)
+	data["headcount_by_grade"] = _active_employee_group_count("grade", company, branch, department, limit=15)
+	data["headcount_by_employee_branch"] = _active_employee_group_count("branch", company, branch, department, limit=15)
+	data["headcount_by_designation"] = _active_employee_group_count("designation", company, branch, department, limit=20)
+	data["headcount_by_department"] = _active_employee_group_count("department", company, branch, department, limit=25)
+
 	return data
 
 
@@ -96,6 +111,17 @@ def _empty_payload(from_date, to_date, company, branch, department="", employee=
 		"leave_status_breakdown": {"labels": [], "values": []},
 		"pending_leave_applications": 0,
 		"approved_leave_days": 0.0,
+		"active_headcount": 0,
+		"new_hires": 0,
+		"left_employees": 0,
+		"attrition_rate": 0.0,
+		"hiring_attrition_trend": {"labels": [], "series": []},
+		"headcount_by_employment_type": {"labels": [], "values": []},
+		"headcount_by_gender": {"labels": [], "values": []},
+		"headcount_by_grade": {"labels": [], "values": []},
+		"headcount_by_employee_branch": {"labels": [], "values": []},
+		"headcount_by_designation": {"labels": [], "values": []},
+		"headcount_by_department": {"labels": [], "values": []},
 	}
 
 
@@ -564,3 +590,165 @@ def _approved_leave_days_sum(from_date, to_date, company=None, branch=None, depa
 		as_dict=True,
 	)
 	return flt((row or [{}])[0].get("s"))
+
+
+# --- Workforce: hiring, attrition, employment type (tabEmployee; org filters only) ---
+
+
+def _emp_filters_sql(company, branch, department):
+	"""WHERE fragment for `tabEmployee` alias e (no single-employee filter)."""
+	conditions = []
+	params = {}
+	if company and _has_field("Employee", "company"):
+		conditions.append("e.company = %(company)s")
+		params["company"] = company
+	if branch and _has_field("Employee", "branch"):
+		conditions.append("e.branch = %(branch)s")
+		params["branch"] = branch
+	if department and _has_field("Employee", "department"):
+		conditions.append("e.department = %(department)s")
+		params["department"] = department
+	if not conditions:
+		return "1=1", {}
+	return " AND ".join(conditions), params
+
+
+def _count_active_employees(company, branch, department):
+	if not frappe.db.table_exists("Employee"):
+		return 0
+	where_sql, params = _emp_filters_sql(company, branch, department)
+	row = frappe.db.sql(
+		f"""
+		SELECT COUNT(e.name) AS c
+		FROM `tabEmployee` e
+		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}
+		""",
+		params,
+		as_dict=True,
+	)
+	return cint((row or [{}])[0].get("c"))
+
+
+def _count_new_hires(from_date, to_date, company, branch, department):
+	if not frappe.db.table_exists("Employee"):
+		return 0
+	if not _has_field("Employee", "date_of_joining"):
+		return 0
+	where_sql, params = _emp_filters_sql(company, branch, department)
+	params.update({"from_date": str(from_date), "to_date": str(to_date)})
+	row = frappe.db.sql(
+		f"""
+		SELECT COUNT(e.name) AS c
+		FROM `tabEmployee` e
+		WHERE {where_sql}
+		  AND e.date_of_joining BETWEEN %(from_date)s AND %(to_date)s
+		""",
+		params,
+		as_dict=True,
+	)
+	return cint((row or [{}])[0].get("c"))
+
+
+def _count_left_employees(from_date, to_date, company, branch, department):
+	if not frappe.db.table_exists("Employee"):
+		return 0
+	where_sql, params = _emp_filters_sql(company, branch, department)
+	params.update({"from_date": str(from_date), "to_date": str(to_date)})
+
+	date_field = None
+	for candidate in ("relieving_date", "date_of_leaving", "date_of_resignation", "contract_end_date"):
+		if _has_field("Employee", candidate):
+			date_field = candidate
+			break
+	if not date_field:
+		try:
+			meta = frappe.get_meta("Employee")
+			for df in meta.fields:
+				if df.fieldtype != "Date":
+					continue
+				key = (df.fieldname or "").lower()
+				if "reliev" in key or ("leave" in key and "leave_" not in key):
+					date_field = df.fieldname
+					break
+		except Exception:
+			date_field = None
+
+	if date_field:
+		row = frappe.db.sql(
+			f"""
+			SELECT COUNT(e.name) AS c
+			FROM `tabEmployee` e
+			WHERE {where_sql}
+			  AND e.`{date_field}` BETWEEN %(from_date)s AND %(to_date)s
+			""",
+			params,
+			as_dict=True,
+		)
+		return cint((row or [{}])[0].get("c"))
+
+	row = frappe.db.sql(
+		f"""
+		SELECT COUNT(e.name) AS c
+		FROM `tabEmployee` e
+		WHERE {where_sql}
+		  AND COALESCE(e.status, '') = 'Left'
+		  AND e.modified BETWEEN %(from_date)s AND %(to_date)s
+		""",
+		params,
+		as_dict=True,
+	)
+	return cint((row or [{}])[0].get("c"))
+
+
+def _hiring_attrition_trend(from_date, to_date, company, branch, department):
+	labels = []
+	hired = []
+	left_counts = []
+	cur = get_first_day(from_date)
+	while cur <= to_date:
+		labels.append(cur.strftime("%b %Y"))
+		m_from = get_first_day(cur)
+		m_to = get_last_day(cur)
+		hired.append(_count_new_hires(m_from, m_to, company, branch, department))
+		left_counts.append(_count_left_employees(m_from, m_to, company, branch, department))
+		cur = add_months(cur, 1)
+	return {
+		"labels": labels,
+		"series": [
+			{"name": "New hires", "data": hired},
+			{"name": "Attrition (exits)", "data": left_counts},
+		],
+	}
+
+
+_ALLOWED_EMP_GROUP_FIELDS = frozenset(
+	{"gender", "grade", "branch", "designation", "department", "employment_type"}
+)
+
+
+def _active_employee_group_count(fieldname, company, branch, department, limit=15):
+	"""Group Active employees by a whitelisted Employee field (Link/Data/Select)."""
+	fieldname = (fieldname or "").strip()
+	if fieldname not in _ALLOWED_EMP_GROUP_FIELDS:
+		return {"labels": [], "values": []}
+	if not frappe.db.table_exists("Employee") or not _has_field("Employee", fieldname):
+		return {"labels": [], "values": []}
+	where_sql, params = _emp_filters_sql(company, branch, department)
+	rows = frappe.db.sql(
+		f"""
+		SELECT COALESCE(NULLIF(TRIM(e.`{fieldname}`), ''), 'Not set') AS label,
+			COUNT(e.name) AS c
+		FROM `tabEmployee` e
+		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}
+		GROUP BY label
+		ORDER BY c DESC
+		LIMIT {cint(limit)}
+		""",
+		params,
+		as_dict=True,
+	)
+	return {"labels": [r["label"] for r in rows], "values": [cint(r.get("c")) for r in rows]}
+
+
+def _headcount_by_employment_type(company, branch, department, limit=12):
+	return _active_employee_group_count("employment_type", company, branch, department, limit=limit)
