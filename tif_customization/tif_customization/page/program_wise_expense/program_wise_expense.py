@@ -87,8 +87,35 @@ REPORT_ROWS = [
 
 
 @frappe.whitelist()
-def get_report_data():
+def get_report_data(from_date=None, to_date=None):
 	today = getdate(nowdate())
+
+	# Optional custom date range (single "Selected Range" bucket)
+	if from_date and to_date:
+		from_dt = getdate(from_date)
+		to_dt = getdate(to_date)
+		if from_dt > to_dt:
+			from_dt, to_dt = to_dt, from_dt
+		entries = _fetch_gl_data(str(from_dt), str(to_dt))
+		return {
+			"fiscal_year_label": "Selected Range",
+			"fiscal_year_from_date": str(from_dt),
+			"fiscal_year_to_date": str(to_dt),
+			"as_on_date": str(to_dt),
+			"departments": [{"key": d["key"], "label": d["label"]} for d in DEPARTMENTS],
+			"quarters": [
+				{
+					"key": "range",
+					"label": "Selected Range",
+					"from_date": str(from_dt),
+					"to_date": str(to_dt),
+					"effective_to_date": str(to_dt),
+					"is_current_quarter": True,
+					"rows": _build_rows(entries),
+				}
+			],
+		}
+
 	fy_start_year = today.year if today.month >= 7 else today.year - 1
 	fy_start = date(fy_start_year, 7, 1)
 	fy_end = date(fy_start_year + 1, 6, 30)

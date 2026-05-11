@@ -2,9 +2,10 @@
 
 import calendar
 import json
+import re
 
 import frappe
-from frappe.utils import add_months, cint, flt, get_first_day, get_last_day, getdate, nowdate
+from frappe.utils import add_days, add_months, cint, flt, get_first_day, get_last_day, getdate, nowdate
 
 
 EA_DOCTYPE = "Employee Attendance"
@@ -53,6 +54,10 @@ def get_dashboard_data(filters=None):
 	data["department_absents_lates"] = _ea_by_department(month_keys, company, branch, department, employee, limit=12)
 	data["branch_breakdown"] = _ea_by_branch(month_keys, company, branch, department, employee, limit=12)
 	data["metrics_distribution"] = _ea_distribution_totals(totals)
+	data["punctuality_late_buckets"] = _punctuality_late_buckets(
+		month_keys, company, branch, department, employee
+	)
+	data["punctuality_incident_mix"] = _punctuality_incident_mix(totals)
 	data["top_by_lates"] = _ea_top_employees(month_keys, company, branch, department, employee, order_field="total_lates", limit=12)
 	data["top_by_absents"] = _ea_top_employees(month_keys, company, branch, department, employee, order_field="total_absents", limit=12)
 
@@ -76,6 +81,28 @@ def get_dashboard_data(filters=None):
 	data["headcount_by_employee_branch"] = _active_employee_group_count("branch", company, branch, department, limit=15)
 	data["headcount_by_designation"] = _active_employee_group_count("designation", company, branch, department, limit=20)
 	data["headcount_by_department"] = _active_employee_group_count("department", company, branch, department, limit=25)
+	# City / Branch wise (Employee master; best-effort based on available fields)
+	data["headcount_by_city"] = _active_employee_city_count(company, branch, department, limit=15)
+	data["headcount_by_city_branch"] = _active_employee_city_branch_table(company, branch, department, limit=25)
+
+	# This calendar month, payroll, Pakistan/Qatar headcount, CNIC compliance
+	month_start = get_first_day(today)
+	month_end = get_last_day(today)
+	year_start = getdate(f"{today.year}-01-01")
+	data["new_hires_this_month"] = _count_new_hires(month_start, month_end, company, branch, department)
+	data["left_employees_this_month"] = _count_left_employees(month_start, month_end, company, branch, department)
+	data["new_hires_this_year"] = _count_new_hires(year_start, today, company, branch, department)
+	data["left_employees_this_year"] = _count_left_employees(year_start, today, company, branch, department)
+	data["total_left_employees"] = _count_total_left_employees(company, branch, department)
+	data.update(_payroll_month_summary(company, branch, department, month_start, month_end))
+	data["active_headcount_pakistan"] = _count_active_region_keyword(company, branch, department, "pakistan")
+	data["active_headcount_qatar"] = _count_active_region_keyword(company, branch, department, "qatar")
+	data.update(_cnic_expired_stats_and_rows(company, branch, department, limit=25))
+	# Probation employees (best-effort; supports common custom fields if present)
+	data.update(_probation_stats_and_rows(company, branch, department, today=today, limit=25))
+	cnic_days = 30
+	data["cnic_upcoming_days"] = cint(cnic_days)
+	data.update(_cnic_upcoming_stats_and_rows(company, branch, department, today=today, days=cnic_days, limit=25))
 
 	return data
 
@@ -122,6 +149,26 @@ def _empty_payload(from_date, to_date, company, branch, department="", employee=
 		"headcount_by_employee_branch": {"labels": [], "values": []},
 		"headcount_by_designation": {"labels": [], "values": []},
 		"headcount_by_department": {"labels": [], "values": []},
+		"headcount_by_city": {"labels": [], "values": []},
+		"headcount_by_city_branch": [],
+		"punctuality_late_buckets": {"labels": [], "values": []},
+		"punctuality_incident_mix": {"labels": [], "values": []},
+		"new_hires_this_month": 0,
+		"left_employees_this_month": 0,
+		"payroll_salary_slips_this_month": 0,
+		"payroll_net_pay_this_month": 0.0,
+		"new_hires_this_year": 0,
+		"left_employees_this_year": 0,
+		"total_left_employees": 0,
+		"active_headcount_pakistan": 0,
+		"active_headcount_qatar": 0,
+		"probation_employees_count": 0,
+		"probation_employees": [],
+		"cnic_expired_count": 0,
+		"cnic_expired_employees": [],
+		"cnic_upcoming_count": 0,
+		"cnic_upcoming_days": 30,
+		"cnic_upcoming_employees": [],
 	}
 
 
@@ -396,6 +443,59 @@ def _ea_distribution_totals(totals):
 	return {"labels": labels, "values": values}
 
 
+def _punctuality_late_buckets(month_keys, company, branch, department, employee):
+	"""Count employees by Σ total_lates across EA rows in range (bucketed)."""
+	if not month_keys or not _has_field(EA_DOCTYPE, "total_lates") or not _has_field(EA_DOCTYPE, "employee"):
+		return {"labels": [], "values": []}
+	join_sql, where_sql, params = _ea_join_and_where(company, branch, department, employee, month_keys)
+	late_expr = _num_sql("a", "total_lates")
+	rows = frappe.db.sql(
+		f"""
+		SELECT bucket AS label, COUNT(*) AS c
+		FROM (
+			SELECT
+				CASE
+					WHEN t.late_sum <= 0 THEN '0 lates'
+					WHEN t.late_sum <= 5 THEN '1-5 lates'
+					WHEN t.late_sum <= 15 THEN '6-15 lates'
+					ELSE '16+ lates'
+				END AS bucket
+			FROM (
+				SELECT a.employee AS emp, SUM({late_expr}) AS late_sum
+				FROM {EA_TABLE} a {join_sql}
+				WHERE {where_sql} AND COALESCE(a.employee, '') != ''
+				GROUP BY a.employee
+			) AS t
+		) AS x
+		GROUP BY bucket
+		""",
+		params,
+		as_dict=True,
+	)
+	order = ["0 lates", "1-5 lates", "6-15 lates", "16+ lates"]
+	by_label = {r.get("label"): cint(r.get("c") or 0) for r in (rows or []) if r.get("label")}
+	out_labels = [lbl for lbl in order if lbl in by_label]
+	out_values = [by_label[lbl] for lbl in out_labels]
+	for r in rows or []:
+		lb = r.get("label")
+		if lb and lb not in order:
+			out_labels.append(lb)
+			out_values.append(cint(r.get("c") or 0))
+	return {"labels": out_labels, "values": out_values}
+
+
+def _punctuality_incident_mix(totals):
+	"""Pie-friendly totals: absents, lates, half days, early goings (Σ)."""
+	labels = ["Absents", "Lates", "Half days", "Early goings"]
+	values = [
+		max(0.0, flt(totals.get("total_absents"))),
+		max(0.0, flt(totals.get("total_lates"))),
+		max(0.0, flt(totals.get("total_half_days"))),
+		max(0.0, flt(totals.get("total_early_goings"))),
+	]
+	return {"labels": labels, "values": values}
+
+
 def _ea_top_employees(month_keys, company, branch, department, employee, order_field="total_lates", limit=10):
 	if not month_keys or not _has_field(EA_DOCTYPE, order_field):
 		return []
@@ -592,6 +692,146 @@ def _approved_leave_days_sum(from_date, to_date, company=None, branch=None, depa
 	return flt((row or [{}])[0].get("s"))
 
 
+def _payroll_month_summary(company, branch, department, month_start, month_end):
+	"""Salary Slip counts and net pay for posting dates in [month_start, month_end]."""
+	out = {
+		"payroll_salary_slips_this_month": 0,
+		"payroll_net_pay_this_month": 0.0,
+	}
+	if not frappe.db.table_exists("Salary Slip"):
+		return out
+	conditions = [
+		"ss.docstatus = 1",
+		"ss.posting_date >= %(ms)s",
+		"ss.posting_date <= %(me)s",
+	]
+	params = {"ms": str(month_start), "me": str(month_end)}
+	if company and _has_field("Salary Slip", "company"):
+		conditions.append("ss.company = %(company)s")
+		params["company"] = company
+	if branch and _has_field("Salary Slip", "branch"):
+		conditions.append("ss.branch = %(branch)s")
+		params["branch"] = branch
+	if department and _has_field("Salary Slip", "department"):
+		conditions.append("ss.department = %(department)s")
+		params["department"] = department
+	where = " AND ".join(conditions)
+	row = frappe.db.sql(
+		f"""
+		SELECT COUNT(ss.name) AS c, COALESCE(SUM(ss.net_pay), 0) AS net
+		FROM `tabSalary Slip` ss
+		WHERE {where}
+		""",
+		params,
+		as_dict=True,
+	)
+	r = (row or [{}])[0]
+	out["payroll_salary_slips_this_month"] = cint(r.get("c"))
+	out["payroll_net_pay_this_month"] = flt(r.get("net"))
+	return out
+
+
+def _count_active_region_keyword(company, branch, department, keyword):
+	"""Active employees: Country / nationality or Branch name contains keyword (e.g. Pakistan / Qatar)."""
+	if not frappe.db.table_exists("Employee"):
+		return 0
+	kw = f"%{(keyword or '').strip().lower()}%"
+	where_sql, params = _emp_filters_sql(company, branch, department)
+	params["kw"] = kw
+
+	joins = []
+	ors = []
+	if _has_field("Employee", "nationality") and frappe.db.table_exists("Country"):
+		joins.append("LEFT JOIN `tabCountry` nat ON nat.name = e.nationality")
+		ors.append(
+			"(LOWER(COALESCE(nat.country_name, '')) LIKE %(kw)s OR "
+			"LOWER(COALESCE(e.nationality, '')) LIKE %(kw)s)"
+		)
+	if frappe.db.table_exists("Branch"):
+		joins.append("LEFT JOIN `tabBranch` br ON br.name = e.branch")
+		# ERPNext Branch DocType uses `branch` (not `branch_name`). Keep backward-compat
+		# with any custom field name by selecting a safe existing column.
+		branch_label_field = (
+			"branch_name"
+			if _has_field("Branch", "branch_name")
+			else "branch"
+			if _has_field("Branch", "branch")
+			else "name"
+		)
+		ors.append(
+			f"(LOWER(COALESCE(br.`{branch_label_field}`, '')) LIKE %(kw)s OR "
+			"LOWER(COALESCE(e.branch, '')) LIKE %(kw)s)"
+		)
+	else:
+		ors.append("(LOWER(COALESCE(e.branch, '')) LIKE %(kw)s)")
+
+	match_sql = "(" + " OR ".join(ors) + ")"
+	from_join = "\n		".join(joins)
+
+	row = frappe.db.sql(
+		f"""
+		SELECT COUNT(e.name) AS c
+		FROM `tabEmployee` e
+		{from_join}
+		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}
+		  AND {match_sql}
+		""",
+		params,
+		as_dict=True,
+	)
+	return cint((row or [{}])[0].get("c"))
+
+
+def _cnic_expired_stats_and_rows(company, branch, department, limit=25):
+	"""Active employees with CNIC expiry date before today."""
+	out = {"cnic_expired_count": 0, "cnic_expired_employees": []}
+	if not frappe.db.table_exists("Employee") or not _has_field("Employee", "cnic_expiry"):
+		return out
+	today = getdate(nowdate())
+	where_sql, params = _emp_filters_sql(company, branch, department)
+	params["today"] = str(today)
+	count_row = frappe.db.sql(
+		f"""
+		SELECT COUNT(*) AS c
+		FROM `tabEmployee` e
+		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}
+		  AND e.cnic_expiry IS NOT NULL
+		  AND e.cnic_expiry < %(today)s
+		""",
+		params,
+		as_dict=True,
+	)
+	out["cnic_expired_count"] = cint((count_row or [{}])[0].get("c"))
+	lim = cint(limit)
+	rows = frappe.db.sql(
+		f"""
+		SELECT
+			e.employee_name AS employee_name,
+			e.name AS employee_id,
+			COALESCE(NULLIF(TRIM(e.department), ''), '—') AS department,
+			e.cnic_expiry AS cnic_expiry
+		FROM `tabEmployee` e
+		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}
+		  AND e.cnic_expiry IS NOT NULL
+		  AND e.cnic_expiry < %(today)s
+		ORDER BY e.cnic_expiry ASC
+		LIMIT {lim}
+		""",
+		params,
+		as_dict=True,
+	)
+	for r in rows or []:
+		out["cnic_expired_employees"].append(
+			{
+				"employee_name": r.get("employee_name") or "—",
+				"employee_id": r.get("employee_id"),
+				"department": r.get("department") or "—",
+				"cnic_expiry": r.get("cnic_expiry"),
+			}
+		)
+	return out
+
+
 # --- Workforce: hiring, attrition, employment type (tabEmployee; org filters only) ---
 
 
@@ -611,6 +851,76 @@ def _emp_filters_sql(company, branch, department):
 	if not conditions:
 		return "1=1", {}
 	return " AND ".join(conditions), params
+
+
+def _count_total_left_employees(company, branch, department):
+	"""Total employees whose status is Left (not date-range-scoped)."""
+	if not frappe.db.table_exists("Employee"):
+		return 0
+	where_sql, params = _emp_filters_sql(company, branch, department)
+	row = frappe.db.sql(
+		f"""
+		SELECT COUNT(e.name) AS c
+		FROM `tabEmployee` e
+		WHERE COALESCE(e.status, '') = 'Left' AND {where_sql}
+		""",
+		params,
+		as_dict=True,
+	)
+	return cint((row or [{}])[0].get("c"))
+
+
+def _cnic_upcoming_stats_and_rows(company, branch, department, today=None, days=30, limit=25):
+	"""Active employees with CNIC expiry date in the next N days (inclusive)."""
+	out = {"cnic_upcoming_count": 0, "cnic_upcoming_employees": []}
+	if not frappe.db.table_exists("Employee") or not _has_field("Employee", "cnic_expiry"):
+		return out
+	today = getdate(today or nowdate())
+	until = add_days(today, cint(days or 30))
+	where_sql, params = _emp_filters_sql(company, branch, department)
+	params.update({"today": str(today), "until": str(until)})
+
+	count_row = frappe.db.sql(
+		f"""
+		SELECT COUNT(*) AS c
+		FROM `tabEmployee` e
+		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}
+		  AND e.cnic_expiry IS NOT NULL
+		  AND e.cnic_expiry BETWEEN %(today)s AND %(until)s
+		""",
+		params,
+		as_dict=True,
+	)
+	out["cnic_upcoming_count"] = cint((count_row or [{}])[0].get("c"))
+
+	lim = cint(limit)
+	rows = frappe.db.sql(
+		f"""
+		SELECT
+			e.employee_name AS employee_name,
+			e.name AS employee_id,
+			COALESCE(NULLIF(TRIM(e.department), ''), '—') AS department,
+			e.cnic_expiry AS cnic_expiry
+		FROM `tabEmployee` e
+		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}
+		  AND e.cnic_expiry IS NOT NULL
+		  AND e.cnic_expiry BETWEEN %(today)s AND %(until)s
+		ORDER BY e.cnic_expiry ASC
+		LIMIT {lim}
+		""",
+		params,
+		as_dict=True,
+	)
+	for r in rows or []:
+		out["cnic_upcoming_employees"].append(
+			{
+				"employee_name": r.get("employee_name") or "—",
+				"employee_id": r.get("employee_id"),
+				"department": r.get("department") or "—",
+				"cnic_expiry": r.get("cnic_expiry"),
+			}
+		)
+	return out
 
 
 def _count_active_employees(company, branch, department):
@@ -734,6 +1044,30 @@ def _active_employee_group_count(fieldname, company, branch, department, limit=1
 	if not frappe.db.table_exists("Employee") or not _has_field("Employee", fieldname):
 		return {"labels": [], "values": []}
 	where_sql, params = _emp_filters_sql(company, branch, department)
+	# Grade should appear in numeric sequence (e.g. 1,2,3 or G1,G2,...) rather than by headcount.
+	if fieldname == "grade":
+		rows = frappe.db.sql(
+			f"""
+			SELECT COALESCE(NULLIF(TRIM(e.`{fieldname}`), ''), 'Not set') AS label,
+				COUNT(e.name) AS c
+			FROM `tabEmployee` e
+			WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}
+			GROUP BY label
+			LIMIT 500
+			""",
+			params,
+			as_dict=True,
+		)
+
+		def _grade_sort_key(r):
+			label = (r.get("label") or "").strip()
+			m = re.search(r"(\d+)", label)
+			n = int(m.group(1)) if m else 10**9
+			return (n, label.lower())
+
+		rows = sorted(rows or [], key=_grade_sort_key)[: cint(limit)]
+		return {"labels": [r["label"] for r in rows], "values": [cint(r.get("c")) for r in rows]}
+
 	rows = frappe.db.sql(
 		f"""
 		SELECT COALESCE(NULLIF(TRIM(e.`{fieldname}`), ''), 'Not set') AS label,
@@ -752,3 +1086,216 @@ def _active_employee_group_count(fieldname, company, branch, department, limit=1
 
 def _headcount_by_employment_type(company, branch, department, limit=12):
 	return _active_employee_group_count("employment_type", company, branch, department, limit=limit)
+
+
+def _employee_city_source():
+	"""
+	Best-effort city source for Employee headcount.
+
+	Priority:
+	1) Employee.city / Employee.current_city / Employee.residence_city if present
+	2) Address.city via Employee.current_address if available
+
+	Returns (join_sql, city_expr_sql) or ("", None) when unavailable.
+	"""
+	if not frappe.db.table_exists("Employee"):
+		return "", None
+
+	for fieldname in ("city", "current_city", "residence_city"):
+		if _has_field("Employee", fieldname):
+			return "", f"NULLIF(TRIM(e.`{fieldname}`), '')"
+
+	if _has_field("Employee", "current_address") and frappe.db.table_exists("Address") and _has_field("Address", "city"):
+		return "LEFT JOIN `tabAddress` a ON a.name = e.current_address", "NULLIF(TRIM(a.city), '')"
+
+	return "", None
+
+
+def _active_employee_city_count(company, branch, department, limit=15):
+	"""Group Active employees by City (best-effort based on available fields)."""
+	join_sql, city_expr = _employee_city_source()
+	if not city_expr:
+		return {"labels": [], "values": []}
+	where_sql, params = _emp_filters_sql(company, branch, department)
+	rows = frappe.db.sql(
+		f"""
+		SELECT COALESCE({city_expr}, 'Not set') AS label, COUNT(e.name) AS c
+		FROM `tabEmployee` e
+		{join_sql}
+		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}
+		GROUP BY label
+		ORDER BY c DESC
+		LIMIT {cint(limit)}
+		""",
+		params,
+		as_dict=True,
+	)
+	return {"labels": [r["label"] for r in rows], "values": [cint(r.get("c")) for r in rows]}
+
+
+def _active_employee_city_branch_table(company, branch, department, limit=25):
+	"""Top City+Branch combinations for Active employees (best-effort city)."""
+	if not frappe.db.table_exists("Employee"):
+		return []
+	join_sql, city_expr = _employee_city_source()
+	if not city_expr:
+		return []
+
+	where_sql, params = _emp_filters_sql(company, branch, department)
+	branch_expr = "NULLIF(TRIM(e.branch), '')" if _has_field("Employee", "branch") else "NULL"
+	rows = frappe.db.sql(
+		f"""
+		SELECT
+			COALESCE({city_expr}, 'Not set') AS city,
+			COALESCE({branch_expr}, 'Not set') AS branch,
+			COUNT(e.name) AS c
+		FROM `tabEmployee` e
+		{join_sql}
+		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}
+		GROUP BY city, branch
+		ORDER BY c DESC
+		LIMIT {cint(limit)}
+		""",
+		params,
+		as_dict=True,
+	)
+	return [
+		{"city": r.get("city") or "Not set", "branch": r.get("branch") or "Not set", "count": cint(r.get("c"))}
+		for r in (rows or [])
+	]
+
+
+def _probation_stats_and_rows(company, branch, department, today=None, limit=25):
+	"""
+	Best-effort probation tracking.
+
+	Supported customizations (first match wins):
+	- Employee.probation_end_date (Date): on probation when >= today
+	- Employee.is_on_probation (Check): on probation when = 1
+	- Employee.employment_type contains 'probation' (fallback)
+	"""
+	out = {"probation_employees_count": 0, "probation_employees": []}
+	if not frappe.db.table_exists("Employee"):
+		return out
+
+	where_sql, params = _emp_filters_sql(company, branch, department)
+	today = getdate(today or nowdate())
+	params["today"] = str(today)
+
+	if _has_field("Employee", "probation_end_date"):
+		count_row = frappe.db.sql(
+			f"""
+			SELECT COUNT(e.name) AS c
+			FROM `tabEmployee` e
+			WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}
+			  AND e.probation_end_date IS NOT NULL
+			  AND e.probation_end_date >= %(today)s
+			""",
+			params,
+			as_dict=True,
+		)
+		out["probation_employees_count"] = cint((count_row or [{}])[0].get("c"))
+		rows = frappe.db.sql(
+			f"""
+			SELECT
+				e.employee_name AS employee_name,
+				e.name AS employee_id,
+				COALESCE(NULLIF(TRIM(e.department), ''), '—') AS department,
+				e.probation_end_date AS probation_until
+			FROM `tabEmployee` e
+			WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}
+			  AND e.probation_end_date IS NOT NULL
+			  AND e.probation_end_date >= %(today)s
+			ORDER BY e.probation_end_date ASC
+			LIMIT {cint(limit)}
+			""",
+			params,
+			as_dict=True,
+		)
+		out["probation_employees"] = [
+			{
+				"employee_name": r.get("employee_name") or "—",
+				"employee_id": r.get("employee_id"),
+				"department": r.get("department") or "—",
+				"probation_until": r.get("probation_until"),
+			}
+			for r in (rows or [])
+		]
+		return out
+
+	if _has_field("Employee", "is_on_probation"):
+		count_row = frappe.db.sql(
+			f"""
+			SELECT COUNT(e.name) AS c
+			FROM `tabEmployee` e
+			WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}
+			  AND COALESCE(e.is_on_probation, 0) = 1
+			""",
+			params,
+			as_dict=True,
+		)
+		out["probation_employees_count"] = cint((count_row or [{}])[0].get("c"))
+		rows = frappe.db.sql(
+			f"""
+			SELECT
+				e.employee_name AS employee_name,
+				e.name AS employee_id,
+				COALESCE(NULLIF(TRIM(e.department), ''), '—') AS department
+			FROM `tabEmployee` e
+			WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}
+			  AND COALESCE(e.is_on_probation, 0) = 1
+			ORDER BY e.employee_name ASC
+			LIMIT {cint(limit)}
+			""",
+			params,
+			as_dict=True,
+		)
+		out["probation_employees"] = [
+			{
+				"employee_name": r.get("employee_name") or "—",
+				"employee_id": r.get("employee_id"),
+				"department": r.get("department") or "—",
+			}
+			for r in (rows or [])
+		]
+		return out
+
+	if _has_field("Employee", "employment_type"):
+		count_row = frappe.db.sql(
+			f"""
+			SELECT COUNT(e.name) AS c
+			FROM `tabEmployee` e
+			WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}
+			  AND LOWER(COALESCE(e.employment_type, '')) LIKE '%%probation%%'
+			""",
+			params,
+			as_dict=True,
+		)
+		out["probation_employees_count"] = cint((count_row or [{}])[0].get("c"))
+		rows = frappe.db.sql(
+			f"""
+			SELECT
+				e.employee_name AS employee_name,
+				e.name AS employee_id,
+				COALESCE(NULLIF(TRIM(e.department), ''), '—') AS department,
+				e.employment_type AS employment_type
+			FROM `tabEmployee` e
+			WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}
+			  AND LOWER(COALESCE(e.employment_type, '')) LIKE '%%probation%%'
+			ORDER BY e.employee_name ASC
+			LIMIT {cint(limit)}
+			""",
+			params,
+			as_dict=True,
+		)
+		out["probation_employees"] = [
+			{
+				"employee_name": r.get("employee_name") or "—",
+				"employee_id": r.get("employee_id"),
+				"department": r.get("department") or "—",
+				"employment_type": r.get("employment_type") or "—",
+			}
+			for r in (rows or [])
+		]
+
+	return out

@@ -10,11 +10,16 @@ frappe.pages["program-wise-expense"].on_page_load = function (wrapper) {
 			constructor(page) {
 				this.page = page;
 				this.data = null;
+				this.filters = {
+					from_date: null,
+					to_date: null,
+				};
 			}
 
 			make() {
 				this.render_layout();
 				this.bind_events();
+				this.make_filters();
 				this.load_data();
 			}
 
@@ -40,10 +45,39 @@ frappe.pages["program-wise-expense"].on_page_load = function (wrapper) {
 				$("#print-program-expense").on("click", () => window.print());
 			}
 
+			make_filters() {
+				this.page.add_field({
+					label: "From Date",
+					fieldtype: "Date",
+					fieldname: "from_date",
+					change: () => {
+						this.filters.from_date = this.page.fields_dict.from_date.get_value() || null;
+						this.load_data();
+					},
+				});
+				this.page.add_field({
+					label: "To Date",
+					fieldtype: "Date",
+					fieldname: "to_date",
+					default: frappe.datetime.get_today(),
+					change: () => {
+						this.filters.to_date = this.page.fields_dict.to_date.get_value() || null;
+						this.load_data();
+					},
+				});
+				this.filters.to_date = frappe.datetime.get_today();
+			}
+
 			load_data() {
+				const args = {};
+				if (this.filters.from_date && this.filters.to_date) {
+					args.from_date = this.filters.from_date;
+					args.to_date = this.filters.to_date;
+				}
 				frappe.call({
 					method:
 						"tif_customization.tif_customization.page.program_wise_expense.program_wise_expense.get_report_data",
+					args,
 					freeze: true,
 					freeze_message: "Loading Program Wise Expense Report...",
 					callback: (r) => {

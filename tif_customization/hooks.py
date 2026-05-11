@@ -5,6 +5,12 @@ app_description = "app for tif customization"
 app_email = "shoaibmohtashim973@gmail.com"
 app_license = "mit"
 
+# Fixtures
+# ------------------
+fixtures = [
+	{"dt": "Custom HTML Block", "filters": [["name", "in", ["Trustee Easy Menu"]]]},
+]
+
 # Apps
 # ------------------
 
