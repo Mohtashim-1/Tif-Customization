@@ -48,34 +48,56 @@ function render_allocated_leaves_with_accrual(data) {
 		.map(([leave_type, value]) => {
 			const color = cint(value.remaining_leaves) > 0 ? "green" : "red";
 			const accrual_allowed = value.leave_allowed_as_per_accrual ?? 0;
+			const accrualAvail = value.available_leaves_as_per_accrual ?? 0;
+			const accrualAvailColor = cint(accrualAvail) > 0 ? "green" : "red";
 			return `
 				<tr>
 					<td>${leave_type}</td>
 					<td class="text-right">${value.total_leaves}</td>
 					<td class="text-right">${value.expired_leaves}</td>
-					<td class="text-right">${value.leaves_taken}</td>
+					
 					<td class="text-right">${value.leaves_pending_approval}</td>
 					<td class="text-right">${accrual_allowed}</td>
+					<td class="text-right">${value.leaves_taken}</td>
+					<td class="text-right" style="color: ${accrualAvailColor}">${accrualAvail}</td>
 					<td class="text-right" style="color: ${color}">${value.remaining_leaves}</td>
 				</tr>
 			`;
 		})
 		.join("");
 
+	const accrualGrossTitle = __(
+		"Leave earned under the accrual rule up to the selected date, before subtracting used or pending leave."
+	);
+	const accrualNetTitle = __(
+		"Accrued To Date minus Used Leaves minus Pending. This is the accrual-limited balance; it can be lower than Available Leaves when the full-year allocation is on the ledger but accrual is earned over time."
+	);
+
 	return `
 		<table class="table table-bordered small">
 			<thead>
 				<tr>
-					<th style="width: 14%">${__("Leave Type")}</th>
-					<th style="width: 14%" class="text-right">${__("Total Allocated Leaves")}</th>
-					<th style="width: 14%" class="text-right">${__("Expired Leaves")}</th>
-					<th style="width: 14%" class="text-right">${__("Used Leaves")}</th>
-					<th style="width: 14%" class="text-right">${__("Leaves Pending Approval")}</th>
-					<th style="width: 16%" class="text-right">${__("Leave Allowed As Per Accrual")}</th>
-					<th style="width: 14%" class="text-right">${__("Available Leaves")}</th>
+					<th style="width: 12%">${__("Leave Type")}</th>
+					<th style="width: 11%" class="text-right">${__("Total Allocated Leaves")}</th>
+					<th style="width: 11%" class="text-right">${__("Expired Leaves")}</th>
+					<th style="width: 11%" class="text-right">${__("Leaves Pending Approval")}</th>
+					<th style="width: 13%" class="text-right" title="${frappe.utils.escape_html(accrualGrossTitle)}">${__(
+						"Accrued To Date"
+					)}</th>
+										<th style="width: 11%" class="text-right">${__("Used Leaves")}</th>
+
+					<th style="width: 13%" class="text-right" title="${frappe.utils.escape_html(accrualNetTitle)}">${__(
+						"Remaining (Accrual)"
+					)}</th>
+					<th style="width: 12%" class="text-right">${__("Available Leaves")}</th>
 				</tr>
 			</thead>
 			<tbody>${rows}</tbody>
 		</table>
+		<p class="text-muted small" style="margin-top:10px;margin-bottom:0;">
+			${__(
+				"Example: Accrued To Date 16.5 with Used 1.5 gives Remaining (Accrual) 15. Available Leaves can still show 16.5 because it follows the leave ledger (e.g. full allocation minus use), not the accrual schedule."
+			)}
+		</p>
 	`;
 }

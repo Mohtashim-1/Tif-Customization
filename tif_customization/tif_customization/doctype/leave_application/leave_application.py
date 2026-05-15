@@ -174,7 +174,14 @@ def get_leave_details(employee, date, for_salary_slip=False):
 			if is_restricted_employee
 			else flt(allocation.total_leaves_allocated)
 		)
+		# Gross: leave "earned" under the accrual rule up to reference_date (before subtracting use).
+		# This can equal "Available Leaves" by coincidence; it is not the same as ledger balance.
 		leave_allowed_as_per_accrual = max(0, accrued_leaves)
+		# Net under accrual: gross accrued minus approved use and open drafts (matches submit check).
+		available_leaves_as_per_accrual = max(
+			0.0,
+			flt(leave_allowed_as_per_accrual) - flt(leaves_taken) - flt(leaves_pending),
+		)
 
 		leave_allocation[d] = {
 			"total_leaves": flt(allocation.total_leaves_allocated, precision),
@@ -182,6 +189,7 @@ def get_leave_details(employee, date, for_salary_slip=False):
 			"leaves_taken": flt(leaves_taken, precision),
 			"leaves_pending_approval": flt(leaves_pending, precision),
 			"leave_allowed_as_per_accrual": flt(leave_allowed_as_per_accrual, precision),
+			"available_leaves_as_per_accrual": flt(available_leaves_as_per_accrual, precision),
 			"remaining_leaves": flt(remaining_leaves, precision),
 		}
 
