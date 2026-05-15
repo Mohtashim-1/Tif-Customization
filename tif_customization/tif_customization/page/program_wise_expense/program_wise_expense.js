@@ -14,6 +14,15 @@ frappe.pages["program-wise-expense"].on_page_load = function (wrapper) {
 					from_date: null,
 					to_date: null,
 				};
+				this.filter_controls = {};
+			}
+
+			get_default_from_date() {
+				const today = frappe.datetime.get_today();
+				const year = cint(today.split("-")[0]);
+				const month = cint(today.split("-")[1]);
+				const fyStartYear = month >= 7 ? year : year - 1;
+				return `${fyStartYear}-07-01`;
 			}
 
 			make() {
@@ -27,6 +36,10 @@ frappe.pages["program-wise-expense"].on_page_load = function (wrapper) {
 				this.page.main.html(`
 					<div class="program-expense-root">
 						<div class="program-expense-toolbar">
+							<div class="program-expense-filters">
+								<div class="pwe-filter" data-fieldname="from_date"></div>
+								<div class="pwe-filter" data-fieldname="to_date"></div>
+							</div>
 							<button class="btn btn-primary" id="reload-program-expense">
 								<i class="fa fa-refresh"></i> Reload
 							</button>
@@ -46,34 +59,58 @@ frappe.pages["program-wise-expense"].on_page_load = function (wrapper) {
 			}
 
 			make_filters() {
-				this.page.add_field({
-					label: "From Date",
-					fieldtype: "Date",
-					fieldname: "from_date",
-					change: () => {
-						this.filters.from_date = this.page.fields_dict.from_date.get_value() || null;
-						this.load_data();
-					},
-				});
-				this.page.add_field({
-					label: "To Date",
-					fieldtype: "Date",
-					fieldname: "to_date",
-					default: frappe.datetime.get_today(),
-					change: () => {
-						this.filters.to_date = this.page.fields_dict.to_date.get_value() || null;
-						this.load_data();
-					},
-				});
+				this.filters.from_date = this.get_default_from_date();
 				this.filters.to_date = frappe.datetime.get_today();
+
+				this.make_filter_control({
+					fieldname: "from_date",
+					label: "From Date",
+					default: this.filters.from_date,
+					on_change: (value) => {
+						this.filters.from_date = value || null;
+						this.load_data();
+					},
+				});
+				this.make_filter_control({
+					fieldname: "to_date",
+					label: "To Date",
+					default: this.filters.to_date,
+					on_change: (value) => {
+						this.filters.to_date = value || null;
+						this.load_data();
+					},
+				});
+			}
+
+			make_filter_control({ fieldname, label, default: default_value, on_change }) {
+				const $target = this.page.main.find(`.pwe-filter[data-fieldname="${fieldname}"]`);
+				if (!$target.length) return;
+
+				const control = frappe.ui.form.make_control({
+					df: {
+						fieldtype: "Date",
+						fieldname,
+						label,
+						change: () => {
+							const value = control.get_value();
+							on_change && on_change(value);
+						},
+					},
+					parent: $target.get(0),
+					render_input: true,
+				});
+				control.refresh();
+				if (default_value) {
+					control.set_value(default_value);
+				}
+				this.filter_controls[fieldname] = control;
 			}
 
 			load_data() {
-				const args = {};
-				if (this.filters.from_date && this.filters.to_date) {
-					args.from_date = this.filters.from_date;
-					args.to_date = this.filters.to_date;
-				}
+				const args = {
+					from_date: this.filters.from_date,
+					to_date: this.filters.to_date,
+				};
 				frappe.call({
 					method:
 						"tif_customization.tif_customization.page.program_wise_expense.program_wise_expense.get_report_data",
@@ -380,8 +417,24 @@ frappe.pages["program-wise-expense"].on_page_load = function (wrapper) {
 					<style id="program-expense-style">
 						.program-expense-toolbar {
 							display: flex;
+							align-items: end;
+							flex-wrap: wrap;
 							gap: 8px;
 							margin-bottom: 14px;
+						}
+						.program-expense-filters {
+							display: flex;
+							gap: 8px;
+							flex-wrap: wrap;
+							align-items: end;
+							margin-right: 6px;
+						}
+						.program-expense-filters .form-group {
+							margin-bottom: 0;
+							min-width: 170px;
+						}
+						.program-expense-filters .control-label {
+							margin-bottom: 2px;
 						}
 						.statement-head {
 							margin-bottom: 14px;

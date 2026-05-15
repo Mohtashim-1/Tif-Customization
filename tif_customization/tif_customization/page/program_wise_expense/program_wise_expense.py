@@ -91,9 +91,16 @@ def get_report_data(from_date=None, to_date=None):
 	today = getdate(nowdate())
 
 	# Optional custom date range (single "Selected Range" bucket)
-	if from_date and to_date:
-		from_dt = getdate(from_date)
-		to_dt = getdate(to_date)
+	if from_date or to_date:
+		from_dt = getdate(from_date) if from_date else None
+		to_dt = getdate(to_date) if to_date else None
+
+		# Sensible defaults if only one side is provided
+		if not from_dt and to_dt:
+			from_dt = to_dt
+		if from_dt and not to_dt:
+			to_dt = today
+
 		if from_dt > to_dt:
 			from_dt, to_dt = to_dt, from_dt
 		entries = _fetch_gl_data(str(from_dt), str(to_dt))
