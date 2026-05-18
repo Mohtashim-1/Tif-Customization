@@ -182,6 +182,9 @@ def _fetch_gl_data(from_date, to_date):
 		WHERE gle.docstatus < 2
 		AND gle.posting_date BETWEEN %(from_date)s AND %(to_date)s
 		AND IFNULL(gle.is_cancelled, 0) = 0
+		-- This report is meant for expenses/capex. Exclude Income accounts so
+		-- entries like "Rental Income" don't get netted against "Office Rentals".
+		AND COALESCE(acc.root_type, '') != 'Income'
 		GROUP BY account_name, account_id, cost_center_name, cost_center_id
 		""",
 		{"from_date": from_date, "to_date": to_date},
@@ -381,6 +384,7 @@ def get_drilldown_entries(row_index, from_date, to_date, department_key=None):
 		WHERE gle.docstatus < 2
 		AND IFNULL(gle.is_cancelled, 0) = 0
 		AND gle.posting_date BETWEEN %(from_date)s AND %(to_date)s
+		AND COALESCE(acc.root_type, '') != 'Income'
 		AND {where_sql}
 		""",
 		params,
@@ -412,6 +416,7 @@ def get_drilldown_entries(row_index, from_date, to_date, department_key=None):
 		WHERE gle.docstatus < 2
 		AND IFNULL(gle.is_cancelled, 0) = 0
 		AND gle.posting_date BETWEEN %(from_date)s AND %(to_date)s
+		AND COALESCE(acc.root_type, '') != 'Income'
 		AND {where_sql}
 		ORDER BY gle.posting_date ASC, gle.voucher_type ASC, gle.voucher_no ASC, gle.name ASC
 		LIMIT %(limit)s

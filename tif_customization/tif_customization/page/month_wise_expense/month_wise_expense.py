@@ -148,6 +148,8 @@ def _fetch_gl_data(from_date, to_date):
 		WHERE gle.docstatus < 2
 		AND gle.posting_date BETWEEN %(from_date)s AND %(to_date)s
 		AND IFNULL(gle.is_cancelled, 0) = 0
+		-- Keep this as an expense/capex report; don't net Income accounts into totals.
+		AND COALESCE(acc.root_type, '') != 'Income'
 		GROUP BY account_name, account_id, month_key
 		""",
 		{"from_date": from_date, "to_date": to_date},
@@ -276,6 +278,7 @@ def get_drilldown_entries(section_label, row_label, month_key=None):
 		WHERE gle.docstatus < 2
 		AND IFNULL(gle.is_cancelled, 0) = 0
 		AND gle.posting_date BETWEEN %(from_date)s AND %(to_date)s
+		AND COALESCE(acc.root_type, '') != 'Income'
 		AND ( {where_patterns} )
 		ORDER BY gle.posting_date ASC, gle.voucher_type ASC, gle.voucher_no ASC, gle.name ASC
 		LIMIT %(limit)s
