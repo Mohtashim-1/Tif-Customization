@@ -210,3 +210,84 @@ def get_leave_allocation_for_print(employee, date):
 
 	response = get_leave_details(employee=employee, date=date)
 	return (response or {}).get("leave_allocation", {})
+
+
+def _cleanup_other_open_todos(doctype: str, name: str, keep_user: str | None):
+	"""Cancel any other open ToDos for this document except keep_user."""
+	if not name:
+		return
+
+	filters = {
+		"reference_type": doctype,
+		"reference_name": name,
+		"status": "Open",
+	}
+	if keep_user:
+		filters["allocated_to"] = ["!=", keep_user]
+
+	other_todos = frappe.get_all("ToDo", filters=filters, pluck="name")
+	if not other_todos:
+		return
+
+	for todo_name in other_todos:
+		frappe.db.set_value("ToDo", todo_name, "status", "Cancelled", update_modified=False)
+
+
+def _close_all_todos(doctype: str, name: str):
+	if not name:
+		return
+	frappe.db.sql(
+		"""
+		UPDATE `tabToDo`
+		SET status='Closed'
+		WHERE reference_type=%s AND reference_name=%s AND status='Open'
+		""",
+		(doctype, name),
+	)
+
+
+def sync_leave_approver_todo(doc, method=None):
+	"""Ensure a ToDo exists for Leave Approver while the application is Open (even in Draft)."""
+	# When leave is no longer pending, close any open assignments.
+	if getattr(doc, "status", None) in ("Approved", "Rejected", "Cancelled") or cint(doc.docstatus) == 2:
+		_close_all_todos(doc.doctype, doc.name)
+		return
+
+	leave_approver = getattr(doc, "leave_approver", None)
+	if not leave_approver:
+		_cleanup_other_open_todos(doc.doctype, doc.name, keep_user=None)
+		return
+
+	# Keep only the current approver's ToDo open (cancel others if approver changed).
+	_cleanup_other_open_todos(doc.doctype, doc.name, keep_user=leave_approver)
+
+	# Create ToDo only when the application is pending approval.
+	if getattr(doc, "status", None) != "Open":
+		return
+
+	exists = frappe.get_all(
+		"ToDo",
+		filters={
+			"reference_type": doc.doctype,
+			"reference_name": doc.name,
+			"allocated_to": leave_approver,
+			"status": "Open",
+		},
+		limit=1,
+	)
+	if exists:
+		return
+
+	from frappe.desk.form.assign_to import add as add_assignment
+
+	description = f"Leave Application {doc.name} requires your approval."
+	add_assignment(
+		{
+			"assign_to": [leave_approver],
+			"doctype": doc.doctype,
+			"name": doc.name,
+			"description": description,
+			"priority": "High",
+		},
+		ignore_permissions=True,
+	)

@@ -44,6 +44,18 @@ function render_allocated_leaves_with_accrual(data) {
 		return `<p style="margin-top: 30px;">${__("No leaves have been allocated.")}</p>`;
 	}
 
+	const precision = cint(frappe.boot.sysdefaults?.float_precision) || 2;
+	const fmt = (value) => {
+		const number = flt(value || 0);
+		if (frappe.utils?.format_number) {
+			return frappe.utils.format_number(number, precision);
+		}
+		if (frappe.format) {
+			return frappe.format(number, { fieldtype: "Float", precision });
+		}
+		return number.toFixed(precision);
+	};
+
 	const rows = Object.entries(data)
 		.map(([leave_type, value]) => {
 			const color = cint(value.remaining_leaves) > 0 ? "green" : "red";
@@ -53,14 +65,14 @@ function render_allocated_leaves_with_accrual(data) {
 			return `
 				<tr>
 					<td>${leave_type}</td>
-					<td class="text-right">${value.total_leaves}</td>
-					<td class="text-right">${value.expired_leaves}</td>
+					<td class="text-right">${fmt(value.total_leaves)}</td>
+					<td class="text-right">${fmt(value.expired_leaves)}</td>
 					
-					<td class="text-right">${value.leaves_pending_approval}</td>
-					<td class="text-right">${accrual_allowed}</td>
-					<td class="text-right">${value.leaves_taken}</td>
-					<td class="text-right" style="color: ${accrualAvailColor}">${accrualAvail}</td>
-					<td class="text-right" style="color: ${color}">${value.remaining_leaves}</td>
+					<td class="text-right">${fmt(value.leaves_pending_approval)}</td>
+					<td class="text-right">${fmt(value.leaves_taken)}</td>
+					<td class="text-right" style="color: ${color}">${fmt(value.remaining_leaves)}</td>
+					<td class="text-right">${fmt(accrual_allowed)}</td>
+					<td class="text-right" style="color: ${accrualAvailColor}">${fmt(accrualAvail)}</td>
 				</tr>
 			`;
 		})
@@ -81,15 +93,16 @@ function render_allocated_leaves_with_accrual(data) {
 					<th style="width: 11%" class="text-right">${__("Total Allocated Leaves")}</th>
 					<th style="width: 11%" class="text-right">${__("Expired Leaves")}</th>
 					<th style="width: 11%" class="text-right">${__("Leaves Pending Approval")}</th>
+					<th style="width: 11%" class="text-right">${__("Used Leaves")}</th>
+					<th style="width: 12%" class="text-right" title="${__("Balance from Leave Ledger (allocation minus used), not limited by accrual schedule.")}">${__(
+						"Available (Ledger)"
+					)}</th>
 					<th style="width: 13%" class="text-right" title="${frappe.utils.escape_html(accrualGrossTitle)}">${__(
 						"Accrued To Date"
 					)}</th>
-										<th style="width: 11%" class="text-right">${__("Used Leaves")}</th>
-
 					<th style="width: 13%" class="text-right" title="${frappe.utils.escape_html(accrualNetTitle)}">${__(
 						"Remaining (Accrual)"
 					)}</th>
-					<th style="width: 12%" class="text-right">${__("Available Leaves")}</th>
 				</tr>
 			</thead>
 			<tbody>${rows}</tbody>

@@ -63,6 +63,9 @@ page_js = {
 	"procurement-expense" : "tif_customization/page/procurement_expense/procurement_expense.js"
 }
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
+doctype_list_js = {
+	"Leave Application": "public/js/leave_application_list.js",
+}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
 
@@ -165,7 +168,10 @@ doc_events = {
         "validate": "tif_customization.tif_customization.doctype.material_request.material_request.get_employee"
     },
     "Leave Application": {
-        "validate": "tif_customization.tif_customization.doctype.leave_application.leave_application.leave_apply_on_probabe_base"
+        "validate": [
+            "tif_customization.tif_customization.doctype.leave_application.leave_application.leave_apply_on_probabe_base",
+            "tif_customization.tif_customization.doctype.leave_application.leave_application.sync_leave_approver_todo",
+        ]
     },
     "Employee Attendance": {
         "validate": "tif_customization.tif_customization.doctype.employee_attendance.employee_attendance.validate_sat_attendance"

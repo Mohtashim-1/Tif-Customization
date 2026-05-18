@@ -1,0 +1,260 @@
+<!--<meta name="pdfkit-orientation" content="Landscape"/>-->
+
+<style type="text/css">
+*{ font-size:12px;}
+.tab2 tr { line-height:0; }
+table tr { overflow:hidden; height:14px; white-space:nowrap; }
+@media print{
+  table{ page-break-after:auto }
+  tr{ page-break-inside:avoid; page-break-after:auto }
+  td{ page-break-inside:avoid; page-break-after:auto }
+  thead{ display:table-header-group }
+  tfoot{ display:table-footer-group }
+}
+
+#border-bottom { border-bottom:solid 3px; border-bottom-color:#076ba0; }
+#border { border-collapse:collapse; width:100%; }
+#border td, #border thead td { border:1px solid black; padding:8px; text-align:center; }
+</style>
+
+<table width="100%" style="border-bottom:2px solid #0b5ea8; margin-bottom:10px;">
+  <tr>
+    <td style="width:30%;">
+      <div style="font-weight:bold; font-size:14px; margin-top:4px;">The ILM Foundation</div>
+      <div style="font-size:11px; color:#555;">Individual Attendance Sheet</div>
+    </td>
+    <td style="width:70%; text-align:right;">
+      <div style="font-weight:800; font-size:18px; color:#0b5ea8;">INDIVIDUAL ATTENDANCE SHEET</div>
+      <div style="font-weight:700; font-size:13px;">
+        FOR THE PERIOD OF {{ doc.period_label or (doc.month ~ " " ~ doc.year) }}
+      </div>
+    </td>
+  </tr>
+</table>
+
+<table width="100%">
+  <tr>
+    <td><strong>Employee ID:</strong></td>
+    <td id="border-bottom"><strong>{{ doc.biometric_id }}</strong></td>
+  </tr>
+  <tr>
+    <td><strong>Employee Name:</strong></td>
+    <td id="border-bottom"><strong>{{ doc.employee_name }}</strong></td>
+
+    <td><strong>CNIC No. #</strong></td>
+    <td id="border-bottom"><strong>{{ doc.cnic }}</strong></td>
+  </tr>
+  <tr>
+    <td><strong>Department:</strong></td>
+    <td id="border-bottom"><strong>{{ doc.department }}</strong></td>
+
+    <td><strong>Date of Joining #</strong></td>
+    <td id="border-bottom"><strong>{{ doc.date_of_joining }}</strong></td>
+  </tr>
+  <tr>
+    <td><strong>Designation:</strong></td>
+    <td id="border-bottom"><strong>{{ doc.designation }}</strong></td>
+  </tr>
+</table>
+
+<br/>
+
+<table width="100%" id="border">
+  <thead>
+    <tr>
+      <td rowspan="2"><strong>Date</strong></td>
+      <td rowspan="2"><strong>DAY</strong></td>
+      <td colspan="2"><strong>TIME</strong></td>
+      <td rowspan="2"><strong>LATE <br>ARRIVAL</strong></td>
+      <td rowspan="2"><strong>EARLY <br>OUT</strong></td>
+      <td rowspan="2"><strong>NARRATION</strong></td>
+      <td colspan="2"><strong>SHIFT</strong></td>
+      <td rowspan="2"><strong>TOTAL<br> HOURS</strong></td>
+    </tr>
+    <tr>
+      <td><strong>In</strong></td>
+      <td><strong>Out</strong></td>
+      <td><strong>START</strong></td>
+      <td><strong>END</strong></td>
+    </tr>
+  </thead>
+
+  <tbody>
+
+    {# ----------------- RESOLVE EMPLOYEE ----------------- #}
+    {% set employee = doc.employee or "" %}
+
+    {# If employee not found, resolve from biometric_id -> Employee.attendance_device_id #}
+    {% if not employee and doc.biometric_id %}
+      {% set employee = frappe.db.get_value("Employee", {"attendance_device_id": doc.biometric_id}, "name") or "" %}
+    {% endif %}
+
+    {# ----------------- PREFETCH HOLIDAY LIST -> BUILD holiday_map {date_str: description} ----------------- #}
+    {% set holiday_map = {} %}
+
+    {# Step 1: Get the holiday list name linked to this employee or their company/branch #}
+    {% set holiday_list_name = "" %}
+
+    {% if employee %}
+      {# Try employee-level holiday list first #}
+      {% set holiday_list_name = frappe.db.get_value("Employee", employee, "holiday_list") or "" %}
+    {% endif %}
+
+    {# Fallback: company-level default holiday list #}
+    {% if not holiday_list_name %}
+      {% set company = doc.company or frappe.db.get_value("Employee", employee, "company") or "" %}
+      {% if company %}
+        {% set holiday_list_name = frappe.db.get_value("Company", company, "default_holiday_list") or "" %}
+      {% endif %}
+    {% endif %}
+
+    {# Step 2: Fetch all holidays from that holiday list and build the map #}
+    {% if holiday_list_name %}
+      {% set holidays = frappe.get_all(
+          "Holiday",
+          filters={"parent": holiday_list_name},
+          fields=["holiday_date", "description"]
+      ) %}
+      {% for h in holidays %}
+        {% set hk = frappe.utils.getdate(h.holiday_date).strftime("%Y-%m-%d") %}
+        {% set _ = holiday_map.update({ hk: h.description or "Public Holiday" }) %}
+      {% endfor %}
+    {% endif %}
+
+    {# ----------------- PREFETCH LEAVES (APPROVED/SUBMITTED) ----------------- #}
+    {% set leave_map = {} %}
+    {% set leave_value_map = {} %}
+
+    {% if employee %}
+      {% set leave_list = frappe.get_all(
+          "Leave Application",
+          filters={"employee": employee, "docstatus": 1},
+          fields=["from_date","to_date","leave_type","half_day","half_day_date","status"]
+      ) %}
+
+      {% for leave in leave_list %}
+        {% set approved = (leave.status == "Approved") %}
+
+        {% if approved %}
+          {% set total_days = frappe.utils.date_diff(leave.to_date, leave.from_date) %}
+          {% for i in range(total_days + 1) %}
+            {% set leave_date = frappe.utils.add_days(leave.from_date, i) %}
+            {% set leave_key = frappe.utils.getdate(leave_date).strftime("%Y-%m-%d") %}
+
+            {% if leave.half_day and leave.half_day_date == leave_date %}
+              {% set _ = leave_map.update({ leave_key: "Half Day - " ~ (leave.leave_type or "Leave") }) %}
+              {% set _ = leave_value_map.update({ leave_key: 0.5 }) %}
+            {% else %}
+              {% set _ = leave_map.update({ leave_key: (leave.leave_type or "Leave") }) %}
+              {% set _ = leave_value_map.update({ leave_key: 1 }) %}
+            {% endif %}
+          {% endfor %}
+        {% endif %}
+      {% endfor %}
+    {% endif %}
+
+    {% set ns = namespace(leave_days=0) %}
+    {% for r in doc.table1 %}
+      {% set rk = frappe.utils.getdate(r.date).strftime("%Y-%m-%d") %}
+      {% if rk in leave_value_map %}
+        {% set ns.leave_days = ns.leave_days + (leave_value_map[rk] or 0) %}
+      {% endif %}
+    {% endfor %}
+
+
+    {% for row in doc.table1 %}
+
+      {% set narration = "" %}
+      {% set has_in = row.check_in_1 and row.check_in_1 not in ["00:00", "00:00:00"] %}
+      {% set has_out = row.check_out_1 and row.check_out_1 not in ["00:00", "00:00:00"] %}
+      {% set has_early = row.early_going_hours and row.early_going_hours not in ["00:00", "00:00:00"] %}
+      {% set row_key = frappe.utils.getdate(row.date).strftime("%Y-%m-%d") %}
+
+      {# 1) Public Holiday — check holiday_map first (from Holiday List), then fallback to row.public_holiday field #}
+      {% if row_key in holiday_map %}
+        {% set narration = "Public Holiday - " ~ holiday_map[row_key] %}
+      {% elif row.public_holiday %}
+        {% set narration = "Public Holiday" %}
+      {% endif %}
+
+      {# 2) Weekend (Sunday) — only if not already a holiday #}
+      {% if narration == "" and row.day == "Sunday" %}
+        {% set narration = "Weekend" %}
+      {% endif %}
+
+      {# 3) Weekly Off (non-Sunday off days like Saturday) — only if not already marked #}
+      {% if narration == "" and row.weekly_off %}
+        {% set narration = "Weekly Off" %}
+      {% endif %}
+
+      {# 4) Leave (Approved) #}
+      {% if narration == "" and row_key in leave_map %}
+        {% set narration = "Leave - " ~ leave_map[row_key] %}
+      {% endif %}
+
+      {# 5) Half Day #}
+      {% if narration == "" and row.half_day %}
+        {% set narration = "Half Day" %}
+      {% endif %}
+
+      {# 6) Late Present #}
+      {% if narration == "" and (row.late == 1 or row.late == "1") %}
+        {% set narration = "Late Present" %}
+      {% endif %}
+
+      {# 7) Early Out #}
+      {% if narration == "" and has_in and has_out and has_early %}
+        {% set narration = "Early Out" %}
+      {% endif %}
+
+      {# 8) Present #}
+      {% if narration == "" and has_in and has_out %}
+        {% set narration = "Present" %}
+      {% endif %}
+
+      {# 9) Absent #}
+      {% if narration == "" %}
+        {% set narration = "Absent" %}
+      {% endif %}
+
+      <tr>
+        <td>{{ frappe.format_date(row.date, "dd-MM-yyyy") }}</td>
+        <td>{{ row.day if row.day else "Sunday" }}</td>
+        <td>{{ row.check_in_1 if row.check_in_1 else "00:00" }}</td>
+        <td>{{ row.check_out_1 if row.check_out_1 else "00:00" }}</td>
+        <td>{{ row.late_sitting if row.late_sitting else "00:00" }}</td>
+        <td>{{ row.early_going_hours if row.early_going_hours else "00:00" }}</td>
+        <td style="font-weight:700;">{{ narration }}</td>
+        <td>{{ row.shift_start if row.shift_start else "00:00" }}</td>
+        <td>{{ row.shift_end if row.shift_end else "00:00" }}</td>
+        <td>{{ row.difference if row.difference else "00:00" }}</td>
+      </tr>
+
+    {% endfor %}
+  </tbody>
+</table>
+
+<h1 style="text-align:center; font-weight:bold; width:100%;" id="border-bottom">SUMMARY</h1>
+
+<table width="100%">
+  <tr>
+    <td style="width:50%;">
+      <table width="100%">
+        <tr><td><strong>Total days:</strong></td><td>{{ doc.month_days }}</td></tr>
+        <tr><td><strong>Present days:</strong></td><td>{{ doc.present_days }}</td></tr>
+        <tr><td><strong>Gazette/Holiday/Off:</strong></td><td>{{ doc.no_of_sundays }}</td></tr>
+
+        {# Leaves calculated from approved leave applications #}
+        <tr>
+          <td><strong>Leaves:</strong></td>
+          <td>{{ ns.leave_days }}</td>
+        </tr>
+
+        <tr><td><strong>Absent:</strong></td><td>{{ doc.total_absents }}</td></tr>
+        <tr><td><strong>Half Day:</strong></td><td>{{ doc.total_half_days }}</td></tr>
+        <tr><td><strong>Total Late:</strong></td><td>{{ doc.total_lates }}</td></tr>
+        <tr><td id="border-bottom"><strong>Total Minutes of Early Out:</strong></td><td id="border-bottom">{{ doc.total_early_going_hours }}</td></tr>
+      </table>
+    </td>
+  </tr>
+</table>
