@@ -1,0 +1,111 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-05-21 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "employee",
+  "employee_name",
+  "employment_type",
+  "leave_balance",
+  "actual_encashable_days",
+  "encashment_days",
+  "encashment_amount",
+  "leave_encashment",
+  "status",
+  "remarks"
+ ],
+ "fields": [
+  {
+   "fieldname": "employee",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Employee",
+   "options": "Employee",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "employee.employee_name",
+   "fieldname": "employee_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Employee Name",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "employee.employment_type",
+   "fieldname": "employment_type",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Employment Type",
+   "read_only": 1
+  },
+  {
+   "fieldname": "leave_balance",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Leave Balance",
+   "read_only": 1
+  },
+  {
+   "fieldname": "actual_encashable_days",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Actual Encashable Days",
+   "read_only": 1
+  },
+  {
+   "fieldname": "encashment_days",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Encashment Days"
+  },
+  {
+   "fieldname": "encashment_amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Encashment Amount",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "fieldname": "leave_encashment",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Leave Encashment",
+   "options": "Leave Encashment",
+   "read_only": 1
+  },
+  {
+   "default": "Pending",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Pending\nCreated\nSkipped",
+   "read_only": 1
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Data",
+   "label": "Remarks",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-05-21 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Tif Customization",
+ "name": "Leave Encashment Bulk Employee",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

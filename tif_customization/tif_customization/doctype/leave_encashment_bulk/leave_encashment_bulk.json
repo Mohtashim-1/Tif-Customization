@@ -1,0 +1,188 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-05-21 00:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "series",
+  "column_break_uhin",
+  "company",
+  "column_break_avdc",
+  "leave_period",
+  "column_break_lcgg",
+  "leave_type",
+  "column_break_gwnh",
+  "encashment_date",
+  "employment_type",
+  "section_break_settings",
+  "submit_leave_encashment",
+  "section_break_employees",
+  "employees",
+  "section_break_totals",
+  "total_employees",
+  "column_break_olvg",
+  "total_encashment_amount",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "leave_period",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Leave Period",
+   "options": "Leave Period",
+   "reqd": 1
+  },
+  {
+   "default": "Annual Leave",
+   "fieldname": "leave_type",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Leave Type",
+   "link_filters": "[[\"Leave Type\",\"leave_type_name\",\"=\",\"Annual Leave\"]]",
+   "options": "Leave Type",
+   "reqd": 1
+  },
+  {
+   "default": "Full Time -  (Permanent)",
+   "fieldname": "employment_type",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "in_list_view": 1,
+   "label": "Employment Type",
+   "reqd": 1
+  },
+  {
+   "default": "Today",
+   "fieldname": "encashment_date",
+   "fieldtype": "Date",
+   "label": "Encashment Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_settings",
+   "fieldtype": "Section Break",
+   "label": "Settings"
+  },
+  {
+   "default": "1",
+   "description": "If checked, created Leave Encashment will be submitted (docstatus = 1).",
+   "fieldname": "submit_leave_encashment",
+   "fieldtype": "Check",
+   "label": "Submit Leave Encashment"
+  },
+  {
+   "fieldname": "section_break_employees",
+   "fieldtype": "Section Break",
+   "label": "Employees"
+  },
+  {
+   "fieldname": "employees",
+   "fieldtype": "Table",
+   "label": "Employees",
+   "options": "Leave Encashment Bulk Employee",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_totals",
+   "fieldtype": "Section Break",
+   "label": "Totals"
+  },
+  {
+   "fieldname": "total_employees",
+   "fieldtype": "Int",
+   "label": "Total Employees",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_encashment_amount",
+   "fieldtype": "Currency",
+   "label": "Total Encashment Amount",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_avdc",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_lcgg",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_gwnh",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_olvg",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "series",
+   "fieldtype": "Select",
+   "label": "Series",
+   "options": "LEB-.#."
+  },
+  {
+   "fieldname": "column_break_uhin",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Leave Encashment Bulk",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-05-21 16:59:20.228544",
+ "modified_by": "Administrator",
+ "module": "Tif Customization",
+ "name": "Leave Encashment Bulk",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "HR Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "HR User",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "leave_type"
+}

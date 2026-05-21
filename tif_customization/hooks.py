@@ -151,9 +151,9 @@ jinja = {
 # ---------------
 # Override standard doctype classes
 
-# override_doctype_class = {
-# 	"ToDo": "custom_app.overrides.CustomToDo"
-# }
+override_doctype_class = {
+	"Leave Encashment": "tif_customization.tif_customization.overrides.leave_encashment.CustomLeaveEncashment"
+}
 
 # Document Events
 # ---------------   
@@ -170,8 +170,9 @@ doc_events = {
     "Leave Application": {
         "validate": [
             "tif_customization.tif_customization.doctype.leave_application.leave_application.leave_apply_on_probabe_base",
-            "tif_customization.tif_customization.doctype.leave_application.leave_application.sync_leave_approver_todo",
-        ]
+            # "tif_customization.tif_customization.doctype.leave_application.leave_application.sync_leave_approver_todo",
+        ],
+        "after_save": "tif_customization.tif_customization.doctype.leave_application.leave_application.sync_leave_approver_todo",
     },
     "Employee Attendance": {
         "validate": "tif_customization.tif_customization.doctype.employee_attendance.employee_attendance.validate_sat_attendance"

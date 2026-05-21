@@ -1,0 +1,240 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "naming_series:naming_series",
+ "creation": "2026-05-21 00:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "column_break_dzsh",
+  "company",
+  "column_break_mwov",
+  "posting_date",
+  "column_break_3",
+  "bonus_event",
+  "from_date",
+  "to_date",
+  "section_break_settings",
+  "salary_component",
+  "submit_additional_salary",
+  "attendance_check",
+  "column_break_settings_2",
+  "full_time_employment_types",
+  "part_time_employment_types",
+  "full_time_percentage",
+  "part_time_amount",
+  "section_break_employees",
+  "employees",
+  "section_break_totals",
+  "total_employees",
+  "column_break_tjve",
+  "total_bonus_amount",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "bonus_event",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Bonus Event",
+   "options": "First Eid\nSecond Eid",
+   "reqd": 1
+  },
+  {
+   "default": "Today",
+   "fieldname": "posting_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Posting Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "from_date",
+   "fieldtype": "Date",
+   "hidden": 1,
+   "label": "Attendance From Date"
+  },
+  {
+   "fieldname": "to_date",
+   "fieldtype": "Date",
+   "hidden": 1,
+   "label": "Attendance To Date"
+  },
+  {
+   "fieldname": "section_break_settings",
+   "fieldtype": "Section Break",
+   "label": "Settings"
+  },
+  {
+   "fieldname": "salary_component",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Salary Component",
+   "options": "Salary Component",
+   "reqd": 1
+  },
+  {
+   "default": "1",
+   "description": "If checked, created Additional Salary will be submitted (docstatus = 1).",
+   "fieldname": "submit_additional_salary",
+   "fieldtype": "Check",
+   "label": "Submit Additional Salary"
+  },
+  {
+   "default": "ERPNext Attendance (Absent/Half Day)",
+   "description": "Used only while fetching employees. If Attendance dates are not marked, keep this as None and select employees manually.",
+   "fieldname": "attendance_check",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Attendance Check",
+   "options": "None\nERPNext Attendance (Absent/Half Day)"
+  },
+  {
+   "fieldname": "column_break_settings_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Full Time -  (Permanent)",
+   "description": "One per line. Used while fetching employees.",
+   "fieldname": "full_time_employment_types",
+   "fieldtype": "Small Text",
+   "hidden": 1,
+   "label": "Full Time Employment Types"
+  },
+  {
+   "default": "Part Time - (Permanent)",
+   "description": "One per line. Used while fetching employees.",
+   "fieldname": "part_time_employment_types",
+   "fieldtype": "Small Text",
+   "hidden": 1,
+   "label": "Part Time Employment Types"
+  },
+  {
+   "default": "50",
+   "fieldname": "full_time_percentage",
+   "fieldtype": "Float",
+   "hidden": 1,
+   "label": "Full Time Bonus % of Salary",
+   "precision": "2"
+  },
+  {
+   "default": "10000",
+   "fieldname": "part_time_amount",
+   "fieldtype": "Currency",
+   "hidden": 1,
+   "label": "Part Time Bonus Amount",
+   "precision": "2"
+  },
+  {
+   "fieldname": "section_break_employees",
+   "fieldtype": "Section Break",
+   "label": "Employees"
+  },
+  {
+   "fieldname": "employees",
+   "fieldtype": "Table",
+   "label": "Employees",
+   "options": "Bonus Bulk Employee",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_totals",
+   "fieldtype": "Section Break",
+   "label": "Totals"
+  },
+  {
+   "fieldname": "total_employees",
+   "fieldtype": "Int",
+   "label": "Total Employees",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_bonus_amount",
+   "fieldtype": "Currency",
+   "label": "Total Bonus Amount",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_mwov",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_tjve",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Series",
+   "options": "BB-.#."
+  },
+  {
+   "fieldname": "column_break_dzsh",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Bonus Bulk",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-05-21 16:31:44.630455",
+ "modified_by": "Administrator",
+ "module": "Tif Customization",
+ "name": "Bonus Bulk",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "HR Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "HR User",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "bonus_event",
+ "track_changes": 1
+}

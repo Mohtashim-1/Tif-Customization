@@ -49,6 +49,26 @@ def get_accrued_leaves(
 	return min(flt(total_leaves), flt(accrued))
 
 
+def snap_leave_display(value) -> float:
+	"""Half-day display: 1st decimal > 5 → .5; otherwise whole number."""
+	v = flt(value)
+	sign = -1 if v < 0 else 1
+	abs_v = abs(v)
+	integer = int(abs_v)
+	first_decimal = int((abs_v - integer) * 10 + 1e-9)
+
+	snapped = float(integer)
+	if first_decimal > 5 or first_decimal == 5:
+		snapped = integer + 0.5
+
+	return sign * snapped
+
+
+def format_leave_qty(value) -> float:
+	"""Snap to half-day increments and round to 1 decimal for UI."""
+	return flt(snap_leave_display(value), 1)
+
+
 def is_accrual_restricted_employee(employee: str) -> bool:
 	employment_type = frappe.db.get_value("Employee", employee, "employment_type")
 	return employment_type in ACCRUAL_EMPLOYMENT_TYPES
@@ -145,7 +165,6 @@ def get_leave_details(employee, date, for_salary_slip=False):
 	
 	allocation_records = get_leave_allocation_records(employee, date)
 	leave_allocation = {}
-	precision = cint(frappe.db.get_single_value("System Settings", "float_precision")) or 2
 	is_restricted_employee = is_accrual_restricted_employee(employee)
 	reference_date = getdate(date)
 
@@ -184,13 +203,13 @@ def get_leave_details(employee, date, for_salary_slip=False):
 		)
 
 		leave_allocation[d] = {
-			"total_leaves": flt(allocation.total_leaves_allocated, precision),
-			"expired_leaves": flt(expired_leaves, precision) if expired_leaves > 0 else 0,
-			"leaves_taken": flt(leaves_taken, precision),
-			"leaves_pending_approval": flt(leaves_pending, precision),
-			"leave_allowed_as_per_accrual": flt(leave_allowed_as_per_accrual, precision),
-			"available_leaves_as_per_accrual": flt(available_leaves_as_per_accrual, precision),
-			"remaining_leaves": flt(remaining_leaves, precision),
+			"total_leaves": format_leave_qty(allocation.total_leaves_allocated),
+			"expired_leaves": format_leave_qty(expired_leaves) if expired_leaves > 0 else 0,
+			"leaves_taken": format_leave_qty(leaves_taken),
+			"leaves_pending_approval": format_leave_qty(leaves_pending),
+			"leave_allowed_as_per_accrual": format_leave_qty(leave_allowed_as_per_accrual),
+			"available_leaves_as_per_accrual": format_leave_qty(available_leaves_as_per_accrual),
+			"remaining_leaves": format_leave_qty(remaining_leaves),
 		}
 
 	# is used in set query
