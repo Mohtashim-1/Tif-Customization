@@ -1,0 +1,200 @@
+{
+ "charts": [],
+ "content": "[{\"id\":\"pfHdr001\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Provident Fund</b></span>\",\"col\":12}},{\"id\":\"pfSc001\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"PF Dashboard\",\"col\":3}},{\"id\":\"pfSc002\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"PF Contribution Log\",\"col\":3}},{\"id\":\"pfSc003\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"PF Settings\",\"col\":3}},{\"id\":\"pfSc004\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Salary Register\",\"col\":3}},{\"id\":\"pfSp001\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"pfHdr002\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Transactions &amp; Masters</b></span>\",\"col\":12}},{\"id\":\"pfCd001\",\"type\":\"card\",\"data\":{\"card_name\":\"PF\",\"col\":4}},{\"id\":\"pfCd002\",\"type\":\"card\",\"data\":{\"card_name\":\"Payroll\",\"col\":4}},{\"id\":\"pfCd003\",\"type\":\"card\",\"data\":{\"card_name\":\"Salary Components\",\"col\":4}}]",
+ "creation": "2026-05-25 12:00:00.000000",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "for_user": "",
+ "hide_custom": 0,
+ "icon": "money-coins-1",
+ "idx": 0,
+ "indicator_color": "blue",
+ "is_hidden": 0,
+ "label": "Provident Fund",
+ "links": [
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "PF",
+   "link_count": 5,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "PF Dashboard",
+   "link_count": 0,
+   "link_to": "pf-dashboard",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "PF Settings",
+   "link_count": 0,
+   "link_to": "PF Settings",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "PF Contribution Log",
+   "link_count": 0,
+   "link_to": "PF Contribution Log",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Employee",
+   "link_count": 0,
+   "link_to": "Employee",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Payroll",
+   "link_count": 5,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Salary Slip",
+   "link_count": 0,
+   "link_to": "Salary Slip",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Salary Structure",
+   "link_count": 0,
+   "link_to": "Salary Structure",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Additional Salary",
+   "link_count": 0,
+   "link_to": "Additional Salary",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Salary Register",
+   "link_count": 0,
+   "link_to": "salary-register",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Variable Components",
+   "link_count": 0,
+   "link_to": "variable-components",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Salary Components",
+   "link_count": 2,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Provident Fund Deduction",
+   "link_count": 0,
+   "link_to": "Provident Fund Deduction",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Employer Provident Fund Contribution",
+   "link_count": 0,
+   "link_to": "Employer Provident Fund Contribution",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-05-25 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Tif Customization",
+ "name": "Provident Fund",
+ "number_cards": [],
+ "owner": "Administrator",
+ "parent_page": "",
+ "public": 1,
+ "quick_lists": [],
+ "roles": [],
+ "sequence_id": 45.0,
+ "shortcuts": [
+  {
+   "color": "Blue",
+   "label": "PF Dashboard",
+   "link_to": "pf-dashboard",
+   "type": "Page"
+  },
+  {
+   "color": "Green",
+   "doc_view": "List",
+   "label": "PF Contribution Log",
+   "link_to": "PF Contribution Log",
+   "type": "DocType"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "Form",
+   "label": "PF Settings",
+   "link_to": "PF Settings",
+   "type": "DocType"
+  },
+  {
+   "color": "Orange",
+   "label": "Salary Register",
+   "link_to": "salary-register",
+   "type": "Page"
+  },
+  {
+   "color": "Purple",
+   "label": "Variable Components",
+   "link_to": "variable-components",
+   "type": "Page"
+  }
+ ],
+ "title": "Provident Fund"
+}

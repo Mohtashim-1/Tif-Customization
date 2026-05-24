@@ -1,0 +1,272 @@
+.vc-root {
+	padding: 8px 4px 28px;
+}
+
+.vc-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-end;
+	gap: 12px;
+	margin-bottom: 14px;
+	padding: 14px;
+	background: #f8f9fa;
+	border: 1px solid #dee2e6;
+	border-radius: 8px;
+}
+
+.vc-toolbar .filter-field label {
+	font-size: 11px;
+	font-weight: 600;
+	color: #495057;
+	margin-bottom: 4px;
+	display: block;
+}
+
+.vc-toolbar .filter-field {
+	min-width: 200px;
+}
+
+.vc-toolbar__actions {
+	margin-left: auto;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	align-items: center;
+}
+
+.vc-dirty-hint {
+	font-size: 11px;
+	color: #d97706;
+	font-weight: 600;
+	display: none;
+}
+
+.vc-dirty-hint.is-visible {
+	display: inline-block;
+}
+
+.vc-sheet-wrap {
+	overflow: auto;
+	max-width: 100%;
+	border: 1px solid #adb5bd;
+	background: #fff;
+	max-height: calc(100vh - 220px);
+}
+
+.vc-head {
+	text-align: center;
+	padding: 14px 10px 10px;
+	border-bottom: 2px solid #1e3a5f;
+	background: linear-gradient(180deg, #f0f4fa 0%, #fff 100%);
+}
+
+.vc-head .org-name {
+	font-size: 15px;
+	font-weight: 700;
+	color: #1e3a5f;
+}
+
+.vc-head .sheet-title {
+	font-size: 13px;
+	font-weight: 700;
+	margin-top: 4px;
+}
+
+.vc-head .sheet-sub {
+	font-size: 11px;
+	color: #555;
+	margin-top: 2px;
+}
+
+.vc-table {
+	width: max-content;
+	min-width: 100%;
+	border-collapse: collapse;
+	font-size: 10px;
+}
+
+.vc-table th,
+.vc-table td {
+	border: 1px solid #adb5bd;
+	padding: 2px 4px;
+	vertical-align: middle;
+	white-space: nowrap;
+}
+
+.vc-table thead th {
+	background: #d9e2f3;
+	font-weight: 700;
+	text-align: center;
+	font-size: 9px;
+	line-height: 1.25;
+	position: sticky;
+	top: 0;
+	z-index: 3;
+}
+
+.vc-table thead tr.hdr-row-2 th {
+	top: 28px;
+	z-index: 2;
+}
+
+.vc-table .hdr-salary {
+	background: #b4c6e7 !important;
+	color: #1e3a5f;
+}
+
+.vc-table .vc-salary-cell {
+	background: #f8fafc;
+	font-weight: 600;
+	color: #334155;
+}
+
+.vc-legend .swatch-salary {
+	width: 14px;
+	height: 14px;
+	background: #b4c6e7;
+	border: 1px solid #adb5bd;
+}
+
+.vc-table .hdr-earning {
+	background: #c6e0b4 !important;
+	color: #1b4332;
+}
+
+.vc-table .hdr-deduction {
+	background: #f4c7c3 !important;
+	color: #7f1d1d;
+}
+
+.vc-table .hdr-group-main {
+	background: #b4c6e7 !important;
+	font-size: 10px;
+}
+
+.vc-table .hdr-info {
+	background: #d9e2f3 !important;
+}
+
+.vc-table .section-row td {
+	background: #d9d9d9 !important;
+	font-weight: 700;
+	font-size: 10px;
+	position: sticky;
+	left: 0;
+	z-index: 1;
+}
+
+.vc-table .section-total td {
+	background: #e2efda !important;
+	font-weight: 700;
+}
+
+.vc-table .col-sticky {
+	position: sticky;
+	left: 0;
+	background: #fff;
+	z-index: 1;
+	box-shadow: 2px 0 4px rgba(0, 0, 0, 0.06);
+}
+
+.vc-table .col-sticky-2 {
+	position: sticky;
+	left: 36px;
+	background: #fff;
+	z-index: 1;
+}
+
+.vc-table .col-name {
+	min-width: 160px;
+	max-width: 200px;
+	white-space: normal;
+	text-align: left;
+}
+
+.vc-table .col-desig {
+	min-width: 110px;
+	white-space: normal;
+	text-align: left;
+	font-size: 9px;
+}
+
+.vc-table .text-center {
+	text-align: center;
+}
+
+.vc-table .text-right {
+	text-align: right;
+}
+
+.vc-table input.vc-input {
+	width: 72px;
+	max-width: 88px;
+	font-size: 10px;
+	padding: 2px 4px;
+	height: 22px;
+	text-align: right;
+	border: 1px solid #ced4da;
+	border-radius: 3px;
+}
+
+.vc-table input.vc-input:focus {
+	border-color: #0f766e;
+	outline: none;
+	box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.2);
+}
+
+.vc-table input.vc-input.is-dirty {
+	background: #fffbeb;
+	border-color: #f59e0b;
+}
+
+.vc-table input.vc-input.is-readonly {
+	background: #f1f5f9;
+	color: #64748b;
+	cursor: not-allowed;
+}
+
+.vc-table input.vc-input.has-value {
+	font-weight: 600;
+}
+
+.vc-empty {
+	padding: 48px;
+	text-align: center;
+	color: #6c757d;
+}
+
+.vc-legend {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 16px;
+	margin-bottom: 10px;
+	font-size: 11px;
+	color: #64748b;
+}
+
+.vc-legend span {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.vc-legend .swatch-earn {
+	width: 14px;
+	height: 14px;
+	background: #c6e0b4;
+	border: 1px solid #adb5bd;
+}
+
+.vc-legend .swatch-ded {
+	width: 14px;
+	height: 14px;
+	background: #f4c7c3;
+	border: 1px solid #adb5bd;
+}
+
+.vc-legend .swatch-dirty {
+	width: 14px;
+	height: 14px;
+	background: #fffbeb;
+	border: 1px solid #f59e0b;
+}
