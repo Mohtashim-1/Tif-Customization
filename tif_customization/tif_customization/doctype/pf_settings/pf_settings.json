@@ -1,0 +1,123 @@
+{
+ "actions": [],
+ "creation": "2026-05-25 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "company",
+  "section_accounts",
+  "pf_payable_account",
+  "employer_pf_expense_account",
+  "section_components",
+  "employee_pf_component",
+  "employer_pf_component",
+  "section_defaults",
+  "default_employee_pf_rate",
+  "default_employer_pf_rate",
+  "pf_formula_base"
+ ],
+ "fields": [
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_accounts",
+   "fieldtype": "Section Break",
+   "label": "Accounts"
+  },
+  {
+   "fieldname": "pf_payable_account",
+   "fieldtype": "Link",
+   "label": "Provident Fund Payable Account",
+   "options": "Account",
+   "reqd": 1
+  },
+  {
+   "fieldname": "employer_pf_expense_account",
+   "fieldtype": "Link",
+   "label": "Employer PF Expense Account",
+   "options": "Account",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_components",
+   "fieldtype": "Section Break",
+   "label": "Salary Components"
+  },
+  {
+   "default": "Provident Fund Deduction",
+   "fieldname": "employee_pf_component",
+   "fieldtype": "Link",
+   "label": "Employee PF Deduction Component",
+   "options": "Salary Component",
+   "reqd": 1
+  },
+  {
+   "default": "Employer Provident Fund Contribution",
+   "fieldname": "employer_pf_component",
+   "fieldtype": "Link",
+   "label": "Employer PF Component",
+   "options": "Salary Component",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_defaults",
+   "fieldtype": "Section Break",
+   "label": "Default Rates"
+  },
+  {
+   "default": "8.33",
+   "fieldname": "default_employee_pf_rate",
+   "fieldtype": "Percent",
+   "label": "Default Employee PF Rate (%)"
+  },
+  {
+   "default": "8.33",
+   "fieldname": "default_employer_pf_rate",
+   "fieldtype": "Percent",
+   "label": "Default Employer PF Rate (%)"
+  },
+  {
+   "default": "Gross",
+   "fieldname": "pf_formula_base",
+   "fieldtype": "Select",
+   "label": "PF Formula Base",
+   "options": "Base\nGross"
+  }
+ ],
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-05-25 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Tif Customization",
+ "name": "PF Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "HR Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

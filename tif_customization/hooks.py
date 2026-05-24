@@ -9,6 +9,7 @@ app_license = "mit"
 # ------------------
 fixtures = [
 	{"dt": "Custom HTML Block", "filters": [["name", "in", ["Trustee Easy Menu"]]]},
+	{"dt": "Workspace", "filters": [["name", "in", ["Provident Fund"]]]},
 ]
 
 # Apps
@@ -60,7 +61,7 @@ page_js = {
 	"stock-detail" : "tif_customization/page/stock_detail/stock_detail.js",
 	"courier-report" : "tif_customization/page/courier_report/courier_report.js",
 	"dispatch-report" : "tif_customization/page/dispatch_report/dispatch_report.js",
-	"procurement-expense" : "tif_customization/page/procurement_expense/procurement_expense.js"
+	"procurement-expense" : "tif_customization/page/procurement_expense/procurement_expense.js",
 }
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 doctype_list_js = {
@@ -182,8 +183,18 @@ doc_events = {
     },
     "Loan Application": {
         "validate": "tif_customization.tif_customization.doctype.loan_application.loan_application.populate_previous_loan_and_leave_details"
-    }
+    },
+    "Salary Slip": {
+        "on_submit": "tif_customization.tif_customization.pf.pf_contribution.sync_log_from_salary_slip",
+        "on_cancel": "tif_customization.tif_customization.pf.pf_contribution.cancel_log_from_salary_slip",
+    },
+    "Additional Salary": {
+        "on_submit": "tif_customization.tif_customization.pf.pf_contribution.sync_log_from_additional_salary",
+        "on_cancel": "tif_customization.tif_customization.pf.pf_contribution.cancel_log_from_additional_salary",
+    },
 }
+
+after_migrate = ["tif_customization.tif_customization.pf.setup.run_pf_setup_on_migrate"]
 
 # Scheduled Tasks
 # ---------------

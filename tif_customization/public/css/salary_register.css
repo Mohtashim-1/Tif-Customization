@@ -1,0 +1,165 @@
+.salary-register-root {
+	padding: 8px 4px 24px;
+}
+
+.salary-register-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-end;
+	gap: 12px;
+	margin-bottom: 16px;
+	padding: 14px;
+	background: #f8f9fa;
+	border: 1px solid #dee2e6;
+	border-radius: 8px;
+}
+
+.salary-register-toolbar .filter-field {
+	min-width: 200px;
+}
+
+.salary-register-toolbar .filter-field label {
+	font-size: 11px;
+	font-weight: 600;
+	color: #495057;
+	margin-bottom: 4px;
+	display: block;
+}
+
+.salary-register-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin-left: auto;
+}
+
+.salary-register-sheet-wrap {
+	overflow: auto;
+	max-width: 100%;
+	border: 1px solid #adb5bd;
+	background: #fff;
+}
+
+.salary-register-head {
+	text-align: center;
+	padding: 12px 8px 8px;
+}
+
+.salary-register-head .org-name {
+	font-size: 15px;
+	font-weight: 700;
+	letter-spacing: 0.3px;
+}
+
+.salary-register-head .sheet-title {
+	font-size: 13px;
+	font-weight: 700;
+	margin-top: 4px;
+}
+
+.salary-register-head .sheet-sub {
+	font-size: 11px;
+	color: #555;
+	margin-top: 2px;
+}
+
+.salary-register-table {
+	width: max-content;
+	min-width: 100%;
+	border-collapse: collapse;
+	font-size: 10px;
+}
+
+.salary-register-table th,
+.salary-register-table td {
+	border: 1px solid #adb5bd;
+	padding: 3px 5px;
+	vertical-align: middle;
+	white-space: nowrap;
+}
+
+.salary-register-table thead th {
+	background: #d9e2f3;
+	font-weight: 700;
+	text-align: center;
+	font-size: 9px;
+	line-height: 1.2;
+}
+
+.salary-register-table .hdr-group-1 {
+	background: #b4c6e7;
+}
+
+.salary-register-table .hdr-group-2 {
+	background: #c6d9f0;
+}
+
+.salary-register-table tbody td {
+	background: #fff;
+}
+
+.salary-register-table .section-row td {
+	background: #d9d9d9 !important;
+	font-weight: 700;
+	font-size: 10px;
+}
+
+.salary-register-table .section-total td {
+	background: #e2efda !important;
+	font-weight: 700;
+}
+
+.salary-register-table .grand-total td {
+	background: #fff2cc !important;
+	font-weight: 700;
+}
+
+.salary-register-table .text-left {
+	text-align: left;
+}
+
+.salary-register-table .text-center {
+	text-align: center;
+}
+
+.salary-register-table .text-right {
+	text-align: right;
+}
+
+.salary-register-table .col-name {
+	min-width: 150px;
+	max-width: 200px;
+	white-space: normal;
+}
+
+.salary-register-table .col-desig {
+	min-width: 120px;
+	max-width: 160px;
+	white-space: normal;
+}
+
+.salary-register-empty {
+	text-align: center;
+	padding: 48px 16px;
+	color: #6c757d;
+}
+
+@media print {
+	.salary-register-toolbar {
+		display: none !important;
+	}
+
+	.salary-register-sheet-wrap {
+		overflow: visible;
+		border: none;
+	}
+
+	.salary-register-table {
+		font-size: 8px;
+	}
+
+	.page-head,
+	.layout-side-section {
+		display: none !important;
+	}
+}
