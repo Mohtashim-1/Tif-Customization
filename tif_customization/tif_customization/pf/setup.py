@@ -108,31 +108,19 @@ def ensure_pf_settings(company):
 			"Employer Provident Fund Expense first."
 		)
 
-	_pf_condition = (
-		"frappe.db.get_value('Employee', doc.employee, 'custom_pf_applicable')"
+	from tif_customization.tif_customization.pf.formulas import (
+		EMPLOYEE_PF_FORMULA,
+		EMPLOYER_PF_FORMULA,
+		PF_CONDITION,
 	)
-	_rate_emp = (
-		"frappe.db.get_value('Employee', doc.employee, 'custom_employee_pf_rate') "
-		"or frappe.db.get_single_value('PF Settings', 'default_employee_pf_rate') or 0"
-	)
-	_rate_er = (
-		"frappe.db.get_value('Employee', doc.employee, 'custom_employer_pf_rate') "
-		"or frappe.db.get_single_value('PF Settings', 'default_employer_pf_rate') or 0"
-	)
-	_pf_base = (
-		"gross_pay if (frappe.db.get_value('Employee', doc.employee, 'custom_pf_formula_base') "
-		"or frappe.db.get_single_value('PF Settings', 'pf_formula_base') or 'Gross') == 'Gross' else base"
-	)
-	_emp_formula = f"flt({_pf_base}) * flt({_rate_emp}) / 100"
-	_er_formula = f"flt({_pf_base}) * flt({_rate_er}) / 100"
 
 	emp_comp = ensure_salary_component(
 		"Provident Fund Deduction",
 		"Deduction",
 		{company: payable},
 		abbr="PF",
-		condition=_pf_condition,
-		formula=_emp_formula,
+		condition=PF_CONDITION,
+		formula=EMPLOYEE_PF_FORMULA,
 	)
 
 	er_comp = ensure_salary_component(
@@ -141,8 +129,8 @@ def ensure_pf_settings(company):
 		{company: expense},
 		abbr="EPF",
 		do_not_include_in_total=1,
-		condition=_pf_condition,
-		formula=_er_formula,
+		condition=PF_CONDITION,
+		formula=EMPLOYER_PF_FORMULA,
 	)
 
 	settings = frappe.get_single("PF Settings")
@@ -170,8 +158,56 @@ def run_pf_setup_on_migrate():
 			)
 			if company:
 				ensure_pf_settings(company)
+		fix_pf_salary_component_formulas()
 	except Exception:
 		frappe.log_error(frappe.get_traceback(), "PF setup on migrate")
+
+
+def fix_pf_salary_component_formulas():
+	"""Patch Salary Component + Structure rows — removes frappe.* from PF formulas."""
+	from tif_customization.tif_customization.pf.formulas import (
+		EMPLOYEE_PF_FORMULA,
+		EMPLOYER_PF_FORMULA,
+		PF_COMPONENTS,
+		PF_CONDITION,
+	)
+
+	updated_components = 0
+	updated_rows = 0
+	for component, formula in PF_COMPONENTS.items():
+		if not frappe.db.exists("Salary Component", component):
+			continue
+		frappe.db.set_value(
+			"Salary Component",
+			component,
+			{
+				"condition": PF_CONDITION,
+				"formula": formula,
+				"amount_based_on_formula": 1,
+			},
+			update_modified=False,
+		)
+		updated_components += 1
+		rows = frappe.db.sql(
+			"""
+			SELECT name FROM `tabSalary Detail`
+			WHERE salary_component = %(component)s
+			""",
+			{"component": component},
+		)
+		if rows:
+			frappe.db.sql(
+				"""
+				UPDATE `tabSalary Detail`
+				SET `condition` = %(condition)s, formula = %(formula)s, amount_based_on_formula = 1
+				WHERE salary_component = %(component)s
+				""",
+				{"condition": PF_CONDITION, "formula": formula, "component": component},
+			)
+			updated_rows += len(rows)
+
+	frappe.clear_cache(doctype="Salary Component")
+	return {"updated_components": updated_components, "updated_structure_rows": updated_rows}
 
 
 def run_pf_setup(company=None):
@@ -183,6 +219,7 @@ def run_pf_setup(company=None):
 
 	setup_pf_custom_fields()
 	ensure_pf_settings(company)
+	fix_pf_salary_component_formulas()
 	frappe.db.commit()
 	return {"company": company, "message": "PF setup completed"}
 

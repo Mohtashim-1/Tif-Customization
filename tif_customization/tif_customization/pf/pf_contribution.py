@@ -52,6 +52,40 @@ def _employee_pf_rates(employee):
 	}
 
 
+def get_pf_formula_base_for_employee(employee):
+	"""Return 'Gross' or 'Basic' per employee / PF Settings."""
+	settings = get_pf_settings()
+	emp_base = frappe.db.get_value("Employee", employee, "custom_pf_formula_base")
+	formula = emp_base or getattr(settings, "pf_formula_base", None) or "Gross"
+	return formula if formula in ("Gross", "Basic") else "Gross"
+
+
+def get_pf_base_amount(employee, projected_gross, assigned_base=None):
+	"""PF calculation base for variable sheet / previews."""
+	if get_pf_formula_base_for_employee(employee) == "Gross":
+		return flt(projected_gross)
+	return flt(assigned_base if assigned_base is not None else projected_gross)
+
+
+def compute_pf_deduction_amount(employee, projected_gross, assigned_base=None):
+	"""Employee PF deduction from projected gross and assignment base."""
+	rates = _employee_pf_rates(employee)
+	if not rates["applicable"] or not rates["employee_rate"]:
+		return 0.0
+	pf_base = get_pf_base_amount(employee, projected_gross, assigned_base)
+	return flt(pf_base) * flt(rates["employee_rate"]) / 100
+
+
+def get_pf_meta_for_employee(employee):
+	"""Rates and flags for client-side PF preview on Variable Components."""
+	rates = _employee_pf_rates(employee)
+	return {
+		"pf_applicable": rates["applicable"],
+		"pf_rate": rates["employee_rate"],
+		"pf_formula_base": get_pf_formula_base_for_employee(employee),
+	}
+
+
 def get_amounts_from_salary_slip(salary_slip):
 	"""Return dict of PF amounts from a Salary Slip doc or name."""
 	doc = salary_slip
@@ -224,6 +258,16 @@ def setup_pf(company=None):
 	from tif_customization.tif_customization.pf.setup import run_pf_setup
 
 	return run_pf_setup(company)
+
+
+@frappe.whitelist()
+def fix_pf_formulas():
+	"""Repair PF component/structure formulas (removes invalid frappe.* in eval)."""
+	from tif_customization.tif_customization.pf.setup import fix_pf_salary_component_formulas
+
+	result = fix_pf_salary_component_formulas()
+	frappe.db.commit()
+	return result
 
 
 @frappe.whitelist()

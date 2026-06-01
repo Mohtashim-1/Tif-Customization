@@ -1,6 +1,6 @@
 {
  "charts": [],
- "content": "[{\"id\":\"B2Oa7zB4ca\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Reports</span>\",\"col\":12}},{\"id\":\"CluU3Swx76\",\"type\":\"card\",\"data\":{\"card_name\":\"Supply Chain\",\"col\":4}},{\"id\":\"NSUIMsvRee\",\"type\":\"card\",\"data\":{\"card_name\":\"Purchase\",\"col\":4}}]",
+ "content": "[{\"id\":\"B2Oa7zB4ca\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Reports</span>\",\"col\":12}},{\"id\":\"CluU3Swx76\",\"type\":\"card\",\"data\":{\"card_name\":\"Supply Chain\",\"col\":4}},{\"id\":\"ema4xqDvdc\",\"type\":\"card\",\"data\":{\"card_name\":\"Accounts\",\"col\":4}},{\"id\":\"NSUIMsvRee\",\"type\":\"card\",\"data\":{\"card_name\":\"Purchase\",\"col\":4}}]",
  "creation": "2025-12-29 00:25:08.999696",
  "custom_blocks": [],
  "docstatus": 0,
@@ -55,7 +55,7 @@
    "hidden": 0,
    "is_query_report": 0,
    "label": "Purchase",
-   "link_count": 3,
+   "link_count": 2,
    "link_type": "DocType",
    "onboard": 0,
    "type": "Card Break"
@@ -83,15 +83,34 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Sales Return Report",
+   "label": "Accounts",
+   "link_count": 2,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Donation Analytics",
    "link_count": 0,
-   "link_to": "Sales Return Report",
-   "link_type": "Report",
+   "link_to": "donation-analytics",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Donation Collection",
+   "link_count": 0,
+   "link_to": "donation-collection-",
+   "link_type": "Page",
    "onboard": 0,
    "type": "Link"
   }
  ],
- "modified": "2026-01-03 11:31:44.165711",
+ "modified": "2026-05-25 14:27:49.820013",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Reports",

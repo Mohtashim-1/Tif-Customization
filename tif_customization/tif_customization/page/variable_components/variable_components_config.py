@@ -18,7 +18,11 @@ VARIABLE_DEDUCTIONS = [
 	{"key": "pf", "label": "PF", "components": ["Provident Fund Deduction"], "readonly": True},
 	{"key": "fuel_ded", "label": "Fuel Deduction", "components": ["Fuel Deducted", "Conveyance Allowance Deduction"]},
 	{"key": "other_ded", "label": "Other Deduction", "components": ["Other Deduction"]},
-	{"key": "tax", "label": "Tax", "components": ["Income Tax Deduction", "Withholding Tax", "Income Tax"]},
+	{
+		"key": "tax",
+		"label": "Tax",
+		"components": ["Income Tax Deduction", "Withholding Tax", "Income Tax"],
+	},
 ]
 
 

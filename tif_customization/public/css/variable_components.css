@@ -26,6 +26,26 @@
 	min-width: 200px;
 }
 
+.vc-toolbar .filter-field--period {
+	min-width: 280px;
+}
+
+.vc-period-row {
+	display: flex;
+	gap: 6px;
+	align-items: stretch;
+}
+
+.vc-period-row .period-select {
+	flex: 1;
+	min-width: 0;
+}
+
+.vc-period-row .btn-new-period {
+	flex-shrink: 0;
+	padding: 4px 8px;
+}
+
 .vc-toolbar__actions {
 	margin-left: auto;
 	display: flex;
@@ -43,6 +63,77 @@
 
 .vc-dirty-hint.is-visible {
 	display: inline-block;
+}
+
+.vc-roster-panel {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 14px;
+	margin-bottom: 12px;
+	padding: 12px 14px;
+	background: #eff6ff;
+	border: 1px solid #93c5fd;
+	border-radius: 8px;
+	font-size: 12px;
+}
+
+.vc-roster-panel__steps {
+	flex: 1 1 320px;
+	min-width: 280px;
+}
+
+.vc-roster-panel__steps ol {
+	margin: 6px 0 0 18px;
+	padding: 0;
+	color: #475569;
+	font-size: 11px;
+	line-height: 1.5;
+}
+
+.vc-roster-panel__actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+}
+
+.vc-roster-status {
+	font-size: 11px;
+	margin-right: 4px;
+}
+
+.vc-payroll-panel {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+	margin-bottom: 12px;
+	padding: 10px 14px;
+	background: #ecfdf5;
+	border: 1px solid #6ee7b7;
+	border-radius: 8px;
+	font-size: 12px;
+}
+
+.vc-payroll-panel__status a {
+	font-weight: 600;
+}
+
+.vc-payroll-panel__selection {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+}
+
+.vc-payroll-count {
+	font-weight: 600;
+	color: #065f46;
+}
+
+.btn-create-payroll:disabled {
+	opacity: 0.55;
 }
 
 .vc-sheet-wrap {
@@ -120,6 +211,16 @@
 	color: #334155;
 }
 
+.vc-net-preview.vc-net-changed {
+	color: #0f766e;
+	font-weight: 800;
+}
+
+.vc-gross-preview,
+.vc-ded-preview {
+	font-weight: 600;
+}
+
 .vc-legend .swatch-salary {
 	width: 14px;
 	height: 14px;
@@ -170,7 +271,7 @@
 
 .vc-table .col-sticky-2 {
 	position: sticky;
-	left: 36px;
+	left: 72px;
 	background: #fff;
 	z-index: 1;
 }
@@ -269,4 +370,230 @@
 	height: 14px;
 	background: #fffbeb;
 	border: 1px solid #f59e0b;
+}
+
+.vc-legend .swatch-pf {
+	width: 14px;
+	height: 14px;
+	background: #e8eaf6;
+	border: 1px solid #7986cb;
+}
+
+.vc-legend .swatch-tax {
+	width: 14px;
+	height: 14px;
+	background: #fef3c7;
+	border: 1px solid #d97706;
+}
+
+.vc-table input.vc-input[data-key="tax"] {
+	background: #fffbeb;
+}
+
+.vc-table input.vc-input[data-key="tax"].has-value {
+	color: #92400e;
+	font-weight: 600;
+}
+
+.vc-legend .swatch-payroll {
+	width: 14px;
+	height: 14px;
+	background: #ecfdf5;
+	border: 1px solid #6ee7b7;
+}
+
+.vc-table .col-payroll {
+	min-width: 36px;
+	width: 36px;
+}
+
+.vc-table .col-sticky-payroll {
+	position: sticky;
+	left: 0;
+	background: #fff;
+	z-index: 2;
+	box-shadow: 2px 0 4px rgba(0, 0, 0, 0.06);
+}
+
+.vc-table tr.vc-emp-row-ineligible {
+	opacity: 0.72;
+}
+
+.vc-table tr.vc-emp-row-ineligible .vc-payroll-cb:disabled {
+	cursor: not-allowed;
+}
+
+.vc-table .col-sticky {
+	left: 36px;
+}
+
+.vc-table input.vc-input.is-computed {
+	background: #eef2ff;
+	color: #3730a3;
+	font-weight: 600;
+	cursor: help;
+}
+
+.vc-table .hdr-payment {
+	background: #dbeafe !important;
+	color: #1e3a8a;
+}
+
+.vc-table .vc-payment-cell {
+	background: #f8fafc;
+	vertical-align: middle;
+}
+
+.vc-table .vc-net-final-amt {
+	font-weight: 700;
+	color: #0f766e;
+}
+
+.vc-table .vc-net-final-amt.vc-net-changed {
+	color: #0d9488;
+}
+
+.vc-table select.vc-payment-mode {
+	min-width: 72px;
+	max-width: 88px;
+	font-size: 9px;
+	height: 22px;
+	padding: 0 2px;
+}
+
+.vc-table input.vc-payment-bank {
+	min-width: 100px;
+	max-width: 140px;
+	font-size: 9px;
+	height: 22px;
+	padding: 2px 4px;
+}
+
+.vc-table input.vc-payment-bank:disabled {
+	background: #f1f5f9;
+	cursor: not-allowed;
+}
+
+/* Finalized: lock variable edits only; payment columns stay editable until explicitly finalized */
+.vc-sheet-locked input.vc-input[data-type="earning"],
+.vc-sheet-locked input.vc-input[data-type="deduction"]:not(.is-readonly) {
+	pointer-events: none;
+	opacity: 0.85;
+}
+
+.vc-sheet-locked.vc-sheet-fully-locked input.vc-payable-input,
+.vc-sheet-locked.vc-sheet-fully-locked .vc-payment-mode,
+.vc-sheet-locked.vc-sheet-fully-locked .vc-payment-bank {
+	pointer-events: none;
+	opacity: 0.85;
+}
+
+.vc-table input.vc-payable-input {
+	min-width: 88px;
+	font-weight: 600;
+	color: #0f766e;
+}
+
+.vc-table input.vc-payable-input::placeholder {
+	font-weight: 400;
+	color: #94a3b8;
+	font-size: 9px;
+}
+
+.vc-table input.vc-payable-input:not(.is-override) {
+	background: #f0fdf4;
+}
+
+.vc-period-status-badge .label {
+	font-size: 10px;
+	vertical-align: middle;
+}
+
+.vc-table input.vc-payable-input {
+	width: 80px;
+	max-width: 96px;
+	font-size: 10px;
+	padding: 2px 4px;
+	height: 22px;
+	text-align: right;
+}
+
+.vc-table input.vc-payable-input.is-active {
+	background: #ecfdf5;
+}
+
+.vc-table tr.vc-row-included .col-payroll .vc-payroll-cb:checked {
+	outline: 2px solid #6ee7b7;
+}
+
+.vc-payment-summary-wrap {
+	margin-top: 16px;
+	padding: 0 4px 24px;
+}
+
+.vc-payment-summary {
+	background: #fff;
+	border: 1px solid #cbd5e1;
+	border-radius: 8px;
+	padding: 16px 18px;
+}
+
+.vc-payment-summary h4 {
+	margin: 0 0 12px;
+	font-size: 14px;
+	font-weight: 700;
+	color: #1e3a5f;
+}
+
+.vc-payment-summary h5 {
+	margin: 0 0 8px;
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.vc-payment-summary__cards {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+	margin-bottom: 16px;
+}
+
+.vc-summary-card {
+	min-width: 160px;
+	padding: 12px 16px;
+	background: #f1f5f9;
+	border-radius: 8px;
+	border: 1px solid #e2e8f0;
+}
+
+.vc-summary-card--amount {
+	background: #ecfdf5;
+	border-color: #6ee7b7;
+}
+
+.vc-summary-card__label {
+	font-size: 11px;
+	color: #64748b;
+	margin-bottom: 4px;
+}
+
+.vc-summary-card__value {
+	font-size: 18px;
+	font-weight: 700;
+	color: #0f172a;
+}
+
+.vc-payment-summary__tables {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+	gap: 16px;
+}
+
+.vc-summary-table {
+	font-size: 11px;
+	margin-bottom: 0;
+}
+
+.vc-summary-table th {
+	background: #e2e8f0;
 }
