@@ -1,0 +1,32 @@
+{
+ "content": null,
+ "creation": "2026-06-03 11:25:18.918174",
+ "docstatus": 0,
+ "doctype": "Page",
+ "idx": 0,
+ "modified": "2026-06-03 11:52:11.381230",
+ "modified_by": "Administrator",
+ "module": "Tif Customization",
+ "name": "reconcillation-with-",
+ "owner": "Administrator",
+ "page_name": "reconcillation-with-",
+ "roles": [
+  {
+   "role": "COO"
+  },
+  {
+   "role": "HR Manager"
+  },
+  {
+   "role": "Accounts Manager"
+  },
+  {
+   "role": "Accounts User"
+  }
+ ],
+ "script": null,
+ "standard": "Yes",
+ "style": null,
+ "system_page": 0,
+ "title": "Reconcillation with Bank Statement"
+}
