@@ -419,7 +419,7 @@
    "insert_after": "section_break_qosm3",
    "is_system_generated": 0,
    "is_virtual": 0,
-   "label": "beneficiary",
+   "label": "Health Provider Members",
    "length": 0,
    "link_filters": null,
    "mandatory_depends_on": null,

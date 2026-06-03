@@ -54,6 +54,7 @@ doctype_js = {
 	"Delivery Note": "public/js/delivery_note.js",
 	"Leave Application": "public/js/leave_application.js",
 	"Loan Application": "tif_customization/doctype/loan_application/loan_application.js",
+	"Employee": "public/js/employee_health_provider.js",
 }
 
 # include js in page
