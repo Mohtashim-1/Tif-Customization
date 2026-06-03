@@ -60,7 +60,7 @@ FIELDS = {
 			"fieldname": "custom_plan",
 			"label": "Plan",
 			"fieldtype": "Select",
-			"options": "\nA\nB\nC\nD",
+			"options": "\nA\nB\nC\nD\nE\nF",
 			"insert_after": "custom_effective_date",
 			"in_list_view": 1,
 			"columns": 1,

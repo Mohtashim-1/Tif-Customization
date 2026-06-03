@@ -6,3 +6,4 @@
 # Patches added in this section will be executed after doctypes are migrated
 tif_customization.tif_customization.patches.v2026_03_28_school_statuses
 tif_customization.tif_customization.patches.v2026_06_03_health_provider_member_fields
+tif_customization.tif_customization.patches.v2026_06_03_health_plan_options_ef
