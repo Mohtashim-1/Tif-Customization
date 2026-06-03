@@ -1722,6 +1722,15 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 						<p style="margin: 5px 0 0 0; font-size: 12px;color: black; opacity: 0.8;">Total Books Returned</p>
 					</div>
 				</div>
+
+
+				<div style="flex: 1; padding: 0 8px;">
+					<div class="kpi-card millat-purchase-kpi" style="background: linear-gradient(135deg, #f7971e 0%, #ffd200 100%); color: black; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;" onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 4px 8px rgba(0,0,0,0.2)';" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 2px 4px rgba(0,0,0,0.1)';">
+						<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Millat Publishers Purchase Details</h5>
+						<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${formatNumber(kpiData.millat_po_total_qty || 0)}</h2>
+						<p style="margin: 5px 0 0 0; font-size: 12px;color: black; opacity: 0.8;">${formatNumber(kpiData.millat_po_count || 0)} POs | ${formatCurrency(kpiData.millat_po_total_amount || 0)}</p>
+					</div>
+				</div>
 			</div>
 			
 			<!-- Department-wise Item Count and Totals KPIs -->
@@ -2019,6 +2028,18 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 		
 		kpiSection.html(summaryHtml + itemsHtml);
 		
+		$('.millat-purchase-kpi').on('click', function() {
+			const fromDate = $('#from-date').val() || frappe.datetime.month_start();
+			const toDate = $('#to-date').val() || frappe.datetime.get_today();
+			let listUrl =
+				'/app/purchase-order?supplier=' +
+				encodeURIComponent('Millat Printers & Publishers Peshawar');
+			if (fromDate && toDate) {
+				listUrl += `&transaction_date=["between",["${fromDate}","${toDate}"]]`;
+			}
+			window.open(listUrl, '_blank');
+		});
+
 		// Add click handler for Return Books KPI
 		$('.return-books-kpi').on('click', function() {
 			// Get current date filters

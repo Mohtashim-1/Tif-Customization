@@ -1401,6 +1401,11 @@ def calculate_kpis_for_specific_items(data, filters=None):
         totals["sales_invoice_count"] = sales_invoice_stats.get("invoice_count", 0)
         totals["sales_invoice_total_qty"] = sales_invoice_stats.get("total_qty", 0)
         totals["sales_invoice_total_amount"] = sales_invoice_stats.get("total_amount", 0)
+
+        millat_po_stats = get_millat_purchase_order_stats(filters)
+        totals["millat_po_count"] = millat_po_stats.get("po_count", 0)
+        totals["millat_po_total_qty"] = millat_po_stats.get("total_qty", 0)
+        totals["millat_po_total_amount"] = millat_po_stats.get("total_amount", 0)
         
         # Combine totals and individual items
         kpi_data = {
@@ -1425,6 +1430,9 @@ def calculate_kpis_for_specific_items(data, filters=None):
             "sales_invoice_count": 0,
             "sales_invoice_total_qty": 0,
             "sales_invoice_total_amount": 0,
+            "millat_po_count": 0,
+            "millat_po_total_qty": 0,
+            "millat_po_total_amount": 0,
             "tps_item_count": 0,
             "tps_opening_stock": 0,
             "tps_available_stock": 0,
@@ -1536,6 +1544,59 @@ def get_sales_invoice_stats(filters=None):
             "total_qty": 0,
             "total_amount": 0
         }
+
+
+MILLAT_SUPPLIER = "Millat Printers & Publishers Peshawar"
+
+
+def get_millat_purchase_order_stats(filters=None):
+    """Purchase Order qty and amount for Millat Printers & Publishers Peshawar."""
+    try:
+        if filters is None:
+            filters = {}
+
+        date_filter = ""
+        date_params = []
+
+        if filters.get("from_date") and filters.get("to_date"):
+            date_filter = "AND po.transaction_date BETWEEN %s AND %s"
+            date_params = [filters.get("from_date"), filters.get("to_date")]
+        elif filters.get("from_date"):
+            date_filter = "AND po.transaction_date >= %s"
+            date_params = [filters.get("from_date")]
+        elif filters.get("to_date"):
+            date_filter = "AND po.transaction_date <= %s"
+            date_params = [filters.get("to_date")]
+
+        query = f"""
+            SELECT
+                COUNT(DISTINCT po.name) AS po_count,
+                COALESCE(SUM(poi.qty), 0) AS total_qty,
+                COALESCE(SUM(poi.base_amount), 0) AS total_amount
+            FROM `tabPurchase Order` po
+            INNER JOIN `tabPurchase Order Item` poi ON poi.parent = po.name
+            WHERE po.docstatus = 1
+              AND po.supplier = %s
+              {date_filter}
+        """
+        query_params = [MILLAT_SUPPLIER] + date_params
+        result = frappe.db.sql(query, tuple(query_params), as_dict=True)
+
+        if result:
+            return {
+                "po_count": cint(result[0].get("po_count", 0)),
+                "total_qty": flt(result[0].get("total_qty", 0)),
+                "total_amount": flt(result[0].get("total_amount", 0)),
+            }
+
+        return {"po_count": 0, "total_qty": 0, "total_amount": 0}
+    except Exception as e:
+        frappe.log_error(
+            f"Error getting Millat purchase order stats: {str(e)}",
+            "Millat PO Stats Error",
+        )
+        return {"po_count": 0, "total_qty": 0, "total_amount": 0}
+
 
 @frappe.whitelist()
 def get_stock_data(filters=None):
