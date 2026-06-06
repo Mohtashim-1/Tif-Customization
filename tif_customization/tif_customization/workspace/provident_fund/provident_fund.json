@@ -1,7 +1,7 @@
 {
  "charts": [],
  "content": "[{\"id\":\"pfHdr001\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Provident Fund</b></span>\",\"col\":12}},{\"id\":\"pfSc001\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"PF Dashboard\",\"col\":3}},{\"id\":\"pfSc002\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"PF Contribution Log\",\"col\":3}},{\"id\":\"pfSc003\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"PF Settings\",\"col\":3}},{\"id\":\"pfSc004\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Salary Register\",\"col\":3}},{\"id\":\"pfSp001\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"pfHdr002\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Transactions &amp; Masters</b></span>\",\"col\":12}},{\"id\":\"pfCd001\",\"type\":\"card\",\"data\":{\"card_name\":\"PF\",\"col\":4}},{\"id\":\"pfCd002\",\"type\":\"card\",\"data\":{\"card_name\":\"Payroll\",\"col\":4}},{\"id\":\"pfCd003\",\"type\":\"card\",\"data\":{\"card_name\":\"Salary Components\",\"col\":4}}]",
- "creation": "2026-05-25 12:00:00.000000",
+ "creation": "2026-05-25 12:00:00",
  "custom_blocks": [],
  "docstatus": 0,
  "doctype": "Workspace",
@@ -129,29 +129,9 @@
    "link_type": "DocType",
    "onboard": 0,
    "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Provident Fund Deduction",
-   "link_count": 0,
-   "link_to": "Provident Fund Deduction",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Employer Provident Fund Contribution",
-   "link_count": 0,
-   "link_to": "Employer Provident Fund Contribution",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
   }
  ],
- "modified": "2026-05-25 12:00:00.000000",
+ "modified": "2026-06-04 16:18:05.956368",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Provident Fund",
@@ -160,7 +140,11 @@
  "parent_page": "",
  "public": 1,
  "quick_lists": [],
- "roles": [],
+ "roles": [
+  {
+   "role": "HR Manager"
+  }
+ ],
  "sequence_id": 45.0,
  "shortcuts": [
   {
@@ -178,7 +162,7 @@
   },
   {
    "color": "Grey",
-   "doc_view": "Form",
+   "doc_view": "List",
    "label": "PF Settings",
    "link_to": "PF Settings",
    "type": "DocType"
