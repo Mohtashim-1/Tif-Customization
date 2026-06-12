@@ -1,15 +1,76 @@
 import frappe
-from frappe.utils import flt, nowdate
+from frappe import _
+from frappe.utils import add_days, flt, getdate, nowdate
 
 from hrms.hr.doctype.leave_application.leave_application import (
 	get_leave_details as hrms_get_leave_details,
 )
+from lending.loan_management.doctype.loan_application.loan_application import create_loan
 from lending.loan_management.doctype.loan_repayment.loan_repayment import (
 	get_pending_principal_amount,
 )
 from tif_customization.tif_customization.doctype.leave_application.leave_application import (
 	get_leave_details as custom_get_leave_details,
 )
+
+APPROVED_WORKFLOW_STATES = frozenset({"Approved By CEO"})
+
+
+def on_loan_application_submit(doc, method=None):
+	"""After final workflow approval, mark application approved and create the Loan."""
+	if doc.workflow_state not in APPROVED_WORKFLOW_STATES:
+		return
+
+	if doc.status != "Approved":
+		frappe.db.set_value("Loan Application", doc.name, "status", "Approved", update_modified=False)
+
+	create_loan_from_application(doc.name)
+
+
+@frappe.whitelist()
+def create_loan_from_application(loan_application_name, submit=True):
+	existing_loan = frappe.db.get_value(
+		"Loan",
+		{"loan_application": loan_application_name, "docstatus": ["<", 2]},
+		"name",
+	)
+	if existing_loan:
+		return existing_loan
+
+	application = frappe.get_doc("Loan Application", loan_application_name)
+	if (
+		application.workflow_state in APPROVED_WORKFLOW_STATES
+		and application.status != "Approved"
+	):
+		frappe.db.set_value(
+			"Loan Application", loan_application_name, "status", "Approved", update_modified=False
+		)
+
+	loan = create_loan(loan_application_name, submit=0)
+
+	if loan.is_term_loan and not loan.repayment_start_date:
+		loan.repayment_start_date = _get_repayment_start_date(application)
+
+	loan.insert()
+	if submit:
+		loan.submit()
+
+	frappe.msgprint(
+		_("Loan {0} created from Loan Application {1}.").format(
+			frappe.bold(loan.name), frappe.bold(loan_application_name)
+		),
+		alert=True,
+	)
+	return loan.name
+
+def _get_repayment_start_date(application):
+	if application.applicant_type == "Employee" and application.applicant:
+		relieving_date = frappe.db.get_value("Employee", application.applicant, "relieving_date")
+		if relieving_date:
+			return add_days(getdate(relieving_date), 4)
+
+	reference_date = getdate(application.posting_date or nowdate())
+	return add_days(reference_date, 4)
 
 
 def populate_previous_loan_and_leave_details(doc, method=None):

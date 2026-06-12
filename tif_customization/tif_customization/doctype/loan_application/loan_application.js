@@ -1,6 +1,7 @@
 frappe.ui.form.on("Loan Application", {
 	refresh(frm) {
 		update_leave_summary(frm);
+		add_create_loan_button(frm);
 	},
 	applicant(frm) {
 		update_leave_summary(frm);
@@ -12,6 +13,41 @@ frappe.ui.form.on("Loan Application", {
 		update_leave_summary(frm);
 	},
 });
+
+function add_create_loan_button(frm) {
+	if (frm.doc.docstatus !== 1 || frm.is_new()) {
+		return;
+	}
+
+	const is_approved =
+		frm.doc.status === "Approved" || frm.doc.workflow_state === "Approved By CEO";
+	if (!is_approved) {
+		return;
+	}
+
+	frappe.db.get_value(
+		"Loan",
+		{ loan_application: frm.doc.name, docstatus: ["<", 2] },
+		"name",
+		(r) => {
+			if (r && r.name) {
+				return;
+			}
+
+			frm.add_custom_button(__("Loan"), () => {
+				frappe.call({
+					method:
+						"tif_customization.tif_customization.doctype.loan_application.loan_application.create_loan_from_application",
+					args: { loan_application_name: frm.doc.name },
+					freeze: true,
+					callback() {
+						frm.reload_doc();
+					},
+				});
+			}, __("Create"));
+		}
+	);
+}
 
 function update_leave_summary(frm) {
 	if (!frm.doc.applicant) return;
