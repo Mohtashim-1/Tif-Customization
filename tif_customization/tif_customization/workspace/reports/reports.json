@@ -188,7 +188,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-06-04 16:18:21.099959",
+ "modified": "2026-06-12 12:04:13.366271",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Reports",
@@ -200,6 +200,9 @@
  "roles": [
   {
    "role": "HR Manager"
+  },
+  {
+   "role": "Purchase Manager"
   }
  ],
  "sequence_id": 47.0,

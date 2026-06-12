@@ -1,0 +1,235 @@
+{% extends "templates/web.html" %}
+
+{% block page_content %}
+<div class="container py-5 training-feedback-portal">
+	<div class="row justify-content-center">
+		<div class="col-lg-8">
+			<div id="feedback-loading" class="text-center py-5">
+				<div class="spinner-border text-primary" role="status"></div>
+				<p class="mt-3 text-muted">Loading training details...</p>
+			</div>
+
+			<div id="feedback-submitted" class="card shadow-sm d-none">
+				<div class="card-body text-center p-5">
+					<div class="display-4 text-success mb-3">&#10003;</div>
+					<h2 class="mb-3">Thank You!</h2>
+					<p class="lead">Your feedback has already been submitted for this training session.</p>
+					<div id="submitted-summary" class="alert alert-light text-start mt-4"></div>
+				</div>
+			</div>
+
+			<div id="feedback-invalid" class="card shadow-sm d-none">
+				<div class="card-body text-center p-5">
+					<h2 class="text-danger mb-3">Invalid Link</h2>
+					<p class="text-muted">This feedback link is invalid or has expired. Please contact the training organizer.</p>
+				</div>
+			</div>
+
+			<div id="feedback-form-wrap" class="d-none">
+				<div class="card shadow-sm mb-4">
+					<div class="card-body p-4">
+						<h2 class="mb-1">Training Feedback</h2>
+						<p class="text-muted mb-4">Please share your experience so we can improve future sessions.</p>
+						<div id="training-summary" class="training-summary p-3 mb-0"></div>
+					</div>
+				</div>
+
+				<div class="card shadow-sm">
+					<div class="card-body p-4">
+						<form id="training-feedback-form">
+							<div class="row g-3">
+								<div class="col-md-6">
+									<label class="form-label">Overall Rating <span class="text-danger">*</span></label>
+									<select class="form-control" name="overall_rating" required>
+										<option value="">Select rating</option>
+										<option value="5">5 - Excellent</option>
+										<option value="4">4 - Good</option>
+										<option value="3">3 - Average</option>
+										<option value="2">2 - Below Average</option>
+										<option value="1">1 - Poor</option>
+									</select>
+								</div>
+								<div class="col-md-6">
+									<label class="form-label">Content Quality</label>
+									<select class="form-control" name="content_quality">
+										<option value="">Select rating</option>
+										<option value="5">5 - Excellent</option>
+										<option value="4">4 - Good</option>
+										<option value="3">3 - Average</option>
+										<option value="2">2 - Below Average</option>
+										<option value="1">1 - Poor</option>
+									</select>
+								</div>
+								<div class="col-md-6">
+									<label class="form-label">Trainer Rating</label>
+									<select class="form-control" name="trainer_rating">
+										<option value="">Select rating</option>
+										<option value="5">5 - Excellent</option>
+										<option value="4">4 - Good</option>
+										<option value="3">3 - Average</option>
+										<option value="2">2 - Below Average</option>
+										<option value="1">1 - Poor</option>
+									</select>
+								</div>
+								<div class="col-md-6">
+									<label class="form-label">Venue Rating</label>
+									<select class="form-control" name="venue_rating">
+										<option value="">Select rating</option>
+										<option value="5">5 - Excellent</option>
+										<option value="4">4 - Good</option>
+										<option value="3">3 - Average</option>
+										<option value="2">2 - Below Average</option>
+										<option value="1">1 - Poor</option>
+									</select>
+								</div>
+								<div class="col-md-6">
+									<label class="form-label">Would you recommend this training?</label>
+									<select class="form-control" name="would_recommend">
+										<option value="">Select</option>
+										<option value="Yes">Yes</option>
+										<option value="No">No</option>
+									</select>
+								</div>
+								<div class="col-12">
+									<label class="form-label">What went well?</label>
+									<textarea class="form-control" name="what_went_well" rows="3"></textarea>
+								</div>
+								<div class="col-12">
+									<label class="form-label">What can be improved?</label>
+									<textarea class="form-control" name="improvements" rows="3"></textarea>
+								</div>
+								<div class="col-12">
+									<label class="form-label">Additional comments</label>
+									<textarea class="form-control" name="additional_comments" rows="3"></textarea>
+								</div>
+							</div>
+							<div class="mt-4">
+								<button type="submit" class="btn btn-primary btn-lg" id="submit-feedback-btn">
+									Submit Feedback
+								</button>
+							</div>
+						</form>
+					</div>
+				</div>
+			</div>
+
+			<div id="feedback-success" class="card shadow-sm d-none">
+				<div class="card-body text-center p-5">
+					<div class="display-4 text-success mb-3">&#10003;</div>
+					<h2 class="mb-3">Thank You!</h2>
+					<p class="lead">Your feedback has been submitted successfully.</p>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<style>
+.training-feedback-portal .card {
+	border: none;
+	border-radius: 16px;
+}
+.training-summary {
+	background: #f8f9fa;
+	border-radius: 12px;
+}
+.training-summary dt {
+	font-weight: 600;
+	color: #495057;
+}
+.training-summary dd {
+	margin-bottom: 0.75rem;
+}
+</style>
+
+<script>
+(function () {
+	const token = {{ (token or "") | tojson }};
+
+	function hideAll() {
+		["feedback-loading", "feedback-submitted", "feedback-invalid", "feedback-form-wrap", "feedback-success"].forEach((id) => {
+			document.getElementById(id).classList.add("d-none");
+		});
+	}
+
+	function renderSummary(container, data) {
+		const rows = [
+			["Attendee", data.attendee_name],
+			["Training Date", data.training_date || "-"],
+			["Trainer", data.trainer_name || "-"],
+			["Venue", data.venue_name || "-"],
+			["Session", data.session_category || "-"],
+		];
+		container.innerHTML = "<dl class='row mb-0'>" + rows.map(([label, value]) =>
+			`<dt class='col-sm-4'>${label}</dt><dd class='col-sm-8'>${frappe.utils.escape_html(value || "-")}</dd>`
+		).join("") + "</dl>";
+	}
+
+	if (!token) {
+		hideAll();
+		document.getElementById("feedback-invalid").classList.remove("d-none");
+		return;
+	}
+
+	frappe.call({
+		method: "tif_customization.tif_customization.api.training_feedback_portal.get_training_feedback_context",
+		args: { token },
+		callback(r) {
+			hideAll();
+			const data = r.message;
+			if (!data) {
+				document.getElementById("feedback-invalid").classList.remove("d-none");
+				return;
+			}
+
+			if (data.submitted) {
+				const submitted = document.getElementById("feedback-submitted");
+				renderSummary(document.getElementById("submitted-summary"), data);
+				submitted.classList.remove("d-none");
+				return;
+			}
+
+			renderSummary(document.getElementById("training-summary"), data);
+			document.getElementById("feedback-form-wrap").classList.remove("d-none");
+
+			document.getElementById("training-feedback-form").addEventListener("submit", function (e) {
+				e.preventDefault();
+				const form = e.target;
+				const btn = document.getElementById("submit-feedback-btn");
+				btn.disabled = true;
+
+				frappe.call({
+					method: "tif_customization.tif_customization.api.training_feedback_portal.submit_training_feedback",
+					args: {
+						token,
+						overall_rating: form.overall_rating.value,
+						content_quality: form.content_quality.value,
+						trainer_rating: form.trainer_rating.value,
+						venue_rating: form.venue_rating.value,
+						would_recommend: form.would_recommend.value,
+						what_went_well: form.what_went_well.value,
+						improvements: form.improvements.value,
+						additional_comments: form.additional_comments.value,
+					},
+					callback(res) {
+						if (res.message && res.message.success) {
+							hideAll();
+							document.getElementById("feedback-success").classList.remove("d-none");
+						} else {
+							btn.disabled = false;
+						}
+					},
+					error() {
+						btn.disabled = false;
+					}
+				});
+			});
+		},
+		error() {
+			hideAll();
+			document.getElementById("feedback-invalid").classList.remove("d-none");
+		}
+	});
+})();
+</script>
+{% endblock %}

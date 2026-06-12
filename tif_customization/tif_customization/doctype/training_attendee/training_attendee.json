@@ -1,0 +1,77 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-06-10 14:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "attendee_name",
+  "email",
+  "school_organization",
+  "designation",
+  "feedback_submitted",
+  "feedback_token"
+ ],
+ "fields": [
+  {
+   "columns": 2,
+   "fieldname": "attendee_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Attendee Name",
+   "reqd": 1
+  },
+  {
+   "columns": 2,
+   "fieldname": "email",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Email",
+   "options": "Email",
+   "reqd": 1
+  },
+  {
+   "columns": 2,
+   "fieldname": "school_organization",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "School / Organization"
+  },
+  {
+   "fieldname": "designation",
+   "fieldtype": "Data",
+   "label": "Designation"
+  },
+  {
+   "columns": 1,
+   "default": "0",
+   "fieldname": "feedback_submitted",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Feedback Submitted",
+   "read_only": 1
+  },
+  {
+   "fieldname": "feedback_token",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Feedback Token",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-06-10 16:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Tif Customization",
+ "name": "Training Attendee",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

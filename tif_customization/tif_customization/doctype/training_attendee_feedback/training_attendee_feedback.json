@@ -1,0 +1,182 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "format:TRFB-{field_visit}-{#####}",
+ "creation": "2026-06-10 14:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_details",
+  "field_visit",
+  "attendee_name",
+  "email",
+  "feedback_token",
+  "column_break_training",
+  "training_date",
+  "trainer_name",
+  "venue_name",
+  "session_category",
+  "section_break_ratings",
+  "overall_rating",
+  "content_quality",
+  "trainer_rating",
+  "venue_rating",
+  "would_recommend",
+  "section_break_comments",
+  "what_went_well",
+  "improvements",
+  "additional_comments"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_details",
+   "fieldtype": "Section Break",
+   "label": "Attendee Details"
+  },
+  {
+   "fieldname": "field_visit",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Field Visit",
+   "options": "Field Visit",
+   "reqd": 1
+  },
+  {
+   "fieldname": "attendee_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Attendee Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "email",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Email",
+   "options": "Email",
+   "read_only": 1
+  },
+  {
+   "fieldname": "feedback_token",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Feedback Token",
+   "read_only": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "column_break_training",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "training_date",
+   "fieldtype": "Date",
+   "label": "Training Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "trainer_name",
+   "fieldtype": "Data",
+   "label": "Trainer Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "venue_name",
+   "fieldtype": "Data",
+   "label": "Venue Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "session_category",
+   "fieldtype": "Data",
+   "label": "Session Category",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_ratings",
+   "fieldtype": "Section Break",
+   "label": "Ratings"
+  },
+  {
+   "fieldname": "overall_rating",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Overall Rating",
+   "options": "\n1\n2\n3\n4\n5",
+   "reqd": 1
+  },
+  {
+   "fieldname": "content_quality",
+   "fieldtype": "Select",
+   "label": "Content Quality",
+   "options": "\n1\n2\n3\n4\n5"
+  },
+  {
+   "fieldname": "trainer_rating",
+   "fieldtype": "Select",
+   "label": "Trainer Rating",
+   "options": "\n1\n2\n3\n4\n5"
+  },
+  {
+   "fieldname": "venue_rating",
+   "fieldtype": "Select",
+   "label": "Venue Rating",
+   "options": "\n1\n2\n3\n4\n5"
+  },
+  {
+   "fieldname": "would_recommend",
+   "fieldtype": "Select",
+   "label": "Would Recommend This Training",
+   "options": "\nYes\nNo"
+  },
+  {
+   "fieldname": "section_break_comments",
+   "fieldtype": "Section Break",
+   "label": "Comments"
+  },
+  {
+   "fieldname": "what_went_well",
+   "fieldtype": "Small Text",
+   "label": "What Went Well"
+  },
+  {
+   "fieldname": "improvements",
+   "fieldtype": "Small Text",
+   "label": "What Can Be Improved"
+  },
+  {
+   "fieldname": "additional_comments",
+   "fieldtype": "Small Text",
+   "label": "Additional Comments"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-06-10 14:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Tif Customization",
+ "name": "Training Attendee Feedback",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

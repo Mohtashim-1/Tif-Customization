@@ -4,7 +4,7 @@
  "docstatus": 0,
  "doctype": "Page",
  "idx": 0,
- "modified": "2026-06-04 15:11:14.000941",
+ "modified": "2026-06-10 14:25:16.138290",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "city-wise-list-of-sc",
@@ -16,6 +16,9 @@
   },
   {
    "role": "HOD"
+  },
+  {
+   "role": "Sales User - Tif"
   }
  ],
  "script": null,
