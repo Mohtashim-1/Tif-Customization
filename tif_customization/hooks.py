@@ -33,7 +33,7 @@ fixtures = [
 
 # include js, css files in header of desk.html
 # app_include_css = "/assets/tif_customization/css/tif_customization.css"
-# app_include_js = "/assets/tif_customization/js/tif_customization.js"
+app_include_js = "/assets/tif_customization/js/workspace_sidebar.js"
 
 # include js, css files in header of web template
 # web_include_css = "/assets/tif_customization/css/tif_customization.css"
@@ -87,6 +87,8 @@ doctype_list_js = {
 # role_home_page = {
 # 	"Role": "home_page"
 # }
+
+boot_session = "tif_customization.tif_customization.overrides.workspace_sidebar.boot_session"
 
 # Generators
 # ----------
@@ -228,7 +230,8 @@ after_migrate = ["tif_customization.tif_customization.pf.setup.run_pf_setup_on_m
 # Overriding Methods
 # ------------------------------
 override_whitelisted_methods = {
-	"hrms.hr.doctype.leave_application.leave_application.get_leave_details": "tif_customization.tif_customization.doctype.leave_application.leave_application.get_leave_details"
+	"hrms.hr.doctype.leave_application.leave_application.get_leave_details": "tif_customization.tif_customization.doctype.leave_application.leave_application.get_leave_details",
+	"frappe.desk.desktop.get_workspace_sidebar_items": "tif_customization.tif_customization.overrides.workspace_sidebar.get_workspace_sidebar_items",
 }
 #
 # each overriding function accepts a `data` argument;

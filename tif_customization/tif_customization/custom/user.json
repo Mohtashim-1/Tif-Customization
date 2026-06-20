@@ -1,0 +1,16 @@
+{
+ "custom_fields": [
+  {
+   "dt": "User",
+   "fieldname": "hidden_workspaces",
+   "fieldtype": "Small Text",
+   "insert_after": "block_modules",
+   "label": "Hidden Workspaces",
+   "description": "Comma-separated workspace names hidden from this user's sidebar only (e.g. HR TIF, Forms). Roles and document permissions are unchanged."
+  }
+ ],
+ "custom_perms": [],
+ "doctype": "User",
+ "property_setters": [],
+ "sync_on_migrate": 1
+}

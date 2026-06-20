@@ -73,8 +73,8 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "QPS",
-   "link_count": 6,
+   "label": "HR",
+   "link_count": 10,
    "link_type": "DocType",
    "onboard": 0,
    "type": "Card Break"
@@ -82,7 +82,117 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "City Wise List of School (UAT)",
+   "label": "Salary Register",
+   "link_count": 0,
+   "link_to": "salary-register",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Salary Report",
+   "link_count": 0,
+   "link_to": "variable-components",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "PF Dashboard",
+   "link_count": 0,
+   "link_to": "pf-dashboard",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Individual Attendance Sheet",
+   "link_count": 0,
+   "link_to": "individual-attendance-sheet-range",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Organization Charts ",
+   "link_count": 0,
+   "link_to": "organization-chart-grouped",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Task Reports",
+   "link_count": 0,
+   "link_to": "reporting-report",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Task Reporting",
+   "link_count": 0,
+   "link_to": "task-reporting",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Leave Summary",
+   "link_count": 0,
+   "link_to": "Leave Summary",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Daily Attendance Summary",
+   "link_count": 0,
+   "link_to": "Daily Attendance Summary",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Monthly Attendance Summary",
+   "link_count": 0,
+   "link_to": "Monthly Attendance Summary",
+   "link_type": "Report",
+   "onboard": 0,
+   "report_ref_doctype": "Employee Attendance",
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "QPS",
+   "link_count": 10,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "City Wise List of School ",
    "link_count": 0,
    "link_to": "city-wise-list-of-sc",
    "link_type": "Page",
@@ -92,7 +202,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "No of Students (UAT)",
+   "label": "No of Students",
    "link_count": 0,
    "link_to": "no-of-students-repor",
    "link_type": "Page",
@@ -102,7 +212,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Field Staff Report (UAT)",
+   "label": "Field Staff Report ",
    "link_count": 0,
    "link_to": "field-staff-report",
    "link_type": "Page",
@@ -112,10 +222,50 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Field Staff Visit Monthly (UAT)",
+   "label": "Field Staff Visit Monthly",
    "link_count": 0,
    "link_to": "field-staff-visit-mo",
    "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Customer",
+   "link_count": 0,
+   "link_to": "Customer",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Sales Order",
+   "link_count": 0,
+   "link_to": "Sales Order",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "School",
+   "link_count": 0,
+   "link_to": "School",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Upcoming Training",
+   "link_count": 0,
+   "link_to": "Upcoming Training",
+   "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
   },
@@ -147,66 +297,6 @@
    "link_type": "DocType",
    "onboard": 0,
    "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Reconciliation with Bank Statements Summary (UAT)",
-   "link_count": 0,
-   "link_to": "reconcillation-with-",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Donation Analytics (UAT)",
-   "link_count": 0,
-   "link_to": "donation-analytics",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Donation Collection (UAT)",
-   "link_count": 0,
-   "link_to": "donation-collection-",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Consolidated Funds Flow (UAT)",
-   "link_count": 0,
-   "link_to": "consolidated-funds-flow",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Bank Wise Funds Distribution (UAT)",
-   "link_count": 0,
-   "link_to": "bank-wise-fund-distribution",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Funds Dashboard (UAT)",
-   "link_count": 0,
-   "link_to": "funds-dashboard",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
   },
   {
    "hidden": 0,
@@ -349,18 +439,9 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "HR",
-   "link_count": 10,
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Salary Register",
+   "label": "Funds Dashboard (UAT)",
    "link_count": 0,
-   "link_to": "salary-register",
+   "link_to": "funds-dashboard",
    "link_type": "Page",
    "onboard": 0,
    "type": "Link"
@@ -368,9 +449,9 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Salary Report",
+   "label": "Reconciliation with Bank Statements Summary (UAT)",
    "link_count": 0,
-   "link_to": "variable-components",
+   "link_to": "reconcillation-with-",
    "link_type": "Page",
    "onboard": 0,
    "type": "Link"
@@ -378,9 +459,9 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "PF Dashboard",
+   "label": "Donation Analytics (UAT)",
    "link_count": 0,
-   "link_to": "pf-dashboard",
+   "link_to": "donation-analytics",
    "link_type": "Page",
    "onboard": 0,
    "type": "Link"
@@ -388,9 +469,9 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Individual Attendance Sheet",
+   "label": "Consolidated Funds Flow (UAT)",
    "link_count": 0,
-   "link_to": "individual-attendance-sheet-range",
+   "link_to": "consolidated-funds-flow",
    "link_type": "Page",
    "onboard": 0,
    "type": "Link"
@@ -398,9 +479,9 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Organization Charts ",
+   "label": "Donation Collection (UAT)",
    "link_count": 0,
-   "link_to": "organization-chart-grouped",
+   "link_to": "donation-collection-",
    "link_type": "Page",
    "onboard": 0,
    "type": "Link"
@@ -408,57 +489,16 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Task Reports",
+   "label": "Bank Wise Funds Distribution (UAT)",
    "link_count": 0,
-   "link_to": "reporting-report",
+   "link_to": "bank-wise-fund-distribution",
    "link_type": "Page",
    "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Task Reporting",
-   "link_count": 0,
-   "link_to": "task-reporting",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Leave Summary",
-   "link_count": 0,
-   "link_to": "Leave Summary",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Daily Attendance Summary",
-   "link_count": 0,
-   "link_to": "Daily Attendance Summary",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Monthly Attendance Summary",
-   "link_count": 0,
-   "link_to": "Monthly Attendance Summary",
-   "link_type": "Report",
-   "onboard": 0,
-   "report_ref_doctype": "Employee Attendance",
    "type": "Link"
   }
  ],
- "modified": "2026-06-20 12:50:51.550086",
- "modified_by": "Administrator",
+ "modified": "2026-06-20 13:49:22.442347",
+ "modified_by": "trustee@tif.edu.pk",
  "module": "Tif Customization",
  "name": "Reports",
  "number_cards": [],
