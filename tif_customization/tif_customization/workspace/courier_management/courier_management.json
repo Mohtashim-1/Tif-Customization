@@ -9,7 +9,7 @@
  "hide_custom": 0,
  "idx": 0,
  "indicator_color": "green",
- "is_hidden": 0,
+ "is_hidden": 1,
  "label": "Courier Management",
  "links": [
   {
@@ -62,7 +62,7 @@
    "type": "Link"
   }
  ],
- "modified": "2025-10-02 12:25:15.000400",
+ "modified": "2026-06-18 17:08:27.665237",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Courier Management",
@@ -71,8 +71,15 @@
  "parent_page": "",
  "public": 1,
  "quick_lists": [],
- "roles": [],
- "sequence_id": 46.0,
+ "roles": [
+  {
+   "role": "Procurement User"
+  },
+  {
+   "role": "System Manager"
+  }
+ ],
+ "sequence_id": 47.0,
  "shortcuts": [],
  "title": "Courier Management"
 }

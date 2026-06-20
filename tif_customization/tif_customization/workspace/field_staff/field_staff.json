@@ -10,14 +10,14 @@
  "icon": "",
  "idx": 1,
  "indicator_color": "",
- "is_hidden": 0,
+ "is_hidden": 1,
  "label": "Field Staff",
  "links": [
   {
    "hidden": 0,
    "is_query_report": 0,
    "label": "Master",
-   "link_count": 4,
+   "link_count": 3,
    "link_type": "DocType",
    "onboard": 0,
    "type": "Card Break"
@@ -51,19 +51,9 @@
    "link_type": "Page",
    "onboard": 0,
    "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "SMEs Target Base KPIs",
-   "link_count": 0,
-   "link_to": "smes-target-base---k",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
   }
  ],
- "modified": "2026-02-16 17:08:01.692456",
+ "modified": "2026-06-18 17:08:27.567701",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Field Staff",
@@ -72,7 +62,17 @@
  "parent_page": "",
  "public": 1,
  "quick_lists": [],
- "roles": [],
+ "roles": [
+  {
+   "role": "Field Staff"
+  },
+  {
+   "role": "Field Staff Manager"
+  },
+  {
+   "role": "System Manager"
+  }
+ ],
  "sequence_id": 49.0,
  "shortcuts": [],
  "title": "Field Staff"

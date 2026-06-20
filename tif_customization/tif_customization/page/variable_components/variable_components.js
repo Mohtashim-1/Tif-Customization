@@ -943,14 +943,10 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 				const $payIn = $tr.find(".vc-payable-input");
 				let payableVal = $payIn.val();
 				if ((payableVal === "" || payableVal == null) && !$payIn.hasClass("is-override")) {
-					const slipNet = flt($tr.attr("data-slip-net"));
-					const slipDed = flt($tr.attr("data-slip-deduction"));
 					const baseGross = this._row_base_gross($tr);
-					const { earn, ded } = this._row_variable_sums($tr, { skip_pf_tax: true });
+					const { earn } = this._row_variable_sums($tr);
 					const projectedGross = baseGross + earn;
-					const pfAmt = flt($tr.find('input[data-key="pf"]').val());
-					const taxAmt = flt($tr.find('input[data-key="tax"]').val());
-					const projectedDed = slipDed + ded + pfAmt + taxAmt;
+					const projectedDed = this._row_total_deduction($tr);
 					const projectedNet = Math.max(0, projectedGross - projectedDed);
 					payableVal = projectedNet > 0 ? projectedNet : "";
 				}
@@ -1234,19 +1230,20 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 				);
 			}
 
-			_row_variable_sums($tr, opts = {}) {
-				const skip_pf_tax = opts.skip_pf_tax;
+			_row_variable_sums($tr) {
 				let earn = 0;
-				let ded = 0;
 				$tr.find("input.vc-input[data-type='earning']").each(function () {
 					earn += flt($(this).val());
 				});
+				return { earn };
+			}
+
+			_row_total_deduction($tr) {
+				let ded = 0;
 				$tr.find("input.vc-input[data-type='deduction']").each(function () {
-					const key = $(this).attr("data-key");
-					if (skip_pf_tax && (key === "pf" || key === "tax")) return;
 					ded += flt($(this).val());
 				});
-				return { earn, ded };
+				return ded;
 			}
 
 			recalc_totals() {
@@ -1292,9 +1289,8 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 					const acc = section_acc[section];
 
 					const slipNet = flt($tr.attr("data-slip-net"));
-					const slipDed = flt($tr.attr("data-slip-deduction"));
 					const baseGross = self._row_base_gross($tr);
-					const { earn, ded } = self._row_variable_sums($tr, { skip_pf_tax: true });
+					const { earn } = self._row_variable_sums($tr);
 
 					const projectedGross = baseGross + earn;
 					const pfApplicable = flt($tr.attr("data-pf-applicable")) > 0;
@@ -1317,15 +1313,14 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 						$tax.toggleClass("has-value", flt($tax.val()) > 0);
 					}
 
-					const taxAmt = $tax.length ? flt($tax.val()) : 0;
-					const projectedDed = slipDed + ded + pfAmt + taxAmt;
+					const projectedDed = self._row_total_deduction($tr);
 					const projectedNet = Math.max(0, projectedGross - projectedDed);
 					const included = $tr.find(".vc-payroll-cb").is(":checked");
 					const payable = self.row_payable_amount($tr, projectedNet, true);
 
 					$tr.find(".vc-gross-preview").text(self.fmt_plain(projectedGross));
 					$tr.find(".vc-ded-preview").text(self.fmt_plain(projectedDed));
-					const net_title = __("Base {0} + variable {1} − deductions {2} = net {3}", [
+					const net_title = __("Gross {0} + earnings {1} − deductions {2} = net {3}", [
 						self.fmt_plain(baseGross),
 						self.fmt_plain(earn),
 						self.fmt_plain(projectedDed),

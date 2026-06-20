@@ -4,13 +4,20 @@
  "docstatus": 0,
  "doctype": "Page",
  "idx": 0,
- "modified": "2026-04-11 16:02:33.579540",
+ "modified": "2026-06-20 12:04:35.633467",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "bank-balance-reconci",
  "owner": "Administrator",
  "page_name": "bank-balance-reconci",
- "roles": [],
+ "roles": [
+  {
+   "role": "COO"
+  },
+  {
+   "role": "Accounts Manager"
+  }
+ ],
  "script": null,
  "standard": "Yes",
  "style": null,

@@ -3,14 +3,18 @@
  "creation": "2026-05-25 00:33:22.622752",
  "docstatus": 0,
  "doctype": "Page",
- "idx": 0,
- "modified": "2026-05-25 00:33:22.622752",
+ "idx": 1,
+ "modified": "2026-06-20 12:02:24.898926",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "salary-register",
  "owner": "Administrator",
  "page_name": "salary-register",
- "roles": [],
+ "roles": [
+  {
+   "role": "HR Manager"
+  }
+ ],
  "script": null,
  "standard": "Yes",
  "style": null,

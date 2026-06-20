@@ -3,14 +3,21 @@
  "creation": "2026-04-11 14:10:37.301264",
  "docstatus": 0,
  "doctype": "Page",
- "idx": 0,
- "modified": "2026-04-11 14:10:37.301264",
+ "idx": 2,
+ "modified": "2026-06-20 12:03:29.690065",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "donation-collection-",
  "owner": "Administrator",
  "page_name": "donation-collection-",
- "roles": [],
+ "roles": [
+  {
+   "role": "Accounts Manager"
+  },
+  {
+   "role": "COO"
+  }
+ ],
  "script": null,
  "standard": "Yes",
  "style": null,

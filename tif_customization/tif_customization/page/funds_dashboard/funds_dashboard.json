@@ -3,14 +3,21 @@
  "creation": "2026-06-06 23:23:19.565232",
  "docstatus": 0,
  "doctype": "Page",
- "idx": 0,
- "modified": "2026-06-06 23:23:19.565232",
+ "idx": 1,
+ "modified": "2026-06-20 12:03:55.442825",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "funds-dashboard",
  "owner": "Administrator",
  "page_name": "funds-dashboard",
- "roles": [],
+ "roles": [
+  {
+   "role": "Accounts Manager"
+  },
+  {
+   "role": "COO"
+  }
+ ],
  "script": null,
  "standard": "Yes",
  "style": null,

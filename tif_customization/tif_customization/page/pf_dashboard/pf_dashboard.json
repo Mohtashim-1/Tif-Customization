@@ -1,16 +1,20 @@
 {
  "content": null,
- "creation": "2026-05-25 12:00:00.000000",
+ "creation": "2026-05-25 12:00:00",
  "docstatus": 0,
  "doctype": "Page",
  "idx": 0,
- "modified": "2026-05-25 12:00:00.000000",
+ "modified": "2026-06-20 12:02:44.596496",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "pf-dashboard",
  "owner": "Administrator",
  "page_name": "pf-dashboard",
- "roles": [],
+ "roles": [
+  {
+   "role": "HR Manager"
+  }
+ ],
  "script": null,
  "standard": "Yes",
  "style": null,

@@ -20,7 +20,7 @@ const TIF_HR_PALETTE = {
 frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 	const page = frappe.ui.make_app_page({
 		parent: wrapper,
-		title: "HR — Workforce",
+		title: "HR Dashboard",
 		single_column: true,
 	});
 
@@ -51,10 +51,7 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 			render() {
 				this.page.main.html(`
 					<div class="tif-attdash">
-						<p class="text-muted" style="font-size:12px;margin:0 0 10px">
-							<strong>Workforce</strong> uses <strong>Employee</strong> (hiring, attrition, gender, grade, branch, designation, department, employment type) with Company / Branch / Department only.
-							Attendance has been moved to the separate Attendance Dashboard.
-						</p>
+						
 						<div class="tif-attdash__cards" style="display:none">
 							<div class="tif-card" data-card="attendance_records">
 								<div class="tif-card__label">Attendance Records</div>
@@ -140,7 +137,7 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 							</div>
 
 						<p class="text-muted" style="font-size:12px;margin:16px 0 8px">
-							<strong>This month</strong> (calendar) · <strong>Pakistan / Qatar</strong> · <strong>CNIC</strong>
+							<strong>This month</strong> (calendar) · <strong>Pakistan </strong> · <strong>CNIC</strong>
 							</p>
 							<div class="tif-attdash__cards">
 							<div class="tif-card" data-card="new_hires_this_month">
@@ -158,11 +155,7 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 									<div class="tif-card__value">—</div>
 									<div class="tif-card__hint">Nationality / branch name match</div>
 								</div>
-							<div class="tif-card" data-card="active_headcount_qatar">
-								<div class="tif-card__label">Qatar (active)</div>
-								<div class="tif-card__value">—</div>
-								<div class="tif-card__hint">Nationality / branch name match</div>
-							</div>
+							
 							<div class="tif-card" data-card="probation_employees_count">
 								<div class="tif-card__label">Probation (active)</div>
 								<div class="tif-card__value">—</div>
@@ -597,7 +590,6 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 				this.set_card("payroll_salary_slips_this_month", data.payroll_salary_slips_this_month);
 				this.set_card("payroll_net_pay_this_month", data.payroll_net_pay_this_month, "currency");
 				this.set_card("active_headcount_pakistan", data.active_headcount_pakistan);
-				this.set_card("active_headcount_qatar", data.active_headcount_qatar);
 				this.set_card("probation_employees_count", data.probation_employees_count);
 				this.set_card("cnic_expired_count", data.cnic_expired_count);
 				this.set_card("cnic_upcoming_count", data.cnic_upcoming_count);
