@@ -44,6 +44,7 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 				this.render();
 				this.inject_styles();
 				this.make_filters();
+				this.bind_card_clicks();
 				await this.load_apexcharts();
 				await this.refresh();
 			}
@@ -95,83 +96,96 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 							</div>
 						</div>
 
-						<p class="text-muted" style="font-size:12px;margin:16px 0 8px">
-							<strong>Workforce</strong> — hiring &amp; attrition (Employee master)
-						</p>
+						
+						
 							<div class="tif-attdash__cards">
-								<div class="tif-card" data-card="active_headcount">
-									<div class="tif-card__label">Active headcount</div>
+								<div class="tif-card tif-card--clickable" data-card="active_headcount" title="Click for detail">
+									<div class="tif-card__label">Active Employees</div>
 									<div class="tif-card__value">—</div>
 									<div class="tif-card__hint">Current Active</div>
 								</div>
-								<div class="tif-card" data-card="new_hires">
-									<div class="tif-card__label">New hires</div>
+								<div class="tif-card tif-card--clickable" data-card="emp_full_time_permanent" title="Click for detail">
+									<div class="tif-card__label">Full Time Permanent</div>
 									<div class="tif-card__value">—</div>
-									<div class="tif-card__hint">Joining in range</div>
+									<div class="tif-card__hint">Active employees</div>
 								</div>
-								<div class="tif-card" data-card="left_employees">
-									<div class="tif-card__label">Attrition (exits)</div>
+								<div class="tif-card tif-card--clickable" data-card="emp_part_time_permanent" title="Click for detail">
+									<div class="tif-card__label">Part Time Permanent</div>
 									<div class="tif-card__value">—</div>
-									<div class="tif-card__hint">Left in range</div>
+									<div class="tif-card__hint">Active employees</div>
 								</div>
-								<div class="tif-card" data-card="attrition_rate">
-									<div class="tif-card__label">Attrition rate</div>
+								<div class="tif-card tif-card--clickable" data-card="emp_full_time_probation" title="Click for detail">
+									<div class="tif-card__label">Full Time Probation</div>
 									<div class="tif-card__value">—</div>
-									<div class="tif-card__hint">Exits ÷ active × 100</div>
+									<div class="tif-card__hint">Active employees</div>
 								</div>
-								<div class="tif-card" data-card="new_hires_this_year">
-									<div class="tif-card__label">New hires (this year)</div>
+								<div class="tif-card tif-card--clickable" data-card="emp_part_time_probation" title="Click for detail">
+									<div class="tif-card__label">Part Time Probation</div>
 									<div class="tif-card__value">—</div>
-									<div class="tif-card__hint">Jan 1 → today</div>
+									<div class="tif-card__hint">Active employees</div>
 								</div>
-								<div class="tif-card" data-card="left_employees_this_year">
-									<div class="tif-card__label">Left employees (this year)</div>
+								<div class="tif-card tif-card--clickable" data-card="emp_contract_as_per_need" title="Click for detail">
+									<div class="tif-card__label">Contract Base (As Per Need)</div>
 									<div class="tif-card__value">—</div>
-									<div class="tif-card__hint">Jan 1 → today</div>
+									<div class="tif-card__hint">Contract / consultant staff</div>
 								</div>
-								<div class="tif-card" data-card="total_left_employees">
-									<div class="tif-card__label">Total left employees</div>
+								<div class="tif-card tif-card--clickable" data-card="emp_contract_fixed_salary" title="Click for detail">
+									<div class="tif-card__label">Contract Base (Fixed Salary)</div>
 									<div class="tif-card__value">—</div>
-									<div class="tif-card__hint">All-time status = Left</div>
+									<div class="tif-card__hint">Active employees</div>
 								</div>
-							</div>
-
-						<p class="text-muted" style="font-size:12px;margin:16px 0 8px">
-							<strong>This month</strong> (calendar) · <strong>Pakistan </strong> · <strong>CNIC</strong>
-							</p>
-							<div class="tif-attdash__cards">
-							<div class="tif-card" data-card="new_hires_this_month">
-								<div class="tif-card__label">New hires (this month)</div>
-								<div class="tif-card__value">—</div>
-								<div class="tif-card__hint">Date of joining in current month</div>
-							</div>
-							<div class="tif-card" data-card="left_employees_this_month">
-								<div class="tif-card__label">Left employees (this month)</div>
-								<div class="tif-card__value">—</div>
-								<div class="tif-card__hint">Relieving / status Left in month</div>
-							</div>
-								<div class="tif-card" data-card="active_headcount_pakistan">
-									<div class="tif-card__label">Pakistan (active)</div>
+								<div class="tif-card tif-card--clickable" data-card="new_hires_this_month" title="Click for detail">
+									<div class="tif-card__label">New hires (This Month)</div>
 									<div class="tif-card__value">—</div>
-									<div class="tif-card__hint">Nationality / branch name match</div>
+									<div class="tif-card__hint">Joining this month</div>
 								</div>
-							
-							<div class="tif-card" data-card="probation_employees_count">
-								<div class="tif-card__label">Probation (active)</div>
-								<div class="tif-card__value">—</div>
-								<div class="tif-card__hint">Best-effort (custom fields)</div>
-							</div>
-								<div class="tif-card" data-card="cnic_expired_count">
-									<div class="tif-card__label">CNIC expired</div>
+								<div class="tif-card tif-card--clickable" data-card="new_hires_this_year" title="Click for detail">
+									<div class="tif-card__label">New hires (This Year)</div>
+									<div class="tif-card__value">—</div>
+									<div class="tif-card__hint">Joining this year</div>
+								</div>
+								<div class="tif-card tif-card--clickable" data-card="left_employees_this_month" title="Click for detail">
+									<div class="tif-card__label">Left Employees (This Month)</div>
+									<div class="tif-card__value">—</div>
+									<div class="tif-card__hint">Exits this month</div>
+								</div>
+								<div class="tif-card tif-card--clickable" data-card="left_employees_this_year" title="Click for detail">
+									<div class="tif-card__label">Left Employees (This Year)</div>
+									<div class="tif-card__value">—</div>
+									<div class="tif-card__hint">Exits this year</div>
+								</div>
+								<div class="tif-card tif-card--clickable" data-card="pak_qatar_enrolled" title="Click for detail">
+									<div class="tif-card__label">Pak Qatar (Enrolled Health Card, Paycon, GLI)</div>
+									<div class="tif-card__value">—</div>
+									<div class="tif-card__hint">Health card / Pak Qatar insurance</div>
+								</div>
+								<div class="tif-card tif-card--clickable" data-card="cnic_expired_count" title="Click for detail">
+									<div class="tif-card__label">CNIC Expired</div>
 									<div class="tif-card__value">—</div>
 									<div class="tif-card__hint">Active; expiry before today</div>
 								</div>
-									<div class="tif-card" data-card="cnic_upcoming_count">
-										<div class="tif-card__label">CNIC expiring soon</div>
-										<div class="tif-card__value">—</div>
-										<div class="tif-card__hint">Active; next — days</div>
-									</div>
+								<div class="tif-card tif-card--clickable" data-card="cnic_upcoming_count" title="Click for detail">
+									<div class="tif-card__label">Upcoming CNIC Expiry</div>
+									<div class="tif-card__value">—</div>
+									<div class="tif-card__hint">Active; expiring soon</div>
 								</div>
+								<div class="tif-card tif-card--clickable" data-card="upcoming_confirmation" title="Click for detail">
+									<div class="tif-card__label">Upcoming Confirmation</div>
+									<div class="tif-card__value">—</div>
+									<div class="tif-card__hint">Next 60 days</div>
+								</div>
+								<div class="tif-card tif-card--clickable" data-card="total_male" title="Click for detail">
+									<div class="tif-card__label">Total Male</div>
+									<div class="tif-card__value">—</div>
+									<div class="tif-card__hint">Active employees</div>
+								</div>
+								<div class="tif-card tif-card--clickable" data-card="total_female" title="Click for detail">
+									<div class="tif-card__label">Total Female</div>
+									<div class="tif-card__value">—</div>
+									<div class="tif-card__hint">Active employees</div>
+								</div>
+							</div>
+							
 
 						<div class="tif-attdash__grid">
 							<div class="tif-panel tif-panel--span2">
@@ -187,17 +201,11 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 								<div id="tif-dash-wf-gender"></div>
 							</div>
 							<div class="tif-panel">
-								<div class="tif-panel__title">Grade (active)</div>
+								<div class="tif-panel__title">Grades (active employees)</div>
 								<div id="tif-dash-wf-grade"></div>
 							</div>
-							<div class="tif-panel">
-								<div class="tif-panel__title">Branch — Employee master (active)</div>
-								<div id="tif-dash-wf-ebranch"></div>
-							</div>
-							<div class="tif-panel">
-								<div class="tif-panel__title">City (active)</div>
-								<div id="tif-dash-wf-city"></div>
-							</div>
+							
+							
 							<div class="tif-panel tif-panel--span2">
 								<div class="tif-panel__title">Designation (active count)</div>
 								<div id="tif-dash-wf-desig"></div>
@@ -271,21 +279,9 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 								<p class="tif-panel__hint">Active employees with CNIC Expiry before today (if field exists).</p>
 								<div id="tif-attdash-cnic-expired"></div>
 							</div>
-							<div class="tif-panel tif-panel--span2">
-								<div class="tif-panel__title">CNIC expiring soon — detail</div>
-								<p class="tif-panel__hint">Active employees whose CNIC expiry is within the configured upcoming days.</p>
-								<div id="tif-attdash-cnic-upcoming"></div>
-							</div>
-							<div class="tif-panel tif-panel--span2">
-								<div class="tif-panel__title">City × Branch (active) — top</div>
-								<p class="tif-panel__hint">Best-effort city (Employee city/current_city/residence_city or Current Address → city).</p>
-								<div id="tif-attdash-city-branch"></div>
-							</div>
-							<div class="tif-panel tif-panel--span2">
-								<div class="tif-panel__title">Probation employees — detail</div>
-								<p class="tif-panel__hint">Uses probation_end_date / is_on_probation / employment_type contains “probation” (first match).</p>
-								<div id="tif-attdash-probation"></div>
-							</div>
+							
+							
+							
 							<div class="tif-panel" style="display:none">
 								<div class="tif-panel__title">Top late comers — detail</div>
 								<div id="tif-attdash-table-lates"></div>
@@ -306,6 +302,9 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 				style.textContent = `
 					.tif-attdash__cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:12px;margin:8px 0 14px}
 					.tif-card{border:1px solid var(--border-color);border-radius:10px;background:var(--card-bg);padding:12px;min-width:140px}
+					.tif-card--clickable{cursor:pointer;transition:border-color .15s ease,box-shadow .15s ease}
+					.tif-card--clickable:hover{border-color:var(--primary);box-shadow:0 2px 8px rgba(37,99,235,.12)}
+					.tif-drill-row:hover{background:var(--control-bg)}
 					.tif-card__label{font-size:12px;color:var(--text-muted);margin-bottom:4px}
 					.tif-card__value{font-size:20px;font-weight:700;line-height:1.2}
 					.tif-card__hint{font-size:11px;color:var(--text-muted);margin-top:6px}
@@ -561,6 +560,7 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 			}
 
 			render_kpis(data) {
+				this.dashboard_data = data || {};
 				this.set_card("attendance_records", data.attendance_records);
 				this.set_card("employees_covered", data.employees_covered);
 				this.set_card("total_present_days", data.total_present_days, true);
@@ -571,6 +571,23 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 				this.set_card("pending_leave_applications", data.pending_leave_applications);
 
 				this.set_card("active_headcount", data.active_headcount);
+				this.set_card("emp_full_time_permanent", data.emp_full_time_permanent);
+				this.set_card("emp_part_time_permanent", data.emp_part_time_permanent);
+				this.set_card("emp_full_time_probation", data.emp_full_time_probation);
+				this.set_card("emp_part_time_probation", data.emp_part_time_probation);
+				this.set_card("emp_contract_as_per_need", data.emp_contract_as_per_need);
+				this.set_card("emp_contract_fixed_salary", data.emp_contract_fixed_salary);
+				this.set_card("new_hires_this_month", data.new_hires_this_month);
+				this.set_card("new_hires_this_year", data.new_hires_this_year);
+				this.set_card("left_employees_this_month", data.left_employees_this_month);
+				this.set_card("left_employees_this_year", data.left_employees_this_year);
+				this.set_card("pak_qatar_enrolled", data.pak_qatar_enrolled_count);
+				this.set_card("cnic_expired_count", data.cnic_expired_count);
+				this.set_card("cnic_upcoming_count", data.cnic_upcoming_count);
+				this.set_card("upcoming_confirmation", data.upcoming_confirmation_count);
+				this.set_card("total_male", data.total_male);
+				this.set_card("total_female", data.total_female);
+
 				this.set_card("new_hires", data.new_hires);
 				this.set_card("left_employees", data.left_employees);
 				const arEl = this.page.main.find('.tif-card[data-card="attrition_rate"] .tif-card__value')[0];
@@ -582,19 +599,114 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 							: `${Number(v).toFixed(2)}%`;
 				}
 
-				this.set_card("new_hires_this_month", data.new_hires_this_month);
-				this.set_card("left_employees_this_month", data.left_employees_this_month);
-				this.set_card("new_hires_this_year", data.new_hires_this_year);
-				this.set_card("left_employees_this_year", data.left_employees_this_year);
 				this.set_card("total_left_employees", data.total_left_employees);
 				this.set_card("payroll_salary_slips_this_month", data.payroll_salary_slips_this_month);
 				this.set_card("payroll_net_pay_this_month", data.payroll_net_pay_this_month, "currency");
 				this.set_card("active_headcount_pakistan", data.active_headcount_pakistan);
 				this.set_card("probation_employees_count", data.probation_employees_count);
-				this.set_card("cnic_expired_count", data.cnic_expired_count);
-				this.set_card("cnic_upcoming_count", data.cnic_upcoming_count);
 				const d = Number(data.cnic_upcoming_days || 30);
 				this.set_card_hint("cnic_upcoming_count", `Active; next ${Number.isFinite(d) ? d : 30} days`);
+			}
+
+			bind_card_clicks() {
+				const me = this;
+				this.page.main.off("click.tifCardDrill");
+				this.page.main.on("click.tifCardDrill", ".tif-card--clickable", function () {
+					const cardKey = this.getAttribute("data-card");
+					if (cardKey) me.show_card_drilldown(cardKey);
+				});
+			}
+
+			async show_card_drilldown(cardKey) {
+				const filters = {
+					...this.filters,
+					cnic_upcoming_days: this.dashboard_data?.cnic_upcoming_days || 30,
+				};
+				const label = this.page.main
+					.find(`.tif-card[data-card="${cardKey}"] .tif-card__label`)
+					.first()
+					.text()
+					.trim();
+				const d = new frappe.ui.Dialog({
+					title: __("Drill-down: {0}", [label || cardKey]),
+					size: "extra-large",
+					fields: [{ fieldtype: "HTML", fieldname: "body" }],
+				});
+				d.fields_dict.body.$wrapper.html(
+					`<div class="text-muted" style="padding:20px;text-align:center">${__("Loading…")}</div>`,
+				);
+				d.show();
+
+				try {
+					const r = await frappe.call({
+						method: "tif_customization.tif_customization.page.hr_dashboard.hr_dashboard.get_card_drilldown",
+						args: { card_key: cardKey, filters },
+					});
+					const payload = r?.message || {};
+					const rows = payload.rows || [];
+					if (!rows.length) {
+						d.fields_dict.body.$wrapper.html(
+							`<div class="text-muted" style="padding:20px;text-align:center">${__("No records found")}</div>`,
+						);
+						return;
+					}
+					const columns = payload.columns || [];
+					const tableHtml = this._drilldown_table_html(rows, columns);
+					d.fields_dict.body.$wrapper.html(
+						`<p class="text-muted small" style="margin-bottom:10px">${__(
+							"{0} record(s)",
+							[String(rows.length)],
+						)}</p>${tableHtml}`,
+					);
+					d.fields_dict.body.$wrapper.find("tr[data-route]").on("click", function () {
+						const route = $(this).data("route");
+						if (route) frappe.set_route(route);
+					});
+				} catch (e) {
+					d.fields_dict.body.$wrapper.html(
+						`<div class="text-danger" style="padding:20px">${__("Could not load drill-down")}</div>`,
+					);
+				}
+			}
+
+			_drilldown_table_html(rows, columns) {
+				const safe = (v) =>
+					frappe.utils?.escape_html ? frappe.utils.escape_html(String(v ?? "")) : String(v ?? "");
+				const th = columns
+					.map(
+						(c) =>
+							`<th style="font-size:12px;font-weight:600;padding:8px;border-bottom:1px solid var(--border-color)">${safe(c.label)}</th>`,
+					)
+					.join("");
+				const body = rows
+					.map((row) => {
+						const route = this._row_route(row);
+						const attrs = route ? ` class="tif-drill-row" data-route='${JSON.stringify(route)}' style="cursor:pointer"` : "";
+						const tds = columns
+							.map((c) => {
+								let val = row[c.key];
+								if (c.format === "Date" && val) {
+									val = frappe.datetime.str_to_user(val);
+								} else if (c.format === "Float") {
+									val = this._plain_formatted(val, "Float");
+								} else if (c.format === "Int") {
+									val = this._plain_formatted(val, "Int");
+								}
+								const align = c.format === "Float" || c.format === "Int" ? "right" : "left";
+								return `<td style="padding:8px;text-align:${align}">${safe(val ?? "—")}</td>`;
+							})
+							.join("");
+						return `<tr${attrs}>${tds}</tr>`;
+					})
+					.join("");
+				return `<div style="max-height:420px;overflow:auto"><table class="table table-bordered" style="width:100%;font-size:13px"><thead><tr>${th}</tr></thead><tbody>${body}</tbody></table></div>`;
+			}
+
+			_row_route(row) {
+				if (row.employee_id) return ["Form", "Employee", row.employee_id];
+				if (row.attendance_id) return ["Form", "Employee Attendance", row.attendance_id];
+				if (row.leave_application) return ["Form", "Leave Application", row.leave_application];
+				return null;
 			}
 
 			render_charts(data) {
@@ -696,7 +808,7 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 						theme: { mode },
 						colors: ["#4f46e5"],
 						grid: { borderColor: "#e2e8f0", strokeDashArray: 4 },
-						noData: { text: "No grade field / data" },
+						noData: { text: "No grades data" },
 						plotOptions: { bar: { horizontal: true, borderRadius: 4, barHeight: "72%" } },
 						xaxis: this._xaxisCategoriesNoTrim(labels),
 						series: [{ name: "Employees", data: values }],

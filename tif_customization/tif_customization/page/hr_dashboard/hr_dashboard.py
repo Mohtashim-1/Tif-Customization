@@ -77,7 +77,9 @@ def get_dashboard_data(filters=None):
 	data["headcount_by_employment_type"] = _headcount_by_employment_type(company, branch, department, limit=12)
 	# Active headcount distributions (Employee master)
 	data["headcount_by_gender"] = _active_employee_group_count("gender", company, branch, department, limit=10)
-	data["headcount_by_grade"] = _active_employee_group_count("grade", company, branch, department, limit=15)
+	data["total_male"] = _count_active_by_gender("Male", company, branch, department)
+	data["total_female"] = _count_active_by_gender("Female", company, branch, department)
+	data["headcount_by_grade"] = _headcount_by_grade(company, branch, department, limit=20)
 	data["headcount_by_employee_branch"] = _active_employee_group_count("branch", company, branch, department, limit=15)
 	data["headcount_by_designation"] = _active_employee_group_count("designation", company, branch, department, limit=20)
 	data["headcount_by_department"] = _active_employee_group_count("department", company, branch, department, limit=25)
@@ -103,8 +105,78 @@ def get_dashboard_data(filters=None):
 	cnic_days = 30
 	data["cnic_upcoming_days"] = cint(cnic_days)
 	data.update(_cnic_upcoming_stats_and_rows(company, branch, department, today=today, days=cnic_days, limit=25))
+	data.update(_workforce_card_counts(company, branch, department))
+	data.update(_pak_qatar_enrolled_stats(company, branch, department, limit=500))
+	data.update(_upcoming_confirmation_stats(company, branch, department, today=today, days=60, limit=500))
 
 	return data
+
+
+@frappe.whitelist()
+def get_card_drilldown(card_key=None, filters=None):
+	"""Return row-level detail for a dashboard KPI card."""
+	if isinstance(filters, str):
+		filters = json.loads(filters or "{}")
+	filters = filters or {}
+
+	company = (filters.get("company") or "").strip()
+	branch = (filters.get("branch") or "").strip()
+	department = (filters.get("department") or "").strip()
+	today = getdate(nowdate())
+	from_date = getdate(filters.get("from_date") or add_months(get_first_day(today), -5))
+	to_date = getdate(filters.get("to_date") or today)
+	month_start = get_first_day(today)
+	month_end = get_last_day(today)
+	year_start = getdate(f"{today.year}-01-01")
+
+	card_key = (card_key or "").strip()
+	handlers = {
+		"active_headcount": lambda: _drill_active_employees(company, branch, department),
+		"emp_full_time_permanent": lambda: _drill_active_employment_types(
+			company, branch, department, EMPLOYMENT_CARD_TYPES["emp_full_time_permanent"]
+		),
+		"emp_part_time_permanent": lambda: _drill_active_employment_types(
+			company, branch, department, EMPLOYMENT_CARD_TYPES["emp_part_time_permanent"]
+		),
+		"emp_full_time_probation": lambda: _drill_active_employment_types(
+			company, branch, department, EMPLOYMENT_CARD_TYPES["emp_full_time_probation"]
+		),
+		"emp_part_time_probation": lambda: _drill_active_employment_types(
+			company, branch, department, EMPLOYMENT_CARD_TYPES["emp_part_time_probation"]
+		),
+		"emp_contract_as_per_need": lambda: _drill_active_employment_types(
+			company, branch, department, EMPLOYMENT_CARD_TYPES["emp_contract_as_per_need"]
+		),
+		"emp_contract_fixed_salary": lambda: _drill_active_employment_types(
+			company, branch, department, EMPLOYMENT_CARD_TYPES["emp_contract_fixed_salary"]
+		),
+		"new_hires_this_month": lambda: _drill_new_hires(month_start, month_end, company, branch, department),
+		"new_hires_this_year": lambda: _drill_new_hires(year_start, today, company, branch, department),
+		"left_employees_this_month": lambda: _drill_left_employees(month_start, month_end, company, branch, department),
+		"left_employees_this_year": lambda: _drill_left_employees(year_start, today, company, branch, department),
+		"pak_qatar_enrolled": lambda: _drill_pak_qatar_enrolled(company, branch, department),
+		"cnic_expired_count": lambda: _drill_cnic_expired(company, branch, department),
+		"cnic_upcoming_count": lambda: _drill_cnic_upcoming(
+			company, branch, department, today=today, days=cint(filters.get("cnic_upcoming_days") or 30)
+		),
+		"upcoming_confirmation": lambda: _drill_upcoming_confirmation(
+			company, branch, department, today=today, days=60
+		),
+		"total_male": lambda: _drill_active_by_gender(company, branch, department, "Male"),
+		"total_female": lambda: _drill_active_by_gender(company, branch, department, "Female"),
+		"attendance_records": lambda: _drill_attendance_records(from_date, to_date, company, branch, department, filters.get("employee")),
+		"employees_covered": lambda: _drill_employees_covered(from_date, to_date, company, branch, department, filters.get("employee")),
+		"pending_leave_applications": lambda: _drill_pending_leaves(from_date, to_date, company, branch, department, filters.get("employee")),
+	}
+
+	handler = handlers.get(card_key)
+	if not handler:
+		return {"title": card_key or "Detail", "columns": [], "rows": [], "error": "Unknown card"}
+
+	payload = handler()
+	payload["card_key"] = card_key
+	payload["count"] = len(payload.get("rows") or [])
+	return payload
 
 
 def _empty_payload(from_date, to_date, company, branch, department="", employee=""):
@@ -169,7 +241,38 @@ def _empty_payload(from_date, to_date, company, branch, department="", employee=
 		"cnic_upcoming_count": 0,
 		"cnic_upcoming_days": 30,
 		"cnic_upcoming_employees": [],
+		"emp_full_time_permanent": 0,
+		"emp_part_time_permanent": 0,
+		"emp_full_time_probation": 0,
+		"emp_part_time_probation": 0,
+		"emp_contract_as_per_need": 0,
+		"emp_contract_fixed_salary": 0,
+		"pak_qatar_enrolled_count": 0,
+		"upcoming_confirmation_count": 0,
+		"total_male": 0,
+		"total_female": 0,
 	}
+
+
+EMPLOYMENT_CARD_TYPES = {
+	"emp_full_time_permanent": ["Full Time -  (Permanent)"],
+	"emp_part_time_permanent": ["Part Time - (Permanent)"],
+	"emp_full_time_probation": ["Full Time (Probation)"],
+	"emp_part_time_probation": ["Part Time (Probation)"],
+	"emp_contract_fixed_salary": ["Contract Base - (Fixed Salary)"],
+	"emp_contract_as_per_need": [
+		"Contract Base - Consultant",
+		"QPS - Contract Staff",
+		"TPS - Contract Staff",
+		"Teacher Training - Contract Staff",
+		"CEE - Contract Staff",
+		"Contract",
+		"Contract - Zakat Employee",
+		"Storyteller - Contract",
+		"Flexible",
+		"Program Director - TIF",
+	],
+}
 
 
 def _has_field(doctype, fieldname):
@@ -939,6 +1042,25 @@ def _count_active_employees(company, branch, department):
 	return cint((row or [{}])[0].get("c"))
 
 
+def _count_active_by_gender(gender, company, branch, department):
+	if not frappe.db.table_exists("Employee") or not _has_field("Employee", "gender"):
+		return 0
+	where_sql, params = _emp_filters_sql(company, branch, department)
+	params["gender"] = gender
+	row = frappe.db.sql(
+		f"""
+		SELECT COUNT(e.name) AS c
+		FROM `tabEmployee` e
+		WHERE COALESCE(e.status, '') = 'Active'
+		  AND TRIM(COALESCE(e.gender, '')) = %(gender)s
+		  AND {where_sql}
+		""",
+		params,
+		as_dict=True,
+	)
+	return cint((row or [{}])[0].get("c"))
+
+
 def _count_new_hires(from_date, to_date, company, branch, department):
 	if not frappe.db.table_exists("Employee"):
 		return 0
@@ -1032,8 +1154,58 @@ def _hiring_attrition_trend(from_date, to_date, company, branch, department):
 
 
 _ALLOWED_EMP_GROUP_FIELDS = frozenset(
-	{"gender", "grade", "branch", "designation", "department", "employment_type"}
+	{"gender", "grade", "grades", "branch", "designation", "department", "employment_type"}
 )
+
+
+def _employee_grade_field():
+	"""Prefer custom Employee.grades (Link) over standard grade field."""
+	if _has_field("Employee", "grades"):
+		return "grades"
+	if _has_field("Employee", "grade"):
+		return "grade"
+	return None
+
+
+def _roman_numeral_value(roman):
+	roman = (roman or "").strip().lower()
+	if not roman:
+		return 10**9
+	values = {"i": 1, "v": 5, "x": 10, "l": 50, "c": 100}
+	total = 0
+	prev = 0
+	for ch in reversed(roman):
+		v = values.get(ch, 0)
+		if not v:
+			return 10**9
+		if v < prev:
+			total -= v
+		else:
+			total += v
+		prev = v
+	return total or 10**9
+
+
+def _grade_label_sort_key(label):
+	label = (label or "").strip()
+	if not label or label.lower() == "not set":
+		return (10**9, "", "")
+	lower = label.lower()
+	parts = lower.split("-", 1)
+	roman = _roman_numeral_value(parts[0])
+	suffix = parts[1] if len(parts) > 1 else ""
+	if roman >= 10**9:
+		m = re.search(r"(\d+)", lower)
+		if m:
+			roman = int(m.group(1))
+	return (roman, suffix, lower)
+
+
+def _headcount_by_grade(company, branch, department, limit=20):
+	fieldname = _employee_grade_field()
+	if not fieldname:
+		return {"labels": [], "values": []}
+	return _active_employee_group_count(fieldname, company, branch, department, limit=limit)
 
 
 def _active_employee_group_count(fieldname, company, branch, department, limit=15):
@@ -1044,8 +1216,8 @@ def _active_employee_group_count(fieldname, company, branch, department, limit=1
 	if not frappe.db.table_exists("Employee") or not _has_field("Employee", fieldname):
 		return {"labels": [], "values": []}
 	where_sql, params = _emp_filters_sql(company, branch, department)
-	# Grade should appear in numeric sequence (e.g. 1,2,3 or G1,G2,...) rather than by headcount.
-	if fieldname == "grade":
+	# Grade / grades: sort by roman numeral (ii, iii, vii-a, …) not headcount.
+	if fieldname in ("grade", "grades"):
 		rows = frappe.db.sql(
 			f"""
 			SELECT COALESCE(NULLIF(TRIM(e.`{fieldname}`), ''), 'Not set') AS label,
@@ -1059,13 +1231,7 @@ def _active_employee_group_count(fieldname, company, branch, department, limit=1
 			as_dict=True,
 		)
 
-		def _grade_sort_key(r):
-			label = (r.get("label") or "").strip()
-			m = re.search(r"(\d+)", label)
-			n = int(m.group(1)) if m else 10**9
-			return (n, label.lower())
-
-		rows = sorted(rows or [], key=_grade_sort_key)[: cint(limit)]
+		rows = sorted(rows or [], key=lambda r: _grade_label_sort_key(r.get("label")))[: cint(limit)]
 		return {"labels": [r["label"] for r in rows], "values": [cint(r.get("c")) for r in rows]}
 
 	rows = frappe.db.sql(
@@ -1299,3 +1465,403 @@ def _probation_stats_and_rows(company, branch, department, today=None, limit=25)
 		]
 
 	return out
+
+
+def _workforce_card_counts(company, branch, department):
+	out = {}
+	for key, types in EMPLOYMENT_CARD_TYPES.items():
+		out[key] = _count_active_employment_types(company, branch, department, types)
+	return out
+
+
+def _count_active_employment_types(company, branch, department, employment_types):
+	if not employment_types or not frappe.db.table_exists("Employee"):
+		return 0
+	where_sql, params = _emp_filters_sql(company, branch, department)
+	placeholders = ", ".join([f"%(et{i})s" for i in range(len(employment_types))])
+	for i, value in enumerate(employment_types):
+		params[f"et{i}"] = value
+	row = frappe.db.sql(
+		f"""
+		SELECT COUNT(e.name) AS c
+		FROM `tabEmployee` e
+		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}
+		  AND e.employment_type IN ({placeholders})
+		""",
+		params,
+		as_dict=True,
+	)
+	return cint((row or [{}])[0].get("c"))
+
+
+def _employee_row_select_extra():
+	fields = [
+		"e.employee_name",
+		"e.name AS employee_id",
+		"COALESCE(NULLIF(TRIM(e.department), ''), '—') AS department",
+	]
+	if _has_field("Employee", "employment_type"):
+		fields.append("e.employment_type AS employment_type")
+	if _has_field("Employee", "date_of_joining"):
+		fields.append("e.date_of_joining AS date_of_joining")
+	if _has_field("Employee", "designation"):
+		fields.append("e.designation AS designation")
+	if _has_field("Employee", "branch"):
+		fields.append("e.branch AS branch")
+	return ", ".join(fields)
+
+
+def _drill_active_employees(company, branch, department, limit=500):
+	rows = _fetch_active_employee_rows(company, branch, department, limit=limit)
+	return _drill_payload("Active Employees", rows)
+
+
+def _drill_active_by_gender(company, branch, department, gender, limit=500):
+	rows = _fetch_active_employee_rows(company, branch, department, gender=gender, limit=limit)
+	return _drill_payload(f"Active Employees — {gender}", rows)
+
+
+def _drill_active_employment_types(company, branch, department, employment_types, limit=500):
+	rows = _fetch_active_employee_rows(
+		company, branch, department, employment_types=employment_types, limit=limit
+	)
+	label = ", ".join(employment_types[:2]) + ("…" if len(employment_types) > 2 else "")
+	return _drill_payload(f"Employees — {label}", rows)
+
+
+def _fetch_active_employee_rows(company, branch, department, employment_types=None, gender=None, limit=500):
+	if not frappe.db.table_exists("Employee"):
+		return []
+	where_sql, params = _emp_filters_sql(company, branch, department)
+	type_sql = ""
+	if employment_types:
+		placeholders = ", ".join([f"%(et{i})s" for i in range(len(employment_types))])
+		for i, value in enumerate(employment_types):
+			params[f"et{i}"] = value
+		type_sql = f" AND e.employment_type IN ({placeholders})"
+	gender_sql = ""
+	if gender and _has_field("Employee", "gender"):
+		params["gender"] = gender
+		gender_sql = " AND TRIM(COALESCE(e.gender, '')) = %(gender)s"
+	lim = cint(limit)
+	return frappe.db.sql(
+		f"""
+		SELECT {_employee_row_select_extra()}
+		FROM `tabEmployee` e
+		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}{type_sql}{gender_sql}
+		ORDER BY e.employee_name ASC
+		LIMIT {lim}
+		""",
+		params,
+		as_dict=True,
+	) or []
+
+
+def _drill_new_hires(from_date, to_date, company, branch, department, limit=500):
+	rows = _fetch_hire_rows(from_date, to_date, company, branch, department, limit=limit)
+	return _drill_payload(f"New Hires ({from_date} to {to_date})", rows)
+
+
+def _fetch_hire_rows(from_date, to_date, company, branch, department, limit=500):
+	if not frappe.db.table_exists("Employee") or not _has_field("Employee", "date_of_joining"):
+		return []
+	where_sql, params = _emp_filters_sql(company, branch, department)
+	params.update({"from_date": str(from_date), "to_date": str(to_date)})
+	lim = cint(limit)
+	return frappe.db.sql(
+		f"""
+		SELECT {_employee_row_select_extra()}
+		FROM `tabEmployee` e
+		WHERE {where_sql}
+		  AND e.date_of_joining BETWEEN %(from_date)s AND %(to_date)s
+		ORDER BY e.date_of_joining DESC, e.employee_name ASC
+		LIMIT {lim}
+		""",
+		params,
+		as_dict=True,
+	) or []
+
+
+def _drill_left_employees(from_date, to_date, company, branch, department, limit=500):
+	rows = _fetch_left_rows(from_date, to_date, company, branch, department, limit=limit)
+	return _drill_payload(f"Left Employees ({from_date} to {to_date})", rows)
+
+
+def _fetch_left_rows(from_date, to_date, company, branch, department, limit=500):
+	if not frappe.db.table_exists("Employee"):
+		return []
+	where_sql, params = _emp_filters_sql(company, branch, department)
+	params.update({"from_date": str(from_date), "to_date": str(to_date)})
+
+	date_field = None
+	for candidate in ("relieving_date", "date_of_leaving", "date_of_resignation", "contract_end_date"):
+		if _has_field("Employee", candidate):
+			date_field = candidate
+			break
+
+	lim = cint(limit)
+	if date_field:
+		rows = frappe.db.sql(
+			f"""
+			SELECT {_employee_row_select_extra()}, e.`{date_field}` AS exit_date, e.status AS status
+			FROM `tabEmployee` e
+			WHERE {where_sql}
+			  AND e.`{date_field}` BETWEEN %(from_date)s AND %(to_date)s
+			ORDER BY e.`{date_field}` DESC, e.employee_name ASC
+			LIMIT {lim}
+			""",
+			params,
+			as_dict=True,
+		)
+	else:
+		rows = frappe.db.sql(
+			f"""
+			SELECT {_employee_row_select_extra()}, e.modified AS exit_date, e.status AS status
+			FROM `tabEmployee` e
+			WHERE {where_sql}
+			  AND COALESCE(e.status, '') = 'Left'
+			  AND DATE(e.modified) BETWEEN %(from_date)s AND %(to_date)s
+			ORDER BY e.modified DESC, e.employee_name ASC
+			LIMIT {lim}
+			""",
+			params,
+			as_dict=True,
+		)
+	return rows or []
+
+
+def _pak_qatar_enrolled_stats(company, branch, department, limit=500):
+	out = {"pak_qatar_enrolled_count": 0, "pak_qatar_enrolled_employees": []}
+	if not frappe.db.table_exists("Employee"):
+		return out
+	rows = _fetch_pak_qatar_rows(company, branch, department, limit=limit)
+	out["pak_qatar_enrolled_count"] = len(rows)
+	out["pak_qatar_enrolled_employees"] = rows[:25]
+	return out
+
+
+def _pak_qatar_match_sql():
+	ors = []
+	if _has_field("Employee", "health_insurance_provider"):
+		ors.append("LOWER(COALESCE(e.health_insurance_provider, '')) LIKE '%%pak qatar%%'")
+	if _has_field("Employee", "medical_card"):
+		ors.append("COALESCE(e.medical_card, '') = 'Yes'")
+	if not ors:
+		return "1=0"
+	return "(" + " OR ".join(ors) + ")"
+
+
+def _fetch_pak_qatar_rows(company, branch, department, limit=500):
+	where_sql, params = _emp_filters_sql(company, branch, department)
+	match_sql = _pak_qatar_match_sql()
+	extra = []
+	if _has_field("Employee", "health_insurance_provider"):
+		extra.append("e.health_insurance_provider AS health_insurance_provider")
+	if _has_field("Employee", "medical_card"):
+		extra.append("e.medical_card AS medical_card")
+	extra_sql = (", " + ", ".join(extra)) if extra else ""
+	lim = cint(limit)
+	return frappe.db.sql(
+		f"""
+		SELECT {_employee_row_select_extra()}{extra_sql}
+		FROM `tabEmployee` e
+		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}
+		  AND {match_sql}
+		ORDER BY e.employee_name ASC
+		LIMIT {lim}
+		""",
+		params,
+		as_dict=True,
+	) or []
+
+
+def _drill_pak_qatar_enrolled(company, branch, department, limit=500):
+	rows = _fetch_pak_qatar_rows(company, branch, department, limit=limit)
+	return _drill_payload("Pak Qatar Enrolled (Health Card / Insurance)", rows)
+
+
+def _upcoming_confirmation_stats(company, branch, department, today=None, days=60, limit=500):
+	out = {"upcoming_confirmation_count": 0, "upcoming_confirmation_employees": []}
+	if not frappe.db.table_exists("Employee") or not _has_field("Employee", "scheduled_confirmation_date"):
+		return out
+	rows = _fetch_upcoming_confirmation_rows(company, branch, department, today=today, days=days, limit=limit)
+	out["upcoming_confirmation_count"] = len(rows)
+	out["upcoming_confirmation_employees"] = rows[:25]
+	return out
+
+
+def _fetch_upcoming_confirmation_rows(company, branch, department, today=None, days=60, limit=500):
+	today = getdate(today or nowdate())
+	until = add_days(today, cint(days or 60))
+	where_sql, params = _emp_filters_sql(company, branch, department)
+	params.update({"today": str(today), "until": str(until)})
+	lim = cint(limit)
+	return frappe.db.sql(
+		f"""
+		SELECT {_employee_row_select_extra()}, e.scheduled_confirmation_date AS scheduled_confirmation_date
+		FROM `tabEmployee` e
+		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}
+		  AND e.scheduled_confirmation_date IS NOT NULL
+		  AND e.scheduled_confirmation_date BETWEEN %(today)s AND %(until)s
+		ORDER BY e.scheduled_confirmation_date ASC, e.employee_name ASC
+		LIMIT {lim}
+		""",
+		params,
+		as_dict=True,
+	) or []
+
+
+def _drill_upcoming_confirmation(company, branch, department, today=None, days=60, limit=500):
+	rows = _fetch_upcoming_confirmation_rows(company, branch, department, today=today, days=days, limit=limit)
+	return _drill_payload("Upcoming Confirmation", rows)
+
+
+def _drill_cnic_expired(company, branch, department, limit=500):
+	stats = _cnic_expired_stats_and_rows(company, branch, department, limit=limit)
+	return _drill_payload("CNIC Expired", stats.get("cnic_expired_employees") or [])
+
+
+def _drill_cnic_upcoming(company, branch, department, today=None, days=30, limit=500):
+	stats = _cnic_upcoming_stats_and_rows(company, branch, department, today=today, days=days, limit=limit)
+	return _drill_payload(f"CNIC Expiring (next {days} days)", stats.get("cnic_upcoming_employees") or [])
+
+
+def _drill_attendance_records(from_date, to_date, company, branch, department, employee, limit=500):
+	month_keys = _months_in_range(from_date, to_date)
+	if not month_keys:
+		return _drill_payload("Attendance Records", [])
+	join_sql, where_sql, params = _ea_join_and_where(company, branch, department, employee, month_keys)
+	lim = cint(limit)
+	rows = frappe.db.sql(
+		f"""
+		SELECT
+			a.name AS attendance_id,
+			COALESCE(NULLIF(TRIM(a.employee_name), ''), a.employee, '—') AS employee_name,
+			a.employee AS employee_id,
+			COALESCE(NULLIF(TRIM(a.department), ''), '—') AS department,
+			CONCAT(TRIM(COALESCE(a.month, '')), ' ', TRIM(COALESCE(a.year, ''))) AS period,
+			a.docstatus AS docstatus
+		FROM {EA_TABLE} a {join_sql}
+		WHERE {where_sql}
+		ORDER BY a.year DESC, a.month DESC, a.employee_name ASC
+		LIMIT {lim}
+		""",
+		params,
+		as_dict=True,
+	) or []
+	return _drill_payload("Attendance Records", rows)
+
+
+def _drill_employees_covered(from_date, to_date, company, branch, department, employee, limit=500):
+	month_keys = _months_in_range(from_date, to_date)
+	if not month_keys or not _has_field(EA_DOCTYPE, "employee"):
+		return _drill_payload("Employees Covered", [])
+	join_sql, where_sql, params = _ea_join_and_where(company, branch, department, employee, month_keys)
+	lim = cint(limit)
+	rows = frappe.db.sql(
+		f"""
+		SELECT
+			COALESCE(NULLIF(TRIM(a.employee_name), ''), a.employee, '—') AS employee_name,
+			a.employee AS employee_id,
+			COALESCE(NULLIF(TRIM(a.department), ''), '—') AS department,
+			COUNT(a.name) AS attendance_records
+		FROM {EA_TABLE} a {join_sql}
+		WHERE {where_sql} AND COALESCE(a.employee, '') != ''
+		GROUP BY employee_name, employee_id, department
+		ORDER BY attendance_records DESC, employee_name ASC
+		LIMIT {lim}
+		""",
+		params,
+		as_dict=True,
+	) or []
+	return _drill_payload("Employees Covered", rows)
+
+
+def _drill_pending_leaves(from_date, to_date, company, branch, department, employee, limit=500):
+	if not frappe.db.table_exists("Leave Application"):
+		return _drill_payload("Open Leave Applications", [])
+	join_employee, emp_conditions, params = _leave_join_conditions(
+		company=company, branch=branch, department=department, employee=employee
+	)
+	params.update({"from_date": str(from_date), "to_date": str(to_date)})
+	where_emp = (" AND " + " AND ".join(emp_conditions)) if emp_conditions else ""
+	lim = cint(limit)
+	rows = frappe.db.sql(
+		f"""
+		SELECT
+			la.name AS leave_application,
+			COALESCE(NULLIF(TRIM(la.employee_name), ''), la.employee, '—') AS employee_name,
+			la.employee AS employee_id,
+			COALESCE(la.leave_type, '—') AS leave_type,
+			la.from_date AS from_date,
+			la.to_date AS to_date,
+			COALESCE(la.total_leave_days, 0) AS total_leave_days,
+			COALESCE(la.status, '—') AS status
+		FROM `tabLeave Application` la
+		{join_employee}
+		WHERE la.docstatus = 1
+		  AND COALESCE(la.status, '') = 'Open'
+		  AND la.from_date BETWEEN %(from_date)s AND %(to_date)s
+		  {where_emp}
+		ORDER BY la.from_date DESC
+		LIMIT {lim}
+		""",
+		params,
+		as_dict=True,
+	) or []
+	return _drill_payload("Open Leave Applications", rows)
+
+
+def _drill_payload(title, rows):
+	columns = _columns_from_rows(rows)
+	return {"title": title, "columns": columns, "rows": rows or []}
+
+
+def _columns_from_rows(rows):
+	if not rows:
+		return [
+			{"key": "employee_name", "label": "Employee"},
+			{"key": "employee_id", "label": "Employee ID"},
+			{"key": "department", "label": "Department"},
+		]
+	label_map = {
+		"employee_name": "Employee",
+		"employee_id": "Employee ID",
+		"department": "Department",
+		"employment_type": "Employment Type",
+		"date_of_joining": "Joining Date",
+		"designation": "Designation",
+		"branch": "Branch",
+		"exit_date": "Exit Date",
+		"status": "Status",
+		"cnic_expiry": "CNIC Expiry",
+		"scheduled_confirmation_date": "Confirmation Date",
+		"health_insurance_provider": "Health Insurance",
+		"medical_card": "Medical Card",
+		"attendance_id": "Attendance ID",
+		"period": "Period",
+		"docstatus": "Docstatus",
+		"attendance_records": "Records",
+		"leave_application": "Leave Application",
+		"leave_type": "Leave Type",
+		"from_date": "From Date",
+		"to_date": "To Date",
+		"total_leave_days": "Leave Days",
+	}
+	columns = []
+	for key in rows[0].keys():
+		fmt = None
+		if key in ("date_of_joining", "exit_date", "cnic_expiry", "scheduled_confirmation_date", "from_date", "to_date"):
+			fmt = "Date"
+		elif key in ("attendance_records", "docstatus"):
+			fmt = "Int"
+		elif key == "total_leave_days":
+			fmt = "Float"
+		columns.append(
+			{
+				"key": key,
+				"label": label_map.get(key, key.replace("_", " ").title()),
+				"format": fmt,
+			}
+		)
+	return columns

@@ -3,16 +3,17 @@
  "creation": "2025-12-12 19:28:48.771121",
  "docstatus": 0,
  "doctype": "Page",
- "idx": 0,
- "modified": "2025-12-12 19:28:48.771121",
+ "idx": 4,
+ "modified": "2026-06-22 16:16:43.360408",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "items-receiving-repo",
  "owner": "Administrator",
  "page_name": "items-receiving-repo",
  "roles": [],
- "script": "tif_customization.tif_customization.page.items_receiving_repo.items_receiving_repo",
+ "script": null,
  "standard": "Yes",
  "style": null,
- "system_page": 0
+ "system_page": 0,
+ "title": "MR and PO"
 }

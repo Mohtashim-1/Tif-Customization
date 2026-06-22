@@ -1,5 +1,13 @@
 frappe.ui.form.on("Leave Application", {
 	refresh(frm) {
+		frm.set_query("custom_substitute_name", () => {
+			const filters = { is_active: 1 };
+			if (frm.doc.employee) {
+				filters.name = ["!=", frm.doc.employee];
+			}
+			return { filters };
+		});
+
 		if (frm.doc.docstatus === 0 && frm.doc.employee) {
 			// Run after HRMS make_dashboard so our accrual table is not overwritten.
 			setTimeout(() => build_allocated_leaves_dashboard(frm), 0);
