@@ -1,0 +1,38 @@
+{
+ "add_total_row": 0,
+ "add_translate_data": 0,
+ "columns": [],
+ "creation": "2026-06-22 14:29:47.296981",
+ "disabled": 0,
+ "docstatus": 0,
+ "doctype": "Report",
+ "filters": [],
+ "idx": 0,
+ "is_standard": "Yes",
+ "json": "{}",
+ "letter_head": null,
+ "modified": "2026-06-22 14:36:07.713730",
+ "modified_by": "Administrator",
+ "module": "Tif Customization",
+ "name": "Leave Summary Consolidate",
+ "owner": "Administrator",
+ "prepared_report": 0,
+ "ref_doctype": "Leave Ledger Entry",
+ "report_name": "Leave Summary Consolidate",
+ "report_type": "Script Report",
+ "roles": [
+  {
+   "role": "System Manager"
+  },
+  {
+   "role": "HR Manager"
+  },
+  {
+   "role": "HR User"
+  },
+  {
+   "role": "All"
+  }
+ ],
+ "timeout": 0
+}

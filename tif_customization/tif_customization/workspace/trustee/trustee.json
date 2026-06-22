@@ -17,7 +17,7 @@
  "is_hidden": 1,
  "label": "Trustee",
  "links": [],
- "modified": "2026-06-20 12:43:46.980051",
+ "modified": "2026-06-20 14:02:47.386900",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Trustee",
@@ -34,7 +34,7 @@
    "role": "System Manager"
   }
  ],
- "sequence_id": 52.0,
+ "sequence_id": 51.0,
  "shortcuts": [],
  "title": "Trustee"
 }

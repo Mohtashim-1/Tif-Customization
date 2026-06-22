@@ -53,7 +53,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-06-18 17:08:27.567701",
+ "modified": "2026-06-20 14:02:47.261565",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Field Staff",
@@ -73,7 +73,7 @@
    "role": "System Manager"
   }
  ],
- "sequence_id": 49.0,
+ "sequence_id": 48.0,
  "shortcuts": [],
  "title": "Field Staff"
 }

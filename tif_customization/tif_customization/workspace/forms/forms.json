@@ -599,7 +599,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Reporting",
+   "label": " Daily Task Reporting",
    "link_count": 0,
    "link_to": "Reporting",
    "link_type": "DocType",
@@ -607,7 +607,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-06-20 12:20:49.817287",
+ "modified": "2026-06-22 14:37:37.918750",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Forms",
@@ -630,7 +630,7 @@
    "role": "HR User"
   }
  ],
- "sequence_id": 55.0,
+ "sequence_id": 53.0,
  "shortcuts": [],
  "title": "Forms"
 }

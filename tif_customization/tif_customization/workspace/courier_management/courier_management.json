@@ -62,7 +62,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-06-18 17:08:27.665237",
+ "modified": "2026-06-20 14:02:47.177934",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Courier Management",
@@ -79,7 +79,7 @@
    "role": "System Manager"
   }
  ],
- "sequence_id": 47.0,
+ "sequence_id": 46.0,
  "shortcuts": [],
  "title": "Courier Management"
 }

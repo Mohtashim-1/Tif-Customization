@@ -54,135 +54,6 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Purchase",
-   "link_count": 1,
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Item Acknowledgement",
-   "link_count": 0,
-   "link_to": "items-receiving-repo",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "HR",
-   "link_count": 10,
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Salary Register",
-   "link_count": 0,
-   "link_to": "salary-register",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Salary Report",
-   "link_count": 0,
-   "link_to": "variable-components",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "PF Dashboard",
-   "link_count": 0,
-   "link_to": "pf-dashboard",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Individual Attendance Sheet",
-   "link_count": 0,
-   "link_to": "individual-attendance-sheet-range",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Organization Charts ",
-   "link_count": 0,
-   "link_to": "organization-chart-grouped",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Task Reports",
-   "link_count": 0,
-   "link_to": "reporting-report",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Task Reporting",
-   "link_count": 0,
-   "link_to": "task-reporting",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Leave Summary",
-   "link_count": 0,
-   "link_to": "Leave Summary",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Daily Attendance Summary",
-   "link_count": 0,
-   "link_to": "Daily Attendance Summary",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Monthly Attendance Summary",
-   "link_count": 0,
-   "link_to": "Monthly Attendance Summary",
-   "link_type": "Report",
-   "onboard": 0,
-   "report_ref_doctype": "Employee Attendance",
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
    "label": "QPS",
    "link_count": 10,
    "link_type": "DocType",
@@ -293,10 +164,20 @@
    "hidden": 0,
    "is_query_report": 0,
    "label": "Accounts",
-   "link_count": 19,
+   "link_count": 20,
    "link_type": "DocType",
    "onboard": 0,
    "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Expense Report",
+   "link_count": 0,
+   "link_to": "procurement-expense",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
   },
   {
    "hidden": 0,
@@ -495,10 +376,139 @@
    "link_type": "Page",
    "onboard": 0,
    "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Purchase",
+   "link_count": 1,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "MR and PO",
+   "link_count": 0,
+   "link_to": "items-receiving-repo",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "HR",
+   "link_count": 10,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Individual Attendance Sheet",
+   "link_count": 0,
+   "link_to": "individual-attendance-sheet-range",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": " Daily Task Reporting",
+   "link_count": 0,
+   "link_to": "task-reporting",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Leave Summary",
+   "link_count": 0,
+   "link_to": "Leave Summary",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Daily Attendance Summary",
+   "link_count": 0,
+   "link_to": "Daily Attendance Summary",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Monthly Attendance Summary",
+   "link_count": 0,
+   "link_to": "Monthly Attendance Summary",
+   "link_type": "Report",
+   "onboard": 0,
+   "report_ref_doctype": "Employee Attendance",
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Salary Report (UAT)",
+   "link_count": 0,
+   "link_to": "variable-components",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Salary Register (UAT)",
+   "link_count": 0,
+   "link_to": "salary-register",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "PF Dashboard (UAT)",
+   "link_count": 0,
+   "link_to": "pf-dashboard",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Organization Charts (UAT)",
+   "link_count": 0,
+   "link_to": "organization-chart-grouped",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "HR Dashboard (UAT)",
+   "link_count": 0,
+   "link_to": "hr-dashboard",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
   }
  ],
- "modified": "2026-06-20 13:49:22.442347",
- "modified_by": "trustee@tif.edu.pk",
+ "modified": "2026-06-22 14:37:21.429822",
+ "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Reports",
  "number_cards": [],
@@ -526,7 +536,7 @@
    "role": "Trustee"
   }
  ],
- "sequence_id": 54.0,
+ "sequence_id": 52.0,
  "shortcuts": [],
  "title": "Reports"
 }
