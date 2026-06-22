@@ -164,7 +164,7 @@ ItemsReceivingRepoPage.prototype.make_datatable = function() {
 	
 	// Create table structure
 	me.table = $(`
-		<table class="table table-bordered table-hover" style="width: 100%; min-width: 1200px;">
+		<table class="table table-bordered table-hover" style="width: 100%; min-width: 900px;">
 			<thead style="background-color: #f8f9fa;">
 				<tr>
 					<th style="min-width: 120px;">Material Request</th>
@@ -174,9 +174,6 @@ ItemsReceivingRepoPage.prototype.make_datatable = function() {
 					<th style="min-width: 110px;">Requested Qty</th>
 					<th style="min-width: 110px;">Received Qty</th>
 					<th style="min-width: 110px;">Pending Qty</th>
-					<th style="min-width: 100px;">Status</th>
-					<th style="min-width: 150px;">Acknowledgment Date</th>
-					<th style="min-width: 120px;">Acknowledged By</th>
 				</tr>
 			</thead>
 			<tbody class="table-body">
@@ -201,7 +198,7 @@ ItemsReceivingRepoPage.prototype.render_table = function(data) {
 	if (!data || data.length === 0) {
 		me.table_body.append(`
 			<tr>
-				<td colspan="10" class="text-center" style="padding: 40px; color: #999;">
+				<td colspan="7" class="text-center" style="padding: 40px; color: #999;">
 					${__('No MR Items found')}
 				</td>
 			</tr>
@@ -217,16 +214,6 @@ ItemsReceivingRepoPage.prototype.render_table = function(data) {
 		const pending_qty = flt(row.pending_qty);
 		const pending_qty_html = `<span style="color: ${pending_qty > 0 ? '#f57c00' : '#388e3c'}; font-weight: bold;">${pending_qty.toFixed(2)} ${row.uom || ''}</span>`;
 		
-		let status_badge = '';
-		if (row.acknowledgment_status === 'Acknowledged') {
-			status_badge = '<span class="badge badge-success">Acknowledged</span>';
-		} else {
-			status_badge = '<span class="badge badge-warning">Pending</span>';
-		}
-		
-		const ack_date = row.acknowledgment_date ? frappe.datetime.str_to_user(row.acknowledgment_date) : '<span style="color: #999;">-</span>';
-		const ack_by = row.acknowledged_by || '<span style="color: #999;">-</span>';
-		
 		const tr = $(`
 			<tr>
 				<td>${mr_link}</td>
@@ -236,9 +223,6 @@ ItemsReceivingRepoPage.prototype.render_table = function(data) {
 				<td>${requested_qty}</td>
 				<td>${received_qty}</td>
 				<td>${pending_qty_html}</td>
-				<td>${status_badge}</td>
-				<td>${ack_date}</td>
-				<td>${ack_by}</td>
 			</tr>
 		`);
 		
@@ -252,7 +236,7 @@ ItemsReceivingRepoPage.prototype.refresh = function() {
 	// Show loading in table
 		me.table_body.html(`
 			<tr>
-				<td colspan="10" class="text-center" style="padding: 40px; color: #999;">
+				<td colspan="7" class="text-center" style="padding: 40px; color: #999;">
 					<i class="fa fa-spinner fa-spin"></i> ${__('Loading...')}
 				</td>
 			</tr>
@@ -267,7 +251,7 @@ ItemsReceivingRepoPage.prototype.refresh = function() {
 			if (r.message && r.message.error) {
 				me.table_body.html(`
 					<tr>
-						<td colspan="10" class="text-center text-danger" style="padding: 40px;">
+						<td colspan="7" class="text-center text-danger" style="padding: 40px;">
 							${__('Error loading data: {0}', [r.message.error])}
 						</td>
 					</tr>

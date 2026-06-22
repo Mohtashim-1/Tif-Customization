@@ -1,8 +1,13 @@
 {
  "charts": [],
- "content": "[{\"id\":\"B2Oa7zB4ca\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Reports (Dev - UAT - Live)</span>\",\"col\":12}},{\"id\":\"CluU3Swx76\",\"type\":\"card\",\"data\":{\"card_name\":\"Supply Chain\",\"col\":4}},{\"id\":\"zJ4Qv-79Vo\",\"type\":\"card\",\"data\":{\"card_name\":\"HR\",\"col\":4}},{\"id\":\"ema4xqDvdc\",\"type\":\"card\",\"data\":{\"card_name\":\"Accounts\",\"col\":4}},{\"id\":\"NSUIMsvRee\",\"type\":\"card\",\"data\":{\"card_name\":\"Purchase\",\"col\":4}},{\"id\":\"O5u9Vpdwtx\",\"type\":\"card\",\"data\":{\"card_name\":\"QPS\",\"col\":4}}]",
+ "content": "[{\"id\":\"B2Oa7zB4ca\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Reports (Dev - UAT - Live)</span>\",\"col\":12}},{\"id\":\"CluU3Swx76\",\"type\":\"card\",\"data\":{\"card_name\":\"Supply Chain\",\"col\":4}},{\"id\":\"zJ4Qv-79Vo\",\"type\":\"card\",\"data\":{\"card_name\":\"HR\",\"col\":4}},{\"id\":\"ema4xqDvdc\",\"type\":\"card\",\"data\":{\"card_name\":\"Accounts\",\"col\":4}},{\"id\":\"NSUIMsvRee\",\"type\":\"card\",\"data\":{\"card_name\":\"Purchase\",\"col\":4}},{\"id\":\"O5u9Vpdwtx\",\"type\":\"card\",\"data\":{\"card_name\":\"QPS\",\"col\":4}},{\"id\":\"oABt4p_ANs\",\"type\":\"custom_block\",\"data\":{\"custom_block_name\":\"Reports Menu\",\"col\":12}}]",
  "creation": "2025-12-29 00:25:08.999696",
- "custom_blocks": [],
+ "custom_blocks": [
+  {
+   "custom_block_name": "Reports Menu",
+   "label": "Reports Menu"
+  }
+ ],
  "docstatus": 0,
  "doctype": "Workspace",
  "for_user": "",
@@ -400,7 +405,7 @@
    "hidden": 0,
    "is_query_report": 0,
    "label": "HR",
-   "link_count": 10,
+   "link_count": 11,
    "link_type": "DocType",
    "onboard": 0,
    "type": "Card Break"
@@ -418,9 +423,19 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": " Daily Task Reporting",
+   "label": "Task Reporting",
    "link_count": 0,
    "link_to": "task-reporting",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Daily Task Reporting",
+   "link_count": 0,
+   "link_to": "reporting-report",
    "link_type": "Page",
    "onboard": 0,
    "type": "Link"
@@ -507,7 +522,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-06-22 14:37:21.429822",
+ "modified": "2026-06-22 15:50:16.544495",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Reports",

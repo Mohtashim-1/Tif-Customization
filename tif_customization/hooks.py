@@ -8,7 +8,7 @@ app_license = "mit"
 # Fixtures
 # ------------------
 fixtures = [
-	{"dt": "Custom HTML Block", "filters": [["name", "in", ["Trustee Easy Menu"]]]},
+	{"dt": "Custom HTML Block", "filters": [["name", "in", ["Trustee Easy Menu", "Reports Menu"]]]},
 	{"dt": "Workspace", "filters": [["name", "in", ["Provident Fund"]]]},
 ]
 
