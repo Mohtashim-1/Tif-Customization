@@ -20,6 +20,34 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "Program",
+   "link_count": 0,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Upcoming Training (UAT) ",
+   "link_count": 0,
+   "link_to": "Upcoming Training",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "School Database Dashboard (UAT)",
+   "link_count": 0,
+   "link_to": "school-dashboard",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "Supply Chain",
    "link_count": 3,
    "onboard": 0,
@@ -38,7 +66,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Courier Expense Report & Dashboard",
+   "label": "Courier Expense Report & Dashboard (UAT)",
    "link_count": 0,
    "link_to": "courier-report",
    "link_type": "Page",
@@ -51,26 +79,6 @@
    "label": "Dispatch Report",
    "link_count": 0,
    "link_to": "dispatch-report",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Moon Bright Publishers Dashboard (UAT)",
-   "link_count": 0,
-   "link_to": "moon-bright-publisher-dashboard",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Millat Publishers Dashboard (UAT)",
-   "link_count": 0,
-   "link_to": "millat-publisher-dashboard",
    "link_type": "Page",
    "onboard": 0,
    "type": "Link"
@@ -115,6 +123,16 @@
   },
   {
    "hidden": 0,
+   "is_query_report": 0,
+   "label": "Millat Publishers Dashboard",
+   "link_count": 0,
+   "link_to": "millat-publisher-dashboard",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
    "is_query_report": 1,
    "label": "Daily Employee Attendance",
    "link_count": 0,
@@ -136,7 +154,17 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Organization Chart (UAT)",
+   "label": "Moon Bright Publishers Dashboard",
+   "link_count": 0,
+   "link_to": "moon-bright-publisher-dashboard",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Organization Chart (UAT) 24-Jun-26",
    "link_count": 0,
    "link_to": "organization-chart-grouped",
    "link_type": "Page",
@@ -155,11 +183,41 @@
   },
   {
    "hidden": 0,
+   "is_query_report": 0,
+   "label": "Salary Register (UAT) 24-Jun-26",
+   "link_count": 0,
+   "link_to": "salary-register",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
    "is_query_report": 1,
-   "label": "Leave Summary",
+   "label": "Leave Summary ",
    "link_count": 0,
    "link_to": "Leave Summary",
    "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Salary Report (UAT) 24-Jun-26",
+   "link_count": 0,
+   "link_to": "variable-components",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Full and Final Clearance 24-Jun-26",
+   "link_count": 0,
+   "link_to": "Full and Final Clearance",
+   "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
   },
@@ -175,61 +233,41 @@
   },
   {
    "hidden": 0,
-   "is_query_report": 1,
-   "label": "Full and Final Settlement",
-   "link_count": 0,
-   "link_to": "Full and Final Statement",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Loan Application",
-   "link_count": 0,
-   "link_to": "Full and Final Statement",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Leave Application",
-   "link_count": 0,
-   "link_to": "Leave Application",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
    "is_query_report": 0,
-   "label": "Salary Register (UAT)",
-   "link_count": 0,
-   "link_to": "salary-register",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Salary Report (UAT)",
-   "link_count": 0,
-   "link_to": "variable-components",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "PF Dashboard (UAT)",
+   "label": "PF Dashboard (UAT) 24-Jun-26",
    "link_count": 0,
    "link_to": "pf-dashboard",
    "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Loan Application ",
+   "link_count": 0,
+   "link_to": "Full and Final Statement",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Full and Final Settlement (UAT) 24-Jun-26",
+   "link_count": 0,
+   "link_to": "Full and Final Statement",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Leave Application 24-Jun-26",
+   "link_count": 0,
+   "link_to": "Leave Application",
+   "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
   },
@@ -244,9 +282,49 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Expense Report and Dashboard",
+   "label": "Expense Report and Dashboard (UAT) 24-Jun-26",
    "link_count": 0,
    "link_to": "procurement-expense",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Donation Received Bank Wise (UAT) 24-Jun-26",
+   "link_count": 0,
+   "link_to": "bank-wise-fund-distribution",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Donation Received Donor Wise (UAT) 24-Jun-26",
+   "link_count": 0,
+   "link_to": "bank-balance-reconci",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Donor Receipt Report (UAT) 24-Jun-26",
+   "link_count": 0,
+   "link_to": "donor-receipt-report",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Reconciliation with Bank Statements Summary (UAT) 29-06-2026",
+   "link_count": 0,
+   "link_to": "reconcillation-with-",
    "link_type": "Page",
    "onboard": 0,
    "type": "Link"
@@ -264,49 +342,9 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Donation Received Bank Wise (UAT)",
-   "link_count": 0,
-   "link_to": "bank-wise-fund-distribution",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Donation Received Donor Wise (UAT)",
-   "link_count": 0,
-   "link_to": "bank-balance-reconci",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
    "label": "Program Wise Expense (UAT)",
    "link_count": 0,
    "link_to": "program-wise-expense",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Donor Receipt Report (UAT)",
-   "link_count": 0,
-   "link_to": "donor-receipt-report",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Reconciliation with Bank Statements Summary (UAT) 29-06-2026",
-   "link_count": 0,
-   "link_to": "reconcillation-with-",
    "link_type": "Page",
    "onboard": 0,
    "type": "Link"
@@ -376,29 +414,9 @@
    "link_type": "Page",
    "onboard": 0,
    "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Upcoming Training",
-   "link_count": 0,
-   "link_to": "Upcoming Training",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "School Dashboard (UAT)",
-   "link_count": 0,
-   "link_to": "school-dashboard",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
   }
  ],
- "modified": "2026-06-23 21:31:52.529598",
+ "modified": "2026-06-23 21:56:44.525572",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Reports",

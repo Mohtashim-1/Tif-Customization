@@ -236,6 +236,7 @@ after_migrate = ["tif_customization.tif_customization.pf.setup.run_pf_setup_on_m
 override_whitelisted_methods = {
 	"hrms.hr.doctype.leave_application.leave_application.get_leave_details": "tif_customization.tif_customization.doctype.leave_application.leave_application.get_leave_details",
 	"frappe.desk.desktop.get_workspace_sidebar_items": "tif_customization.tif_customization.overrides.workspace_sidebar.get_workspace_sidebar_items",
+	"frappe.desk.doctype.workspace.workspace.save_page": "tif_customization.tif_customization.overrides.workspace_save.save_page",
 	"erpnext.selling.doctype.sales_order.sales_order.make_delivery_note": "tif_customization.tif_customization.overrides.sales_order.make_delivery_note",
 }
 #

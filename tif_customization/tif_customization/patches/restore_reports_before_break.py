@@ -3,15 +3,15 @@ import json
 import frappe
 
 
-VERSION_NAME = "a09mq0veoh"
 WORKSPACE = "Reports"
 
 
-def execute():
+def execute(version_name=None):
 	"""Restore Reports workspace to state before accidental bulk delete."""
-	links = _build_links_from_version(VERSION_NAME)
+	version_name = version_name or _latest_bulk_delete_version()
+	links = _build_links_from_version(version_name)
 	if not links:
-		frappe.throw(f"Could not rebuild links from Version {VERSION_NAME}")
+		frappe.throw(f"Could not rebuild links from Version {version_name}")
 
 	doc = frappe.get_doc("Workspace", WORKSPACE)
 	doc.content = (
@@ -40,7 +40,26 @@ def execute():
 	)
 	frappe.db.commit()
 	frappe.clear_cache(doctype="Workspace")
-	return {"restored_links": len(links)}
+	return {"restored_links": len(links), "version": version_name}
+
+
+def _latest_bulk_delete_version():
+	rows = frappe.get_all(
+		"Version",
+		filters={"ref_doctype": "Workspace", "docname": WORKSPACE},
+		fields=["name", "data", "creation"],
+		order_by="creation desc",
+		limit=20,
+	)
+	for row in rows:
+		try:
+			diff = json.loads(row.data or "{}")
+		except json.JSONDecodeError:
+			continue
+		removed_links = [item for item in diff.get("removed", []) if item[0] == "links"]
+		if len(removed_links) >= 10:
+			return row.name
+	frappe.throw("No bulk-delete version found for Reports workspace")
 
 
 def _build_links_from_version(version_name):

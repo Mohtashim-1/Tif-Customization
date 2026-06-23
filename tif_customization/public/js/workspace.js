@@ -43,6 +43,13 @@ frappe.ui.form.on("Workspace Link", {
 frappe.ui.form.on("Workspace", {
 	refresh(frm) {
 		tif_sanitize_workspace_card_breaks(frm);
+		if (frm.doc.name === "Reports") {
+			frm.layout.show_message(
+				__(
+					"Edit report links in the Links table below. Do not use the Edit button on the Reports page — that can clear all links."
+				)
+			);
+		}
 	},
 	before_save(frm) {
 		tif_sanitize_workspace_card_breaks(frm);
