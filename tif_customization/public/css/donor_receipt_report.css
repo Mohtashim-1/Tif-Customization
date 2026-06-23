@@ -2,26 +2,30 @@
 	width: 100%;
 	max-width: 100%;
 	padding-bottom: 24px;
+	box-sizing: border-box;
 }
 
 .donor-receipt-hero {
-	background: linear-gradient(135deg, #0f4c5c 0%, #1a936f 55%, #88d498 100%);
+	background: linear-gradient(135deg, #134e4a 0%, #0d9488 45%, #14b8a6 100%);
 	color: #fff;
-	border-radius: 12px;
-	padding: 20px 24px;
+	border-radius: 14px;
+	padding: 22px 26px;
 	margin-bottom: 16px;
+	box-shadow: 0 8px 24px rgba(13, 148, 136, 0.18);
 }
 
 .donor-receipt-hero__title {
-	margin: 0 0 6px;
-	font-size: 22px;
+	margin: 0 0 8px;
+	font-size: 24px;
 	font-weight: 700;
 }
 
 .donor-receipt-hero__sub {
 	margin: 0;
-	opacity: 0.92;
+	opacity: 0.94;
 	font-size: 13px;
+	max-width: 720px;
+	line-height: 1.5;
 }
 
 .donor-receipt-toolbar {
@@ -31,9 +35,10 @@
 	align-items: flex-end;
 	background: var(--card-bg, #fff);
 	border: 1px solid var(--border-color, #e5e7eb);
-	border-radius: 10px;
-	padding: 12px;
+	border-radius: 12px;
+	padding: 14px;
 	margin-bottom: 16px;
+	box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
 .donor-receipt-toolbar label {
@@ -41,50 +46,183 @@
 	font-size: 11px;
 	color: var(--text-muted, #6b7280);
 	margin-bottom: 4px;
+	font-weight: 600;
 }
 
 .donor-receipt-kpis {
 	display: grid;
-	grid-template-columns: repeat(3, minmax(0, 1fr));
+	grid-template-columns: repeat(4, minmax(0, 1fr));
 	gap: 12px;
 	margin-bottom: 16px;
 }
 
-@media (max-width: 800px) {
+@media (max-width: 1000px) {
+	.donor-receipt-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 600px) {
 	.donor-receipt-kpis { grid-template-columns: 1fr; }
 }
 
 .donor-receipt-kpi {
 	background: var(--card-bg, #fff);
 	border: 1px solid var(--border-color, #e5e7eb);
-	border-left: 4px solid #1a936f;
-	border-radius: 10px;
-	padding: 14px;
+	border-radius: 12px;
+	padding: 16px;
+	box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
+
+.donor-receipt-kpi--primary { border-top: 3px solid #0d9488; }
+.donor-receipt-kpi--amount { border-top: 3px solid #2563eb; }
+.donor-receipt-kpi--months { border-top: 3px solid #7c3aed; }
+.donor-receipt-kpi--avg { border-top: 3px solid #ea580c; }
 
 .donor-receipt-kpi__label {
 	font-size: 12px;
 	color: var(--text-muted, #6b7280);
-	margin-bottom: 6px;
+	margin-bottom: 8px;
 }
 
 .donor-receipt-kpi__value {
-	font-size: 22px;
+	font-size: 24px;
 	font-weight: 700;
+	line-height: 1.2;
+	word-break: break-word;
 }
 
 .donor-receipt-panel {
 	background: var(--card-bg, #fff);
 	border: 1px solid var(--border-color, #e5e7eb);
-	border-radius: 10px;
-	padding: 14px;
+	border-radius: 12px;
+	padding: 16px;
 	margin-bottom: 16px;
+	box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
 .donor-receipt-panel__title {
 	font-size: 15px;
-	font-weight: 600;
+	font-weight: 700;
 	margin: 0 0 12px;
+	color: #0f172a;
+}
+
+.donor-receipt-chart-wrap {
+	position: relative;
+	height: 280px;
+	width: 100%;
+}
+
+.donor-receipt-split {
+	display: grid;
+	grid-template-columns: 340px 1fr;
+	gap: 16px;
+	align-items: start;
+}
+
+@media (max-width: 1100px) {
+	.donor-receipt-split { grid-template-columns: 1fr; }
+}
+
+.donor-receipt-month-list {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	max-height: 620px;
+	overflow: auto;
+	padding-right: 4px;
+}
+
+.donor-month-card {
+	border: 1px solid var(--border-color, #e5e7eb);
+	border-radius: 12px;
+	padding: 14px 16px;
+	cursor: pointer;
+	background: #fff;
+	transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+
+.donor-month-card:hover {
+	border-color: #99f6e4;
+	box-shadow: 0 4px 14px rgba(13, 148, 136, 0.08);
+	transform: translateY(-1px);
+}
+
+.donor-month-card.is-active {
+	border-color: #0d9488;
+	background: linear-gradient(180deg, #f0fdfa 0%, #fff 100%);
+	box-shadow: 0 4px 16px rgba(13, 148, 136, 0.12);
+}
+
+.donor-month-card__top {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 8px;
+	margin-bottom: 8px;
+}
+
+.donor-month-card__label {
+	font-size: 14px;
+	font-weight: 700;
+	color: #0f172a;
+}
+
+.donor-month-card__badge {
+	font-size: 11px;
+	font-weight: 700;
+	color: #0f766e;
+	background: #ccfbf1;
+	padding: 3px 8px;
+	border-radius: 999px;
+	white-space: nowrap;
+}
+
+.donor-month-card__amount {
+	font-size: 20px;
+	font-weight: 800;
+	color: #0d9488;
+	margin-bottom: 4px;
+}
+
+.donor-month-card__hint {
+	font-size: 11px;
+	color: var(--text-muted, #6b7280);
+}
+
+.donor-receipt-detail {
+	min-height: 420px;
+	border: 1px solid var(--border-color, #e5e7eb);
+	border-radius: 12px;
+	background: #fff;
+	overflow: hidden;
+}
+
+.donor-receipt-detail__head {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: space-between;
+	align-items: center;
+	gap: 10px;
+	padding: 14px 16px;
+	background: #f8fafc;
+	border-bottom: 1px solid var(--border-color, #e5e7eb);
+}
+
+.donor-receipt-detail__title {
+	margin: 0;
+	font-size: 15px;
+	font-weight: 700;
+	color: #0f172a;
+}
+
+.donor-receipt-detail__search {
+	max-width: 260px;
+}
+
+.donor-receipt-detail__body {
+	padding: 0;
+	max-height: 560px;
+	overflow: auto;
 }
 
 .donor-receipt-table {
@@ -96,50 +234,76 @@
 .donor-receipt-table th,
 .donor-receipt-table td {
 	border-bottom: 1px solid var(--border-color, #e5e7eb);
-	padding: 8px 6px;
+	padding: 10px 12px;
 	text-align: left;
+	vertical-align: middle;
 }
 
 .donor-receipt-table th {
-	background: var(--control-bg, #f8fafc);
-	font-weight: 600;
+	position: sticky;
+	top: 0;
+	background: #f8fafc;
+	font-weight: 700;
+	z-index: 1;
 }
 
-.donor-receipt-table tr:hover td {
-	background: var(--control-bg, #f8fafc);
+.donor-receipt-table tbody tr:hover td {
+	background: #f8fafc;
 }
 
 .donor-receipt-table .text-right {
 	text-align: right;
 }
 
-.donor-receipt-month-row {
+.donor-receipt-link {
+	color: #0d9488;
 	cursor: pointer;
-}
-
-.donor-receipt-month-row.is-active td {
-	background: #ecfdf5;
 	font-weight: 600;
 }
 
-.donor-receipt-drilldown {
-	margin-top: 16px;
-	border-top: 2px solid #1a936f;
-	padding-top: 14px;
+.donor-receipt-link:hover {
+	text-decoration: underline;
 }
 
-.donor-receipt-link {
-	color: var(--primary, #2563eb);
-	cursor: pointer;
+.donor-receipt-btn-pdf {
+	background: #0d9488;
+	border-color: #0d9488;
+	color: #fff;
+}
+
+.donor-receipt-btn-pdf:hover,
+.donor-receipt-btn-pdf:focus {
+	background: #0f766e;
+	border-color: #0f766e;
+	color: #fff;
 }
 
 .donor-receipt-empty {
-	padding: 24px;
+	padding: 48px 24px;
 	text-align: center;
 	color: var(--text-muted, #6b7280);
 }
 
-.donor-receipt-grand td {
-	font-weight: 700;
-	background: #e2e8f0;
+.donor-receipt-empty i {
+	font-size: 28px;
+	margin-bottom: 10px;
+	color: #94a3b8;
+}
+
+.donor-receipt-placeholder {
+	padding: 48px 24px;
+	text-align: center;
+	color: var(--text-muted, #6b7280);
+	background: linear-gradient(180deg, #f8fafc 0%, #fff 100%);
+	min-height: 420px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+}
+
+.donor-receipt-placeholder i {
+	font-size: 36px;
+	color: #cbd5e1;
+	margin-bottom: 12px;
 }

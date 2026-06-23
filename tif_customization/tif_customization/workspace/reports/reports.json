@@ -1,6 +1,6 @@
 {
  "charts": [],
- "content": "[{\"id\":\"B2Oa7zB4ca\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Reports (Dev - UAT - Live)</span>\",\"col\":12}},{\"id\":\"oABt4p_ANs\",\"type\":\"custom_block\",\"data\":{\"custom_block_name\":\"Reports Menu\",\"col\":12}}]",
+ "content": "[{\"id\":\"B2Oa7zB4ca\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Reports (Development - UAT - Live)</span>\",\"col\":12}},{\"id\":\"oABt4p_ANs\",\"type\":\"custom_block\",\"data\":{\"custom_block_name\":\"Reports Menu\",\"col\":12}}]",
  "creation": "2025-12-29 00:25:08.999696",
  "custom_blocks": [
   {
@@ -17,14 +17,6 @@
  "is_hidden": 0,
  "label": "Reports",
  "links": [
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Programs",
-   "link_count": 0,
-   "onboard": 0,
-   "type": "Card Break"
-  },
   {
    "hidden": 0,
    "is_query_report": 0,
@@ -48,45 +40,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Supply Chain",
-   "link_count": 3,
-   "onboard": 0,
-   "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Stock Report & Dashboard",
-   "link_count": 0,
-   "link_to": "stock-detail",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Courier Expense Report & Dashboard",
-   "link_count": 0,
-   "link_to": "courier-report",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Dispatch Report",
-   "link_count": 0,
-   "link_to": "dispatch-report",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Millat Publishers Dashboard",
+   "label": "Millat Publishers Dashboard (UAT)",
    "link_count": 0,
    "link_to": "millat-publisher-dashboard",
    "link_type": "Page",
@@ -96,118 +50,9 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Moon Bright Publishers Dashboard",
+   "label": "Moon Bright Publishers Dashboard (UAT)",
    "link_count": 0,
    "link_to": "moon-bright-publisher-dashboard",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "HR",
-   "link_count": 10,
-   "onboard": 0,
-   "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "HR Dashboard",
-   "link_count": 0,
-   "link_to": "hr-dashboard",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Individual Attendance Sheet",
-   "link_count": 0,
-   "link_to": "individual-attendance-sheet-range",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Monthly Attendance Summary",
-   "link_count": 0,
-   "link_to": "Monthly Attendance Summary",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Daily Employee Attendance",
-   "link_count": 0,
-   "link_to": "Daily Employee Attendance",
-   "link_type": "Report",
-   "onboard": 0,
-   "report_ref_doctype": "Employee Attendance",
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Geofencing Report",
-   "link_count": 0,
-   "link_to": "geofencing-report",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Staff Daily Reporting",
-   "link_count": 0,
-   "link_to": "reporting-report",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Leave Summary",
-   "link_count": 0,
-   "link_to": "Leave Summary",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Salary Register (UAT)",
-   "link_count": 0,
-   "link_to": "salary-register",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Salary Report (UAT)",
-   "link_count": 0,
-   "link_to": "variable-components",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "PF Dashboard (UAT)",
-   "link_count": 0,
-   "link_to": "pf-dashboard",
    "link_type": "Page",
    "onboard": 0,
    "type": "Link"
@@ -221,143 +66,9 @@
    "link_type": "Page",
    "onboard": 0,
    "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Accounts",
-   "link_count": 19,
-   "onboard": 0,
-   "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Expense Report and Dashboard",
-   "link_count": 0,
-   "link_to": "procurement-expense",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Donation Collection (UAT) 29-06-2026",
-   "link_count": 0,
-   "link_to": "donation-collection-",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Donation Received Bank Wise (UAT)",
-   "link_count": 0,
-   "link_to": "bank-wise-fund-distribution",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Donation Received Donor Wise (UAT)",
-   "link_count": 0,
-   "link_to": "bank-balance-reconci",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Program Wise Expense (UAT)",
-   "link_count": 0,
-   "link_to": "program-wise-expense",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Reconciliation with Bank Statements Summary (UAT) 29-06-2026",
-   "link_count": 0,
-   "link_to": "reconcillation-with-",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Purchase",
-   "link_count": 1,
-   "onboard": 0,
-   "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Material Request and Purchase Order",
-   "link_count": 0,
-   "link_to": "items-receiving-repo",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "SME",
-   "link_count": 10,
-   "onboard": 0,
-   "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "SME Target Base KPI (UAT)",
-   "link_count": 0,
-   "link_to": "target-base-kpi",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "SME Daily Reporting ",
-   "link_count": 0,
-   "link_to": "field-staff-report",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "SME Visits Summary  (UAT)",
-   "link_count": 0,
-   "link_to": "field-staff-visit-mo",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Supervisor Target Base KPI",
-   "link_count": 0,
-   "link_to": "supervisor-target-ba",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
   }
  ],
- "modified": "2026-06-23 20:38:23.223368",
+ "modified": "2026-06-23 20:46:47.327684",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Reports",
