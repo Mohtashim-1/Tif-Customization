@@ -20,11 +20,100 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Supply Chain",
-   "link_count": 3,
-   "link_type": "DocType",
+   "label": "TIF",
+   "link_count": 0,
    "onboard": 0,
    "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "No of Students",
+   "link_count": 0,
+   "link_to": "no-of-students-repor",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "School Analytics (UAT)",
+   "link_count": 0,
+   "link_to": "school-analytics",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "School Dashboard (UAT)",
+   "link_count": 0,
+   "link_to": "school-dashboard",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "School",
+   "link_count": 0,
+   "link_to": "School",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Customer",
+   "link_count": 0,
+   "link_to": "Customer",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Field Staff Report ",
+   "link_count": 0,
+   "link_to": "field-staff-report",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Field Staff Visit Monthly",
+   "link_count": 0,
+   "link_to": "field-staff-visit-mo",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Sales Order",
+   "link_count": 0,
+   "link_to": "Sales Order",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "City Wise List of School ",
+   "link_count": 0,
+   "link_to": "city-wise-list-of-sc",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
   },
   {
    "hidden": 0,
@@ -35,6 +124,14 @@
    "link_type": "Page",
    "onboard": 0,
    "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Supply Chain",
+   "link_count": 3,
+   "onboard": 0,
+   "type": "Card Break"
   },
   {
    "hidden": 0,
@@ -61,7 +158,6 @@
    "is_query_report": 0,
    "label": "HR",
    "link_count": 10,
-   "link_type": "DocType",
    "onboard": 0,
    "type": "Card Break"
   },
@@ -180,7 +276,6 @@
    "is_query_report": 0,
    "label": "Accounts",
    "link_count": 19,
-   "link_type": "DocType",
    "onboard": 0,
    "type": "Card Break"
   },
@@ -354,7 +449,6 @@
    "is_query_report": 0,
    "label": "Purchase",
    "link_count": 1,
-   "link_type": "DocType",
    "onboard": 0,
    "type": "Card Break"
   },
@@ -406,39 +500,8 @@
    "is_query_report": 0,
    "label": "QPS",
    "link_count": 10,
-   "link_type": "DocType",
    "onboard": 0,
    "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Field Staff Report ",
-   "link_count": 0,
-   "link_to": "field-staff-report",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Field Staff Visit Monthly",
-   "link_count": 0,
-   "link_to": "field-staff-visit-mo",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Sales Order",
-   "link_count": 0,
-   "link_to": "Sales Order",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
   },
   {
    "hidden": 0,
@@ -449,78 +512,9 @@
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "TIF",
-   "link_count": 0,
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "City Wise List of School ",
-   "link_count": 0,
-   "link_to": "city-wise-list-of-sc",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "No of Students",
-   "link_count": 0,
-   "link_to": "no-of-students-repor",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Customer",
-   "link_count": 0,
-   "link_to": "Customer",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "School",
-   "link_count": 0,
-   "link_to": "School",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "School Analytics (UAT)",
-   "link_count": 0,
-   "link_to": "school-analytics",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "School Dashboard (UAT)",
-   "link_count": 0,
-   "link_to": "school-dashboard",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
   }
  ],
- "modified": "2026-06-23 15:59:08.012131",
+ "modified": "2026-06-23 16:34:21.405509",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Reports",

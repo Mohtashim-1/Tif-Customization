@@ -55,6 +55,7 @@ doctype_js = {
 	"Leave Application": "public/js/leave_application.js",
 	"Loan Application": "tif_customization/doctype/loan_application/loan_application.js",
 	"Employee": "public/js/employee_health_provider.js",
+	"Workspace": "public/js/workspace.js",
 }
 
 # include js in page
@@ -165,6 +166,9 @@ override_doctype_class = {
 # Hook on document methods and events
 
 doc_events = {
+	"Workspace": {
+		"validate": "tif_customization.tif_customization.overrides.workspace.sanitize_card_break_links",
+	},
 	"Delivery Note": {
         "on_submit": "tif_customization.tif_customization.doctype.delivery_note.delivery_note.on_submit",
         "validate": "tif_customization.tif_customization.doctype.delivery_note.delivery_note.sum_of_cartons"
