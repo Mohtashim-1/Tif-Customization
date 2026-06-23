@@ -15,9 +15,7 @@ def execute(version_name=None):
 
 	doc = frappe.get_doc("Workspace", WORKSPACE)
 	doc.content = (
-		'[{"id":"B2Oa7zB4ca","type":"header","data":{"text":"<span class=\\"h4\\">'
-		'Reports (Dev - UAT - Live)</span>","col":12}},'
-		'{"id":"oABt4p_ANs","type":"custom_block","data":{"custom_block_name":"Reports Menu","col":12}}]'
+		'[{"id":"oABt4p_ANs","type":"custom_block","data":{"custom_block_name":"Reports Menu","col":12}}]'
 	)
 	doc.custom_blocks = []
 	doc.append(
