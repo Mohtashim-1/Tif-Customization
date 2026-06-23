@@ -37,14 +37,28 @@ def get_reports_workspace_menu():
 
 	for title in order:
 		if title in sections:
-			result.append(sections[title])
+			section = sections[title]
+			section["links"] = _sort_links_by_color(section["links"])
+			result.append(section)
 			seen.add(title)
 
 	for title, section in sections.items():
 		if title not in seen:
+			section["links"] = _sort_links_by_color(section["links"])
 			result.append(section)
 
 	return result
+
+
+def _sort_links_by_color(links):
+	"""Live (blue) links first, then UAT/Dev; alphabetical within each group."""
+	return sorted(
+		links or [],
+		key=lambda link: (
+			0 if link.get("highlight") else 1,
+			(link.get("label") or "").strip().lower(),
+		),
+	)
 
 
 def cint(value):
