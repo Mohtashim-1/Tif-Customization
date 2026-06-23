@@ -68,9 +68,9 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Daily Task Reporting - TIF",
+   "label": "Daily Task Reporting",
    "link_count": 0,
-   "link_to": "task-reporting",
+   "link_to": "reporting-report",
    "link_type": "Page",
    "onboard": 0,
    "type": "Link"
@@ -118,6 +118,16 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "HR Dashboard (UAT)",
+   "link_count": 0,
+   "link_to": "hr-dashboard",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "Salary Register (UAT)",
    "link_count": 0,
    "link_to": "salary-register",
@@ -158,9 +168,9 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "HR Dashboard (UAT)",
+   "label": "Task Reports",
    "link_count": 0,
-   "link_to": "hr-dashboard",
+   "link_to": "reporting-report",
    "link_type": "Page",
    "onboard": 0,
    "type": "Link"
@@ -342,6 +352,15 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "Purchase",
+   "link_count": 1,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "Purchase Invoice Trends",
    "link_count": 0,
    "link_to": "Purchase Invoice Trends",
@@ -353,12 +372,11 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Purchase Invoice to be Paid",
+   "label": "MR and PO",
    "link_count": 0,
-   "link_to": "Purchase Invoice to be Paid",
-   "link_type": "Report",
+   "link_to": "items-receiving-repo",
+   "link_type": "Page",
    "onboard": 0,
-   "report_ref_doctype": "Purchase Invoice",
    "type": "Link"
   },
   {
@@ -375,20 +393,12 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Purchase",
-   "link_count": 1,
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "MR and PO",
+   "label": "Purchase Invoice to be Paid",
    "link_count": 0,
-   "link_to": "items-receiving-repo",
-   "link_type": "Page",
+   "link_to": "Purchase Invoice to be Paid",
+   "link_type": "Report",
    "onboard": 0,
+   "report_ref_doctype": "Purchase Invoice",
    "type": "Link"
   },
   {
@@ -396,6 +406,55 @@
    "is_query_report": 0,
    "label": "QPS",
    "link_count": 10,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Field Staff Report ",
+   "link_count": 0,
+   "link_to": "field-staff-report",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Field Staff Visit Monthly",
+   "link_count": 0,
+   "link_to": "field-staff-visit-mo",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Sales Order",
+   "link_count": 0,
+   "link_to": "Sales Order",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Upcoming Training",
+   "link_count": 0,
+   "link_to": "Upcoming Training",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "TIF",
+   "link_count": 0,
    "link_type": "DocType",
    "onboard": 0,
    "type": "Card Break"
@@ -423,26 +482,6 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Field Staff Report ",
-   "link_count": 0,
-   "link_to": "field-staff-report",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Field Staff Visit Monthly",
-   "link_count": 0,
-   "link_to": "field-staff-visit-mo",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
    "label": "Customer",
    "link_count": 0,
    "link_to": "Customer",
@@ -453,29 +492,9 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Sales Order",
-   "link_count": 0,
-   "link_to": "Sales Order",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
    "label": "School",
    "link_count": 0,
    "link_to": "School",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Upcoming Training",
-   "link_count": 0,
-   "link_to": "Upcoming Training",
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
@@ -501,7 +520,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-06-23 15:38:36.238082",
+ "modified": "2026-06-23 15:59:08.012131",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Reports",
