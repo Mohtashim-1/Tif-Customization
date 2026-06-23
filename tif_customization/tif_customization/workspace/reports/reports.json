@@ -86,6 +86,26 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "Millat Publishers Dashboard (UAT)",
+   "link_count": 0,
+   "link_to": "millat-publisher-dashboard",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Moon Bright Publishers Dashboard (UAT)",
+   "link_count": 0,
+   "link_to": "moon-bright-publisher-dashboard",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "HR",
    "link_count": 10,
    "onboard": 0,
@@ -123,16 +143,6 @@
   },
   {
    "hidden": 0,
-   "is_query_report": 0,
-   "label": "Millat Publishers Dashboard",
-   "link_count": 0,
-   "link_to": "millat-publisher-dashboard",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
    "is_query_report": 1,
    "label": "Daily Employee Attendance",
    "link_count": 0,
@@ -147,16 +157,6 @@
    "label": "Geofencing Report",
    "link_count": 0,
    "link_to": "geofencing-report",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Moon Bright Publishers Dashboard",
-   "link_count": 0,
-   "link_to": "moon-bright-publisher-dashboard",
    "link_type": "Page",
    "onboard": 0,
    "type": "Link"
@@ -214,7 +214,7 @@
   {
    "hidden": 0,
    "is_query_report": 1,
-   "label": "Full and Final Clearance 24-Jun-26",
+   "label": "Full and Final Clearance (UAT) 24-Jun-26",
    "link_count": 0,
    "link_to": "Full and Final Clearance",
    "link_type": "DocType",
@@ -244,7 +244,7 @@
   {
    "hidden": 0,
    "is_query_report": 1,
-   "label": "Loan Application ",
+   "label": "Loan Application  (UAT)",
    "link_count": 0,
    "link_to": "Full and Final Statement",
    "link_type": "DocType",
@@ -264,7 +264,7 @@
   {
    "hidden": 0,
    "is_query_report": 1,
-   "label": "Leave Application 24-Jun-26",
+   "label": "Leave Application 24-Jun-26 (UAT)",
    "link_count": 0,
    "link_to": "Leave Application",
    "link_type": "DocType",
@@ -416,7 +416,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-06-23 21:56:44.525572",
+ "modified": "2026-06-23 21:59:15.101736",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Reports",
