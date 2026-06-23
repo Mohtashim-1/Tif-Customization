@@ -1,0 +1,237 @@
+/* Full-width dashboard inside Frappe page */
+.layout-main-section .millat-dash-root,
+.page-content .millat-dash-root {
+	width: 100%;
+	max-width: 100%;
+	box-sizing: border-box;
+}
+
+.millat-dash-root {
+	font-family: inherit;
+	padding-bottom: 24px;
+}
+
+.millat-hero {
+	background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 55%, #7c3aed 100%);
+	color: #fff;
+	border-radius: 12px;
+	padding: 20px 24px;
+	margin-bottom: 16px;
+	display: flex;
+	justify-content: space-between;
+	gap: 16px;
+	flex-wrap: wrap;
+	align-items: flex-start;
+}
+
+.millat-hero__title {
+	margin: 0 0 6px;
+	font-size: 22px;
+	font-weight: 700;
+}
+
+.millat-hero__sub {
+	margin: 0;
+	opacity: 0.9;
+	font-size: 13px;
+	max-width: 720px;
+}
+
+.millat-hero__links {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 12px;
+	align-items: center;
+}
+
+.millat-hero__links a {
+	color: #fff;
+	text-decoration: underline;
+	font-size: 13px;
+	white-space: nowrap;
+}
+
+.millat-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+	align-items: flex-end;
+	margin-bottom: 16px;
+	background: var(--card-bg, #fff);
+	border: 1px solid var(--border-color, #e5e7eb);
+	border-radius: 10px;
+	padding: 12px;
+	width: 100%;
+}
+
+.millat-toolbar .filter-field label {
+	display: block;
+	font-size: 11px;
+	color: var(--text-muted, #6b7280);
+	margin-bottom: 4px;
+}
+
+.millat-kpi-grid {
+	display: grid;
+	grid-template-columns: repeat(6, minmax(0, 1fr));
+	gap: 12px;
+	margin-bottom: 16px;
+	width: 100%;
+}
+
+@media (max-width: 1200px) {
+	.millat-kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 700px) {
+	.millat-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.millat-kpi {
+	background: var(--card-bg, #fff);
+	border: 1px solid var(--border-color, #e5e7eb);
+	border-radius: 10px;
+	padding: 14px;
+	min-height: 88px;
+	min-width: 0;
+}
+
+.millat-kpi__label {
+	font-size: 12px;
+	color: var(--text-muted, #6b7280);
+	margin-bottom: 6px;
+}
+
+.millat-kpi__value {
+	font-size: 22px;
+	font-weight: 700;
+	line-height: 1.2;
+	word-break: break-word;
+}
+
+.millat-kpi__hint {
+	font-size: 11px;
+	color: var(--text-muted, #6b7280);
+	margin-top: 4px;
+}
+
+.millat-kpi--ordered { border-left: 4px solid #2563eb; }
+.millat-kpi--received { border-left: 4px solid #059669; }
+.millat-kpi--paid { border-left: 4px solid #7c3aed; }
+.millat-kpi--pending { border-left: 4px solid #ea580c; }
+
+.millat-charts-row {
+	display: grid;
+	gap: 12px;
+	margin-bottom: 12px;
+	width: 100%;
+}
+
+.millat-charts-row--trend {
+	grid-template-columns: 1fr;
+}
+
+.millat-charts-row--split {
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 900px) {
+	.millat-charts-row--split { grid-template-columns: 1fr; }
+}
+
+.millat-panel {
+	background: var(--card-bg, #fff);
+	border: 1px solid var(--border-color, #e5e7eb);
+	border-radius: 10px;
+	padding: 14px;
+	min-width: 0;
+	width: 100%;
+	box-sizing: border-box;
+}
+
+.millat-panel__title {
+	font-size: 14px;
+	font-weight: 600;
+	margin: 0 0 10px;
+}
+
+.millat-chart-wrap {
+	position: relative;
+	width: 100%;
+	height: 280px;
+	max-width: 100%;
+	overflow: hidden;
+}
+
+.millat-chart-wrap--sm {
+	height: 240px;
+}
+
+.millat-chart-wrap--items {
+	height: 320px;
+}
+
+.millat-chart-wrap canvas {
+	display: block;
+	max-width: 100%;
+}
+
+.millat-chart-empty {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 100%;
+	color: var(--text-muted, #6b7280);
+	font-size: 13px;
+}
+
+.millat-tables {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 12px;
+	width: 100%;
+}
+
+@media (max-width: 1100px) {
+	.millat-tables { grid-template-columns: 1fr; }
+}
+
+.millat-table-wrap {
+	max-height: 360px;
+	overflow: auto;
+	width: 100%;
+}
+
+.millat-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 12px;
+}
+
+.millat-table th,
+.millat-table td {
+	border-bottom: 1px solid var(--border-color, #e5e7eb);
+	padding: 8px 6px;
+	text-align: left;
+	white-space: nowrap;
+}
+
+.millat-table th {
+	position: sticky;
+	top: 0;
+	background: var(--control-bg, #f8fafc);
+	z-index: 1;
+}
+
+.millat-table tr:hover td { background: var(--control-bg, #f8fafc); }
+
+.millat-link {
+	color: var(--primary, #2563eb);
+	cursor: pointer;
+}
+
+.millat-empty {
+	padding: 24px;
+	text-align: center;
+	color: var(--text-muted, #6b7280);
+}

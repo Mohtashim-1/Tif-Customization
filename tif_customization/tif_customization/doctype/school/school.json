@@ -53,6 +53,8 @@
   "column_break_zrav",
   "school_website",
   "city",
+  "province",
+  "area",
   "country",
   "complete_school_address",
   "section_break_academic",
@@ -320,7 +322,7 @@
    "fieldname": "tps",
    "fieldtype": "Select",
    "label": "TPS",
-   "options": "TPS is associated with this school\nTPS is not associated with this school"
+   "options": "In Active\nActive\nNo"
   },
   {
    "fieldname": "column_break_mazx",
@@ -330,7 +332,7 @@
    "fieldname": "cee",
    "fieldtype": "Select",
    "label": "CEE",
-   "options": "CEE is associated with this school\nCEE is not associated with this school"
+   "options": "In Active\nActive\nNo"
   },
   {
    "fieldname": "column_break_dlno",
@@ -340,7 +342,7 @@
    "fieldname": "qps",
    "fieldtype": "Select",
    "label": "QPS",
-   "options": "QPS is associated with this school\nQPS is not associated with this school"
+   "options": "In Active\nActive\nNo"
   },
   {
    "fieldname": "contact_person",
@@ -363,12 +365,22 @@
    "fieldtype": "Link",
    "label": "Field Officer",
    "options": "User"
+  },
+  {
+   "fieldname": "province",
+   "fieldtype": "Data",
+   "label": "Province"
+  },
+  {
+   "fieldname": "area",
+   "fieldtype": "Data",
+   "label": "Area"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-03-28 21:40:57.744344",
+ "modified": "2026-06-23 16:59:13.557381",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "School",

@@ -3,7 +3,7 @@ import json
 import frappe
 
 
-CARD_ORDER = ["Supply Chain", "HR", "Accounts", "Purchase", "QPS"]
+CARD_ORDER = ["Programs", "HR", "Supply Chain", "Purchase", "Accounts", "QPS"]
 
 
 @frappe.whitelist()
@@ -51,13 +51,10 @@ def get_reports_workspace_menu():
 
 
 def _sort_links_by_color(links):
-	"""Live (blue) links first, then UAT/Dev; alphabetical within each group."""
+	"""Live (blue) links first, then UAT/Dev; preserve original workspace order within each group."""
 	return sorted(
 		links or [],
-		key=lambda link: (
-			0 if link.get("highlight") else 1,
-			(link.get("label") or "").strip().lower(),
-		),
+		key=lambda link: 0 if link.get("highlight") else 1,
 	)
 
 

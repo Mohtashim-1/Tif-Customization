@@ -1,7 +1,7 @@
 frappe.pages['field-staff-visit-mo'].on_page_load = function(wrapper) {
 	var page = frappe.ui.make_app_page({
 		parent: wrapper,
-		title: 'Field Staff Visit Monthly',
+		title: 'SME Visits Summary',
 		single_column: true
 	});
 
@@ -126,7 +126,7 @@ frappe.pages['field-staff-visit-mo'].on_page_load = function(wrapper) {
 		const monthLabel = months.find(m => m.value === data.month)?.label || data.month;
 		const header = `
 			<div style="text-align: center; font-weight: bold; font-size: 20px; margin-bottom: 15px;">
-				Field Staff Visits Month of ${monthLabel}-${data.year}
+				SME Visits Summary Month of ${monthLabel}-${data.year}
 			</div>
 		`;
 

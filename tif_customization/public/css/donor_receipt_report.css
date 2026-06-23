@@ -1,0 +1,145 @@
+.donor-receipt-root {
+	width: 100%;
+	max-width: 100%;
+	padding-bottom: 24px;
+}
+
+.donor-receipt-hero {
+	background: linear-gradient(135deg, #0f4c5c 0%, #1a936f 55%, #88d498 100%);
+	color: #fff;
+	border-radius: 12px;
+	padding: 20px 24px;
+	margin-bottom: 16px;
+}
+
+.donor-receipt-hero__title {
+	margin: 0 0 6px;
+	font-size: 22px;
+	font-weight: 700;
+}
+
+.donor-receipt-hero__sub {
+	margin: 0;
+	opacity: 0.92;
+	font-size: 13px;
+}
+
+.donor-receipt-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+	align-items: flex-end;
+	background: var(--card-bg, #fff);
+	border: 1px solid var(--border-color, #e5e7eb);
+	border-radius: 10px;
+	padding: 12px;
+	margin-bottom: 16px;
+}
+
+.donor-receipt-toolbar label {
+	display: block;
+	font-size: 11px;
+	color: var(--text-muted, #6b7280);
+	margin-bottom: 4px;
+}
+
+.donor-receipt-kpis {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 12px;
+	margin-bottom: 16px;
+}
+
+@media (max-width: 800px) {
+	.donor-receipt-kpis { grid-template-columns: 1fr; }
+}
+
+.donor-receipt-kpi {
+	background: var(--card-bg, #fff);
+	border: 1px solid var(--border-color, #e5e7eb);
+	border-left: 4px solid #1a936f;
+	border-radius: 10px;
+	padding: 14px;
+}
+
+.donor-receipt-kpi__label {
+	font-size: 12px;
+	color: var(--text-muted, #6b7280);
+	margin-bottom: 6px;
+}
+
+.donor-receipt-kpi__value {
+	font-size: 22px;
+	font-weight: 700;
+}
+
+.donor-receipt-panel {
+	background: var(--card-bg, #fff);
+	border: 1px solid var(--border-color, #e5e7eb);
+	border-radius: 10px;
+	padding: 14px;
+	margin-bottom: 16px;
+}
+
+.donor-receipt-panel__title {
+	font-size: 15px;
+	font-weight: 600;
+	margin: 0 0 12px;
+}
+
+.donor-receipt-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 12px;
+}
+
+.donor-receipt-table th,
+.donor-receipt-table td {
+	border-bottom: 1px solid var(--border-color, #e5e7eb);
+	padding: 8px 6px;
+	text-align: left;
+}
+
+.donor-receipt-table th {
+	background: var(--control-bg, #f8fafc);
+	font-weight: 600;
+}
+
+.donor-receipt-table tr:hover td {
+	background: var(--control-bg, #f8fafc);
+}
+
+.donor-receipt-table .text-right {
+	text-align: right;
+}
+
+.donor-receipt-month-row {
+	cursor: pointer;
+}
+
+.donor-receipt-month-row.is-active td {
+	background: #ecfdf5;
+	font-weight: 600;
+}
+
+.donor-receipt-drilldown {
+	margin-top: 16px;
+	border-top: 2px solid #1a936f;
+	padding-top: 14px;
+}
+
+.donor-receipt-link {
+	color: var(--primary, #2563eb);
+	cursor: pointer;
+}
+
+.donor-receipt-empty {
+	padding: 24px;
+	text-align: center;
+	color: var(--text-muted, #6b7280);
+}
+
+.donor-receipt-grand td {
+	font-weight: 700;
+	background: #e2e8f0;
+}

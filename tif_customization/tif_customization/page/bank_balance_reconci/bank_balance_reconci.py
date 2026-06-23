@@ -5,12 +5,20 @@ from frappe.utils import flt, getdate, nowdate
 
 
 @frappe.whitelist()
-def get_report_data(reference_date=None):
-	ref = getdate(reference_date or nowdate())
-	fy_start_year = ref.year if ref.month >= 7 else ref.year - 1
-	fy_from = date(fy_start_year, 7, 1)
-	fy_to = date(fy_start_year + 1, 6, 30)
-	months = _fiscal_months(fy_start_year)
+def get_report_data(from_date=None, to_date=None, reference_date=None):
+	if from_date and to_date:
+		fy_from = getdate(from_date)
+		fy_to = getdate(to_date)
+	else:
+		ref = getdate(reference_date or nowdate())
+		fy_start_year = ref.year if ref.month >= 7 else ref.year - 1
+		fy_from = date(fy_start_year, 7, 1)
+		fy_to = date(fy_start_year + 1, 6, 30)
+
+	if fy_from > fy_to:
+		frappe.throw("From Date cannot be after To Date")
+
+	months = _months_between(fy_from, fy_to)
 	month_keys = [m["key"] for m in months]
 
 	donation_rows = frappe.db.sql(
@@ -123,13 +131,27 @@ def get_report_data(reference_date=None):
 		totals["balance_commitment"] += flt(row.get("balance_commitment"))
 
 	return {
-		"fiscal_year_label": f"{fy_start_year}-{str(fy_start_year + 1)[2:]}",
+		"period_label": f"{fy_from.strftime('%d %b %Y')} to {fy_to.strftime('%d %b %Y')}",
+		"fiscal_year_label": f"{fy_from.year}-{str(fy_to.year)[2:]}",
 		"from_date": str(fy_from),
 		"to_date": str(fy_to),
 		"months": months,
 		"rows": data,
 		"totals": totals,
 	}
+
+
+def _months_between(from_date, to_date):
+	months = []
+	y, m = from_date.year, from_date.month
+	end = (to_date.year, to_date.month)
+	while (y, m) <= end:
+		months.append({"key": f"{y}-{m:02d}", "label": date(y, m, 1).strftime("%B")})
+		m += 1
+		if m > 12:
+			m = 1
+			y += 1
+	return months
 
 
 def _fiscal_months(fy_start_year):

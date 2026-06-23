@@ -49,7 +49,11 @@ table tr { overflow:hidden; height:14px; white-space:nowrap; }
     <td id="border-bottom"><strong>{{ doc.department }}</strong></td>
 
     <td><strong>Date of Joining #</strong></td>
-    <td id="border-bottom"><strong>{{ doc.date_of_joining }}</strong></td>
+    <td id="border-bottom"><strong>
+      
+      {{ frappe.format_date(doc.date_of_joining, "dd-MM-yyyy") }}
+    
+    </strong></td>
   </tr>
   <tr>
     <td><strong>Designation:</strong></td>
@@ -209,6 +213,12 @@ table tr { overflow:hidden; height:14px; white-space:nowrap; }
 
       {# 8) Present #}
       {% if narration == "" and has_in and has_out %}
+        {% set narration = "Present" %}
+      {% endif %}
+
+
+      {# 8) Present #}
+      {% if narration == "" and has_in or has_out %}
         {% set narration = "Present" %}
       {% endif %}
 

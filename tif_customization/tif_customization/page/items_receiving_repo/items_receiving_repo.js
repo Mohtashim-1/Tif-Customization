@@ -173,7 +173,6 @@ ItemsReceivingRepoPage.prototype.make_datatable = function() {
 					<th style="min-width: 150px;">Item Name</th>
 					<th style="min-width: 110px;">Requested Qty</th>
 					<th style="min-width: 110px;">Received Qty</th>
-					<th style="min-width: 110px;">Pending Qty</th>
 				</tr>
 			</thead>
 			<tbody class="table-body">
@@ -222,7 +221,6 @@ ItemsReceivingRepoPage.prototype.render_table = function(data) {
 				<td>${row.item_name || ''}</td>
 				<td>${requested_qty}</td>
 				<td>${received_qty}</td>
-				<td>${pending_qty_html}</td>
 			</tr>
 		`);
 		

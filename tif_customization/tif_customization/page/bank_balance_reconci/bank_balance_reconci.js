@@ -1,7 +1,7 @@
 frappe.pages["bank-balance-reconci"].on_page_load = function (wrapper) {
 	const page = frappe.ui.make_app_page({
 		parent: wrapper,
-		title: "Bank Balance Reconciliation",
+		title: "Donation Received",
 		single_column: true,
 	});
 
@@ -9,8 +9,15 @@ frappe.pages["bank-balance-reconci"].on_page_load = function (wrapper) {
 		window.BankBalanceReconci = class BankBalanceReconci {
 			constructor(page) {
 				this.page = page;
-				this.reference_date = frappe.datetime.get_today();
+				this.to_date = frappe.datetime.get_today();
+				this.from_date = this.get_fiscal_year_start(this.to_date);
 				this.data = null;
+			}
+
+			get_fiscal_year_start(ref_date) {
+				const dt = frappe.datetime.str_to_obj(ref_date || frappe.datetime.get_today());
+				const year = dt.getMonth() >= 6 ? dt.getFullYear() : dt.getFullYear() - 1;
+				return `${year}-07-01`;
 			}
 
 			make() {
@@ -25,12 +32,17 @@ frappe.pages["bank-balance-reconci"].on_page_load = function (wrapper) {
 					<div class="bank-recon-toolbar">
 						<div class="row">
 							<div class="col-md-3">
-								<label>Reference Date</label>
-								<input type="date" id="bank-recon-reference-date" class="form-control" value="${this.reference_date}">
+								<label>${__("From Date")}</label>
+								<input type="date" id="bank-recon-from-date" class="form-control" value="${this.from_date}">
 							</div>
-							<div class="col-md-9" style="padding-top:24px;">
-								<button class="btn btn-primary" id="bank-recon-apply"><i class="fa fa-filter"></i> Apply</button>
-								<button class="btn btn-default" id="bank-recon-print"><i class="fa fa-print"></i> Print</button>
+							<div class="col-md-3">
+								<label>${__("To Date")}</label>
+								<input type="date" id="bank-recon-to-date" class="form-control" value="${this.to_date}">
+							</div>
+							<div class="col-md-6" style="padding-top:24px;">
+								<button class="btn btn-primary" id="bank-recon-apply"><i class="fa fa-filter"></i> ${__("Apply")}</button>
+								<button class="btn btn-default" id="bank-recon-fy">${__("Current FY")}</button>
+								<button class="btn btn-default" id="bank-recon-print"><i class="fa fa-print"></i> ${__("Print")}</button>
 							</div>
 						</div>
 					</div>
@@ -40,7 +52,23 @@ frappe.pages["bank-balance-reconci"].on_page_load = function (wrapper) {
 
 			bind_events() {
 				$("#bank-recon-apply").on("click", () => {
-					this.reference_date = $("#bank-recon-reference-date").val() || frappe.datetime.get_today();
+					this.from_date = $("#bank-recon-from-date").val();
+					this.to_date = $("#bank-recon-to-date").val();
+					if (!this.from_date || !this.to_date) {
+						frappe.msgprint(__("Please select both From Date and To Date"));
+						return;
+					}
+					if (this.from_date > this.to_date) {
+						frappe.msgprint(__("From Date cannot be after To Date"));
+						return;
+					}
+					this.load_data();
+				});
+				$("#bank-recon-fy").on("click", () => {
+					this.to_date = frappe.datetime.get_today();
+					this.from_date = this.get_fiscal_year_start(this.to_date);
+					$("#bank-recon-from-date").val(this.from_date);
+					$("#bank-recon-to-date").val(this.to_date);
 					this.load_data();
 				});
 				$("#bank-recon-print").on("click", () => window.print());
@@ -50,7 +78,10 @@ frappe.pages["bank-balance-reconci"].on_page_load = function (wrapper) {
 				frappe.call({
 					method:
 						"tif_customization.tif_customization.page.bank_balance_reconci.bank_balance_reconci.get_report_data",
-					args: { reference_date: this.reference_date },
+					args: {
+						from_date: this.from_date,
+						to_date: this.to_date,
+					},
 					freeze: true,
 					freeze_message: "Loading Bank Balance Reconciliation...",
 					callback: (r) => {
@@ -93,6 +124,8 @@ frappe.pages["bank-balance-reconci"].on_page_load = function (wrapper) {
 					.map((m) => `<td class="text-right">${this.money((totals.month_values || {})[m.key])}</td>`)
 					.join("");
 
+				const periodLabel = frappe.utils.escape_html(data.period_label || "");
+
 				$("#bank-recon-report").html(`
 					<div class="bank-recon-sheet">
 						<table class="table table-bordered bank-recon-table">
@@ -104,8 +137,8 @@ frappe.pages["bank-balance-reconci"].on_page_load = function (wrapper) {
 									<th colspan="${months.length + 5}" class="sheet-subtitle">Receipt & Payment Account</th>
 								</tr>
 								<tr>
-									<th class="left-band" rowspan="2">Donations from July '${String(data.fiscal_year_label || "").slice(2, 4)} to June '${String(data.fiscal_year_label || "").slice(5, 7)}</th>
-									<th colspan="${months.length + 1}" class="center-band">Donations from July '${String(data.fiscal_year_label || "").slice(2, 4)} to June '${String(data.fiscal_year_label || "").slice(5, 7)}<br>Actual received</th>
+									<th class="left-band" rowspan="2">Donations<br>${periodLabel}</th>
+									<th colspan="${months.length + 1}" class="center-band">Donations<br>${periodLabel}<br>Actual received</th>
 									<th rowspan="2">Budgeted for the year</th>
 									<th rowspan="2">Balance Commitment</th>
 									<th rowspan="2">Remarks</th>
