@@ -90,12 +90,15 @@ def get_report_data(filters=None):
 		params,
 		as_dict=True,
 	)
+	summary, staff_wise = _build_summary(rows)
 
 	return {
 		"columns": columns,
 		"labels": _get_labels(columns),
 		"rows": rows,
 		"total_count": len(rows),
+		"summary": summary,
+		"staff_wise": staff_wise,
 	}
 
 
@@ -165,6 +168,91 @@ def _get_labels(columns):
 		"parenttype": "Parent Type",
 	}
 	return {col: field_map.get(col) or standard.get(col) or col.replace("_", " ").title() for col in columns}
+
+
+def _build_summary(rows):
+	type_counts = {"Marketing": 0, "M&E": 0, "Training": 0, "Meeting": 0, "Other": 0}
+	staff_counts = {}
+	raw_staff = [_get_field_staff(row) for row in rows]
+	user_names = _get_user_names(raw_staff)
+
+	for row, staff_value in zip(rows, raw_staff):
+		visit_type = row.get("type") or "Other"
+		if visit_type in type_counts:
+			type_counts[visit_type] += 1
+
+		staff = (user_names.get(staff_value) or staff_value or _("Unassigned")).strip()
+		staff_key = staff.casefold()
+		staff_data = staff_counts.setdefault(
+			staff_key,
+			{
+				"staff": staff,
+				"total_visits": 0,
+				"marketing": 0,
+				"me": 0,
+				"training": 0,
+				"meeting": 0,
+				"other": 0,
+			},
+		)
+		staff_data["total_visits"] += 1
+		if visit_type == "Marketing":
+			staff_data["marketing"] += 1
+		elif visit_type == "M&E":
+			staff_data["me"] += 1
+		elif visit_type == "Training":
+			staff_data["training"] += 1
+		elif visit_type == "Meeting":
+			staff_data["meeting"] += 1
+		else:
+			staff_data["other"] += 1
+
+	total_visits = len(rows)
+	staff_wise = sorted(staff_counts.values(), key=lambda item: (-item["total_visits"], item["staff"]))
+	for staff_data in staff_wise:
+		staff_data["ratio"] = round(
+			(staff_data["total_visits"] / total_visits * 100) if total_visits else 0,
+			1,
+		)
+
+	active_staff = len(staff_wise)
+	return (
+		{
+			"total_visits": total_visits,
+			"marketing_visits": type_counts["Marketing"],
+			"me_visits": type_counts["M&E"],
+			"training_visits": type_counts["Training"],
+			"meeting_visits": type_counts["Meeting"],
+			"other_visits": type_counts["Other"],
+			"active_staff": active_staff,
+			"visits_per_staff": round(total_visits / active_staff, 1) if active_staff else 0,
+		},
+		staff_wise,
+	)
+
+
+def _get_field_staff(row):
+	if row.get("type") == "Marketing":
+		return row.get("visit_by") or row.get("owner") or _("Unassigned")
+	if row.get("type") == "M&E":
+		return row.get("me_visit_by") or row.get("owner") or _("Unassigned")
+	if row.get("type") == "Training":
+		return row.get("training_entry_filled_by") or row.get("owner") or _("Unassigned")
+	if row.get("type") == "Meeting":
+		return row.get("mt_visit_by") or row.get("owner") or _("Unassigned")
+	return row.get("owner") or _("Unassigned")
+
+
+def _get_user_names(staff_values):
+	emails = sorted({value for value in staff_values if value and "@" in value})
+	if not emails:
+		return {}
+	users = frappe.get_all(
+		"User",
+		filters={"name": ["in", emails]},
+		fields=["name", "full_name"],
+	)
+	return {user.name: user.full_name for user in users if user.full_name}
 
 
 def _excel_value(value):

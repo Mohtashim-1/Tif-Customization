@@ -44,6 +44,14 @@ class ReportingDataPage {
 					<div class="row reporting-filter-grid"></div>
 				</div>
 
+				<div class="border rounded p-3 mb-3">
+					<div class="d-flex align-items-center justify-content-between mb-2">
+						<h5 class="mb-0">${__("Section Users Summary")}</h5>
+						<span class="text-muted small">${__("Grouped by employee department / section")}</span>
+					</div>
+					<div class="reporting-section-users"></div>
+				</div>
+
 				<div class="border rounded p-3">
 					<h5 class="mb-2">${__("Report Details")}</h5>
 					<div class="reporting-report-list"></div>
@@ -92,6 +100,12 @@ class ReportingDataPage {
 				fieldtype: "Link",
 				options: "User"
 			}),
+			section: this.make_filter({
+				label: __("Section"),
+				fieldname: "section",
+				fieldtype: "Link",
+				options: "Department"
+			}),
 			status: this.make_filter({
 				label: __("Status"),
 				fieldname: "status",
@@ -128,6 +142,7 @@ class ReportingDataPage {
 			const values = {
 				from_date: this.get_month_start(),
 				to_date: frappe.datetime.get_today(),
+				section: "",
 				status: "",
 				work_type: ""
 			};
@@ -142,6 +157,7 @@ class ReportingDataPage {
 			from_date: this.filters.from_date.get_value(),
 			to_date: this.filters.to_date.get_value(),
 			employee: this.filters.employee.get_value(),
+			section: this.filters.section.get_value(),
 			status: this.filters.status.get_value(),
 			work_type: this.filters.work_type.get_value()
 		};
@@ -155,6 +171,7 @@ class ReportingDataPage {
 			callback: (r) => {
 				const payload = r.message || {};
 				this.apply_permissions(payload);
+				this.render_section_users(payload.section_users_wise || []);
 				this.render_table(payload.rows || []);
 				this.bind_drilldown_actions();
 			}
@@ -206,6 +223,55 @@ class ReportingDataPage {
 			const raw = $(e.currentTarget).attr("data-value") || "";
 			this.set_filter_and_reload("work_type", decodeURIComponent(raw));
 		});
+	}
+
+	render_section_users(sections) {
+		const container = this.body.find(".reporting-section-users");
+		if (!sections.length) {
+			container.html(`<div class="text-muted">${__("No section user activity found for selected filters.")}</div>`);
+			return;
+		}
+
+		const blocks = sections
+			.map((section) => {
+				const userRows = (section.users || [])
+					.map(
+						(user) => `
+					<tr>
+						<td>${frappe.utils.escape_html(user.user_name || user.user || "-")}</td>
+						<td class="text-right">${user.total_reports || 0}</td>
+						<td class="text-right">${user.total_tasks || 0}</td>
+						<td class="text-right">${user.completed_tasks || 0}</td>
+					</tr>
+				`
+					)
+					.join("");
+
+				return `
+				<div class="mb-3">
+					<h6 class="mb-2">
+						${frappe.utils.escape_html(section.section || __("Unassigned"))}
+						<span class="text-muted small">(${section.active_users || 0} ${__("users")}, ${section.total_reports || 0} ${__("reports")})</span>
+					</h6>
+					<div class="table-responsive">
+						<table class="table table-bordered table-sm mb-0">
+							<thead>
+								<tr>
+									<th>${__("User")}</th>
+									<th class="text-right">${__("Reports")}</th>
+									<th class="text-right">${__("Tasks")}</th>
+									<th class="text-right">${__("Completed")}</th>
+								</tr>
+							</thead>
+							<tbody>${userRows}</tbody>
+						</table>
+					</div>
+				</div>
+			`;
+			})
+			.join("");
+
+		container.html(blocks);
 	}
 
 	render_table(rows) {

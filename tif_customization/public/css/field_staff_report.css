@@ -1,0 +1,71 @@
+.fsr-kpis {
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	gap: 12px;
+}
+
+.fsr-kpi {
+	border: 1px solid var(--border-color, #e5e7eb);
+	border-top: 4px solid #64748b;
+	border-radius: 10px;
+	background: var(--card-bg, #fff);
+	padding: 16px;
+	box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+}
+
+.fsr-kpi--primary { border-top-color: #2563eb; }
+.fsr-kpi--marketing { border-top-color: #0d9488; }
+.fsr-kpi--me { border-top-color: #7c3aed; }
+.fsr-kpi--training { border-top-color: #ea580c; }
+.fsr-kpi--meeting { border-top-color: #ca8a04; }
+.fsr-kpi--other { border-top-color: #64748b; }
+.fsr-kpi--staff { border-top-color: #db2777; }
+.fsr-kpi--ratio { border-top-color: #0891b2; }
+
+.fsr-kpi__label {
+	color: var(--text-muted, #64748b);
+	font-size: 12px;
+	margin-bottom: 8px;
+}
+
+.fsr-kpi__value {
+	color: var(--text-color, #0f172a);
+	font-size: 26px;
+	font-weight: 700;
+	line-height: 1;
+}
+
+.fsr-ratio-table th,
+.fsr-ratio-table td {
+	vertical-align: middle;
+}
+
+.fsr-ratio-cell {
+	display: grid;
+	grid-template-columns: minmax(100px, 1fr) 52px;
+	align-items: center;
+	gap: 10px;
+	min-width: 180px;
+}
+
+.fsr-ratio-track {
+	height: 8px;
+	border-radius: 999px;
+	background: #e2e8f0;
+	overflow: hidden;
+}
+
+.fsr-ratio-track span {
+	display: block;
+	height: 100%;
+	border-radius: inherit;
+	background: linear-gradient(90deg, #2563eb, #06b6d4);
+}
+
+@media (max-width: 900px) {
+	.fsr-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 560px) {
+	.fsr-kpis { grid-template-columns: 1fr; }
+}

@@ -18,9 +18,104 @@ def _can_view_all_reports():
 	return bool(user_roles & {"System Manager", "COO", "Staff Reporting Manager"})
 
 
+def _resolved_reported_by_sql():
+	return """CASE
+		WHEN r.reported_by = 'frappe.session.user' OR IFNULL(r.reported_by, '') = '' THEN r.owner
+		ELSE r.reported_by
+	END"""
+
+
+def _get_user_department_map(users):
+	users = sorted({u for u in users if u})
+	if not users:
+		return {}
+
+	rows = frappe.db.sql(
+		"""
+		SELECT e.user_id AS user, e.department
+		FROM `tabEmployee` e
+		WHERE e.user_id IN %(users)s
+			AND IFNULL(e.user_id, '') != ''
+		""",
+		{"users": users},
+		as_dict=True,
+	)
+	return {row.user: (row.department or _("Unassigned")) for row in rows}
+
+
+def _get_users_for_section(section):
+	if not section:
+		return []
+	return frappe.get_all(
+		"Employee",
+		filters={"department": section, "user_id": ["is", "set"]},
+		pluck="user_id",
+	)
+
+
+def _build_section_users_wise(rows):
+	users = {row.get("reported_by") for row in rows if row.get("reported_by")}
+	user_names = {
+		u.name: (u.full_name or u.name)
+		for u in frappe.get_all("User", filters={"name": ["in", list(users)]}, fields=["name", "full_name"])
+	} if users else {}
+	department_map = _get_user_department_map(users)
+
+	user_stats = {}
+	for row in rows:
+		user = row.get("reported_by")
+		if not user:
+			continue
+		stats = user_stats.setdefault(
+			user,
+			{
+				"user": user,
+				"user_name": user_names.get(user) or user,
+				"section": department_map.get(user, _("Unassigned")),
+				"report_names": set(),
+				"total_tasks": 0,
+				"completed_tasks": 0,
+			},
+		)
+		stats["report_names"].add(row.get("name"))
+		if row.get("task_status"):
+			stats["total_tasks"] += 1
+			if row.get("task_status") == "Done":
+				stats["completed_tasks"] += 1
+
+	sections = {}
+	for stats in user_stats.values():
+		section = stats["section"]
+		section_data = sections.setdefault(
+			section,
+			{"section": section, "total_reports": 0, "total_tasks": 0, "users": []},
+		)
+		user_row = {
+			"user": stats["user"],
+			"user_name": stats["user_name"],
+			"total_reports": len(stats["report_names"]),
+			"total_tasks": stats["total_tasks"],
+			"completed_tasks": stats["completed_tasks"],
+		}
+		section_data["users"].append(user_row)
+		section_data["total_reports"] += user_row["total_reports"]
+		section_data["total_tasks"] += user_row["total_tasks"]
+
+	section_list = []
+	for section_data in sections.values():
+		section_data["users"] = sorted(
+			section_data["users"],
+			key=lambda item: (-item["total_reports"], item["user_name"].lower()),
+		)
+		section_data["active_users"] = len(section_data["users"])
+		section_list.append(section_data)
+
+	return sorted(section_list, key=lambda item: (-item["total_reports"], item["section"].lower()))
+
+
 @frappe.whitelist()
 def get_reporting_dashboard_data(
-	from_date=None, to_date=None, employee=None, status=None, work_type=None
+	from_date=None, to_date=None, employee=None, section=None, status=None, work_type=None
 ):
 	if not frappe.has_permission("Reporting", "read"):
 		frappe.throw(_("You are not permitted to view Reporting data."))
@@ -62,7 +157,30 @@ def get_reporting_dashboard_data(
 	if work_type:
 		conditions.append("sr.work_type = %(work_type)s")
 		params["work_type"] = work_type
+	if section:
+		section_users = _get_users_for_section(section)
+		if not section_users:
+			return {
+				"can_view_all": can_view_all,
+				"rows": [],
+				"kpis": {
+					"total_reports": 0,
+					"total_tasks": 0,
+					"completed_tasks": 0,
+					"completion_rate": 0,
+					"active_employees": 0,
+				},
+				"charts": {
+					"status": {"labels": [], "values": []},
+					"work_type": {"labels": [], "values": []},
+					"daily_trend": {"labels": [], "values": []},
+				},
+				"section_users_wise": [],
+			}
+		conditions.append(f"{_resolved_reported_by_sql()} IN %(section_users)s")
+		params["section_users"] = tuple(section_users)
 
+	reported_by_sql = _resolved_reported_by_sql()
 	condition_sql = " AND ".join(conditions)
 	data = frappe.db.sql(
 		f"""
@@ -70,10 +188,7 @@ def get_reporting_dashboard_data(
 			r.name,
 			r.posting_date,
 			r.posting_time,
-			CASE
-				WHEN r.reported_by = 'frappe.session.user' OR IFNULL(r.reported_by, '') = '' THEN r.owner
-				ELSE r.reported_by
-			END AS reported_by,
+			{reported_by_sql} AS reported_by,
 			r.description,
 			r.docstatus,
 			sr.work_type,
@@ -118,10 +233,12 @@ def get_reporting_dashboard_data(
 	trend_dates = sorted(date_counter.keys())
 	trend_counts = [date_counter[d] for d in trend_dates]
 	completion_rate = flt((completed_tasks / total_tasks) * 100, 2) if total_tasks else 0
+	section_users_wise = _build_section_users_wise(data)
 
 	return {
 		"can_view_all": can_view_all,
 		"rows": data,
+		"section_users_wise": section_users_wise,
 		"kpis": {
 			"total_reports": cint(len(report_names)),
 			"total_tasks": cint(total_tasks),
