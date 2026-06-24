@@ -28,6 +28,8 @@ frappe.pages["donor-receipt-report"].on_page_load = function (wrapper) {
 				this.data = null;
 				this.donor = null;
 				this.donor_control = null;
+				this.summary_request_id = 0;
+				this.drilldown_request_id = 0;
 			}
 
 			async make() {
@@ -134,7 +136,7 @@ frappe.pages["donor-receipt-report"].on_page_load = function (wrapper) {
 			apply_filters() {
 				this.from_date = this.page.main.find(".input-from-date").val();
 				this.to_date = this.page.main.find(".input-to-date").val();
-				this.donor = this.donor_control ? this.donor_control.get_value() : null;
+				this.donor = this.get_selected_donor();
 				if (!this.from_date || !this.to_date) {
 					frappe.msgprint(__("Please select both From Date and To Date"));
 					return;
@@ -145,8 +147,16 @@ frappe.pages["donor-receipt-report"].on_page_load = function (wrapper) {
 				}
 				this.active_month = null;
 				this.drilldown_rows = [];
+				this.drilldown_request_id += 1;
 				this.reset_detail_panel();
 				this.load_summary();
+			}
+
+			get_selected_donor() {
+				if (!this.donor_control) return null;
+				return (
+					this.donor_control.get_value() || this.donor_control.$input?.val()?.trim() || null
+				);
 			}
 
 			reset_detail_panel() {
@@ -159,6 +169,7 @@ frappe.pages["donor-receipt-report"].on_page_load = function (wrapper) {
 			}
 
 			load_summary() {
+				const request_id = ++this.summary_request_id;
 				this.page.set_indicator(__("Loading…"), "blue");
 				frappe.call({
 					method:
@@ -169,12 +180,14 @@ frappe.pages["donor-receipt-report"].on_page_load = function (wrapper) {
 						donor: this.donor,
 					},
 					callback: (r) => {
+						if (request_id !== this.summary_request_id) return;
 						this.data = r.message || {};
 						this.render_kpis();
 						this.render_chart();
 						this.render_months();
 					},
 					always: () => {
+						if (request_id !== this.summary_request_id) return;
 						if (this.page.clear_indicator) this.page.clear_indicator();
 					},
 				});
@@ -284,6 +297,7 @@ frappe.pages["donor-receipt-report"].on_page_load = function (wrapper) {
 			}
 
 			load_month_drilldown(month_key) {
+				const request_id = ++this.drilldown_request_id;
 				this.active_month = month_key;
 				this.page.main.find(".donor-month-card").removeClass("is-active");
 				this.page.main
@@ -303,6 +317,7 @@ frappe.pages["donor-receipt-report"].on_page_load = function (wrapper) {
 						donor: this.donor,
 					},
 					callback: (r) => {
+						if (request_id !== this.drilldown_request_id) return;
 						this.drilldown_rows = r.message || [];
 						this.render_drilldown(month_key);
 					},

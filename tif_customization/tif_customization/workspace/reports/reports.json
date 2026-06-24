@@ -28,17 +28,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Upcoming Training (UAT) ",
-   "link_count": 0,
-   "link_to": "Upcoming Training",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Upcoming Training ",
+   "label": "Upcoming Training (UAT)",
    "link_count": 0,
    "link_to": "upcoming-training-report",
    "link_type": "Page",
@@ -312,6 +302,16 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "Donation Analytics (UAT) 24-Jun-26",
+   "link_count": 0,
+   "link_to": "donation-analytics",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "Reconciliation with Bank Statements Summary (UAT) 29-06-2026",
    "link_count": 0,
    "link_to": "reconcillation-with-",
@@ -335,6 +335,16 @@
    "label": "Program Wise Expense (UAT)",
    "link_count": 0,
    "link_to": "program-wise-expense",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Monthly Wise Expense (UAT)",
+   "link_count": 0,
+   "link_to": "month-wise-expense",
    "link_type": "Page",
    "onboard": 0,
    "type": "Link"
@@ -416,7 +426,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-06-24 16:04:34.579854",
+ "modified": "2026-06-24 17:28:11.708166",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Reports",
