@@ -17,7 +17,6 @@
    "is_query_report": 0,
    "label": "Supply Chain",
    "link_count": 9,
-   "link_type": "DocType",
    "onboard": 0,
    "type": "Card Break"
   },
@@ -116,7 +115,6 @@
    "is_query_report": 0,
    "label": "Procurement",
    "link_count": 7,
-   "link_type": "DocType",
    "onboard": 0,
    "type": "Card Break"
   },
@@ -195,7 +193,6 @@
    "is_query_report": 0,
    "label": "Accounts",
    "link_count": 11,
-   "link_type": "DocType",
    "onboard": 0,
    "type": "Card Break"
   },
@@ -314,7 +311,6 @@
    "is_query_report": 0,
    "label": "QPS",
    "link_count": 8,
-   "link_type": "DocType",
    "onboard": 0,
    "type": "Card Break"
   },
@@ -401,9 +397,26 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "HR",
-   "link_count": 18,
+   "label": "Common",
+   "link_count": 1,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": " Daily Task Reporting",
+   "link_count": 0,
+   "link_to": "Reporting",
    "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "HR",
+   "link_count": 19,
    "onboard": 0,
    "type": "Card Break"
   },
@@ -463,26 +476,6 @@
    "label": "Employment Type",
    "link_count": 0,
    "link_to": "Employment Type",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Bonus Bulk",
-   "link_count": 0,
-   "link_to": "Bonus Bulk",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Leave Encashment",
-   "link_count": 0,
-   "link_to": "Leave Encashment",
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
@@ -590,24 +583,35 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Common",
-   "link_count": 1,
-   "link_type": "DocType",
+   "label": "PF Dashboard",
+   "link_count": 0,
+   "link_to": "pf-dashboard",
+   "link_type": "Page",
    "onboard": 0,
-   "type": "Card Break"
+   "type": "Link"
   },
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": " Daily Task Reporting",
+   "label": "Leave Encashment",
    "link_count": 0,
-   "link_to": "Reporting",
+   "link_to": "Leave Encashment",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Bonus Bulk",
+   "link_count": 0,
+   "link_to": "Bonus Bulk",
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
   }
  ],
- "modified": "2026-06-22 14:37:37.918750",
+ "modified": "2026-06-24 13:13:07.913026",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Forms",
