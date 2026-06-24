@@ -236,7 +236,7 @@
    "is_query_report": 1,
    "label": "Loan Application  (UAT)",
    "link_count": 0,
-   "link_to": "Full and Final Statement",
+   "link_to": "Loan Application",
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
@@ -416,7 +416,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-06-24 15:30:56.363767",
+ "modified": "2026-06-24 16:04:34.579854",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Reports",

@@ -99,8 +99,7 @@ if (typeof window.ProcurementExpense === 'undefined') {
 						<div class="col-md-12">
 							<div class="panel panel-default">
 								<div class="panel-heading">
-									<h5>Purchase Invoice Expense Trend by Period</h5>
-									<p style="margin: 5px 0 0 0; font-size: 11px; color: #666;">Based on Purchase Invoice amounts</p>
+									<h5>Expense Trend by Period</h5>
 								</div>
 								<div class="panel-body">
 									<canvas id="chart-expense-trend" style="height: 300px;"></canvas>
@@ -113,7 +112,7 @@ if (typeof window.ProcurementExpense === 'undefined') {
 						<div class="col-md-12">
 							<div class="panel panel-default">
 								<div class="panel-heading">
-									<h5>Top 10 Items by Purchase Invoice Expense</h5>
+									<h5>Top 10 Expense</h5>
 									<p style="margin: 5px 0 0 0; font-size: 11px; color: #666;">Based on Purchase Invoice amounts</p>
 								</div>
 								<div class="panel-body">
@@ -124,40 +123,13 @@ if (typeof window.ProcurementExpense === 'undefined') {
 					</div>
 					
 					
-					<div class="row" style="margin-bottom: 20px;">
-						<div class="col-md-12">
-							<div class="panel panel-default">
-								<div class="panel-heading">
-									<h5>Purchase Invoice Expense Comparison by Department</h5>
-									<p style="margin: 5px 0 0 0; font-size: 11px; color: #666;">Based on Purchase Invoice amounts</p>
-								</div>
-								<div class="panel-body">
-									<canvas id="chart-monthly-comparison" style="height: 300px;"></canvas>
-								</div>
-							</div>
-						</div>
-					</div>
-					
-					<div class="row" style="margin-bottom: 20px;">
-						<div class="col-md-12">
-							<div class="panel panel-default">
-								<div class="panel-heading">
-									<h5>Purchase Invoice Expense vs Invoice Count</h5>
-									<p style="margin: 5px 0 0 0; font-size: 11px; color: #666;">Invoice Amount vs Number of Purchase Invoices</p>
-								</div>
-								<div class="panel-body">
-									<canvas id="chart-expense-vs-count" style="height: 300px;"></canvas>
-								</div>
-							</div>
-						</div>
-					</div>
 					
 					<!-- Summary Pie Chart -->
 					<div class="row" style="margin-bottom: 20px;">
 						<div class="col-md-12">
 							<div class="panel panel-default">
 								<div class="panel-heading">
-									<h5>Purchase Invoice Expense by Department</h5>
+									<h5>Expense by Department</h5>
 									<p style="margin: 5px 0 0 0; font-size: 11px; color: #666;">Based on Purchase Invoice amounts</p>
 								</div>
 								<div class="panel-body">
@@ -169,7 +141,7 @@ if (typeof window.ProcurementExpense === 'undefined') {
 					
 					<!-- Summary Table -->
 					<div class="data-section">
-					<h5 style="margin-bottom: 15px;">Summary by Department / Cost Center</h5>
+					<h5 style="margin-bottom: 15px;">Summary by Department</h5>
 					<div class="table-responsive">
 							<table class="table table-bordered table-striped" id="summary-table">
 							<thead>
@@ -220,21 +192,6 @@ if (typeof window.ProcurementExpense === 'undefined') {
 						</div>
 					</div>
 					
-					<!-- Department Wise Expense Chart -->
-					<div class="row" style="margin-bottom: 20px;">
-						<div class="col-md-12">
-							<div class="panel panel-default">
-								<div class="panel-heading">
-									<h5>Department Wise Expense (Payment Entry)</h5>
-									<p style="margin: 5px 0 0 0; font-size: 11px; color: #666;">Payment amounts grouped by department cost centers</p>
-								</div>
-								<div class="panel-body">
-									<canvas id="chart-department-expense" style="height: 400px;"></canvas>
-								</div>
-							</div>
-						</div>
-					</div>
-					
 					<!-- Payment Entry Charts -->
 					<div class="row" style="margin-bottom: 20px;">
 						<div class="col-md-6">
@@ -245,6 +202,17 @@ if (typeof window.ProcurementExpense === 'undefined') {
 								</div>
 								<div class="panel-body">
 									<canvas id="chart-payment-pie" style="height: 350px;"></canvas>
+								</div>
+							</div>
+						</div>
+						<div class="col-md-6">
+							<div class="panel panel-default">
+								<div class="panel-heading">
+									<h5>Bank Usage Details</h5>
+									<p style="margin: 5px 0 0 0; font-size: 11px; color: #666;">Amount paid from each company bank account</p>
+								</div>
+								<div class="panel-body" id="bank-usage-panel">
+									<div class="text-center text-muted" style="padding: 20px;">Loading bank details...</div>
 								</div>
 							</div>
 						</div>
@@ -673,8 +641,8 @@ if (typeof window.ProcurementExpense === 'undefined') {
 						me.setup_period_row_handlers();
 					me.render_payment_table();
 					me.render_charts();
-					me.render_department_expense_chart();
 					me.render_payment_charts();
+					me.render_bank_usage();
 					me.render_item_payment_charts();
 					me.render_voucher_wise_details();
 					me.schedule_chart_data_tables();
@@ -781,6 +749,62 @@ if (typeof window.ProcurementExpense === 'undefined') {
 			}
 			return format_currency_value(numericValue);
 		}
+
+		render_bank_usage() {
+			let panel = $('#bank-usage-panel');
+			panel.html('<div class="text-center text-muted" style="padding: 20px;"><i class="fa fa-spinner fa-spin"></i> Loading bank details...</div>');
+			frappe.call({
+				method: 'tif_customization.tif_customization.page.procurement_expense.procurement_bank_usage.get_bank_usage',
+				args: { filters: this.filters },
+				callback: response => this.render_bank_usage_rows(response.message || []),
+				error: () => panel.html('<div class="text-center text-danger" style="padding: 20px;">Unable to load bank details</div>')
+			});
+		}
+
+		render_bank_usage_rows(rows) {
+			let panel = $('#bank-usage-panel');
+			if (!rows.length) {
+				panel.html('<div class="text-center text-muted" style="padding: 20px;">No bank payments found for the selected filters</div>');
+				return;
+			}
+
+			let totalAmount = rows.reduce((sum, row) => sum + flt(row.amount || 0), 0);
+			panel.html(`
+				<div class="table-responsive" style="max-height: 390px; overflow-y: auto;">
+					<table class="table table-bordered table-striped" style="margin-bottom: 0; font-size: 12px;">
+						<thead style="position: sticky; top: 0; background: #f8f9fa; z-index: 1;">
+							<tr>
+								<th>Bank Details</th>
+								<th>Ledger Account</th>
+								<th class="text-right">Payments</th>
+								<th class="text-right">Amount Used</th>
+							</tr>
+						</thead>
+						<tbody>
+							${rows.map(row => {
+								let bank = frappe.utils.escape_html(String(row.bank || 'Not Specified'));
+								let accountNumber = frappe.utils.escape_html(String(row.bank_account_no || ''));
+								let account = frappe.utils.escape_html(String(row.account || 'Not Specified'));
+								return `
+									<tr>
+										<td><strong>${bank}</strong>${accountNumber ? `<br><span class="text-muted">A/C: ${accountNumber}</span>` : ''}</td>
+										<td>${account}</td>
+										<td class="text-right">${format_number_value(row.payment_count || 0)}</td>
+										<td class="text-right"><strong>${format_currency_value(row.amount || 0)}</strong></td>
+									</tr>
+								`;
+							}).join('')}
+						</tbody>
+						<tfoot>
+							<tr>
+								<td colspan="3"><strong>Total Bank Usage</strong></td>
+								<td class="text-right"><strong>${format_currency_value(totalAmount)}</strong></td>
+							</tr>
+						</tfoot>
+					</table>
+				</div>
+			`);
+		}
 		
 		render_kpis() {
 			let me = this;
@@ -803,42 +827,40 @@ if (typeof window.ProcurementExpense === 'undefined') {
 			let pending_acknowledgment_count = me.data.pending_acknowledgment_count || 0;
 			
 			let kpi_html = `
-				<div class="col-md-3">
-					<div class="kpi-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+				<div class="col-sm-4" style="margin-bottom: 15px;">
+					<div class="kpi-card" style="min-height: 122px; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
 						<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Total Payments</h5>
-						<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${format_currency_value(total_payment)}</h2>
+						<h2 style="margin: 0; font-size: clamp(18px, 2vw, 28px); font-weight: bold; white-space: nowrap;">${format_currency_value(total_payment)}</h2>
 						<p style="margin: 5px 0 0 0; font-size: 12px; opacity: 0.8;">${total_payment_count} Payments, ${total_invoice_count} Invoices</p>
 					</div>
 				</div>
-				<div class="col-md-3">
-					<div class="kpi-card" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+				<div class="col-sm-4" style="margin-bottom: 15px;">
+					<div class="kpi-card" style="min-height: 122px; background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
 						<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Cash Payments</h5>
-						<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${format_currency_value(total_cash)}</h2>
+						<h2 style="margin: 0; font-size: clamp(18px, 2vw, 28px); font-weight: bold; white-space: nowrap;">${format_currency_value(total_cash)}</h2>
 						<p style="margin: 5px 0 0 0; font-size: 12px; opacity: 0.8;">${((total_cash / total_payment) * 100).toFixed(1) || 0}% of Total</p>
 					</div>
 				</div>
-				<div class="col-md-3">
-					<div class="kpi-card" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+				<div class="col-sm-4" style="margin-bottom: 15px;">
+					<div class="kpi-card" style="min-height: 122px; background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
 						<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Cheque Payments</h5>
-						<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${format_currency_value(total_other)}</h2>
+						<h2 style="margin: 0; font-size: clamp(18px, 2vw, 28px); font-weight: bold; white-space: nowrap;">${format_currency_value(total_other)}</h2>
 						<p style="margin: 5px 0 0 0; font-size: 12px; opacity: 0.8;">${((total_other / total_payment) * 100).toFixed(1) || 0}% of Total</p>
 					</div>
 				</div>
-				<div class="col-md-4" style="margin-top: 15px;">
+				<div class="col-sm-6" style="margin-bottom: 15px;">
 					<div class="kpi-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
 						<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Total Material Requests</h5>
 						<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${format_number_value(mr_count)}</h2>
 						<p style="margin: 5px 0 0 0; font-size: 12px; opacity: 0.8;">MRs Created</p>
 					</div>
 				</div>
-				<div class="col-md-4" style="margin-top: 15px;">
+				<div class="col-sm-6" style="margin-bottom: 15px;">
 					<div class="kpi-card" style="background: linear-gradient(135deg, #f093fb 0%, #4facfe 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
 						<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Total Purchase Invoices</h5>
 						<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${format_number_value(po_count)}</h2>
 						<p style="margin: 5px 0 0 0; font-size: 12px; opacity: 0.8;">POs Created</p>
 					</div>
-				</div>
-				<div class="col-md-4" style="margin-top: 15px;">
 				</div>
 			`;
 			
@@ -1046,7 +1068,8 @@ if (typeof window.ProcurementExpense === 'undefined') {
 			});
 
 			const $detailTable = $('#detail-table');
-			if ($detailTable.length && matchedCount > 0) {
+			const $detailContent = $('#detail-table-content');
+			if ($detailTable.length && $detailContent.is(':visible') && matchedCount > 0) {
 				$('html, body').animate({
 					scrollTop: $detailTable.offset().top - 100
 				}, 300);
@@ -1578,7 +1601,7 @@ if (typeof window.ProcurementExpense === 'undefined') {
 								data: {
 									labels: periods,
 									datasets: [{
-										label: 'Purchase Invoice Expense Amount',
+										label: 'Expense Amount',
 										data: amounts,
 										borderColor: '#f5576c',
 										backgroundColor: 'rgba(245, 87, 108, 0.1)',

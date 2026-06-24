@@ -3,17 +3,24 @@
  "creation": "2026-05-02 11:09:39.303467",
  "docstatus": 0,
  "doctype": "Page",
- "idx": 0,
- "modified": "2026-05-02 11:09:39.303467",
+ "idx": 7,
+ "modified": "2026-06-24 15:54:50.393579",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "hr-dashboard",
  "owner": "Administrator",
  "page_name": "hr-dashboard",
- "roles": [],
+ "roles": [
+  {
+   "role": "HR Manager"
+  },
+  {
+   "role": "HR User"
+  }
+ ],
  "script": null,
  "standard": "Yes",
  "style": null,
  "system_page": 0,
- "title": "HR — Attendance & Workforce"
+ "title": "HR Dashboard"
 }
