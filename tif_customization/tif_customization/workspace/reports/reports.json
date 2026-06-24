@@ -76,7 +76,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Courier Expense Report & Dashboard (UAT)",
+   "label": "Courier Expense Report & Dashboard",
    "link_count": 0,
    "link_to": "courier-report",
    "link_type": "Page",
@@ -416,7 +416,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-06-24 14:25:30.559377",
+ "modified": "2026-06-24 15:30:56.363767",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Reports",

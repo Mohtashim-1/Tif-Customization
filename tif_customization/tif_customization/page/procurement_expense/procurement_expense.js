@@ -46,16 +46,10 @@ if (typeof window.ProcurementExpense === 'undefined') {
 						<h5 style="margin-bottom: 15px;">Filters</h5>
 						<div class="row">
 							<div class="col-md-3">
-								<div class="form-group">
-									<label>From Date</label>
-									<input type="date" id="from-date" class="form-control" value="${me.filters.from_date}">
-								</div>
+								<div id="from-date-control"></div>
 							</div>
 							<div class="col-md-3">
-								<div class="form-group">
-									<label>To Date</label>
-									<input type="date" id="to-date" class="form-control" value="${me.filters.to_date}">
-								</div>
+								<div id="to-date-control"></div>
 							</div>
 							<div class="col-md-3">
 								<div class="form-group">
@@ -411,6 +405,27 @@ if (typeof window.ProcurementExpense === 'undefined') {
 			`;
 			
 			$(me.page.body).html(html);
+
+			me.from_date_control = frappe.ui.form.make_control({
+				parent: $(me.page.body).find('#from-date-control'),
+				df: {
+					fieldname: 'from_date',
+					fieldtype: 'Date',
+					label: 'From Date'
+				},
+				render_input: true
+			});
+			me.to_date_control = frappe.ui.form.make_control({
+				parent: $(me.page.body).find('#to-date-control'),
+				df: {
+					fieldname: 'to_date',
+					fieldtype: 'Date',
+					label: 'To Date'
+				},
+				render_input: true
+			});
+			me.from_date_control.set_value(me.filters.from_date);
+			me.to_date_control.set_value(me.filters.to_date);
 			
 			// Add CSS for expandable rows
 			if (!$('#expense-head-styles').length) {
@@ -516,8 +531,8 @@ if (typeof window.ProcurementExpense === 'undefined') {
 		apply_filters() {
 			let me = this;
 			
-			me.filters.from_date = $('#from-date').val();
-			me.filters.to_date = $('#to-date').val();
+			me.filters.from_date = me.from_date_control.get_value();
+			me.filters.to_date = me.to_date_control.get_value();
 			me.filters.period_type = $('#period-type').val();
 			
 			// Get cost centers
@@ -554,8 +569,8 @@ if (typeof window.ProcurementExpense === 'undefined') {
 				cost_centers: []
 			};
 			
-			$('#from-date').val(me.filters.from_date);
-			$('#to-date').val(me.filters.to_date);
+			me.from_date_control.set_value(me.filters.from_date);
+			me.to_date_control.set_value(me.filters.to_date);
 			$('#period-type').val(me.filters.period_type);
 			
 			// Reset cost center filter
@@ -682,11 +697,6 @@ if (typeof window.ProcurementExpense === 'undefined') {
 					</div>
 				</div>
 				<div class="col-md-4" style="margin-top: 15px;">
-					<div class="kpi-card" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-						<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Pending Acknowledgements</h5>
-						<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${format_number_value(pending_acknowledgment_count)}</h2>
-						<p style="margin: 5px 0 0 0; font-size: 12px; opacity: 0.8;">Awaiting Receipt</p>
-					</div>
 				</div>
 			`;
 			
