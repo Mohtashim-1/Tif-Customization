@@ -49,12 +49,10 @@ if (typeof window.CourierDashboard === 'undefined') {
 			<div class="filter-section" style="background: #f8f9fa; padding: 20px; margin-bottom: 20px; border-radius: 5px;">
 				<div class="row">
 					<div class="col-md-4">
-						<label>From Date:</label>
-						<input type="date" id="from-date" class="form-control" value="${me.filters.from_date}">
+						<div id="from-date-control"></div>
 					</div>
 					<div class="col-md-4">
-						<label>To Date:</label>
-						<input type="date" id="to-date" class="form-control" value="${me.filters.to_date}">
+						<div id="to-date-control"></div>
 					</div>
 					<div class="col-md-4">
 						<label>Customer (Optional):</label>
@@ -89,6 +87,27 @@ if (typeof window.CourierDashboard === 'undefined') {
 		`;
 		
 		this.page.main.append(filter_html);
+
+		this.from_date_control = frappe.ui.form.make_control({
+			parent: this.page.main.find('#from-date-control'),
+			df: {
+				fieldname: 'from_date',
+				fieldtype: 'Date',
+				label: 'From Date',
+			},
+			render_input: true,
+		});
+		this.to_date_control = frappe.ui.form.make_control({
+			parent: this.page.main.find('#to-date-control'),
+			df: {
+				fieldname: 'to_date',
+				fieldtype: 'Date',
+				label: 'To Date',
+			},
+			render_input: true,
+		});
+		this.from_date_control.set_value(me.filters.from_date);
+		this.to_date_control.set_value(me.filters.to_date);
 		
 		// Setup event listeners
 		$('#apply-filters').on('click', () => me.apply_filters());
@@ -244,14 +263,14 @@ if (typeof window.CourierDashboard === 'undefined') {
 				</div>
 				
 				<!-- Transaction Log Table -->
-				<div class="transaction-section" style="margin-bottom: 30px;">
-					<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px;">
+				<div class="transaction-section" style="margin-bottom: 30px; border: 1px solid #d1d8dd; border-radius: 8px; background: #fff; padding: 0 20px;">
+					<div style="display: flex; align-items: center; justify-content: space-between; min-height: 90px;">
 						<h4 style="margin: 0;">Transaction Log</h4>
 						<button type="button" class="btn btn-default btn-sm toggle-transaction-log" aria-expanded="false">
 							<i class="fa fa-chevron-down"></i> Expand
 						</button>
 					</div>
-					<div id="transaction-log-content" style="display: none;">
+					<div id="transaction-log-content" style="display: none; padding-bottom: 20px;">
 						<div class="table-responsive">
 							<table class="table table-bordered table-striped" id="transaction-table">
 								<thead id="transaction-thead">
@@ -348,8 +367,8 @@ if (typeof window.CourierDashboard === 'undefined') {
 	apply_filters() {
 		let me = this;
 		
-		me.filters.from_date = $('#from-date').val();
-		me.filters.to_date = $('#to-date').val();
+		me.filters.from_date = me.from_date_control.get_value();
+		me.filters.to_date = me.to_date_control.get_value();
 		me.filters.customer = $('#customer-filter').val() || '';
 		
 		me.load_data();
@@ -365,8 +384,8 @@ if (typeof window.CourierDashboard === 'undefined') {
 			view_type: 'all'
 		};
 		
-		$('#from-date').val(me.filters.from_date);
-		$('#to-date').val(me.filters.to_date);
+		me.from_date_control.set_value(me.filters.from_date);
+		me.to_date_control.set_value(me.filters.to_date);
 		$('#customer-filter').val('');
 		$('.btn-group button[data-view="all"]').click();
 		
@@ -596,7 +615,7 @@ if (typeof window.CourierDashboard === 'undefined') {
 						if (dateStr && dateStr !== 'undefined' && dateStr !== 'null' && dateStr.match(/^\d{4}-\d{2}$/)) {
 							let [year, month] = dateStr.split('-');
 							let monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-							return `${monthNames[parseInt(month) - 1]} ${year}`;
+							return `${monthNames[parseInt(month) - 1]} ${String(year).slice(-2)}`;
 						}
 						return dateStr && dateStr !== 'undefined' && dateStr !== 'null' ? dateStr : '';
 					}).filter(label => label !== ''),
@@ -632,13 +651,24 @@ if (typeof window.CourierDashboard === 'undefined') {
 					}
 					
 					try {
+						let monthly_chart_type = chart_data.labels.length === 1 ? 'bar' : 'line';
 						me.charts.monthly_trend = new frappe.Chart('#chart-monthly-trend', {
 							title: '',
 							data: chart_data,
-							type: 'line',
+							type: monthly_chart_type,
 							colors: ['#f5576c'],
-							height: 300
+							height: 400,
+							axisOptions: {
+								xAxisMode: 'tick',
+								xIsSeries: true
+							},
+							lineOptions: {
+								hideDots: 0,
+								dotSize: 6,
+								regionFill: 1
+							}
 						});
+						$('#chart-monthly-trend .x.axis text').css('font-size', '12px');
 					} catch(e) {
 						console.error('Error creating monthly trend chart:', e);
 						$('#chart-monthly-trend').html('<p class="text-muted">Chart data unavailable</p>');
@@ -785,11 +815,20 @@ if (typeof window.CourierDashboard === 'undefined') {
 		// Courier Service Chart
 		let courier_service_data = me.data.courier_service_data || [];
 		if (courier_service_data.length > 0) {
+			let courier_service_totals = {};
+			courier_service_data.forEach(row => {
+				let label = display_courier_service(row.label);
+				courier_service_totals[label] = flt(courier_service_totals[label] || 0) + flt(row.value || 0);
+			});
+			let normalized_courier_services = Object.entries(courier_service_totals).map(([label, value]) => ({
+				label,
+				value,
+			}));
 			let chart_data = {
-				labels: courier_service_data.map(d => display_courier_service(d.label)),
+				labels: normalized_courier_services.map(d => d.label),
 				datasets: [{
 					name: 'Expense Amount',
-					values: courier_service_data.map(d => flt(d.value || 0))
+					values: normalized_courier_services.map(d => d.value)
 				}]
 			};
 			
