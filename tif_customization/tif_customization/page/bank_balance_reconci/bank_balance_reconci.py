@@ -94,6 +94,7 @@ def get_report_data(from_date=None, to_date=None, reference_date=None, donor=Non
 				"donation_amount": 0.0,
 				"zakat_amount": 0.0,
 				"endowment_funds_amount": 0.0,
+				"has_endowment_receipt": False,
 				"total_received": 0.0,
 				"budgeted_amount": 0.0,
 				"balance_commitment": 0.0,
@@ -108,6 +109,7 @@ def get_report_data(from_date=None, to_date=None, reference_date=None, donor=Non
 			lines[row_key]["zakat_amount"] += amount
 		elif receipt_type == "Endowment Funds":
 			lines[row_key]["endowment_funds_amount"] += amount
+			lines[row_key]["has_endowment_receipt"] = True
 		else:
 			lines[row_key]["donation_amount"] += amount
 		lines[row_key]["total_received"] += amount
@@ -125,6 +127,7 @@ def get_report_data(from_date=None, to_date=None, reference_date=None, donor=Non
 				"donation_amount": 0.0,
 				"zakat_amount": 0.0,
 				"endowment_funds_amount": 0.0,
+				"has_endowment_receipt": "endowment" in donor_name.lower(),
 				"total_received": 0.0,
 				"budgeted_amount": 0.0,
 				"balance_commitment": 0.0,
@@ -138,8 +141,13 @@ def get_report_data(from_date=None, to_date=None, reference_date=None, donor=Non
 
 	data = sorted(lines.values(), key=lambda r: (r.get("donor_name") or "").lower())
 	sections = []
-	for donor_type in ("Key Donor", "General Donor"):
-		section_rows = [row for row in data if (row.get("donor_type") or "General Donor") == donor_type]
+	section_filters = (
+		("Key Donor", lambda row: (row.get("donor_type") or "General Donor") == "Key Donor" and not row.get("has_endowment_receipt")),
+		("Endowment Funds", lambda row: bool(row.get("has_endowment_receipt"))),
+		("General Donor", lambda row: (row.get("donor_type") or "General Donor") == "General Donor" and not row.get("has_endowment_receipt")),
+	)
+	for donor_type, row_filter in section_filters:
+		section_rows = [row for row in data if row_filter(row)]
 		sections.append({
 			"donor_type": donor_type,
 			"rows": section_rows,
@@ -166,6 +174,7 @@ def _calculate_totals(rows, month_keys):
 		"donation_amount": 0.0,
 		"zakat_amount": 0.0,
 		"endowment_funds_amount": 0.0,
+		"total_donors": len({_key(row.get("donor_name"), row.get("donor_id")) for row in rows}),
 		"budgeted_amount": 0.0,
 		"balance_commitment": 0.0,
 	}

@@ -49,6 +49,7 @@ frappe.pages["bank-balance-reconci"].on_page_load = function (wrapper) {
 							</div>
 						</div>
 					</div>
+					<div class="row" id="bank-recon-kpis"></div>
 					<div id="bank-recon-report"></div>
 				`);
 
@@ -116,10 +117,30 @@ frappe.pages["bank-balance-reconci"].on_page_load = function (wrapper) {
 				const sections = data.sections || [
 					{ donor_type: __("All Donors"), rows: data.rows || [], totals: data.totals || {} },
 				];
+				this.render_kpis(data.totals || {});
 
 				$("#bank-recon-report").html(`
 					${sections.map((section) => this.render_section_table(section, months, periodLabel)).join("")}
 				`);
+			}
+
+			render_kpis(totals) {
+				const cards = [
+					{ label: __("Total Donations"), value: this.money(totals.donation_amount), gradient: "#4facfe, #00f2fe" },
+					{ label: __("Total Zakat Donations"), value: this.money(totals.zakat_amount), gradient: "#43e97b, #38f9d7" },
+					{ label: __("Total Endowment Funds"), value: this.money(totals.endowment_funds_amount), gradient: "#fa709a, #fee140" },
+					{ label: __("Total Donors"), value: this.number(totals.total_donors), gradient: "#667eea, #764ba2" },
+				];
+				$("#bank-recon-kpis").html(
+					cards.map((card) => `
+						<div class="col-sm-6 col-lg-3 bank-recon-kpi-column">
+							<div class="bank-recon-kpi" style="background: linear-gradient(135deg, ${card.gradient});">
+								<div class="bank-recon-kpi-label">${card.label}</div>
+								<div class="bank-recon-kpi-value">${card.value}</div>
+							</div>
+						</div>
+					`).join("")
+				);
 			}
 
 			render_section_table(section, months, periodLabel) {
@@ -200,6 +221,10 @@ frappe.pages["bank-balance-reconci"].on_page_load = function (wrapper) {
 				return format_currency(v || 0, frappe.defaults.get_default("currency"));
 			}
 
+			number(v) {
+				return new Intl.NumberFormat().format(Number(v || 0));
+			}
+
 			inject_styles() {
 				if ($("#bank-recon-style").length) return;
 				$("head").append(`
@@ -244,6 +269,26 @@ frappe.pages["bank-balance-reconci"].on_page_load = function (wrapper) {
 							padding: 8px 12px;
 							background: #e5edf9;
 							border-left: 4px solid #4c6ef5;
+						}
+						.bank-recon-kpi-column {
+							margin-bottom: 14px;
+						}
+						.bank-recon-kpi {
+							min-height: 108px;
+							padding: 18px;
+							border-radius: 8px;
+							color: #fff;
+							box-shadow: 0 2px 4px rgba(15, 23, 42, 0.12);
+						}
+						.bank-recon-kpi-label {
+							font-size: 13px;
+							opacity: 0.9;
+							margin-bottom: 10px;
+						}
+						.bank-recon-kpi-value {
+							font-size: clamp(20px, 2vw, 28px);
+							font-weight: 700;
+							white-space: nowrap;
 						}
 						@media print {
 							@page {
