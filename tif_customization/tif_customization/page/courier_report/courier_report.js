@@ -406,64 +406,28 @@ if (typeof window.CourierDashboard === 'undefined') {
 		let books_expense = item_category_data.find(row => row.category === 'Books') || {};
 		let general_courier_expense = item_category_data.find(row => row.category === 'General Courier Expense') || {};
 		
-		let kpi_html = `
-			<div class="col-md-3" style="margin-bottom: 15px;">
-				<div class="kpi-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-					<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Total Courier Expense</h5>
-					<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${format_currency_value(kpi_data.total_courier_expense || 0)}</h2>
+		let cards = [
+			{ label: 'Total Courier Expense', value: format_currency_value(kpi_data.total_courier_expense || 0), gradient: '#667eea, #764ba2' },
+			{ label: 'Books Courier Expense', value: format_currency_value(books_expense.expense_amount || 0), subtitle: `${format_number_value(books_expense.delivery_note_count || 0)} Delivery Notes`, gradient: '#ec77ab, #7873f5' },
+			{ label: 'General Courier Expense', value: format_currency_value(general_courier_expense.expense_amount || 0), subtitle: `${format_number_value(general_courier_expense.delivery_note_count || 0)} Delivery Notes`, gradient: '#2193b0, #6dd5ed' },
+			{ label: 'Total Books Dispatch', value: format_number_value(kpi_data.total_books_sent || 0), gradient: '#4facfe, #00f2fe' },
+			{ label: 'Total Books Disptch by Courier', value: format_number_value(kpi_data.books_sent_by_courier || 0), gradient: '#5ee7df, #b490ca' },
+			{ label: 'Total Books Dispatch by Hand', value: format_number_value(kpi_data.books_sent_by_hand || 0), gradient: '#fa709a, #fee140' },
+
+			{ label: 'Total JVs Created', value: format_number_value(kpi_data.total_jvs_created || 0), gradient: '#43e97b, #38f9d7' },
+			{ label: 'Customers Served', value: format_number_value(kpi_data.total_customers_served || 0), gradient: '#30cfd0, #330867' },
+			{ label: 'Total Delivery Notes', value: format_number_value(kpi_data.total_delivery_notes || 0), gradient: '#f093fb, #f5576c' },
+		];
+
+		let kpi_html = cards.map(card => `
+			<div class="col-md-4" style="margin-bottom: 15px;">
+				<div class="kpi-card" style="min-height: 118px; background: linear-gradient(135deg, ${card.gradient}); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+					<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">${card.label}</h5>
+					<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${card.value}</h2>
+					${card.subtitle ? `<div style="margin-top: 6px; font-size: 12px; opacity: 0.9;">${card.subtitle}</div>` : ''}
 				</div>
 			</div>
-			<div class="col-md-3" style="margin-bottom: 15px;">
-				<div class="kpi-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-					<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Total Delivery Notes</h5>
-					<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${format_number_value(kpi_data.total_delivery_notes || 0)}</h2>
-				</div>
-			</div>
-			<div class="col-md-3" style="margin-bottom: 15px;">
-				<div class="kpi-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-					<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Total Books Sent</h5>
-					<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${format_number_value(kpi_data.total_books_sent || 0)}</h2>
-				</div>
-			</div>
-			<div class="col-md-3" style="margin-bottom: 15px;">
-				<div class="kpi-card" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-					<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Total Books Sent by Hand</h5>
-					<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${format_number_value(kpi_data.books_sent_by_hand || 0)}</h2>
-				</div>
-			</div>
-			<div class="col-md-3" style="margin-bottom: 15px;">
-				<div class="kpi-card" style="background: linear-gradient(135deg, #5ee7df 0%, #b490ca 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-					<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Total Books Sent by Courier</h5>
-					<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${format_number_value(kpi_data.books_sent_by_courier || 0)}</h2>
-				</div>
-			</div>
-			<div class="col-md-3" style="margin-bottom: 15px;">
-				<div class="kpi-card" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-					<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Total JVs Created</h5>
-					<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${format_number_value(kpi_data.total_jvs_created || 0)}</h2>
-				</div>
-			</div>
-			<div class="col-md-3" style="margin-bottom: 15px;">
-				<div class="kpi-card" style="background: linear-gradient(135deg, #30cfd0 0%, #330867 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-					<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Customers Served</h5>
-					<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${format_number_value(kpi_data.total_customers_served || 0)}</h2>
-				</div>
-			</div>
-			<div class="col-md-3" style="margin-bottom: 15px;">
-				<div class="kpi-card" style="background: linear-gradient(135deg, #ec77ab 0%, #7873f5 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-					<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Books Expense</h5>
-					<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${format_currency_value(books_expense.expense_amount || 0)}</h2>
-					<div style="margin-top: 6px; font-size: 12px; opacity: 0.9;">${format_number_value(books_expense.delivery_note_count || 0)} Delivery Notes</div>
-				</div>
-			</div>
-			<div class="col-md-3" style="margin-bottom: 15px;">
-				<div class="kpi-card" style="background: linear-gradient(135deg, #2193b0 0%, #6dd5ed 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-					<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">General Courier Expense</h5>
-					<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${format_currency_value(general_courier_expense.expense_amount || 0)}</h2>
-					<div style="margin-top: 6px; font-size: 12px; opacity: 0.9;">${format_number_value(general_courier_expense.delivery_note_count || 0)} Delivery Notes</div>
-				</div>
-			</div>
-		`;
+		`).join('');
 		
 		$('#kpi-cards').html(kpi_html);
 	}
