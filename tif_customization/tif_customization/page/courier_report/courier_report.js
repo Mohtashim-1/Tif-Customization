@@ -786,7 +786,7 @@ if (typeof window.CourierDashboard === 'undefined') {
 		let courier_service_data = me.data.courier_service_data || [];
 		if (courier_service_data.length > 0) {
 			let chart_data = {
-				labels: courier_service_data.map(d => String(d.label || 'Not Set')),
+				labels: courier_service_data.map(d => display_courier_service(d.label)),
 				datasets: [{
 					name: 'Expense Amount',
 					values: courier_service_data.map(d => flt(d.value || 0))
@@ -818,7 +818,7 @@ if (typeof window.CourierDashboard === 'undefined') {
 		let courier_payment_mode_data = me.data.courier_payment_mode_data || [];
 		if (courier_payment_mode_data.length > 0) {
 			let chart_data = {
-				labels: courier_payment_mode_data.map(d => String(d.label || 'Not Set')),
+				labels: courier_payment_mode_data.map(d => display_courier_payment_mode(d.label)),
 				datasets: [{
 					name: 'Expense Amount',
 					values: courier_payment_mode_data.map(d => flt(d.value || 0))
@@ -1352,9 +1352,9 @@ if (typeof window.CourierDashboard === 'undefined') {
 					</tr>
 					<tr>
 						<td><strong>Courier Service</strong></td>
-						<td>${row.custom_courier_service || '-'}</td>
+						<td>${display_courier_service(row.custom_courier_service, '-')}</td>
 						<td><strong>Payment Mode</strong></td>
-						<td>${row.custom_courier_mode_of_payment || '-'}</td>
+						<td>${display_courier_payment_mode(row.custom_courier_mode_of_payment, '-')}</td>
 					</tr>
 					<tr>
 						<td><strong>Delivery Rate</strong></td>
@@ -1760,4 +1760,14 @@ function format_number_value(value) {
 	// Format as integer using toLocaleString
 	value = cint(value);
 	return value.toLocaleString();
+}
+
+function display_courier_service(value, fallback = 'Not Set') {
+	let label = String(value || fallback);
+	return label.trim().toLowerCase() === 'cargo' ? 'Overland' : label;
+}
+
+function display_courier_payment_mode(value, fallback = 'Not Set') {
+	let label = String(value || fallback);
+	return label.trim().toLowerCase() === 'account' ? 'Cheque' : label;
 }
