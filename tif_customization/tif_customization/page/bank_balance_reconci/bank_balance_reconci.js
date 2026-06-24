@@ -136,6 +136,9 @@ frappe.pages["bank-balance-reconci"].on_page_load = function (wrapper) {
 							<tr>
 								<td>${frappe.utils.escape_html(row.display_name || "")}</td>
 								${monthCells}
+								<td class="text-right">${this.money(row.donation_amount)}</td>
+								<td class="text-right">${this.money(row.zakat_amount)}</td>
+								<td class="text-right">${this.money(row.endowment_funds_amount)}</td>
 								<td class="text-right">${this.money(row.total_received)}</td>
 								<td class="text-right">${this.money(row.budgeted_amount)}</td>
 								<td class="text-right">${this.money(row.balance_commitment)}</td>
@@ -143,7 +146,7 @@ frappe.pages["bank-balance-reconci"].on_page_load = function (wrapper) {
 							</tr>
 						`;
 					}).join("")
-					: `<tr><td colspan="${months.length + 5}" class="text-center text-muted">${__("No records found")}</td></tr>`;
+					: `<tr><td colspan="${months.length + 8}" class="text-center text-muted">${__("No records found")}</td></tr>`;
 				const totalMonthCells = months
 					.map((month) => `<td class="text-right">${this.money((totals.month_values || {})[month.key])}</td>`)
 					.join("");
@@ -154,21 +157,24 @@ frappe.pages["bank-balance-reconci"].on_page_load = function (wrapper) {
 						<table class="table table-bordered bank-recon-table">
 							<thead>
 								<tr>
-									<th colspan="${months.length + 5}" class="sheet-title">The ILM Foundation — ${donorType}</th>
+									<th colspan="${months.length + 8}" class="sheet-title">The ILM Foundation — ${donorType}</th>
 								</tr>
 								<tr>
-									<th colspan="${months.length + 5}" class="sheet-subtitle">Receipt & Payment Account</th>
+									<th colspan="${months.length + 8}" class="sheet-subtitle">Receipt & Payment Account</th>
 								</tr>
 								<tr>
 									<th class="left-band" rowspan="2">Donations<br>${periodLabel}</th>
-									<th colspan="${months.length + 1}" class="center-band">Donations<br>${periodLabel}<br>Actual received</th>
-									<th rowspan="2">Budgeted for the year</th>
+									<th colspan="${months.length + 4}" class="center-band">Donations<br>${periodLabel}<br>Actual received</th>
+									<th rowspan="2">Budgeted for the year (committed)</th>
 									<th rowspan="2">Balance Commitment</th>
 									<th rowspan="2">Remarks</th>
 								</tr>
 								<tr>
 									${monthHeaders}
-									<th>Total</th>
+									<th>Donation</th>
+									<th>Zakat</th>
+									<th>Endowment Funds</th>
+									<th>Total Donations</th>
 								</tr>
 							</thead>
 							<tbody>
@@ -176,6 +182,9 @@ frappe.pages["bank-balance-reconci"].on_page_load = function (wrapper) {
 								<tr class="grand-total">
 									<td>Total</td>
 									${totalMonthCells}
+									<td class="text-right">${this.money(totals.donation_amount)}</td>
+									<td class="text-right">${this.money(totals.zakat_amount)}</td>
+									<td class="text-right">${this.money(totals.endowment_funds_amount)}</td>
 									<td class="text-right">${this.money(totals.total_received)}</td>
 									<td class="text-right">${this.money(totals.budgeted_amount)}</td>
 									<td class="text-right">${this.money(totals.balance_commitment)}</td>
