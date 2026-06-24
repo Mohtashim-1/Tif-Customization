@@ -39,7 +39,10 @@ frappe.pages["bank-balance-reconci"].on_page_load = function (wrapper) {
 								<label>${__("To Date")}</label>
 								<input type="date" id="bank-recon-to-date" class="form-control" value="${this.to_date}">
 							</div>
-							<div class="col-md-6" style="padding-top:24px;">
+							<div class="col-md-3">
+								<div id="bank-recon-donor-control"></div>
+							</div>
+							<div class="col-md-3" style="padding-top:24px;">
 								<button class="btn btn-primary" id="bank-recon-apply"><i class="fa fa-filter"></i> ${__("Apply")}</button>
 								<button class="btn btn-default" id="bank-recon-fy">${__("Current FY")}</button>
 								<button class="btn btn-default" id="bank-recon-print"><i class="fa fa-print"></i> ${__("Print")}</button>
@@ -48,6 +51,17 @@ frappe.pages["bank-balance-reconci"].on_page_load = function (wrapper) {
 					</div>
 					<div id="bank-recon-report"></div>
 				`);
+
+				this.donor_control = frappe.ui.form.make_control({
+					parent: this.page.main.find("#bank-recon-donor-control"),
+					df: {
+						fieldname: "donor",
+						fieldtype: "Link",
+						label: __("Donor"),
+						options: "Donor",
+					},
+					render_input: true,
+				});
 			}
 
 			bind_events() {
@@ -81,6 +95,7 @@ frappe.pages["bank-balance-reconci"].on_page_load = function (wrapper) {
 					args: {
 						from_date: this.from_date,
 						to_date: this.to_date,
+						donor: this.donor_control.get_value(),
 					},
 					freeze: true,
 					freeze_message: "Loading Bank Balance Reconciliation...",
@@ -97,15 +112,25 @@ frappe.pages["bank-balance-reconci"].on_page_load = function (wrapper) {
 			render_report() {
 				const data = this.data || {};
 				const months = data.months || [];
-				const rows = data.rows || [];
-				const totals = data.totals || {};
+				const periodLabel = frappe.utils.escape_html(data.period_label || "");
+				const sections = data.sections || [
+					{ donor_type: __("All Donors"), rows: data.rows || [], totals: data.totals || {} },
+				];
 
-				const monthHeaders = months.map((m) => `<th>${frappe.utils.escape_html(m.label)}</th>`).join("");
+				$("#bank-recon-report").html(`
+					${sections.map((section) => this.render_section_table(section, months, periodLabel)).join("")}
+				`);
+			}
 
-				const body = rows
-					.map((row) => {
+			render_section_table(section, months, periodLabel) {
+				const rows = section.rows || [];
+				const totals = section.totals || {};
+				const donorType = frappe.utils.escape_html(section.donor_type || "");
+				const monthHeaders = months.map((month) => `<th>${frappe.utils.escape_html(month.label)}</th>`).join("");
+				const body = rows.length
+					? rows.map((row) => {
 						const monthCells = months
-							.map((m) => `<td class="text-right">${this.money((row.month_values || {})[m.key])}</td>`)
+							.map((month) => `<td class="text-right">${this.money((row.month_values || {})[month.key])}</td>`)
 							.join("");
 						return `
 							<tr>
@@ -117,21 +142,19 @@ frappe.pages["bank-balance-reconci"].on_page_load = function (wrapper) {
 								<td>${frappe.utils.escape_html(row.remarks || "")}</td>
 							</tr>
 						`;
-					})
-					.join("");
-
+					}).join("")
+					: `<tr><td colspan="${months.length + 5}" class="text-center text-muted">${__("No records found")}</td></tr>`;
 				const totalMonthCells = months
-					.map((m) => `<td class="text-right">${this.money((totals.month_values || {})[m.key])}</td>`)
+					.map((month) => `<td class="text-right">${this.money((totals.month_values || {})[month.key])}</td>`)
 					.join("");
 
-				const periodLabel = frappe.utils.escape_html(data.period_label || "");
-
-				$("#bank-recon-report").html(`
+				return `
+					<div class="bank-recon-section-title">${donorType}</div>
 					<div class="bank-recon-sheet">
 						<table class="table table-bordered bank-recon-table">
 							<thead>
 								<tr>
-									<th colspan="${months.length + 5}" class="sheet-title">The ILM Foundation</th>
+									<th colspan="${months.length + 5}" class="sheet-title">The ILM Foundation — ${donorType}</th>
 								</tr>
 								<tr>
 									<th colspan="${months.length + 5}" class="sheet-subtitle">Receipt & Payment Account</th>
@@ -161,7 +184,7 @@ frappe.pages["bank-balance-reconci"].on_page_load = function (wrapper) {
 							</tbody>
 						</table>
 					</div>
-				`);
+				`;
 			}
 
 			money(v) {
@@ -204,6 +227,14 @@ frappe.pages["bank-balance-reconci"].on_page_load = function (wrapper) {
 						.bank-recon-table .grand-total td {
 							font-weight: 700;
 							background: #e2e8f0;
+						}
+						.bank-recon-section-title {
+							font-size: 16px;
+							font-weight: 700;
+							margin: 18px 0 8px;
+							padding: 8px 12px;
+							background: #e5edf9;
+							border-left: 4px solid #4c6ef5;
 						}
 						@media print {
 							@page {

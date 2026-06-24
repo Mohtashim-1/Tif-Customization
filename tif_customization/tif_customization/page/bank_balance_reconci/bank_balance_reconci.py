@@ -5,7 +5,7 @@ from frappe.utils import flt, getdate, nowdate
 
 
 @frappe.whitelist()
-def get_report_data(from_date=None, to_date=None, reference_date=None):
+def get_report_data(from_date=None, to_date=None, reference_date=None, donor=None):
 	if from_date and to_date:
 		fy_from = getdate(from_date)
 		fy_to = getdate(to_date)
@@ -26,17 +26,24 @@ def get_report_data(from_date=None, to_date=None, reference_date=None):
 		SELECT
 			COALESCE(d.donor_name, d.donor, 'Walk-in / Unknown') AS donor_name,
 			COALESCE(d.donor, '') AS donor_id,
+			COALESCE(dn.donor_type, 'General Donor') AS donor_type,
 			DATE_FORMAT(d.donation_date, '%%Y-%%m') AS month_key,
-			CASE WHEN COALESCE(dt.category, '') = 'Zakat' THEN 'Zakat' ELSE 'Donation' END AS line_type,
+			CASE
+				WHEN COALESCE(dt.category, '') = 'Zakat' THEN 'Zakat'
+				WHEN d.donation_type = 'Rental Income' OR LOWER(COALESCE(d.donation_type, '')) LIKE '%%endowment%%' THEN 'Endowment Funds'
+				ELSE 'Donation'
+			END AS receipt_type,
 			SUM(COALESCE(d.received_amount, 0)) AS received_amount
 		FROM `tabDonation` d
 		LEFT JOIN `tabDonation Type` dt ON dt.name = d.donation_type
+		LEFT JOIN `tabDonor` dn ON dn.name = d.donor
 		WHERE d.docstatus = 1
 		  AND d.donation_date BETWEEN %(from_date)s AND %(to_date)s
-		GROUP BY donor_name, donor_id, month_key, line_type
-		ORDER BY donor_name, line_type, month_key
+		  AND (%(donor)s = '' OR d.donor = %(donor)s)
+		GROUP BY donor_name, donor_id, donor_type, month_key, receipt_type
+		ORDER BY donor_name, receipt_type, month_key
 		""",
-		{"from_date": str(fy_from), "to_date": str(fy_to)},
+		{"from_date": str(fy_from), "to_date": str(fy_to), "donor": donor or ""},
 		as_dict=True,
 	)
 
@@ -46,15 +53,17 @@ def get_report_data(from_date=None, to_date=None, reference_date=None):
 			SELECT
 				COALESCE(dn.donor_name, dc.parent, 'Walk-in / Unknown') AS donor_name,
 				COALESCE(dc.parent, '') AS donor_id,
+				COALESCE(dn.donor_type, 'General Donor') AS donor_type,
 				SUM(COALESCE(dc.commitment_amount, 0)) AS budgeted_amount
 			FROM `tabDonor Commitment` dc
 			LEFT JOIN `tabDonor` dn ON dn.name = dc.parent
 			WHERE COALESCE(dc.status, 'Active') != 'Cancelled'
 			  AND dc.from_date <= %(to_date)s
 			  AND dc.to_date >= %(from_date)s
-			GROUP BY donor_name, donor_id
+			  AND (%(donor)s = '' OR dc.parent = %(donor)s)
+			GROUP BY donor_name, donor_id, donor_type
 			""",
-			{"from_date": str(fy_from), "to_date": str(fy_to)},
+			{"from_date": str(fy_from), "to_date": str(fy_to), "donor": donor or ""},
 			as_dict=True,
 		)
 	except Exception:
@@ -63,21 +72,28 @@ def get_report_data(from_date=None, to_date=None, reference_date=None):
 	commitments = {}
 	for row in commitment_rows:
 		key = _key(row.get("donor_name"), row.get("donor_id"))
-		commitments[key] = flt(row.get("budgeted_amount"))
+		commitments[key] = {
+			"budgeted_amount": flt(row.get("budgeted_amount")),
+			"donor_type": row.get("donor_type") or "General Donor",
+		}
 
 	lines = {}
 	for row in donation_rows:
 		donor_name = row.get("donor_name") or "Walk-in / Unknown"
 		donor_id = row.get("donor_id") or ""
-		line_type = row.get("line_type") or "Donation"
-		row_key = f"{_key(donor_name, donor_id)}::{line_type}"
+		donor_type = row.get("donor_type") or "General Donor"
+		receipt_type = row.get("receipt_type") or "Donation"
+		row_key = _key(donor_name, donor_id)
 		if row_key not in lines:
 			lines[row_key] = {
 				"donor_name": donor_name,
 				"donor_id": donor_id,
-				"line_type": line_type,
-				"display_name": f"{donor_name} ({line_type})" if donor_name else line_type,
+				"donor_type": donor_type,
+				"display_name": donor_name,
 				"month_values": {k: 0.0 for k in month_keys},
+				"donation_amount": 0.0,
+				"zakat_amount": 0.0,
+				"endowment_funds_amount": 0.0,
 				"total_received": 0.0,
 				"budgeted_amount": 0.0,
 				"balance_commitment": 0.0,
@@ -88,47 +104,48 @@ def get_report_data(from_date=None, to_date=None, reference_date=None):
 		amount = flt(row.get("received_amount"))
 		if month_key in lines[row_key]["month_values"]:
 			lines[row_key]["month_values"][month_key] += amount
+		if receipt_type == "Zakat":
+			lines[row_key]["zakat_amount"] += amount
+		elif receipt_type == "Endowment Funds":
+			lines[row_key]["endowment_funds_amount"] += amount
+		else:
+			lines[row_key]["donation_amount"] += amount
 		lines[row_key]["total_received"] += amount
 
 	# Add donor rows from commitments even when no transactions.
-	for donor_k, budget in commitments.items():
+	for donor_k, commitment in commitments.items():
 		donor_name, donor_id = donor_k.split("::", 1)
-		for line_type in ("Donation", "Zakat"):
-			row_key = f"{donor_k}::{line_type}"
-			if row_key not in lines:
-				lines[row_key] = {
-					"donor_name": donor_name,
-					"donor_id": donor_id,
-					"line_type": line_type,
-					"display_name": f"{donor_name} ({line_type})" if donor_name else line_type,
-					"month_values": {k: 0.0 for k in month_keys},
-					"total_received": 0.0,
-					"budgeted_amount": 0.0,
-					"balance_commitment": 0.0,
-					"remarks": "",
-				}
+		if donor_k not in lines:
+			lines[donor_k] = {
+				"donor_name": donor_name,
+				"donor_id": donor_id,
+				"donor_type": commitment.get("donor_type") or "General Donor",
+				"display_name": donor_name,
+				"month_values": {k: 0.0 for k in month_keys},
+				"donation_amount": 0.0,
+				"zakat_amount": 0.0,
+				"endowment_funds_amount": 0.0,
+				"total_received": 0.0,
+				"budgeted_amount": 0.0,
+				"balance_commitment": 0.0,
+				"remarks": "",
+			}
 
-	# Put full donor budget on Donation row only (avoids double counting).
 	for row in lines.values():
 		donor_k = _key(row.get("donor_name"), row.get("donor_id"))
-		if row.get("line_type") == "Donation":
-			row["budgeted_amount"] = commitments.get(donor_k, 0.0)
+		row["budgeted_amount"] = commitments.get(donor_k, {}).get("budgeted_amount", 0.0)
 		row["balance_commitment"] = flt(row["budgeted_amount"]) - flt(row["total_received"])
 
-	data = sorted(lines.values(), key=lambda r: ((r.get("donor_name") or "").lower(), r.get("line_type")))
-
-	totals = {
-		"month_values": {k: 0.0 for k in month_keys},
-		"total_received": 0.0,
-		"budgeted_amount": 0.0,
-		"balance_commitment": 0.0,
-	}
-	for row in data:
-		for key in month_keys:
-			totals["month_values"][key] += flt((row.get("month_values") or {}).get(key))
-		totals["total_received"] += flt(row.get("total_received"))
-		totals["budgeted_amount"] += flt(row.get("budgeted_amount"))
-		totals["balance_commitment"] += flt(row.get("balance_commitment"))
+	data = sorted(lines.values(), key=lambda r: (r.get("donor_name") or "").lower())
+	sections = []
+	for donor_type in ("Key Donor", "General Donor"):
+		section_rows = [row for row in data if (row.get("donor_type") or "General Donor") == donor_type]
+		sections.append({
+			"donor_type": donor_type,
+			"rows": section_rows,
+			"totals": _calculate_totals(section_rows, month_keys),
+		})
+	totals = _calculate_totals(data, month_keys)
 
 	return {
 		"period_label": f"{fy_from.strftime('%d %b %Y')} to {fy_to.strftime('%d %b %Y')}",
@@ -138,7 +155,30 @@ def get_report_data(from_date=None, to_date=None, reference_date=None):
 		"months": months,
 		"rows": data,
 		"totals": totals,
+		"sections": sections,
 	}
+
+
+def _calculate_totals(rows, month_keys):
+	totals = {
+		"month_values": {key: 0.0 for key in month_keys},
+		"total_received": 0.0,
+		"donation_amount": 0.0,
+		"zakat_amount": 0.0,
+		"endowment_funds_amount": 0.0,
+		"budgeted_amount": 0.0,
+		"balance_commitment": 0.0,
+	}
+	for row in rows:
+		for key in month_keys:
+			totals["month_values"][key] += flt((row.get("month_values") or {}).get(key))
+		totals["total_received"] += flt(row.get("total_received"))
+		totals["donation_amount"] += flt(row.get("donation_amount"))
+		totals["zakat_amount"] += flt(row.get("zakat_amount"))
+		totals["endowment_funds_amount"] += flt(row.get("endowment_funds_amount"))
+		totals["budgeted_amount"] += flt(row.get("budgeted_amount"))
+		totals["balance_commitment"] += flt(row.get("balance_commitment"))
+	return totals
 
 
 def _months_between(from_date, to_date):
