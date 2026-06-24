@@ -113,7 +113,6 @@ if (typeof window.ProcurementExpense === 'undefined') {
 							<div class="panel panel-default">
 								<div class="panel-heading">
 									<h5>Top 10 Expense</h5>
-									<p style="margin: 5px 0 0 0; font-size: 11px; color: #666;">Based on Purchase Invoice amounts</p>
 								</div>
 								<div class="panel-body">
 									<canvas id="chart-top-accounts" style="height: 300px;"></canvas>
@@ -130,8 +129,7 @@ if (typeof window.ProcurementExpense === 'undefined') {
 							<div class="panel panel-default">
 								<div class="panel-heading">
 									<h5>Expense by Department</h5>
-									<p style="margin: 5px 0 0 0; font-size: 11px; color: #666;">Based on Purchase Invoice amounts</p>
-								</div>
+							</div>
 								<div class="panel-body">
 									<canvas id="chart-summary-pie" style="height: 400px;"></canvas>
 								</div>
@@ -677,7 +675,6 @@ if (typeof window.ProcurementExpense === 'undefined') {
 				['expense_trend', 'chart-expense-trend'],
 				['top_accounts', 'chart-top-accounts'],
 				['expense_vs_count', 'chart-expense-vs-count'],
-				['summary_pie', 'chart-summary-pie'],
 				['payment_pie', 'chart-payment-pie'],
 				['items_cash_pie', 'chart-items-cash-pie'],
 				['items_cheque_pie', 'chart-items-cheque-pie']
