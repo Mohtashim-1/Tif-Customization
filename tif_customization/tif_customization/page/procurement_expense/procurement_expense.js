@@ -157,7 +157,7 @@ if (typeof window.ProcurementExpense === 'undefined') {
 						<div class="col-md-12">
 							<div class="panel panel-default">
 								<div class="panel-heading">
-									<h5>Purchase Invoice Expense by Department / Cost Center</h5>
+									<h5>Purchase Invoice Expense by Department</h5>
 									<p style="margin: 5px 0 0 0; font-size: 11px; color: #666;">Based on Purchase Invoice amounts</p>
 								</div>
 								<div class="panel-body">
@@ -190,8 +190,18 @@ if (typeof window.ProcurementExpense === 'undefined') {
 					
 					<!-- Detailed Table -->
 					<div class="data-section" style="margin-top: 20px;">
-						<h5 style="margin-bottom: 15px;">Detailed Expense by Period</h5>
-						<div class="table-responsive">
+						<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px;">
+							<h5 style="margin: 0;">Detailed Expense by Period</h5>
+							<div>
+								<button type="button" class="btn btn-default btn-sm" id="toggle-all-period-details" style="display: none; margin-right: 6px;">
+									<i class="fa fa-expand"></i> Expand All
+								</button>
+								<button type="button" class="btn btn-default btn-sm" id="toggle-detail-report" aria-expanded="false">
+									<i class="fa fa-chevron-down"></i> Expand
+								</button>
+							</div>
+						</div>
+						<div class="table-responsive" id="detail-table-content" style="display: none;">
 							<table class="table table-bordered table-striped" id="detail-table">
 							<thead>
 								<tr>
@@ -406,6 +416,15 @@ if (typeof window.ProcurementExpense === 'undefined') {
 			
 			$(me.page.body).html(html);
 
+			$(me.page.body).find('canvas[id^="chart-"]').each(function() {
+				let canvas = $(this);
+				let chartHeight = parseInt(canvas.css('height'), 10) || 350;
+				canvas.wrap(
+					`<div class="chart-canvas-wrapper" style="position: relative; width: 100%; height: ${chartHeight}px;"></div>`
+				);
+				canvas.css({ width: '100%', height: '100%' });
+			});
+
 			me.from_date_control = frappe.ui.form.make_control({
 				parent: $(me.page.body).find('#from-date-control'),
 				df: {
@@ -521,6 +540,38 @@ if (typeof window.ProcurementExpense === 'undefined') {
 			$('#toggle-voucher-details').on('click', function() {
 				me.toggle_voucher_details();
 			});
+
+			$('#toggle-detail-report').on('click', function() {
+				let button = $(this);
+				let isExpanded = button.attr('aria-expanded') === 'true';
+				$('#detail-table-content').stop(true, true).slideToggle(150);
+				button.attr('aria-expanded', String(!isExpanded));
+				button.html(
+					!isExpanded
+						? '<i class="fa fa-chevron-up"></i> Collapse'
+						: '<i class="fa fa-chevron-down"></i> Expand'
+				);
+				$('#toggle-all-period-details').toggle(!isExpanded);
+
+				if (isExpanded) {
+					$('.period-row.expanded').each(function() {
+						let row = $(this);
+						row.removeClass('expanded');
+						row.find('.period-expand-icon').removeClass('fa-chevron-down').addClass('fa-chevron-right');
+						row.nextUntil('.period-row', '.invoice-details-row').remove();
+					});
+					me.update_period_expand_all_button();
+				}
+			});
+
+			$('#toggle-all-period-details').on('click', function() {
+				let visibleRows = $('.period-row:visible');
+				let shouldCollapse = visibleRows.length > 0 && visibleRows.filter('.expanded').length === visibleRows.length;
+				visibleRows.filter(shouldCollapse ? '.expanded' : ':not(.expanded)').each(function() {
+					$(this).trigger('click', [{ skipScroll: true }]);
+				});
+				me.update_period_expand_all_button();
+			});
 			
 			// Load initial data
 			setTimeout(() => {
@@ -590,6 +641,7 @@ if (typeof window.ProcurementExpense === 'undefined') {
 			
 			$('#summary-tbody').html('<tr><td colspan="6" class="text-center">Loading data...</td></tr>');
 			$('#detail-tbody').html('<tr><td colspan="7" class="text-center">Loading data...</td></tr>');
+			$(me.page.body).find('.chart-data-report').remove();
 			
 			frappe.call({
 				method: 'tif_customization.tif_customization.page.procurement_expense.procurement_expense.get_procurement_expense_data',
@@ -625,6 +677,7 @@ if (typeof window.ProcurementExpense === 'undefined') {
 					me.render_payment_charts();
 					me.render_item_payment_charts();
 					me.render_voucher_wise_details();
+					me.schedule_chart_data_tables();
 					} else {
 						let errorMsg = r.message?.error || r.message || 'Unknown error';
 						console.error('Procurement expense error:', errorMsg);
@@ -638,6 +691,95 @@ if (typeof window.ProcurementExpense === 'undefined') {
 					$('#detail-tbody').html(`<tr><td colspan="4" class="text-center text-danger">Failed to load data. Please refresh and try again.</td></tr>`);
 				}
 			});
+		}
+
+		schedule_chart_data_tables(attempt = 0) {
+			let me = this;
+			clearTimeout(me.chart_data_table_timer);
+			me.chart_data_table_timer = setTimeout(() => {
+				let missingCharts = me.render_chart_data_tables(attempt >= 8);
+				if (missingCharts && attempt < 8) {
+					me.schedule_chart_data_tables(attempt + 1);
+				}
+			}, 250);
+		}
+
+		render_chart_data_tables(showEmpty = false) {
+			let chartMap = [
+				['expense_trend', 'chart-expense-trend'],
+				['top_accounts', 'chart-top-accounts'],
+				['expense_vs_count', 'chart-expense-vs-count'],
+				['summary_pie', 'chart-summary-pie'],
+				['payment_pie', 'chart-payment-pie'],
+				['items_cash_pie', 'chart-items-cash-pie'],
+				['items_cheque_pie', 'chart-items-cheque-pie']
+			];
+			let missingCharts = 0;
+
+			chartMap.forEach(([chartKey, canvasId]) => {
+				let chart = this.charts[chartKey];
+				let canvas = $(this.page.body).find(`#${canvasId}`);
+				if (!canvas.length) {
+					return;
+				}
+
+				let report = $(this.page.body).find(`#${canvasId}-data`);
+				if (!report.length) {
+					report = $(`<div id="${canvasId}-data" class="chart-data-report" style="margin-top: 18px;"></div>`);
+					canvas.closest('.chart-canvas-wrapper').after(report);
+				}
+
+				if (!chart || !chart.data) {
+					missingCharts += 1;
+					if (showEmpty) {
+						report.html('<div class="text-muted text-center" style="padding: 12px;">No report data available</div>');
+					}
+					return;
+				}
+				this.render_chart_data_table(report, chart.data);
+			});
+
+			return missingCharts;
+		}
+
+		render_chart_data_table(container, chartData) {
+			let labels = chartData.labels || [];
+			let datasets = chartData.datasets || [];
+			if (!labels.length || !datasets.length) {
+				container.html('<div class="text-muted text-center" style="padding: 12px;">No report data available</div>');
+				return;
+			}
+
+			let headers = ['Label', ...datasets.map((dataset, index) => dataset.label || `Value ${index + 1}`)];
+			let rows = labels.map((label, rowIndex) => {
+				let cells = datasets.map(dataset => {
+					let value = Array.isArray(dataset.data) ? dataset.data[rowIndex] : 0;
+					return this.format_chart_table_value(value, dataset.label);
+				});
+				return [label, ...cells];
+			});
+
+			container.html(`
+				<div style="font-weight: 600; margin-bottom: 8px;">Report Data</div>
+				<div class="table-responsive" style="max-height: 320px; overflow-y: auto; border: 1px solid #d1d8dd; border-radius: 6px;">
+					<table class="table table-bordered table-striped" style="margin: 0; font-size: 12px;">
+						<thead style="position: sticky; top: 0; background: #f8f9fa; z-index: 1;">
+							<tr>${headers.map(header => `<th>${frappe.utils.escape_html(String(header))}</th>`).join('')}</tr>
+						</thead>
+						<tbody>
+							${rows.map(row => `<tr>${row.map((cell, index) => `<td${index ? ' class="text-right"' : ''}>${frappe.utils.escape_html(String(cell ?? '-'))}</td>`).join('')}</tr>`).join('')}
+						</tbody>
+					</table>
+				</div>
+			`);
+		}
+
+		format_chart_table_value(value, datasetLabel) {
+			let numericValue = Number(value || 0);
+			if (/count|number/i.test(String(datasetLabel || ''))) {
+				return format_number_value(numericValue);
+			}
+			return format_currency_value(numericValue);
 		}
 		
 		render_kpis() {
@@ -1007,12 +1149,11 @@ if (typeof window.ProcurementExpense === 'undefined') {
 			// Remove existing handlers to avoid duplicates
 			$('.period-row').off('click');
 			
-			$('.period-row').on('click', function() {
+			$('.period-row').on('click', function(_event, options = {}) {
 				let $row = $(this);
 				let period = $row.data('period');
 				let costCenter = $row.data('cost-center');
 				let $icon = $row.find('.period-expand-icon');
-				let $invoiceDetailsRow = $row.next('.invoice-details-row');
 				
 				console.log('[Period Row Click] Period:', period, 'Cost Center:', costCenter);
 				
@@ -1021,17 +1162,10 @@ if (typeof window.ProcurementExpense === 'undefined') {
 					console.log('[Period Row Click] Collapsing...');
 					$row.removeClass('expanded');
 					$icon.removeClass('fa-chevron-down').addClass('fa-chevron-right');
-					$invoiceDetailsRow.remove();
+					$row.nextUntil('.period-row', '.invoice-details-row').remove();
 				} else {
 					// Expand - fetch and show invoice details
 					console.log('[Period Row Click] Expanding...');
-					
-					// Collapse other expanded period rows
-					$('.period-row.expanded').each(function() {
-						$(this).removeClass('expanded');
-						$(this).find('.period-expand-icon').removeClass('fa-chevron-down').addClass('fa-chevron-right');
-						$(this).next('.invoice-details-row').remove();
-					});
 					
 					// Expand this row
 					$row.addClass('expanded');
@@ -1061,6 +1195,9 @@ if (typeof window.ProcurementExpense === 'undefined') {
 						},
 						callback: function(r) {
 							loadingRow.remove();
+							if (!$row.hasClass('expanded')) {
+								return;
+							}
 							
 							if (r.exc || r.message.error) {
 								console.error('[Period Row Click] Error fetching invoice details:', r.exc || r.message.error);
@@ -1164,14 +1301,19 @@ if (typeof window.ProcurementExpense === 'undefined') {
 							$row.after(detailsRow);
 							
 							// Scroll to the expanded row
-							setTimeout(() => {
-								$('html, body').animate({
-									scrollTop: $row.offset().top - 100
-								}, 300);
-							}, 100);
+							if (!options.skipScroll) {
+								setTimeout(() => {
+									$('html, body').animate({
+										scrollTop: $row.offset().top - 100
+									}, 300);
+								}, 100);
+							}
 						},
 						error: function(r) {
 							loadingRow.remove();
+							if (!$row.hasClass('expanded')) {
+								return;
+							}
 							console.error('[Period Row Click] API call failed:', r);
 							let errorRow = $(`
 								<tr class="invoice-details-row">
@@ -1186,9 +1328,20 @@ if (typeof window.ProcurementExpense === 'undefined') {
 						}
 					});
 				}
+				me.update_period_expand_all_button();
 			});
 			
 			console.log('[Period Row Handlers] Click handlers setup complete');
+		}
+
+		update_period_expand_all_button() {
+			let visibleRows = $('.period-row:visible');
+			let allExpanded = visibleRows.length > 0 && visibleRows.filter('.expanded').length === visibleRows.length;
+			$('#toggle-all-period-details').html(
+				allExpanded
+					? '<i class="fa fa-compress"></i> Collapse All'
+					: '<i class="fa fa-expand"></i> Expand All'
+			);
 		}
 		
 		render_detail_table() {
@@ -1267,6 +1420,7 @@ if (typeof window.ProcurementExpense === 'undefined') {
 				
 				// Setup period row click handlers
 				me.setup_period_row_handlers();
+				me.update_period_expand_all_button();
 			}
 		}
 		
