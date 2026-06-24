@@ -10,23 +10,6 @@ from tif_customization.tif_customization.page.salary_register.salary_register im
 	_resolve_period_dates,
 	get_period_options,
 )
-from tif_customization.tif_customization.payroll_utils import get_assignment_base_by_employee
-
-# Read-only salary reference columns (gross from Salary Structure Assignment)
-SALARY_COLUMNS = [
-	{"key": "perm_gross", "label": "Gross (Permanent)"},
-	{"key": "contract_gross", "label": "Gross (Contract)"},
-	{"key": "gross_pay", "label": "Gross Pay"},
-	{"key": "total_deduction", "label": "Total Deduction"},
-	{"key": "payment_days", "label": "Days Worked"},
-]
-
-PAYMENT_COLUMNS = [
-	{"key": "net_pay", "label": "Net Pay"},
-	{"key": "payable_amount", "label": "Payable Amount"},
-	{"key": "payment_mode", "label": "Mode"},
-	{"key": "bank_name", "label": "Bank"},
-]
 from tif_customization.tif_customization.page.salary_register.salary_register_sections import (
 	EMPLOYEE_SECTION_MAP,
 	HEADER_ONLY_SECTIONS,
@@ -36,38 +19,75 @@ from tif_customization.tif_customization.page.salary_register.salary_register_se
 	sort_key_for_row,
 )
 from tif_customization.tif_customization.page.variable_components.variable_components_config import (
+	resolve_arrear_2_column,
 	resolve_component_names,
-)
-from tif_customization.tif_customization.pf.pf_contribution import (
-	compute_pf_deduction_amount,
-	get_pf_meta_for_employee,
 )
 from tif_customization.tif_customization.page.variable_components.variable_components_roster import (
 	apply_attendance_to_amounts,
 	attendance_by_employee,
-	ensure_period_roster,
 	create_custom_period,
+	ensure_period_roster,
 	extended_period_options,
+	get_included_employee_ids,
 	get_period_status,
+	initialize_period_roster,
 	mark_period_draft_saved,
 	mark_period_finalized,
-	get_included_employee_ids,
 	period_starting_on_26th,
-	tif_26th_cycle_dates,
-	initialize_period_roster,
 	roster_count,
 	set_roster_excluded,
+	tif_26th_cycle_dates,
 )
+from tif_customization.tif_customization.payroll_utils import get_assignment_base_by_employee
+from tif_customization.tif_customization.pf.pf_contribution import (
+	compute_pf_deduction_amount,
+	get_pf_meta_for_employee,
+)
+
+
+def _salary_columns_for_sheet():
+	cols = [
+		{"key": "perm_gross", "label": "Gross (Permanent)"},
+		{"key": "contract_gross", "label": "Gross (Contract)"},
+	]
+	arrear_2 = resolve_arrear_2_column()
+	if arrear_2:
+		cols.append(
+			{
+				"key": "arrear_2",
+				"label": arrear_2["label"],
+				"editable": True,
+				"component": arrear_2["component"],
+			}
+		)
+	cols.extend(
+		[
+			{"key": "gross_pay", "label": "Gross Pay"},
+			{"key": "total_deduction", "label": "Total Deduction"},
+			{"key": "payment_days", "label": "Days Worked"},
+		]
+	)
+	return cols
+
+
+PAYMENT_COLUMNS = [
+	{"key": "net_pay", "label": "Net Pay"},
+	{"key": "payable_amount", "label": "Payable Amount"},
+	{"key": "payment_mode", "label": "Mode"},
+	{"key": "bank_name", "label": "Bank"},
+]
 
 
 def _component_keys(earnings, deductions):
 	return [c["key"] for c in earnings] + [c["key"] for c in deductions]
 
 
-def _key_to_component(earnings, deductions):
+def _key_to_component(earnings, deductions, arrear_2=None):
 	mapping = {}
 	for c in earnings + deductions:
 		mapping[c["key"]] = c["component"]
+	if arrear_2:
+		mapping[arrear_2["key"]] = arrear_2["component"]
 	return mapping
 
 
@@ -217,7 +237,10 @@ def get_variable_sheet_data(month=None, year=None, company=None, start_date=None
 	payment_by_emp = _payment_details_by_employee(company, start_date, end_date, employees)
 	bank_options = _get_bank_options(employees)
 
+	arrear_2_col = resolve_arrear_2_column()
 	component_names = [c["component"] for c in earnings + deductions]
+	if arrear_2_col:
+		component_names.append(arrear_2_col["component"])
 	existing_ads = frappe.get_all(
 		"Additional Salary",
 		filters={
@@ -231,7 +254,7 @@ def get_variable_sheet_data(month=None, year=None, company=None, start_date=None
 	)
 
 	# Map key -> amount per employee (prefer submitted, latest)
-	key_map = _key_to_component(earnings, deductions)
+	key_map = _key_to_component(earnings, deductions, arrear_2_col)
 	comp_to_key = {v: k for k, v in key_map.items()}
 	ads_by_emp = defaultdict(dict)
 	ads_doc_by_emp = defaultdict(dict)
@@ -259,19 +282,28 @@ def get_variable_sheet_data(month=None, year=None, company=None, start_date=None
 			key = col["key"]
 			amounts[key] = ads_by_emp[emp.name].get(key, 0)
 			docnames[key] = ads_doc_by_emp[emp.name].get(key)
+		if arrear_2_col:
+			amounts["arrear_2"] = ads_by_emp[emp.name].get("arrear_2", 0)
+			docnames["arrear_2"] = ads_doc_by_emp[emp.name].get("arrear_2")
 
 		salary_row = slip_salary.get(emp.name, {})
-		assigned_gross = flt(salary_row.get("gross_pay"))
-		base_gross = flt(salary_row.get("assignment_gross")) or assigned_gross
-		variable_earn = sum(flt(amounts.get(k)) for k in earning_keys)
-		projected_gross = assigned_gross + variable_earn
+		base_gross = (
+			flt(salary_row.get("assignment_gross"))
+			or flt(salary_row.get("perm_gross"))
+			or flt(salary_row.get("gross_pay"))
+		)
 		att = attendance_map.get(emp.name) or {}
 		amounts = apply_attendance_to_amounts(amounts, base_gross, att, earning_keys)
 
+		deduction_keys = [c["key"] for c in deductions]
+		arrear_2_amt = flt(amounts.get("arrear_2"))
+		gross_pay = base_gross + arrear_2_amt
 		amounts["pf"] = compute_pf_deduction_amount(
-			emp.name, projected_gross, assigned_base=assigned_gross
+			emp.name, gross_pay, assigned_base=base_gross
 		)
 		amounts["tax"] = _tax_amount_for_employee(emp, amounts, ads_doc_by_emp.get(emp.name, {}))
+
+		totals = _compute_variable_row_totals(salary_row, amounts, earning_keys, deduction_keys)
 
 		pf_meta = get_pf_meta_for_employee(emp.name)
 		default_bank = (emp.bank_name or "").strip()
@@ -298,10 +330,14 @@ def get_variable_sheet_data(month=None, year=None, company=None, start_date=None
 				"pf_rate": pf_meta["pf_rate"],
 				"pf_formula_base": pf_meta["pf_formula_base"],
 				"income_tax": flt(emp.income_tax),
+				"projected_gross": totals["projected_gross"],
+				"projected_gross_pay": totals["gross_pay"],
+				"projected_total_deduction": totals["total_deduction"],
+				"projected_net_pay": totals["net_pay"],
 				"payment": {
 					"payment_mode": saved_payment.get("payment_mode") or default_mode,
 					"bank_name": saved_payment.get("bank_name") or default_bank,
-					"payable_amount": saved_payment.get("payable_amount"),
+					"payable_amount": totals["net_pay"],
 				},
 			}
 		)
@@ -314,7 +350,19 @@ def get_variable_sheet_data(month=None, year=None, company=None, start_date=None
 	grand = defaultdict(float)
 	sr = 0
 	all_keys = _component_keys(earnings, deductions)
-	salary_keys = [c["key"] for c in SALARY_COLUMNS]
+	if arrear_2_col:
+		all_keys = list(all_keys) + ["arrear_2"]
+	salary_columns = _salary_columns_for_sheet()
+	salary_keys = [c["key"] for c in salary_columns]
+
+	def _salary_total_value(item, sk):
+		if sk == "arrear_2":
+			return flt(item["amounts"].get("arrear_2"))
+		if sk == "gross_pay":
+			return flt(item.get("projected_gross_pay"))
+		if sk == "total_deduction":
+			return flt(item.get("projected_total_deduction"))
+		return flt((item.get("salary") or {}).get(sk))
 
 	for section_label in SECTION_ORDER:
 		items = section_rows.get(section_label) or []
@@ -338,7 +386,7 @@ def get_variable_sheet_data(month=None, year=None, company=None, start_date=None
 				section_total[key] += val
 				grand[key] += val
 			for sk in salary_keys:
-				val = flt((item.get("salary") or {}).get(sk))
+				val = _salary_total_value(item, sk)
 				section_total[sk] += val
 				grand[sk] += val
 
@@ -363,7 +411,7 @@ def get_variable_sheet_data(month=None, year=None, company=None, start_date=None
 				section_total[key] += val
 				grand[key] += val
 			for sk in salary_keys:
-				val = flt((item.get("salary") or {}).get(sk))
+				val = _salary_total_value(item, sk)
 				section_total[sk] += val
 				grand[sk] += val
 		sections.append(
@@ -393,7 +441,7 @@ def get_variable_sheet_data(month=None, year=None, company=None, start_date=None
 		"year": end.year,
 		"earnings": earnings,
 		"deductions": deductions,
-		"salary_columns": SALARY_COLUMNS,
+		"salary_columns": salary_columns,
 		"sections": sections,
 		"grand_totals": dict(grand) if grand else {k: 0 for k in all_keys},
 		"employee_count": sr,
@@ -426,7 +474,7 @@ def _empty_response(month_label, start_date, end_date, company, earnings, deduct
 		"end_date": str(end_date),
 		"earnings": earnings,
 		"deductions": deductions,
-		"salary_columns": SALARY_COLUMNS,
+		"salary_columns": _salary_columns_for_sheet(),
 		"sections": [],
 		"grand_totals": {},
 		"employee_count": 0,
@@ -477,6 +525,141 @@ def _get_bank_options(employees=None):
 		if bn and bn.strip():
 			names.add(bn.strip())
 	return sorted(names, key=lambda x: x.lower())
+
+
+def _compute_variable_row_totals(salary_row, amounts, earning_keys, deduction_keys):
+	"""Base gross + Arrear 2 (+ variable earnings) − deductions = net pay."""
+	base_gross = (
+		flt(salary_row.get("assignment_gross"))
+		or flt(salary_row.get("perm_gross"))
+		or flt(salary_row.get("gross_pay"))
+	)
+	arrear_2 = flt(amounts.get("arrear_2"))
+	variable_earn = sum(flt(amounts.get(key)) for key in earning_keys)
+	gross_pay = base_gross + arrear_2
+	projected_gross = gross_pay + variable_earn
+	total_deduction = sum(flt(amounts.get(key)) for key in deduction_keys)
+	net_pay = max(0.0, projected_gross - total_deduction)
+	return {
+		"base_gross": base_gross,
+		"arrear_2": arrear_2,
+		"gross_pay": gross_pay,
+		"projected_gross": projected_gross,
+		"total_deduction": total_deduction,
+		"net_pay": net_pay,
+	}
+
+
+def _employee_period_amounts(
+	employee,
+	company,
+	start_date,
+	end_date,
+	earnings,
+	deductions,
+	in_flight_amounts=None,
+):
+	"""Build component amounts + salary reference for one employee in a payroll period."""
+	earning_keys = [c["key"] for c in earnings]
+	deduction_keys = [c["key"] for c in deductions]
+	arrear_2_col = resolve_arrear_2_column()
+	component_names = [c["component"] for c in earnings + deductions]
+	if arrear_2_col:
+		component_names.append(arrear_2_col["component"])
+	comp_to_key = {c["component"]: c["key"] for c in earnings + deductions}
+	if arrear_2_col:
+		comp_to_key[arrear_2_col["component"]] = arrear_2_col["key"]
+
+	amounts = {key: 0 for key in earning_keys + deduction_keys}
+	if arrear_2_col:
+		amounts["arrear_2"] = 0
+	for row in frappe.get_all(
+		"Additional Salary",
+		filters={
+			"employee": employee,
+			"salary_component": ["in", component_names],
+			"payroll_date": ["between", [start_date, end_date]],
+			"docstatus": ["<", 2],
+			**({"company": company} if company else {}),
+		},
+		fields=["salary_component", "amount", "docstatus"],
+		order_by="modified desc",
+	):
+		key = comp_to_key.get(row.salary_component)
+		if not key:
+			continue
+		if amounts.get(key) and row.docstatus != 1:
+			continue
+		amounts[key] = flt(row.amount)
+
+	if in_flight_amounts:
+		for key, value in in_flight_amounts.items():
+			if key in amounts and value not in (None, ""):
+				amounts[key] = flt(value)
+
+	emp = frappe.get_doc("Employee", employee)
+	slip_salary = _salary_reference_by_employee([emp], start_date, end_date, company)
+	salary_row = slip_salary.get(employee, {})
+	base_gross = (
+		flt(salary_row.get("assignment_gross"))
+		or flt(salary_row.get("perm_gross"))
+		or flt(salary_row.get("gross_pay"))
+	)
+	att = attendance_by_employee([emp], end_date).get(employee) or {}
+	amounts = apply_attendance_to_amounts(amounts, base_gross, att, earning_keys)
+
+	arrear_2_amt = flt(amounts.get("arrear_2"))
+	gross_pay = base_gross + arrear_2_amt
+	amounts["pf"] = compute_pf_deduction_amount(
+		employee, gross_pay, assigned_base=base_gross
+	)
+	amounts["tax"] = _tax_amount_for_employee(emp, amounts, {})
+
+	return amounts, salary_row, earning_keys, deduction_keys
+
+
+def _net_pay_for_employee_period(
+	employee, company, start_date, end_date, in_flight_amounts=None
+):
+	earnings, deductions = resolve_component_names()
+	amounts, salary_row, earning_keys, deduction_keys = _employee_period_amounts(
+		employee,
+		company,
+		start_date,
+		end_date,
+		earnings,
+		deductions,
+		in_flight_amounts=in_flight_amounts,
+	)
+	totals = _compute_variable_row_totals(salary_row, amounts, earning_keys, deduction_keys)
+	return totals["net_pay"]
+
+
+def _sync_payment_entries_to_net(company, start_date, end_date, payment_entries, variable_entries=None):
+	"""Force payable amount = calculated net pay for each payment row."""
+	in_flight_by_emp = defaultdict(dict)
+	if variable_entries:
+		for entry in variable_entries:
+			emp = entry.get("employee")
+			key = entry.get("component_key")
+			if emp and key:
+				in_flight_by_emp[emp][key] = entry.get("amount")
+
+	synced = []
+	for entry in payment_entries or []:
+		employee = entry.get("employee")
+		if not employee:
+			continue
+		row = dict(entry)
+		row["payable_amount"] = _net_pay_for_employee_period(
+			employee,
+			company,
+			start_date,
+			end_date,
+			in_flight_amounts=in_flight_by_emp.get(employee),
+		)
+		synced.append(row)
+	return synced
 
 
 def _payment_details_by_employee(company, start_date, end_date, employees):
@@ -590,17 +773,20 @@ def save_period_draft(
 	payroll_result = {"saved": 0}
 	variable_result = {"created": 0, "updated": 0, "cancelled": 0, "skipped": 0, "errors": []}
 
+	if isinstance(variable_entries, str):
+		variable_entries = json.loads(variable_entries or "[]")
+
+	if save_additional_salary and variable_entries:
+		variable_result = save_variable_components(company, getdate(end_date), variable_entries)
+
 	if payment_entries:
 		if isinstance(payment_entries, str):
 			payment_entries = json.loads(payment_entries or "[]")
 		if payment_entries:
+			payment_entries = _sync_payment_entries_to_net(
+				company, start_date, end_date, payment_entries, variable_entries
+			)
 			payroll_result = save_payment_details(company, start_date, end_date, payment_entries)
-
-	if save_additional_salary and variable_entries:
-		if isinstance(variable_entries, str):
-			variable_entries = json.loads(variable_entries or "[]")
-		if variable_entries:
-			variable_result = save_variable_components(company, getdate(end_date), variable_entries)
 
 	period = mark_period_draft_saved(company, start_date, end_date)
 
@@ -804,21 +990,26 @@ def _slip_component_amounts(employees, start_date, end_date, component_names, co
 
 
 def _projected_gross_for_employee(employee, company, payroll_date, earning_keys, entry_amounts=None):
-	"""Assigned gross + variable earnings (DB + in-flight save entries)."""
+	"""Assigned gross + Arrear 2 + variable earnings (DB + in-flight save entries)."""
 	from tif_customization.tif_customization.payroll_utils import get_employee_base_from_assignment
 
 	assigned_gross = get_employee_base_from_assignment(employee, company, payroll_date)
 	entry_amounts = entry_amounts or {}
+	arrear_2_col = resolve_arrear_2_column()
+	arrear_2 = flt(entry_amounts.get("arrear_2"))
 
 	earnings, _ = resolve_component_names()
 	earning_components = [c["component"] for c in earnings]
+	ads_components = list(earning_components)
+	if arrear_2_col:
+		ads_components.append(arrear_2_col["component"])
 	variable_earn = 0.0
-	if earning_components:
+	if ads_components:
 		rows = frappe.get_all(
 			"Additional Salary",
 			filters={
 				"employee": employee,
-				"salary_component": ["in", earning_components],
+				"salary_component": ["in", ads_components],
 				"payroll_date": payroll_date,
 				"docstatus": ["<", 2],
 				**({"company": company} if company else {}),
@@ -826,16 +1017,22 @@ def _projected_gross_for_employee(employee, company, payroll_date, earning_keys,
 			fields=["salary_component", "amount"],
 		)
 		comp_to_key = {c["component"]: c["key"] for c in earnings}
+		if arrear_2_col:
+			comp_to_key[arrear_2_col["component"]] = arrear_2_col["key"]
 		db_amounts = {}
 		for row in rows:
 			key = comp_to_key.get(row.salary_component)
 			if key:
 				db_amounts[key] = flt(row.amount)
 
+		if not arrear_2 and arrear_2_col:
+			arrear_2 = flt(db_amounts.get("arrear_2"))
 		for key in earning_keys:
 			variable_earn += flt(entry_amounts.get(key, db_amounts.get(key)))
 
-	return assigned_gross, assigned_gross + variable_earn
+	gross_pay = flt(assigned_gross) + arrear_2
+	projected_gross = gross_pay + variable_earn
+	return assigned_gross, gross_pay, projected_gross
 
 
 def _find_existing_additional_salary(employee, component, payroll_date):
@@ -915,14 +1112,15 @@ def save_variable_components(company, payroll_date, entries):
 		return {"created": 0, "updated": 0, "cancelled": 0, "skipped": 0, "errors": [], "message": _("No entries")}
 
 	earnings, deductions = resolve_component_names()
-	key_map = _key_to_component(earnings, deductions)
+	arrear_2_col = resolve_arrear_2_column()
+	key_map = _key_to_component(earnings, deductions, arrear_2_col)
 	earning_keys = [c["key"] for c in earnings]
 
-	# Overlay in-batch earning amounts so PF can be recomputed in the same save request.
+	# Overlay in-batch amounts so PF can be recomputed in the same save request.
 	entry_amounts_by_emp = defaultdict(dict)
 	for entry in entries:
 		key = entry.get("component_key")
-		if key in earning_keys:
+		if key in earning_keys or key == "arrear_2":
 			entry_amounts_by_emp[entry.get("employee")][key] = flt(entry.get("amount"))
 
 	payroll_date = getdate(payroll_date)
@@ -942,7 +1140,7 @@ def save_variable_components(company, payroll_date, entries):
 
 		amount = flt(entry.get("amount"))
 		if key == "pf":
-			assigned_gross, projected_gross = _projected_gross_for_employee(
+			assigned_gross, gross_pay, _projected_gross = _projected_gross_for_employee(
 				employee,
 				company,
 				payroll_date,
@@ -950,7 +1148,7 @@ def save_variable_components(company, payroll_date, entries):
 				entry_amounts_by_emp.get(employee),
 			)
 			amount = compute_pf_deduction_amount(
-				employee, projected_gross, assigned_base=assigned_gross
+				employee, gross_pay, assigned_base=assigned_gross
 			)
 
 		try:

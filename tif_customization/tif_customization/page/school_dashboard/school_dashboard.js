@@ -328,36 +328,40 @@ frappe.tif_customization.SchoolDashboard = class SchoolDashboard {
 						<thead>
 							<tr>
 								<th>Date</th>
-								<th>Session Category</th>
-								<th>Trainer</th>
+								<th>Time</th>
+								<th>Training Type</th>
+								<th>Mode</th>
+								<th>Participants Category</th>
+								<th>School Name</th>
+								<th>School Type</th>
+								<th>Department Training</th>
 								<th>City</th>
-								<th>Province</th>
-								<th>Venue</th>
-								<th class="text-right">Participants</th>
-								<th class="text-right">Schools</th>
+								<th>Area</th>
+								<th>Trainer</th>
+								<th>Program</th>
 							</tr>
 						</thead>
 						<tbody>
 							${rows
 								.map((r) => {
 									const date = frappe.utils.escape_html(r.training_date || "-");
-									const category = frappe.utils.escape_html(r.training_session_category || "-");
-									const trainer = frappe.utils.escape_html(r.training_trainer_name || "-");
-									const city = frappe.utils.escape_html(r.training_city || "-");
-									const province = frappe.utils.escape_html(r.training_province || "-");
-									const venue = frappe.utils.escape_html(r.training_venue_name || "-");
-									const participants = this.format_number(r.training_no_of_participants || 0);
-									const schools = this.format_number(r.training_no_of_schools_attended || 0);
+									const values = [
+										r.training_time,
+										r.training_type,
+										r.mode_of_training,
+										r.participants_category,
+										r.school_name,
+										r.school_type,
+										r.department_training,
+										r.city,
+										r.area,
+										r.trainer_name,
+										r.program,
+									].map((value) => frappe.utils.escape_html(value || "-"));
 									return `
 										<tr>
 											<td>${date}</td>
-											<td>${category}</td>
-											<td>${trainer}</td>
-											<td>${city}</td>
-											<td>${province}</td>
-											<td>${venue}</td>
-											<td class="text-right">${participants}</td>
-											<td class="text-right">${schools}</td>
+											${values.map((value) => `<td>${value}</td>`).join("")}
 										</tr>
 									`;
 								})

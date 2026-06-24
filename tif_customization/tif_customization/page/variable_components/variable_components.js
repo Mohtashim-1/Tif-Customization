@@ -640,7 +640,6 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 						const row_class = can_payroll ? "" : " vc-emp-row-ineligible";
 						const pay_mode = pay.payment_mode || (row.default_bank_name ? "Bank" : "Cheque");
 						const pay_bank = pay.bank_name || row.default_bank_name || "";
-						const pay_override = pay.payable_amount != null && pay.payable_amount !== "" ? flt(pay.payable_amount) : "";
 						const bank_field = this.build_bank_field(row.employee, pay_bank, pay_mode);
 						const slip = sal.salary_slip;
 						const slip_link = slip
@@ -658,8 +657,7 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 							data-pf-applicable="${row.pf_applicable ? 1 : 0}"
 							data-pf-rate="${flt(row.pf_rate)}"
 							data-pf-formula-base="${frappe.utils.escape_html(row.pf_formula_base || "Gross")}"
-							data-income-tax="${flt(row.income_tax)}"
-							data-payable-override="${pay_override}">
+							data-income-tax="${flt(row.income_tax)}">
 							<td class="text-center col-payroll col-sticky-payroll">
 								<input type="checkbox" class="vc-payroll-cb" data-employee="${frappe.utils.escape_html(row.employee)}"
 									${checked ? "checked" : ""} ${!can_payroll || pe_submitted ? "disabled" : ""}
@@ -696,9 +694,26 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 								tbody += `<td class="text-right vc-salary-cell" data-salary-col="${key}"${days_title ? ` title="${frappe.utils.escape_html(days_title)}"` : ""}>${display}${ea_link}</td>`;
 								return;
 							}
+							if (key === "arrear_2") {
+								const val = flt((row.amounts || {}).arrear_2);
+								const id = this.cell_id(row.employee, key);
+								this._values[id] = val;
+								const ads = (row.additional_salary || {}).arrear_2 || "";
+								const val_class = val > 0 ? "has-value" : "";
+								const component = col.component || "Arrear 2";
+								tbody += `<td class="text-right vc-salary-cell" data-salary-col="arrear_2">
+									<input type="number" min="0" step="0.01" class="vc-input vc-arrear-2-input ${val_class}"
+										data-type="earning" data-employee="${frappe.utils.escape_html(row.employee)}"
+										data-key="arrear_2" data-component="${frappe.utils.escape_html(component)}"
+										data-ads="${ads ? frappe.utils.escape_html(ads) : ""}" value="${val || ""}"
+										${d.is_finalized ? "readonly" : ""} />
+								</td>`;
+								return;
+							}
 							if (key === "gross_pay") {
-								const init_gross =
+								const base_gross =
 									flt(sal.assignment_gross) || flt(sal.perm_gross) || flt(sal.gross_pay);
+								const init_gross = base_gross + flt((row.amounts || {}).arrear_2);
 								tbody += `<td class="text-right vc-salary-cell" data-salary-col="gross_pay"><span class="vc-gross-preview">${init_gross ? this.fmt(init_gross) : "—"}</span></td>`;
 								return;
 							}
@@ -755,11 +770,11 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 
 						tbody += `<td class="text-right vc-payment-cell vc-net-final">${slip_link ? `<span class="vc-net-final-amt">—</span>${slip_link}` : `<span class="vc-net-final-amt">—</span>`}</td>
 							<td class="text-right vc-payment-cell vc-payable-cell">
-								<input type="number" min="0" step="0.01" class="vc-payable-input ${pay_override ? "is-override" : ""}"
+								<input type="number" min="0" step="0.01" class="vc-payable-input vc-payable-auto"
 									data-employee="${frappe.utils.escape_html(row.employee)}"
-									value="${pay_override || ""}"
-									placeholder="${__("Override")}"
-									title="${__("Auto-filled from Net Pay; type here only to override")}"
+									value=""
+									readonly tabindex="-1"
+									title="${__("Auto-calculated: Gross Pay minus deductions (same as Net Pay)")}"
 									${d.is_finalized ? "readonly" : ""} />
 							</td>
 							<td class="text-center vc-payment-cell">
@@ -865,14 +880,6 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 					self.update_save_state();
 				});
 
-				this.$sheet.find(".vc-payable-input").on("input", function () {
-					const $el = $(this);
-					$el.toggleClass("is-override", $el.val() !== "");
-					self._payment_dirty = true;
-					self.recalc_totals();
-					self.update_save_state();
-				});
-
 				this.sync_payroll_select_all();
 				this.recalc_totals();
 			}
@@ -901,13 +908,44 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 					${finalized ? "readonly" : ""} autocomplete="off" />`;
 			}
 
-			row_payable_amount($tr, projectedNet, for_payroll_summary) {
-				const $payIn = $tr.find(".vc-payable-input");
-				if ($payIn.hasClass("is-override") && $payIn.val() !== "") {
-					return flt($payIn.val());
+			_row_arrear_2($tr) {
+				const $in = $tr.find('input[data-key="arrear_2"]');
+				return $in.length ? flt($in.val()) : 0;
+			}
+
+			_row_projected_totals($tr) {
+				const baseGross = this._row_base_gross($tr);
+				const arrear2 = this._row_arrear_2($tr);
+				const { earn } = this._row_variable_sums($tr);
+				const grossPay = baseGross + arrear2;
+				const projectedGross = grossPay + earn;
+
+				const pfApplicable = flt($tr.attr("data-pf-applicable")) > 0;
+				const pfRate = flt($tr.attr("data-pf-rate"));
+				const pfUseGross = ($tr.attr("data-pf-formula-base") || "Gross") === "Gross";
+				const pfBase = pfUseGross ? grossPay : baseGross;
+				const pfAmt = pfApplicable && pfRate ? (pfBase * pfRate) / 100 : 0;
+				const $pf = $tr.find('input[data-key="pf"]');
+				if ($pf.length) {
+					$pf.val(pfAmt ? pfAmt : "");
+					$pf.toggleClass("has-value", pfAmt > 0);
 				}
-				const saved = flt($tr.data("payable-override"));
-				if (saved > 0) return saved;
+
+				const $tax = $tr.find('input[data-key="tax"]');
+				if ($tax.length && !$tax.prop("readonly") && $tax.val() === "") {
+					const empTax = flt($tr.data("income-tax"));
+					if (empTax > 0) $tax.val(empTax);
+				}
+				if ($tax.length) {
+					$tax.toggleClass("has-value", flt($tax.val()) > 0);
+				}
+
+				const projectedDed = this._row_total_deduction($tr);
+				const projectedNet = Math.max(0, projectedGross - projectedDed);
+				return { baseGross, arrear2, earn, grossPay, projectedGross, projectedDed, projectedNet };
+			}
+
+			row_payable_amount($tr, projectedNet, for_payroll_summary) {
 				const amount = Math.max(0, projectedNet);
 				if (for_payroll_summary) {
 					const included = $tr.find(".vc-payroll-cb").is(":checked");
@@ -918,7 +956,7 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 
 			update_payable_input($tr, projectedNet) {
 				const $payIn = $tr.find(".vc-payable-input");
-				if (!$payIn.length || $payIn.hasClass("is-override")) return;
+				if (!$payIn.length) return;
 				const amt = this.row_payable_amount($tr, projectedNet, false);
 				$payIn.val(amt > 0 ? amt : "");
 				$payIn.toggleClass("has-value", amt > 0);
@@ -940,21 +978,12 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 				const mode = $tr.find(".vc-payment-mode").val() || "Cheque";
 				let bank = $tr.find(".vc-payment-bank").val() || "";
 				if (mode !== "Bank") bank = "";
-				const $payIn = $tr.find(".vc-payable-input");
-				let payableVal = $payIn.val();
-				if ((payableVal === "" || payableVal == null) && !$payIn.hasClass("is-override")) {
-					const baseGross = this._row_base_gross($tr);
-					const { earn } = this._row_variable_sums($tr);
-					const projectedGross = baseGross + earn;
-					const projectedDed = this._row_total_deduction($tr);
-					const projectedNet = Math.max(0, projectedGross - projectedDed);
-					payableVal = projectedNet > 0 ? projectedNet : "";
-				}
+				const { projectedNet } = this._row_projected_totals($tr);
 				return {
 					employee,
 					payment_mode: mode,
 					bank_name: bank,
-					payable_amount: payableVal === "" || payableVal == null ? null : flt(payableVal),
+					payable_amount: projectedNet > 0 ? projectedNet : null,
 				};
 			}
 
@@ -1196,6 +1225,7 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 				const earnings = (this._data && this._data.earnings) || [];
 				const deductions = (this._data && this._data.deductions) || [];
 				const cols = [...earnings, ...deductions];
+				const has_arrear_2 = (this._data?.salary_columns || []).some((c) => c.key === "arrear_2");
 
 				this.$sheet.find("tbody tr.vc-emp-row").each(function () {
 					const employee = $(this).data("employee");
@@ -1210,6 +1240,17 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 							additional_salary: $in.data("ads") || null,
 						});
 					});
+					if (has_arrear_2) {
+						const $arrear = $(this).find('input[data-key="arrear_2"]');
+						if ($arrear.length && !$arrear.prop("readonly")) {
+							entries.push({
+								employee,
+								component_key: "arrear_2",
+								amount: flt($arrear.val()),
+								additional_salary: $arrear.data("ads") || null,
+							});
+						}
+					}
 				});
 				return entries;
 			}
@@ -1289,39 +1330,16 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 					const acc = section_acc[section];
 
 					const slipNet = flt($tr.attr("data-slip-net"));
-					const baseGross = self._row_base_gross($tr);
-					const { earn } = self._row_variable_sums($tr);
-
-					const projectedGross = baseGross + earn;
-					const pfApplicable = flt($tr.attr("data-pf-applicable")) > 0;
-					const pfRate = flt($tr.attr("data-pf-rate"));
-					const pfUseGross = ($tr.attr("data-pf-formula-base") || "Gross") === "Gross";
-					const pfBase = pfUseGross ? projectedGross : baseGross;
-					const pfAmt = pfApplicable && pfRate ? (pfBase * pfRate) / 100 : 0;
-					const $pf = $tr.find('input[data-key="pf"]');
-					if ($pf.length) {
-						$pf.val(pfAmt ? pfAmt : "");
-						$pf.toggleClass("has-value", pfAmt > 0);
-					}
-
-					const $tax = $tr.find('input[data-key="tax"]');
-					if ($tax.length && !$tax.prop("readonly") && $tax.val() === "") {
-						const empTax = flt($tr.data("income-tax"));
-						if (empTax > 0) $tax.val(empTax);
-					}
-					if ($tax.length) {
-						$tax.toggleClass("has-value", flt($tax.val()) > 0);
-					}
-
-					const projectedDed = self._row_total_deduction($tr);
-					const projectedNet = Math.max(0, projectedGross - projectedDed);
+					const { baseGross, arrear2, earn, grossPay, projectedGross, projectedDed, projectedNet } =
+						self._row_projected_totals($tr);
 					const included = $tr.find(".vc-payroll-cb").is(":checked");
 					const payable = self.row_payable_amount($tr, projectedNet, true);
 
-					$tr.find(".vc-gross-preview").text(self.fmt_plain(projectedGross));
+					$tr.find(".vc-gross-preview").text(self.fmt_plain(grossPay));
 					$tr.find(".vc-ded-preview").text(self.fmt_plain(projectedDed));
-					const net_title = __("Gross {0} + earnings {1} − deductions {2} = net {3}", [
+					const net_title = __("Gross {0} + Arrear 2 {1} + earnings {2} − deductions {3} = net {4}", [
 						self.fmt_plain(baseGross),
+						self.fmt_plain(arrear2),
 						self.fmt_plain(earn),
 						self.fmt_plain(projectedDed),
 						self.fmt_plain(projectedNet),
@@ -1335,9 +1353,15 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 					$tr.find(".vc-payable-input").toggleClass("is-active", included);
 					self.update_payable_input($tr, projectedNet);
 
-					acc.salary.gross_pay += projectedGross;
+					acc.salary.gross_pay += grossPay;
+					if (acc.salary.arrear_2 != null) {
+						acc.salary.arrear_2 += arrear2;
+					}
 					acc.salary.total_deduction += projectedDed;
-					grand_salary.gross_pay += projectedGross;
+					grand_salary.gross_pay += grossPay;
+					if (grand_salary.arrear_2 != null) {
+						grand_salary.arrear_2 += arrear2;
+					}
 					grand_salary.total_deduction += projectedDed;
 
 					if (included) {
@@ -1395,6 +1419,7 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 				const fmt_salary = (key, val) => {
 					if (key === "payment_days") return "—";
 					if (key === "perm_gross" || key === "contract_gross") return "—";
+					if (key === "arrear_2") return self.fmt_plain(val);
 					return self.fmt_plain(val);
 				};
 

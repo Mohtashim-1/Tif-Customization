@@ -38,6 +38,16 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "Upcoming Training ",
+   "link_count": 0,
+   "link_to": "upcoming-training-report",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "School Database Dashboard (UAT)",
    "link_count": 0,
    "link_to": "school-dashboard",
@@ -406,7 +416,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-06-24 13:11:42.555260",
+ "modified": "2026-06-24 14:25:30.559377",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Reports",

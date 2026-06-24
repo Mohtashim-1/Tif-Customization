@@ -26,6 +26,20 @@ VARIABLE_DEDUCTIONS = [
 ]
 
 
+ARREAR_2 = {"key": "arrear_2", "label": "Arrear 2", "components": ["Arrear 2"]}
+
+
+def resolve_arrear_2_column():
+	"""Return Arrear 2 column config if the salary component exists on site."""
+	import frappe
+
+	existing = set(frappe.get_all("Salary Component", pluck="name"))
+	name = _pick_existing(ARREAR_2["components"], existing)
+	if not name:
+		return None
+	return {**ARREAR_2, "component": name}
+
+
 def resolve_component_names():
 	"""Return only components that exist in the site, with canonical name per column."""
 	import frappe

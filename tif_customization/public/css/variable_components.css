@@ -500,7 +500,8 @@
 	font-size: 9px;
 }
 
-.vc-table input.vc-payable-input:not(.is-override) {
+.vc-table input.vc-payable-input:not(.is-override),
+.vc-table input.vc-payable-input.vc-payable-auto {
 	background: #f0fdf4;
 }
 

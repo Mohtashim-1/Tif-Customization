@@ -261,7 +261,10 @@ def get_kpi_data(filters):
 		# Total Books Sent
 		# Show all books from DNs in date range, even if cost center is not set
 		books_query = f"""
-			SELECT COALESCE(SUM(dni.qty), 0) AS total_books
+			SELECT
+				COALESCE(SUM(dni.qty), 0) AS total_books,
+				COALESCE(SUM(CASE WHEN dn.custom_delivery_mode = 'By Hand' THEN dni.qty ELSE 0 END), 0) AS books_sent_by_hand,
+				COALESCE(SUM(CASE WHEN dn.custom_delivery_mode = 'Courier' THEN dni.qty ELSE 0 END), 0) AS books_sent_by_courier
 			FROM `tabDelivery Note` dn
 			JOIN `tabDelivery Note Item` dni ON dni.parent = dn.name
 			WHERE dn.docstatus = 1
@@ -274,6 +277,8 @@ def get_kpi_data(filters):
 			'to_date': to_date
 		}, as_dict=True)
 		total_books = flt(books[0].total_books) if books else 0
+		books_sent_by_hand = flt(books[0].books_sent_by_hand) if books else 0
+		books_sent_by_courier = flt(books[0].books_sent_by_courier) if books else 0
 		
 		# Average Cost Per Book
 		avg_cost_per_book = total_courier_expense / total_books if total_books > 0 else 0
@@ -303,6 +308,8 @@ def get_kpi_data(filters):
 			'total_courier_expense': total_courier_expense,
 			'total_delivery_notes': total_dns,
 			'total_books_sent': total_books,
+			'books_sent_by_hand': books_sent_by_hand,
+			'books_sent_by_courier': books_sent_by_courier,
 			'total_jvs_created': total_jvs,
 			'avg_cost_per_book': avg_cost_per_book,
 			'total_customers_served': total_customers,

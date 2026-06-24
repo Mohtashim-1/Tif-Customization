@@ -34,6 +34,7 @@ if (typeof window.CourierDashboard === 'undefined') {
 	make() {
 		this.setup_filters();
 		this.setup_layout();
+		this.bind_transaction_log_toggle();
 		this.bind_detail_toggles();
 		this.bind_cost_center_details();
 		this.load_filter_options();
@@ -244,15 +245,22 @@ if (typeof window.CourierDashboard === 'undefined') {
 				
 				<!-- Transaction Log Table -->
 				<div class="transaction-section" style="margin-bottom: 30px;">
-					<h4 style="margin-bottom: 15px;">Transaction Log</h4>
-					<div class="table-responsive">
-						<table class="table table-bordered table-striped" id="transaction-table">
-							<thead id="transaction-thead">
-								<!-- Headers will be populated based on view type -->
-							</thead>
-							<tbody id="transaction-tbody">
-							</tbody>
-						</table>
+					<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px;">
+						<h4 style="margin: 0;">Transaction Log</h4>
+						<button type="button" class="btn btn-default btn-sm toggle-transaction-log" aria-expanded="false">
+							<i class="fa fa-chevron-down"></i> Expand
+						</button>
+					</div>
+					<div id="transaction-log-content" style="display: none;">
+						<div class="table-responsive">
+							<table class="table table-bordered table-striped" id="transaction-table">
+								<thead id="transaction-thead">
+									<!-- Headers will be populated based on view type -->
+								</thead>
+								<tbody id="transaction-tbody">
+								</tbody>
+							</table>
+						</div>
 					</div>
 				</div>
 				
@@ -302,6 +310,22 @@ if (typeof window.CourierDashboard === 'undefined') {
 		`;
 		
 		this.page.main.append(layout_html);
+	}
+
+	bind_transaction_log_toggle() {
+		this.page.main.off('click', '.toggle-transaction-log').on('click', '.toggle-transaction-log', function() {
+			let button = $(this);
+			let content = button.closest('.transaction-section').find('#transaction-log-content');
+			let isExpanded = button.attr('aria-expanded') === 'true';
+
+			content.stop(true, true).slideToggle(150);
+			button.attr('aria-expanded', String(!isExpanded));
+			button.html(
+				!isExpanded
+					? '<i class="fa fa-chevron-up"></i> Collapse'
+					: '<i class="fa fa-chevron-down"></i> Expand'
+			);
+		});
 	}
 	
 	load_filter_options() {
@@ -378,36 +402,65 @@ if (typeof window.CourierDashboard === 'undefined') {
 	render_kpis() {
 		let me = this;
 		let kpi_data = me.data.kpi_data || {};
+		let item_category_data = me.data.item_category_expense || [];
+		let books_expense = item_category_data.find(row => row.category === 'Books') || {};
+		let general_courier_expense = item_category_data.find(row => row.category === 'General Courier Expense') || {};
 		
 		let kpi_html = `
-			<div class="col-md-3">
+			<div class="col-md-3" style="margin-bottom: 15px;">
 				<div class="kpi-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
 					<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Total Courier Expense</h5>
 					<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${format_currency_value(kpi_data.total_courier_expense || 0)}</h2>
 				</div>
 			</div>
-			<div class="col-md-3">
+			<div class="col-md-3" style="margin-bottom: 15px;">
 				<div class="kpi-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
 					<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Total Delivery Notes</h5>
 					<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${format_number_value(kpi_data.total_delivery_notes || 0)}</h2>
 				</div>
 			</div>
-			<div class="col-md-3">
+			<div class="col-md-3" style="margin-bottom: 15px;">
 				<div class="kpi-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
 					<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Total Books Sent</h5>
 					<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${format_number_value(kpi_data.total_books_sent || 0)}</h2>
 				</div>
 			</div>
-			<div class="col-md-3">
+			<div class="col-md-3" style="margin-bottom: 15px;">
+				<div class="kpi-card" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+					<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Total Books Sent by Hand</h5>
+					<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${format_number_value(kpi_data.books_sent_by_hand || 0)}</h2>
+				</div>
+			</div>
+			<div class="col-md-3" style="margin-bottom: 15px;">
+				<div class="kpi-card" style="background: linear-gradient(135deg, #5ee7df 0%, #b490ca 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+					<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Total Books Sent by Courier</h5>
+					<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${format_number_value(kpi_data.books_sent_by_courier || 0)}</h2>
+				</div>
+			</div>
+			<div class="col-md-3" style="margin-bottom: 15px;">
 				<div class="kpi-card" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
 					<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Total JVs Created</h5>
 					<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${format_number_value(kpi_data.total_jvs_created || 0)}</h2>
 				</div>
 			</div>
-			<div class="col-md-3" style="margin-top: 15px;">
+			<div class="col-md-3" style="margin-bottom: 15px;">
 				<div class="kpi-card" style="background: linear-gradient(135deg, #30cfd0 0%, #330867 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
 					<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Customers Served</h5>
 					<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${format_number_value(kpi_data.total_customers_served || 0)}</h2>
+				</div>
+			</div>
+			<div class="col-md-3" style="margin-bottom: 15px;">
+				<div class="kpi-card" style="background: linear-gradient(135deg, #ec77ab 0%, #7873f5 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+					<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Books Expense</h5>
+					<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${format_currency_value(books_expense.expense_amount || 0)}</h2>
+					<div style="margin-top: 6px; font-size: 12px; opacity: 0.9;">${format_number_value(books_expense.delivery_note_count || 0)} Delivery Notes</div>
+				</div>
+			</div>
+			<div class="col-md-3" style="margin-bottom: 15px;">
+				<div class="kpi-card" style="background: linear-gradient(135deg, #2193b0 0%, #6dd5ed 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+					<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">General Courier Expense</h5>
+					<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${format_currency_value(general_courier_expense.expense_amount || 0)}</h2>
+					<div style="margin-top: 6px; font-size: 12px; opacity: 0.9;">${format_number_value(general_courier_expense.delivery_note_count || 0)} Delivery Notes</div>
 				</div>
 			</div>
 		`;
@@ -1508,6 +1561,12 @@ if (typeof window.CourierDashboard === 'undefined') {
 		csv.push('Total Courier Expense,' + (me.data.kpi_data?.total_courier_expense || 0));
 		csv.push('Total Delivery Notes,' + (me.data.kpi_data?.total_delivery_notes || 0));
 		csv.push('Total Books Sent,' + (me.data.kpi_data?.total_books_sent || 0));
+		csv.push('Total Books Sent by Hand,' + (me.data.kpi_data?.books_sent_by_hand || 0));
+		csv.push('Total Books Sent by Courier,' + (me.data.kpi_data?.books_sent_by_courier || 0));
+		(me.data.item_category_expense || []).forEach(row => {
+			csv.push(`${row.category} Expense,${row.expense_amount || 0}`);
+			csv.push(`${row.category} Delivery Notes,${row.delivery_note_count || 0}`);
+		});
 		csv.push('');
 		
 		// Add cost center summary

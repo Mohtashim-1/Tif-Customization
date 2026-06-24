@@ -7,108 +7,89 @@
  "engine": "InnoDB",
  "field_order": [
   "training_date",
-  "column_break_a",
-  "status",
-  "section_break_details",
-  "training_session_category",
-  "training_trainer_name",
-  "column_break_b",
-  "training_city",
-  "training_province",
-  "training_venue_name",
-  "section_break_counts",
-  "training_no_of_participants",
-  "column_break_c",
-  "training_no_of_schools_attended",
-  "section_break_notes",
-  "remarks"
+  "training_time",
+  "training_type",
+  "mode_of_training",
+  "participants_category",
+  "school_name",
+  "school_type",
+  "department_training",
+  "city",
+  "area",
+  "trainer_name",
+  "program"
  ],
  "fields": [
   {
    "fieldname": "training_date",
    "fieldtype": "Date",
    "in_list_view": 1,
-   "label": "Training Date",
+   "label": "UP Coming Training Date",
    "reqd": 1
   },
   {
-   "default": "Planned",
-   "fieldname": "status",
+   "fieldname": "training_time",
+   "fieldtype": "Time",
+   "in_list_view": 1,
+   "label": "UP Coming Training Time"
+  },
+  {
+   "fieldname": "training_type",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "UP Coming Training Type"
+  },
+  {
+   "fieldname": "mode_of_training",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Mode of Training"
+  },
+  {
+   "fieldname": "participants_category",
+   "fieldtype": "Data",
+   "label": "Participants Category"
+  },
+  {
+   "fieldname": "school_name",
+   "fieldtype": "Link",
+   "label": "School Name",
+   "options": "School"
+  },
+  {
+   "fieldname": "school_type",
    "fieldtype": "Select",
-   "in_list_view": 1,
-   "label": "Status",
-   "options": "Planned\nCompleted\nCancelled",
-   "reqd": 1
+   "label": "School Type",
+   "options": "\nGOVT\nPVT"
   },
   {
-   "fieldname": "column_break_a",
-   "fieldtype": "Column Break"
+   "fieldname": "department_training",
+   "fieldtype": "Link",
+   "label": "Department Training",
+   "options": "Department"
   },
   {
-   "fieldname": "section_break_details",
-   "fieldtype": "Section Break",
-   "label": "Details"
-  },
-  {
-   "fieldname": "training_session_category",
-   "fieldtype": "Data",
-   "in_list_view": 1,
-   "label": "Session Category"
-  },
-  {
-   "fieldname": "training_trainer_name",
-   "fieldtype": "Data",
-   "label": "Name of Trainer"
-  },
-  {
-   "fieldname": "column_break_b",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "training_city",
+   "fieldname": "city",
    "fieldtype": "Link",
    "label": "City",
    "options": "City"
   },
   {
-   "fieldname": "training_province",
-   "fieldtype": "Select",
-   "label": "Province",
-   "options": "Punjab\nSindh\nKhyber Pakhtunkhwa\nBalochistan\nAzad Jammu & Kashmir\nGilgit-Baltistan\nIslamabad Capital Territory"
+   "fieldname": "area",
+   "fieldtype": "Link",
+   "label": "Area",
+   "options": "Area"
   },
   {
-   "fieldname": "training_venue_name",
+   "fieldname": "trainer_name",
    "fieldtype": "Data",
-   "label": "Venue Name"
+   "label": "Name of Trainer"
   },
   {
-   "fieldname": "section_break_counts",
-   "fieldtype": "Section Break",
-   "label": "Counts"
-  },
-  {
-   "fieldname": "training_no_of_participants",
-   "fieldtype": "Int",
-   "label": "No. of participants"
-  },
-  {
-   "fieldname": "column_break_c",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "training_no_of_schools_attended",
-   "fieldtype": "Int",
-   "label": "No. of Schools Attended"
-  },
-  {
-   "fieldname": "section_break_notes",
-   "fieldtype": "Section Break",
-   "label": "Notes"
-  },
-  {
-   "fieldname": "remarks",
-   "fieldtype": "Small Text",
-   "label": "Remarks"
+   "fieldname": "program",
+   "fieldtype": "Link",
+   "label": "Program",
+   "options": "Program"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -151,4 +132,3 @@
  "states": [],
  "track_changes": 1
 }
-

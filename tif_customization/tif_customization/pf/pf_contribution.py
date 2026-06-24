@@ -60,19 +60,22 @@ def get_pf_formula_base_for_employee(employee):
 	return formula if formula in ("Gross", "Basic") else "Gross"
 
 
-def get_pf_base_amount(employee, projected_gross, assigned_base=None):
-	"""PF calculation base for variable sheet / previews."""
+def get_pf_base_amount(employee, gross_pay, assigned_base=None):
+	"""PF calculation base for variable sheet / previews.
+
+	gross_pay: permanent gross + Arrear 2 (excludes fuel, mobile, etc.).
+	"""
 	if get_pf_formula_base_for_employee(employee) == "Gross":
-		return flt(projected_gross)
-	return flt(assigned_base if assigned_base is not None else projected_gross)
+		return flt(gross_pay)
+	return flt(assigned_base if assigned_base is not None else gross_pay)
 
 
-def compute_pf_deduction_amount(employee, projected_gross, assigned_base=None):
-	"""Employee PF deduction from projected gross and assignment base."""
+def compute_pf_deduction_amount(employee, gross_pay, assigned_base=None):
+	"""Employee PF deduction from gross pay and assignment base."""
 	rates = _employee_pf_rates(employee)
 	if not rates["applicable"] or not rates["employee_rate"]:
 		return 0.0
-	pf_base = get_pf_base_amount(employee, projected_gross, assigned_base)
+	pf_base = get_pf_base_amount(employee, gross_pay, assigned_base)
 	return flt(pf_base) * flt(rates["employee_rate"]) / 100
 
 

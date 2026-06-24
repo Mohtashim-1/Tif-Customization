@@ -92,7 +92,6 @@ def get_dashboard_data(
                 {
                     "docstatus": ["<", 2],
                     "training_date": [">=", nowdate()],
-                    "status": ["!=", "Cancelled"],
                 },
             )
 
@@ -387,18 +386,21 @@ def _get_upcoming_trainings():
         filters={
             "docstatus": ["<", 2],
             "training_date": [">=", nowdate()],
-            "status": ["!=", "Cancelled"],
         },
         fields=[
             "name",
             "training_date",
-            "training_city",
-            "training_province",
-            "training_venue_name",
-            "training_session_category",
-            "training_trainer_name",
-            "training_no_of_participants",
-            "training_no_of_schools_attended",
+            "training_time",
+            "training_type",
+            "mode_of_training",
+            "participants_category",
+            "school_name",
+            "school_type",
+            "department_training",
+            "city",
+            "area",
+            "trainer_name",
+            "program",
         ],
         order_by="training_date asc, modified desc",
         limit_page_length=50,
