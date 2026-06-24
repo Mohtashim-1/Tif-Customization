@@ -151,25 +151,25 @@ frappe.pages["bank-balance-reconci"].on_page_load = function (wrapper) {
 				const body = rows.length
 					? rows.map((row) => {
 						const monthCells = months
-							.map((month) => `<td class="text-right">${this.money((row.month_values || {})[month.key])}</td>`)
+							.map((month) => `<td class="text-right">${this.table_amount((row.month_values || {})[month.key])}</td>`)
 							.join("");
 						return `
 							<tr>
 								<td>${frappe.utils.escape_html(row.display_name || "")}</td>
 								${monthCells}
-								<td class="text-right">${this.money(row.donation_amount)}</td>
-								<td class="text-right">${this.money(row.zakat_amount)}</td>
-								<td class="text-right">${this.money(row.endowment_funds_amount)}</td>
-								<td class="text-right">${this.money(row.total_received)}</td>
-								<td class="text-right">${this.money(row.budgeted_amount)}</td>
-								<td class="text-right">${this.money(row.balance_commitment)}</td>
+								<td class="text-right">${this.table_amount(row.donation_amount)}</td>
+								<td class="text-right">${this.table_amount(row.zakat_amount)}</td>
+								<td class="text-right">${this.table_amount(row.endowment_funds_amount)}</td>
+								<td class="text-right">${this.table_amount(row.total_received)}</td>
+								<td class="text-right">${this.table_amount(row.budgeted_amount)}</td>
+								<td class="text-right">${this.table_amount(row.balance_commitment)}</td>
 								<td>${frappe.utils.escape_html(row.remarks || "")}</td>
 							</tr>
 						`;
 					}).join("")
 					: `<tr><td colspan="${months.length + 8}" class="text-center text-muted">${__("No records found")}</td></tr>`;
 				const totalMonthCells = months
-					.map((month) => `<td class="text-right">${this.money((totals.month_values || {})[month.key])}</td>`)
+					.map((month) => `<td class="text-right">${this.table_amount((totals.month_values || {})[month.key])}</td>`)
 					.join("");
 
 				return `
@@ -203,12 +203,12 @@ frappe.pages["bank-balance-reconci"].on_page_load = function (wrapper) {
 								<tr class="grand-total">
 									<td>Total</td>
 									${totalMonthCells}
-									<td class="text-right">${this.money(totals.donation_amount)}</td>
-									<td class="text-right">${this.money(totals.zakat_amount)}</td>
-									<td class="text-right">${this.money(totals.endowment_funds_amount)}</td>
-									<td class="text-right">${this.money(totals.total_received)}</td>
-									<td class="text-right">${this.money(totals.budgeted_amount)}</td>
-									<td class="text-right">${this.money(totals.balance_commitment)}</td>
+									<td class="text-right">${this.table_amount(totals.donation_amount)}</td>
+									<td class="text-right">${this.table_amount(totals.zakat_amount)}</td>
+									<td class="text-right">${this.table_amount(totals.endowment_funds_amount)}</td>
+									<td class="text-right">${this.table_amount(totals.total_received)}</td>
+									<td class="text-right">${this.table_amount(totals.budgeted_amount)}</td>
+									<td class="text-right">${this.table_amount(totals.balance_commitment)}</td>
 									<td></td>
 								</tr>
 							</tbody>
@@ -219,6 +219,13 @@ frappe.pages["bank-balance-reconci"].on_page_load = function (wrapper) {
 
 			money(v) {
 				return format_currency(v || 0, frappe.defaults.get_default("currency"));
+			}
+
+			table_amount(v) {
+				return new Intl.NumberFormat(undefined, {
+					minimumFractionDigits: 2,
+					maximumFractionDigits: 2,
+				}).format(Number(v || 0));
 			}
 
 			number(v) {
