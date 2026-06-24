@@ -5,28 +5,40 @@ frappe.pages['field-staff-visit-mo'].on_page_load = function(wrapper) {
 		single_column: true
 	});
 
+	function month_start() {
+		const dt = new Date();
+		dt.setDate(1);
+		return dt.toISOString().slice(0, 10);
+	}
+
 	const container = $(`
 		<div class="field-staff-visit-report">
 			<div class="filter-section" style="background: #f8f9fa; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
 				<div class="row">
-					<div class="col-md-3">
-						<label>Month</label>
-						<select id="fs-month" class="form-control"></select>
+					<div class="col-md-2">
+						<label>${__('From Date')}</label>
+						<input type="date" id="fs-from-date" class="form-control" />
+					</div>
+					<div class="col-md-2">
+						<label>${__('To Date')}</label>
+						<input type="date" id="fs-to-date" class="form-control" />
 					</div>
 					<div class="col-md-3">
-						<label>Year</label>
-						<select id="fs-year" class="form-control"></select>
-					</div>
-					<div class="col-md-3">
-						<label>User</label>
-						<select id="fs-user" class="form-control">
-							<option value="">All Users</option>
+						<label>${__('Section')}</label>
+						<select id="fs-section" class="form-control">
+							<option value="">${__('All Sections')}</option>
 						</select>
 					</div>
-					<div class="col-md-3" style="margin-top: 24px;">
-						<button class="btn btn-primary" id="fs-apply">Apply</button>
-						<button class="btn btn-secondary" id="fs-reset">Reset</button>
-						<button class="btn btn-info" id="fs-print"><i class="fa fa-print"></i> Print</button>
+					<div class="col-md-3">
+						<label>${__('User')}</label>
+						<select id="fs-user" class="form-control">
+							<option value="">${__('All Users')}</option>
+						</select>
+					</div>
+					<div class="col-md-2" style="margin-top: 24px;">
+						<button class="btn btn-primary" id="fs-apply">${__('Apply')}</button>
+						<button class="btn btn-secondary" id="fs-reset">${__('Reset')}</button>
+						<button class="btn btn-info" id="fs-print"><i class="fa fa-print"></i> ${__('Print')}</button>
 					</div>
 				</div>
 			</div>
@@ -36,39 +48,29 @@ frappe.pages['field-staff-visit-mo'].on_page_load = function(wrapper) {
 
 	page.main.append(container);
 
-	const months = [
-		{ value: 1, label: 'January' },
-		{ value: 2, label: 'February' },
-		{ value: 3, label: 'March' },
-		{ value: 4, label: 'April' },
-		{ value: 5, label: 'May' },
-		{ value: 6, label: 'June' },
-		{ value: 7, label: 'July' },
-		{ value: 8, label: 'August' },
-		{ value: 9, label: 'September' },
-		{ value: 10, label: 'October' },
-		{ value: 11, label: 'November' },
-		{ value: 12, label: 'December' }
-	];
-
-	function build_select($select, items, selected) {
-		$select.empty();
-		items.forEach(item => {
-			const option = $(`<option value="${item.value}">${item.label}</option>`);
-			if (item.value === selected) {
-				option.attr('selected', 'selected');
+	function build_section_select(selectedSection) {
+		frappe.call({
+			method: 'frappe.client.get_list',
+			args: {
+				doctype: 'Department',
+				fields: ['name'],
+				limit_page_length: 500,
+				order_by: 'name asc'
+			},
+			callback: function(r) {
+				const sections = r.message || [];
+				const $section = $('#fs-section');
+				$section.empty();
+				$section.append(`<option value="">${__('All Sections')}</option>`);
+				sections.forEach((s) => {
+					const option = $(`<option value="${frappe.utils.escape_html(s.name)}">${frappe.utils.escape_html(s.name)}</option>`);
+					if (s.name === selectedSection) {
+						option.attr('selected', 'selected');
+					}
+					$section.append(option);
+				});
 			}
-			$select.append(option);
 		});
-	}
-
-	function build_years(selectedYear) {
-		const currentYear = new Date().getFullYear();
-		const years = [];
-		for (let y = currentYear - 5; y <= currentYear + 1; y++) {
-			years.push({ value: y, label: String(y) });
-		}
-		build_select($('#fs-year'), years, selectedYear);
 	}
 
 	function build_user_select(selectedUser) {
@@ -85,7 +87,7 @@ frappe.pages['field-staff-visit-mo'].on_page_load = function(wrapper) {
 				const users = r.message || [];
 				const $user = $('#fs-user');
 				$user.empty();
-				$user.append('<option value="">All Users</option>');
+				$user.append(`<option value="">${__('All Users')}</option>`);
 				users.forEach(u => {
 					const label = u.full_name ? `${u.full_name} (${u.name})` : u.name;
 					const option = $(`<option value="${frappe.utils.escape_html(u.name)}">${frappe.utils.escape_html(label)}</option>`);
@@ -98,35 +100,45 @@ frappe.pages['field-staff-visit-mo'].on_page_load = function(wrapper) {
 		});
 	}
 
-	function load_report(month, year, user) {
-		$('#fs-report').html('<p class="text-muted">Loading report...</p>');
+	function get_filters() {
+		return {
+			from_date: $('#fs-from-date').val(),
+			to_date: $('#fs-to-date').val(),
+			section: $('#fs-section').val() || '',
+			user: $('#fs-user').val() || ''
+		};
+	}
+
+	function load_report() {
+		const filters = get_filters();
+		if (!filters.from_date || !filters.to_date) {
+			frappe.msgprint(__('Please select From Date and To Date.'));
+			return;
+		}
+
+		$('#fs-report').html(`<p class="text-muted">${__('Loading report...')}</p>`);
 		frappe.call({
 			method: 'tif_customization.tif_customization.page.field_staff_visit_mo.field_staff_visit_mo.get_report_data',
-			args: {
-				filters: {
-					month: month,
-					year: year,
-					user: user || ''
-				}
-			},
+			args: { filters },
 			callback: function(r) {
 				if (!r.message || r.message.error) {
-					$('#fs-report').html('<p class="text-danger">Failed to load report.</p>');
+					$('#fs-report').html(`<p class="text-danger">${__('Failed to load report.')}</p>`);
 					return;
 				}
 				render_report(r.message);
 			},
 			error: function() {
-				$('#fs-report').html('<p class="text-danger">Failed to load report.</p>');
+				$('#fs-report').html(`<p class="text-danger">${__('Failed to load report.')}</p>`);
 			}
 		});
 	}
 
 	function render_report(data) {
-		const monthLabel = months.find(m => m.value === data.month)?.label || data.month;
+		const fromLabel = frappe.datetime.str_to_user(data.from_date || '');
+		const toLabel = frappe.datetime.str_to_user(data.to_date || '');
 		const header = `
 			<div style="text-align: center; font-weight: bold; font-size: 20px; margin-bottom: 15px;">
-				SME Visits Summary Month of ${monthLabel}-${data.year}
+				${__('SME Visits Summary')} (${fromLabel} ${__('to')} ${toLabel})
 			</div>
 		`;
 
@@ -137,11 +149,17 @@ frappe.pages['field-staff-visit-mo'].on_page_load = function(wrapper) {
 		$('#fs-report').html(`
 			${header}
 			<div class="row">
-				<div class="col-md-4">${marketing}</div>
-				<div class="col-md-4">${me}</div>
-				<div class="col-md-4">${training}</div>
+				<div class="col-md-12 mb-3">${marketing}</div>
+				<div class="col-md-6">${me}</div>
+				<div class="col-md-6">${training}</div>
 			</div>
 		`);
+	}
+
+	function render_row_label(row) {
+		const section = frappe.utils.escape_html(row.section || '-');
+		const user = frappe.utils.escape_html(row.user_name || row.user || '-');
+		return `<td>${section}</td><td>${user}</td>`;
 	}
 
 	function render_marketing_table(marketing) {
@@ -149,31 +167,32 @@ frappe.pages['field-staff-visit-mo'].on_page_load = function(wrapper) {
 		const totals = marketing?.totals || { new: 0, followup: 0, tps: 0, total: 0 };
 		const body = rows.length ? rows.map(row => `
 			<tr>
-				<td>${row.province || '-'}</td>
+				${render_row_label(row)}
 				<td class="text-right">${row.new || 0}</td>
 				<td class="text-right">${row.followup || 0}</td>
 				<td class="text-right">${row.tps || 0}</td>
 				<td class="text-right">${row.total || 0}</td>
 			</tr>
-		`).join('') : '<tr><td colspan="5" class="text-center">No data</td></tr>';
+		`).join('') : `<tr><td colspan="6" class="text-center">${__('No data')}</td></tr>`;
 
 		return `
 			<div class="table-responsive">
 				<table class="table table-bordered table-striped" style="font-size: 12px;">
 					<thead>
-						<tr><th colspan="5" class="text-center">Marketing Visits</th></tr>
+						<tr><th colspan="6" class="text-center">${__('Marketing Visits')}</th></tr>
 						<tr>
-							<th>Province</th>
-							<th>New</th>
-							<th>Followup & Other Visits</th>
-							<th>TPS Visits</th>
-							<th>Grand Total</th>
+							<th>${__('Section')}</th>
+							<th>${__('User')}</th>
+							<th>${__('New')}</th>
+							<th>${__('Followup & Other Visits')}</th>
+							<th>${__('TPS Visits')}</th>
+							<th>${__('Grand Total')}</th>
 						</tr>
 					</thead>
 					<tbody>${body}</tbody>
 					<tfoot>
 						<tr>
-							<th>Grand Total</th>
+							<th colspan="2">${__('Grand Total')}</th>
 							<th class="text-right">${totals.new || 0}</th>
 							<th class="text-right">${totals.followup || 0}</th>
 							<th class="text-right">${totals.tps || 0}</th>
@@ -190,29 +209,30 @@ frappe.pages['field-staff-visit-mo'].on_page_load = function(wrapper) {
 		const totals = me?.totals || { active: 0, inactive: 0, total: 0 };
 		const body = rows.length ? rows.map(row => `
 			<tr>
-				<td>${row.province || '-'}</td>
+				${render_row_label(row)}
 				<td class="text-right">${row.active || 0}</td>
 				<td class="text-right">${row.inactive || 0}</td>
 				<td class="text-right">${row.total || 0}</td>
 			</tr>
-		`).join('') : '<tr><td colspan="4" class="text-center">No data</td></tr>';
+		`).join('') : `<tr><td colspan="5" class="text-center">${__('No data')}</td></tr>`;
 
 		return `
 			<div class="table-responsive">
 				<table class="table table-bordered table-striped" style="font-size: 12px;">
 					<thead>
-						<tr><th colspan="4" class="text-center">M&E Visits</th></tr>
+						<tr><th colspan="5" class="text-center">${__('M&E Visits')}</th></tr>
 						<tr>
-							<th>Province</th>
-							<th>Active</th>
-							<th>Inactive</th>
-							<th>Grand Total</th>
+							<th>${__('Section')}</th>
+							<th>${__('User')}</th>
+							<th>${__('Active')}</th>
+							<th>${__('Inactive')}</th>
+							<th>${__('Grand Total')}</th>
 						</tr>
 					</thead>
 					<tbody>${body}</tbody>
 					<tfoot>
 						<tr>
-							<th>Grand Total</th>
+							<th colspan="2">${__('Grand Total')}</th>
 							<th class="text-right">${totals.active || 0}</th>
 							<th class="text-right">${totals.inactive || 0}</th>
 							<th class="text-right">${totals.total || 0}</th>
@@ -228,27 +248,28 @@ frappe.pages['field-staff-visit-mo'].on_page_load = function(wrapper) {
 		const totals = training?.totals || { schools: 0, participants: 0 };
 		const body = rows.length ? rows.map(row => `
 			<tr>
-				<td>${row.province || '-'}</td>
+				${render_row_label(row)}
 				<td class="text-right">${row.schools || 0}</td>
 				<td class="text-right">${row.participants || 0}</td>
 			</tr>
-		`).join('') : '<tr><td colspan="3" class="text-center">No data</td></tr>';
+		`).join('') : `<tr><td colspan="4" class="text-center">${__('No data')}</td></tr>`;
 
 		return `
 			<div class="table-responsive">
 				<table class="table table-bordered table-striped" style="font-size: 12px;">
 					<thead>
-						<tr><th colspan="3" class="text-center">Training Sessions</th></tr>
+						<tr><th colspan="4" class="text-center">${__('Training Sessions')}</th></tr>
 						<tr>
-							<th>Province</th>
-							<th>No. of Schools</th>
-							<th>No. of participants</th>
+							<th>${__('Section')}</th>
+							<th>${__('User')}</th>
+							<th>${__('No. of Schools')}</th>
+							<th>${__('No. of participants')}</th>
 						</tr>
 					</thead>
 					<tbody>${body}</tbody>
 					<tfoot>
 						<tr>
-							<th>Grand Total</th>
+							<th colspan="2">${__('Grand Total')}</th>
 							<th class="text-right">${totals.schools || 0}</th>
 							<th class="text-right">${totals.participants || 0}</th>
 						</tr>
@@ -259,30 +280,20 @@ frappe.pages['field-staff-visit-mo'].on_page_load = function(wrapper) {
 	}
 
 	function reset_filters() {
-		const now = new Date();
-		const month = now.getMonth() + 1;
-		const year = now.getFullYear();
-		build_select($('#fs-month'), months, month);
-		build_years(year);
+		$('#fs-from-date').val(month_start());
+		$('#fs-to-date').val(frappe.datetime.get_today());
+		$('#fs-section').val('');
 		$('#fs-user').val('');
-		load_report(month, year, '');
+		load_report();
 	}
 
-	$('#fs-apply').on('click', function() {
-		const month = parseInt($('#fs-month').val(), 10);
-		const year = parseInt($('#fs-year').val(), 10);
-		const user = $('#fs-user').val() || '';
-		load_report(month, year, user);
-	});
-
-	$('#fs-reset').on('click', function() {
-		reset_filters();
-	});
-
+	$('#fs-apply').on('click', load_report);
+	$('#fs-reset').on('click', reset_filters);
 	$('#fs-print').on('click', function() {
 		window.print();
 	});
 
+	build_section_select('');
 	build_user_select('');
 	reset_filters();
-}
+};

@@ -54,7 +54,6 @@ frappe.listview_settings["Reporting"] = {
 		};
 
 		$summary.find(".reporting-list-refresh-summary").on("click", load_summary);
-		listview.page.fields_dict && load_summary();
 		setTimeout(load_summary, 500);
 	},
 };
