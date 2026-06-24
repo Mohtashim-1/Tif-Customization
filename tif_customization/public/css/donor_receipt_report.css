@@ -49,6 +49,15 @@
 	font-weight: 600;
 }
 
+.donor-receipt-donor-filter {
+	min-width: 260px;
+}
+
+.donor-receipt-donor-filter .frappe-control,
+.donor-receipt-donor-filter .form-group {
+	margin-bottom: 0;
+}
+
 .donor-receipt-kpis {
 	display: grid;
 	grid-template-columns: repeat(4, minmax(0, 1fr));

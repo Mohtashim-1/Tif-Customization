@@ -26,10 +26,13 @@ frappe.pages["donor-receipt-report"].on_page_load = function (wrapper) {
 				this.drilldown_rows = [];
 				this.chart = null;
 				this.data = null;
+				this.donor = null;
+				this.donor_control = null;
 			}
 
 			async make() {
 				this.render_layout();
+				this.make_donor_filter();
 				this.bind_events();
 				await loadCharts();
 				this.load_summary();
@@ -53,6 +56,10 @@ frappe.pages["donor-receipt-report"].on_page_load = function (wrapper) {
 							<div>
 								<label>${__("To Date")}</label>
 								<input type="date" class="form-control input-to-date" value="${this.to_date}" />
+							</div>
+							<div class="donor-receipt-donor-filter">
+								<label>${__("Donor")}</label>
+								<div class="donor-filter-control"></div>
 							</div>
 							<div>
 								<button class="btn btn-primary btn-sm btn-apply">${__("Apply")}</button>
@@ -86,6 +93,20 @@ frappe.pages["donor-receipt-report"].on_page_load = function (wrapper) {
 				`);
 			}
 
+			make_donor_filter() {
+				this.donor_control = frappe.ui.form.make_control({
+					parent: this.page.main.find(".donor-filter-control"),
+					df: {
+						fieldtype: "Link",
+						options: "Donor",
+						fieldname: "donor",
+						placeholder: __("All Donors"),
+					},
+					render_input: true,
+				});
+				this.donor_control.set_value(this.donor);
+			}
+
 			bind_events() {
 				const me = this;
 				this.page.main.find(".btn-apply").on("click", () => me.apply_filters());
@@ -113,6 +134,7 @@ frappe.pages["donor-receipt-report"].on_page_load = function (wrapper) {
 			apply_filters() {
 				this.from_date = this.page.main.find(".input-from-date").val();
 				this.to_date = this.page.main.find(".input-to-date").val();
+				this.donor = this.donor_control ? this.donor_control.get_value() : null;
 				if (!this.from_date || !this.to_date) {
 					frappe.msgprint(__("Please select both From Date and To Date"));
 					return;
@@ -144,6 +166,7 @@ frappe.pages["donor-receipt-report"].on_page_load = function (wrapper) {
 					args: {
 						from_date: this.from_date,
 						to_date: this.to_date,
+						donor: this.donor,
 					},
 					callback: (r) => {
 						this.data = r.message || {};
@@ -277,6 +300,7 @@ frappe.pages["donor-receipt-report"].on_page_load = function (wrapper) {
 						month_key,
 						from_date: this.from_date,
 						to_date: this.to_date,
+						donor: this.donor,
 					},
 					callback: (r) => {
 						this.drilldown_rows = r.message || [];

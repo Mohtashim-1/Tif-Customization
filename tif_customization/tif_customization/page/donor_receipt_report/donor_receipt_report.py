@@ -9,8 +9,9 @@ from frappe.www.printview import validate_print_permission
 
 
 @frappe.whitelist()
-def get_month_wise_summary(from_date=None, to_date=None):
+def get_month_wise_summary(from_date=None, to_date=None, donor=None):
 	from_date, to_date = _resolve_dates(from_date, to_date)
+	donor_condition = " AND d.donor = %(donor)s" if donor else ""
 
 	rows = frappe.db.sql(
 		"""
@@ -22,10 +23,11 @@ def get_month_wise_summary(from_date=None, to_date=None):
 		FROM `tabDonation` d
 		WHERE d.docstatus = 1
 		  AND d.donation_date BETWEEN %(from_date)s AND %(to_date)s
+		  {donor_condition}
 		GROUP BY month_key, month_label
 		ORDER BY month_key DESC
-		""",
-		{"from_date": str(from_date), "to_date": str(to_date)},
+		""".format(donor_condition=donor_condition),
+		{"from_date": str(from_date), "to_date": str(to_date), "donor": donor},
 		as_dict=True,
 	)
 
@@ -43,17 +45,19 @@ def get_month_wise_summary(from_date=None, to_date=None):
 
 
 @frappe.whitelist()
-def get_month_donations(month_key, from_date=None, to_date=None):
+def get_month_donations(month_key, from_date=None, to_date=None, donor=None):
 	if isinstance(month_key, str) and month_key.startswith("{"):
 		payload = json.loads(month_key)
 		month_key = payload.get("month_key")
 		from_date = payload.get("from_date", from_date)
 		to_date = payload.get("to_date", to_date)
+		donor = payload.get("donor", donor)
 
 	if not month_key:
 		frappe.throw("Month is required")
 
 	from_date, to_date = _resolve_dates(from_date, to_date)
+	donor_condition = " AND d.donor = %(donor)s" if donor else ""
 
 	return frappe.db.sql(
 		"""
@@ -72,9 +76,15 @@ def get_month_donations(month_key, from_date=None, to_date=None):
 		WHERE d.docstatus = 1
 		  AND DATE_FORMAT(d.donation_date, '%%Y-%%m') = %(month_key)s
 		  AND d.donation_date BETWEEN %(from_date)s AND %(to_date)s
+		  {donor_condition}
 		ORDER BY d.donation_date DESC, d.name DESC
-		""",
-		{"month_key": month_key, "from_date": str(from_date), "to_date": str(to_date)},
+		""".format(donor_condition=donor_condition),
+		{
+			"month_key": month_key,
+			"from_date": str(from_date),
+			"to_date": str(to_date),
+			"donor": donor,
+		},
 		as_dict=True,
 	)
 
