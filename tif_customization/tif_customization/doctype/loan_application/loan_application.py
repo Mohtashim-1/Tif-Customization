@@ -14,6 +14,7 @@ from tif_customization.tif_customization.doctype.leave_application.leave_applica
 )
 
 APPROVED_WORKFLOW_STATES = frozenset({"Approved By CEO"})
+LOAN_APPLICATION_ASSIGNMENT_ROLES = ("CEO", "COO", "HR User")
 
 
 def on_loan_application_submit(doc, method=None):
@@ -25,6 +26,129 @@ def on_loan_application_submit(doc, method=None):
 		frappe.db.set_value("Loan Application", doc.name, "status", "Approved", update_modified=False)
 
 	create_loan_from_application(doc.name)
+
+
+def sync_loan_application_todo(doc, method=None):
+	"""Assign Loan Application to applicant approvers, CEO, COO, and HR users."""
+	if getattr(doc, "status", None) == "Rejected" or doc.docstatus == 2:
+		_close_all_todos(doc.doctype, doc.name)
+		return
+
+	assignees = _get_loan_application_assignees(doc)
+	_cleanup_other_open_todos(doc.doctype, doc.name, keep_users=assignees)
+
+	if not assignees:
+		return
+
+	from frappe.desk.form.assign_to import add as add_assignment
+
+	description = f"Loan Application {doc.name} has been assigned to you."
+	for user in assignees:
+		if frappe.get_all(
+			"ToDo",
+			filters={
+				"reference_type": doc.doctype,
+				"reference_name": doc.name,
+				"allocated_to": user,
+				"status": "Open",
+			},
+			limit=1,
+		):
+			continue
+
+		add_assignment(
+			{
+				"assign_to": [user],
+				"doctype": doc.doctype,
+				"name": doc.name,
+				"description": description,
+				"priority": "High",
+			},
+			ignore_permissions=True,
+		)
+
+
+def _get_loan_application_assignees(doc):
+	assignees = set()
+	employee = _resolve_employee(doc.applicant_type, doc.applicant)
+
+	if employee:
+		assignees.update(_get_employee_approvers(employee))
+
+	for role in LOAN_APPLICATION_ASSIGNMENT_ROLES:
+		assignees.update(_get_enabled_users_with_role(role))
+
+	return {user for user in assignees if user and frappe.db.exists("User", user)}
+
+
+def _get_employee_approvers(employee):
+	approvers = set()
+	employee_doc = frappe.get_doc("Employee", employee)
+
+	for fieldname in ("leave_approver", "expense_approver", "shift_request_approver"):
+		if employee_doc.get(fieldname):
+			approvers.add(employee_doc.get(fieldname))
+
+	if employee_doc.reports_to:
+		reports_to_user = frappe.db.get_value("Employee", employee_doc.reports_to, "user_id")
+		if reports_to_user:
+			approvers.add(reports_to_user)
+
+	if employee_doc.department:
+		department = frappe.get_doc("Department", employee_doc.department)
+		for table_fieldname in ("leave_approvers", "expense_approvers", "shift_request_approver"):
+			for row in department.get(table_fieldname) or []:
+				if row.approver:
+					approvers.add(row.approver)
+
+	return approvers
+
+
+def _get_enabled_users_with_role(role):
+	users = frappe.get_all(
+		"Has Role",
+		filters={"role": role, "parenttype": "User"},
+		pluck="parent",
+	)
+	return {
+		user
+		for user in users
+		if frappe.db.get_value("User", user, "enabled")
+	}
+
+
+def _cleanup_other_open_todos(doctype: str, name: str, keep_users: set[str] | None):
+	if not name:
+		return
+
+	open_todos = frappe.get_all(
+		"ToDo",
+		filters={
+			"reference_type": doctype,
+			"reference_name": name,
+			"status": "Open",
+		},
+		fields=["name", "allocated_to"],
+	)
+
+	keep_users = keep_users or set()
+	for todo in open_todos:
+		if todo.allocated_to not in keep_users:
+			frappe.db.set_value("ToDo", todo.name, "status", "Cancelled", update_modified=False)
+
+
+def _close_all_todos(doctype: str, name: str):
+	if not name:
+		return
+
+	frappe.db.sql(
+		"""
+		UPDATE `tabToDo`
+		SET status='Closed'
+		WHERE reference_type=%s AND reference_name=%s AND status='Open'
+		""",
+		(doctype, name),
+	)
 
 
 @frappe.whitelist()

@@ -194,7 +194,13 @@ doc_events = {
     },
     "Loan Application": {
         "validate": "tif_customization.tif_customization.doctype.loan_application.loan_application.populate_previous_loan_and_leave_details",
-        "on_submit": "tif_customization.tif_customization.doctype.loan_application.loan_application.on_loan_application_submit",
+        "on_update": "tif_customization.tif_customization.doctype.loan_application.loan_application.sync_loan_application_todo",
+        "on_update_after_submit": "tif_customization.tif_customization.doctype.loan_application.loan_application.sync_loan_application_todo",
+        "on_cancel": "tif_customization.tif_customization.doctype.loan_application.loan_application.sync_loan_application_todo",
+        "on_submit": [
+            "tif_customization.tif_customization.doctype.loan_application.loan_application.on_loan_application_submit",
+            "tif_customization.tif_customization.doctype.loan_application.loan_application.sync_loan_application_todo",
+        ],
     },
     "Salary Slip": {
         "on_submit": "tif_customization.tif_customization.pf.pf_contribution.sync_log_from_salary_slip",

@@ -40,14 +40,6 @@ class FieldStaffReportPage {
 
 				<div class="fsr-kpis mb-3"></div>
 
-				<div class="border rounded p-3 mb-3 fsr-ratio-panel">
-					<div class="d-flex align-items-center justify-content-between mb-2">
-						<h5 class="mb-0">${__("Field Staff Wise Ratio")}</h5>
-						<span class="text-muted small">${__("Share of total field visits")}</span>
-					</div>
-					<div class="fsr-staff-ratios"></div>
-				</div>
-
 				<div class="border rounded p-3">
 					<div class="d-flex align-items-center justify-content-between mb-2">
 						<h5 class="mb-0">${__("Field Visit Reporting")}</h5>
@@ -179,7 +171,6 @@ class FieldStaffReportPage {
 				const data = r.message || { rows: [], columns: [], labels: {}, total_count: 0 };
 				const calculated = this.build_client_summary(data.rows || []);
 				this.render_kpis(data.summary || calculated.summary);
-				this.render_staff_ratios(data.staff_wise || calculated.staff_wise);
 				this.render_table(data.rows || [], data.columns || [], data.labels || {});
 				this.body.find(".fsr-count").text(`${data.total_count || 0} ${__("records")}`);
 			}
@@ -260,8 +251,7 @@ class FieldStaffReportPage {
 			[__("Training Visits"), summary.training_visits || 0, "training"],
 			[__("Meeting Visits"), summary.meeting_visits || 0, "meeting"],
 			[__("Other Visits"), summary.other_visits || 0, "other"],
-			[__("Active Field Staff"), summary.active_staff || 0, "staff"],
-			[__("Visits / Staff"), summary.visits_per_staff || 0, "ratio"]
+			[__("Active Field Staff"), summary.active_staff || 0, "staff"]
 		];
 
 		this.body.find(".fsr-kpis").html(
@@ -272,50 +262,6 @@ class FieldStaffReportPage {
 				</div>
 			`).join("")
 		);
-	}
-
-	render_staff_ratios(rows) {
-		const $target = this.body.find(".fsr-staff-ratios");
-		if (!rows.length) {
-			$target.html(`<div class="text-muted">${__("No field staff activity found.")}</div>`);
-			return;
-		}
-
-		const body = rows.map((row) => `
-			<tr>
-				<td>${frappe.utils.escape_html(row.staff || __("Unassigned"))}</td>
-				<td class="text-right font-weight-bold">${row.total_visits || 0}</td>
-				<td>
-					<div class="fsr-ratio-cell">
-						<div class="fsr-ratio-track"><span style="width:${Math.min(Number(row.ratio) || 0, 100)}%"></span></div>
-						<strong>${Number(row.ratio || 0).toFixed(1)}%</strong>
-					</div>
-				</td>
-				<td class="text-right">${row.marketing || 0}</td>
-				<td class="text-right">${row.me || 0}</td>
-				<td class="text-right">${row.training || 0}</td>
-				<td class="text-right">${row.meeting || 0}</td>
-				<td class="text-right">${row.other || 0}</td>
-			</tr>
-		`).join("");
-
-		$target.html(`
-			<div class="table-responsive">
-				<table class="table table-bordered table-hover mb-0 fsr-ratio-table">
-					<thead><tr>
-						<th>${__("Field Staff")}</th>
-						<th class="text-right">${__("Total Visits")}</th>
-						<th>${__("Visit Ratio")}</th>
-						<th class="text-right">${__("Marketing")}</th>
-						<th class="text-right">${__("M&E")}</th>
-						<th class="text-right">${__("Training")}</th>
-						<th class="text-right">${__("Meeting")}</th>
-						<th class="text-right">${__("Other")}</th>
-					</tr></thead>
-					<tbody>${body}</tbody>
-				</table>
-			</div>
-		`);
 	}
 
 	export_excel() {
