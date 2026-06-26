@@ -123,8 +123,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Status",
-   "options": "Active\nInactive\nIn Process\nClosed\nNot Interested\nDirect Requirement Received",
-   "reqd": 1
+   "options": "Active\nInactive\nIn Process\nClosed\nNot Interested\nDirect Requirement Received"
   },
   {
    "fieldname": "remarks",
@@ -380,7 +379,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-06-23 16:59:13.557381",
+ "modified": "2026-06-26 21:34:34.723912",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "School",

@@ -2,7 +2,7 @@
  "actions": [],
  "allow_rename": 1,
  "autoname": "format:UTR-{YYYY}-{#####}",
- "creation": "2026-03-28 00:00:00.000000",
+ "creation": "2026-03-28 00:00:00",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
@@ -12,6 +12,8 @@
   "mode_of_training",
   "participants_category",
   "school_name",
+  "tag_school",
+  "column_break_lodn",
   "school_type",
   "department_training",
   "city",
@@ -21,6 +23,7 @@
  ],
  "fields": [
   {
+   "default": "Today",
    "fieldname": "training_date",
    "fieldtype": "Date",
    "in_list_view": 1,
@@ -28,6 +31,7 @@
    "reqd": 1
   },
   {
+   "default": "Now",
    "fieldname": "training_time",
    "fieldtype": "Time",
    "in_list_view": 1,
@@ -35,38 +39,41 @@
   },
   {
    "fieldname": "training_type",
-   "fieldtype": "Data",
+   "fieldtype": "Link",
    "in_list_view": 1,
-   "label": "UP Coming Training Type"
+   "label": "UP Coming Training Type",
+   "options": "Training Type"
   },
   {
    "fieldname": "mode_of_training",
-   "fieldtype": "Data",
+   "fieldtype": "Select",
    "in_list_view": 1,
-   "label": "Mode of Training"
+   "label": "Mode of Training",
+   "options": "In-person\nOnline\nOnsite"
   },
   {
    "fieldname": "participants_category",
-   "fieldtype": "Data",
-   "label": "Participants Category"
+   "fieldtype": "Select",
+   "label": "Participants Category",
+   "options": "\nSchool Kids\nTrainees"
   },
   {
    "fieldname": "school_name",
-   "fieldtype": "Link",
-   "label": "School Name",
+   "fieldtype": "Data",
+   "label": "School",
    "options": "School"
   },
   {
    "fieldname": "school_type",
    "fieldtype": "Select",
    "label": "School Type",
-   "options": "\nGOVT\nPVT"
+   "options": "Private\nGovernment"
   },
   {
    "fieldname": "department_training",
-   "fieldtype": "Link",
+   "fieldtype": "Select",
    "label": "Department Training",
-   "options": "Department"
+   "options": "TPS\nCEE\nQPS\nTIF"
   },
   {
    "fieldname": "city",
@@ -90,16 +97,25 @@
    "fieldtype": "Link",
    "label": "Program",
    "options": "Program"
+  },
+  {
+   "fieldname": "column_break_lodn",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "tag_school",
+   "fieldtype": "Link",
+   "label": "Tag School",
+   "options": "School"
   }
  ],
  "index_web_pages_for_search": 1,
- "is_submittable": 0,
  "links": [],
- "modified": "2026-03-28 00:00:00.000000",
+ "modified": "2026-06-26 20:52:51.484646",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Upcoming Training",
- "naming_rule": "Expression",
+ "naming_rule": "Expression (old style)",
  "owner": "Administrator",
  "permissions": [
   {
@@ -127,6 +143,7 @@
    "write": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],

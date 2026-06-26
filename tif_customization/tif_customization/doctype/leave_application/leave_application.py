@@ -6,6 +6,12 @@ import datetime
 
 EXEMPT_ROLES = {"HR Manager", "HR User", "System Manager"}
 ACCRUAL_EMPLOYMENT_TYPES = {"Full Time -  (Permanent)", "Full Time (Probation)"}
+ADDITIONAL_LEAVE_APPLICATION_ASSIGNEES = {
+	"Administrator",
+	"shoaibmohtashim973@gmail.com",
+	"shahid.khan@tif.edu.pk",
+	"anas.khan@tif.edu.pk",
+}
 
 
 def payroll_months_between(start: date, end: date) -> int:
@@ -231,8 +237,8 @@ def get_leave_allocation_for_print(employee, date):
 	return (response or {}).get("leave_allocation", {})
 
 
-def _cleanup_other_open_todos(doctype: str, name: str, keep_user: str | None):
-	"""Cancel any other open ToDos for this document except keep_user."""
+def _cleanup_other_open_todos(doctype: str, name: str, keep_users: set[str] | None):
+	"""Cancel any other open ToDos for this document except keep_users."""
 	if not name:
 		return
 
@@ -241,15 +247,15 @@ def _cleanup_other_open_todos(doctype: str, name: str, keep_user: str | None):
 		"reference_name": name,
 		"status": "Open",
 	}
-	if keep_user:
-		filters["allocated_to"] = ["!=", keep_user]
 
-	other_todos = frappe.get_all("ToDo", filters=filters, pluck="name")
+	other_todos = frappe.get_all("ToDo", filters=filters, fields=["name", "allocated_to"])
 	if not other_todos:
 		return
 
-	for todo_name in other_todos:
-		frappe.db.set_value("ToDo", todo_name, "status", "Cancelled", update_modified=False)
+	keep_users = keep_users or set()
+	for todo in other_todos:
+		if todo.allocated_to not in keep_users:
+			frappe.db.set_value("ToDo", todo.name, "status", "Cancelled", update_modified=False)
 
 
 def _close_all_todos(doctype: str, name: str):
@@ -266,47 +272,45 @@ def _close_all_todos(doctype: str, name: str):
 
 
 def sync_leave_approver_todo(doc, method=None):
-	"""Ensure a ToDo exists for Leave Approver while the application is Open (even in Draft)."""
-	# When leave is no longer pending, close any open assignments.
-	if getattr(doc, "status", None) in ("Approved", "Rejected", "Cancelled") or cint(doc.docstatus) == 2:
+	"""Ensure ToDos exist for Leave Approver and HR assignees on non-cancelled applications."""
+	if getattr(doc, "status", None) == "Cancelled" or cint(doc.docstatus) == 2:
 		_close_all_todos(doc.doctype, doc.name)
 		return
 
 	leave_approver = getattr(doc, "leave_approver", None)
-	if not leave_approver:
-		_cleanup_other_open_todos(doc.doctype, doc.name, keep_user=None)
-		return
+	assignees = set(ADDITIONAL_LEAVE_APPLICATION_ASSIGNEES)
+	if leave_approver:
+		assignees.add(leave_approver)
 
-	# Keep only the current approver's ToDo open (cancel others if approver changed).
-	_cleanup_other_open_todos(doc.doctype, doc.name, keep_user=leave_approver)
+	assignees = {user for user in assignees if frappe.db.exists("User", user)}
 
-	# Create ToDo only when the application is pending approval.
-	if getattr(doc, "status", None) != "Open":
-		return
-
-	exists = frappe.get_all(
-		"ToDo",
-		filters={
-			"reference_type": doc.doctype,
-			"reference_name": doc.name,
-			"allocated_to": leave_approver,
-			"status": "Open",
-		},
-		limit=1,
-	)
-	if exists:
-		return
+	# Keep only the current approver and configured HR ToDos open.
+	_cleanup_other_open_todos(doc.doctype, doc.name, keep_users=assignees)
 
 	from frappe.desk.form.assign_to import add as add_assignment
 
-	description = f"Leave Application {doc.name} requires your approval."
-	add_assignment(
-		{
-			"assign_to": [leave_approver],
-			"doctype": doc.doctype,
-			"name": doc.name,
-			"description": description,
-			"priority": "High",
-		},
-		ignore_permissions=True,
-	)
+	description = f"Leave Application {doc.name} has been assigned to you."
+	for user in assignees:
+		exists = frappe.get_all(
+			"ToDo",
+			filters={
+				"reference_type": doc.doctype,
+				"reference_name": doc.name,
+				"allocated_to": user,
+				"status": "Open",
+			},
+			limit=1,
+		)
+		if exists:
+			continue
+
+		add_assignment(
+			{
+				"assign_to": [user],
+				"doctype": doc.doctype,
+				"name": doc.name,
+				"description": description,
+				"priority": "High",
+			},
+			ignore_permissions=True,
+		)

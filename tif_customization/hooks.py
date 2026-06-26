@@ -182,7 +182,9 @@ doc_events = {
             "tif_customization.tif_customization.doctype.leave_application.leave_application.leave_apply_on_probabe_base",
             # "tif_customization.tif_customization.doctype.leave_application.leave_application.sync_leave_approver_todo",
         ],
-        "after_save": "tif_customization.tif_customization.doctype.leave_application.leave_application.sync_leave_approver_todo",
+        "on_update": "tif_customization.tif_customization.doctype.leave_application.leave_application.sync_leave_approver_todo",
+        "on_update_after_submit": "tif_customization.tif_customization.doctype.leave_application.leave_application.sync_leave_approver_todo",
+        "on_cancel": "tif_customization.tif_customization.doctype.leave_application.leave_application.sync_leave_approver_todo",
     },
     "Employee Attendance": {
         "validate": "tif_customization.tif_customization.doctype.employee_attendance.employee_attendance.validate_sat_attendance"

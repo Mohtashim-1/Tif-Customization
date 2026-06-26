@@ -133,6 +133,45 @@ frappe.pages['field-staff-visit-mo'].on_page_load = function(wrapper) {
 		});
 	}
 
+	function rollup_marketing_by_section(rows) {
+		const buckets = {};
+		rows.forEach((row) => {
+			const section = row.section || __('Unassigned');
+			const bucket = buckets[section] || { section, new: 0, followup: 0, tps: 0, total: 0 };
+			bucket.new += row.new || 0;
+			bucket.followup += row.followup || 0;
+			bucket.tps += row.tps || 0;
+			bucket.total += row.total || 0;
+			buckets[section] = bucket;
+		});
+		return Object.values(buckets).sort((a, b) => a.section.localeCompare(b.section));
+	}
+
+	function rollup_me_by_section(rows) {
+		const buckets = {};
+		rows.forEach((row) => {
+			const section = row.section || __('Unassigned');
+			const bucket = buckets[section] || { section, active: 0, inactive: 0, total: 0 };
+			bucket.active += row.active || 0;
+			bucket.inactive += row.inactive || 0;
+			bucket.total += row.total || 0;
+			buckets[section] = bucket;
+		});
+		return Object.values(buckets).sort((a, b) => a.section.localeCompare(b.section));
+	}
+
+	function rollup_training_by_section(rows) {
+		const buckets = {};
+		rows.forEach((row) => {
+			const section = row.section || __('Unassigned');
+			const bucket = buckets[section] || { section, schools: 0, participants: 0 };
+			bucket.schools += row.schools || 0;
+			bucket.participants += row.participants || 0;
+			buckets[section] = bucket;
+		});
+		return Object.values(buckets).sort((a, b) => a.section.localeCompare(b.section));
+	}
+
 	function render_report(data) {
 		const fromLabel = frappe.datetime.str_to_user(data.from_date || '');
 		const toLabel = frappe.datetime.str_to_user(data.to_date || '');
@@ -142,18 +181,144 @@ frappe.pages['field-staff-visit-mo'].on_page_load = function(wrapper) {
 			</div>
 		`;
 
-		const marketing = render_marketing_table(data.marketing);
-		const me = render_me_table(data.me);
-		const training = render_training_table(data.training);
+		const marketingSection = render_marketing_section_table(data.marketing);
+		const meSection = render_me_section_table(data.me);
+		const trainingSection = render_training_section_table(data.training);
+
+		const marketingUsers = render_marketing_user_table(data.marketing);
+		const meUsers = render_me_user_table(data.me);
+		const trainingUsers = render_training_user_table(data.training);
 
 		$('#fs-report').html(`
 			${header}
 			<div class="row">
-				<div class="col-md-12 mb-3">${marketing}</div>
-				<div class="col-md-6">${me}</div>
-				<div class="col-md-6">${training}</div>
+				<div class="col-md-4">${marketingSection}</div>
+				<div class="col-md-4">${meSection}</div>
+				<div class="col-md-4">${trainingSection}</div>
+			</div>
+			<div style="margin-top: 25px; margin-bottom: 10px; font-weight: bold; font-size: 16px;">
+				${__('User Wise Detail')}
+			</div>
+			<div class="row">
+				<div class="col-md-12 mb-3">${marketingUsers}</div>
+				<div class="col-md-6">${meUsers}</div>
+				<div class="col-md-6">${trainingUsers}</div>
 			</div>
 		`);
+	}
+
+	function render_marketing_section_table(marketing) {
+		const rows = rollup_marketing_by_section(marketing?.rows || []);
+		const totals = marketing?.totals || { new: 0, followup: 0, tps: 0, total: 0 };
+		const body = rows.length ? rows.map(row => `
+			<tr>
+				<td>${frappe.utils.escape_html(row.section || '-')}</td>
+				<td class="text-right">${row.new || 0}</td>
+				<td class="text-right">${row.followup || 0}</td>
+				<td class="text-right">${row.tps || 0}</td>
+				<td class="text-right">${row.total || 0}</td>
+			</tr>
+		`).join('') : `<tr><td colspan="5" class="text-center">${__('No data')}</td></tr>`;
+
+		return `
+			<div class="table-responsive">
+				<table class="table table-bordered table-striped" style="font-size: 12px;">
+					<thead>
+						<tr><th colspan="5" class="text-center">${__('Marketing Visits')}</th></tr>
+						<tr>
+							<th>${__('Section')}</th>
+							<th>${__('New')}</th>
+							<th>${__('Followup & Other Visits')}</th>
+							<th>${__('TPS Visits')}</th>
+							<th>${__('Grand Total')}</th>
+						</tr>
+					</thead>
+					<tbody>${body}</tbody>
+					<tfoot>
+						<tr>
+							<th>${__('Grand Total')}</th>
+							<th class="text-right">${totals.new || 0}</th>
+							<th class="text-right">${totals.followup || 0}</th>
+							<th class="text-right">${totals.tps || 0}</th>
+							<th class="text-right">${totals.total || 0}</th>
+						</tr>
+					</tfoot>
+				</table>
+			</div>
+		`;
+	}
+
+	function render_me_section_table(me) {
+		const rows = rollup_me_by_section(me?.rows || []);
+		const totals = me?.totals || { active: 0, inactive: 0, total: 0 };
+		const body = rows.length ? rows.map(row => `
+			<tr>
+				<td>${frappe.utils.escape_html(row.section || '-')}</td>
+				<td class="text-right">${row.active || 0}</td>
+				<td class="text-right">${row.inactive || 0}</td>
+				<td class="text-right">${row.total || 0}</td>
+			</tr>
+		`).join('') : `<tr><td colspan="4" class="text-center">${__('No data')}</td></tr>`;
+
+		return `
+			<div class="table-responsive">
+				<table class="table table-bordered table-striped" style="font-size: 12px;">
+					<thead>
+						<tr><th colspan="4" class="text-center">${__('M&E Visits')}</th></tr>
+						<tr>
+							<th>${__('Section')}</th>
+							<th>${__('Active')}</th>
+							<th>${__('Inactive')}</th>
+							<th>${__('Grand Total')}</th>
+						</tr>
+					</thead>
+					<tbody>${body}</tbody>
+					<tfoot>
+						<tr>
+							<th>${__('Grand Total')}</th>
+							<th class="text-right">${totals.active || 0}</th>
+							<th class="text-right">${totals.inactive || 0}</th>
+							<th class="text-right">${totals.total || 0}</th>
+						</tr>
+					</tfoot>
+				</table>
+			</div>
+		`;
+	}
+
+	function render_training_section_table(training) {
+		const rows = rollup_training_by_section(training?.rows || []);
+		const totals = training?.totals || { schools: 0, participants: 0 };
+		const body = rows.length ? rows.map(row => `
+			<tr>
+				<td>${frappe.utils.escape_html(row.section || '-')}</td>
+				<td class="text-right">${row.schools || 0}</td>
+				<td class="text-right">${row.participants || 0}</td>
+			</tr>
+		`).join('') : `<tr><td colspan="3" class="text-center">${__('No data')}</td></tr>`;
+
+		return `
+			<div class="table-responsive">
+				<table class="table table-bordered table-striped" style="font-size: 12px;">
+					<thead>
+						<tr><th colspan="3" class="text-center">${__('Training Sessions')}</th></tr>
+						<tr>
+							<th>${__('Section')}</th>
+							<th>${__('No. of Schools')}</th>
+							<th>${__('No. of participants')}</th>
+						</tr>
+					</thead>
+					<tbody>${body}</tbody>
+					<tfoot>
+						<tr>
+							<th>${__('Grand Total')}</th>
+							<th class="text-right">${totals.schools || 0}</th>
+							<th class="text-right">${totals.participants || 0}</th>
+						</tr>
+					</tfoot>
+				</table>
+			</div>
+		`;
 	}
 
 	function render_row_label(row) {
@@ -162,7 +327,7 @@ frappe.pages['field-staff-visit-mo'].on_page_load = function(wrapper) {
 		return `<td>${section}</td><td>${user}</td>`;
 	}
 
-	function render_marketing_table(marketing) {
+	function render_marketing_user_table(marketing) {
 		const rows = marketing?.rows || [];
 		const totals = marketing?.totals || { new: 0, followup: 0, tps: 0, total: 0 };
 		const body = rows.length ? rows.map(row => `
@@ -179,7 +344,7 @@ frappe.pages['field-staff-visit-mo'].on_page_load = function(wrapper) {
 			<div class="table-responsive">
 				<table class="table table-bordered table-striped" style="font-size: 12px;">
 					<thead>
-						<tr><th colspan="6" class="text-center">${__('Marketing Visits')}</th></tr>
+						<tr><th colspan="6" class="text-center">${__('Marketing Visits — User Wise')}</th></tr>
 						<tr>
 							<th>${__('Section')}</th>
 							<th>${__('User')}</th>
@@ -204,7 +369,7 @@ frappe.pages['field-staff-visit-mo'].on_page_load = function(wrapper) {
 		`;
 	}
 
-	function render_me_table(me) {
+	function render_me_user_table(me) {
 		const rows = me?.rows || [];
 		const totals = me?.totals || { active: 0, inactive: 0, total: 0 };
 		const body = rows.length ? rows.map(row => `
@@ -220,7 +385,7 @@ frappe.pages['field-staff-visit-mo'].on_page_load = function(wrapper) {
 			<div class="table-responsive">
 				<table class="table table-bordered table-striped" style="font-size: 12px;">
 					<thead>
-						<tr><th colspan="5" class="text-center">${__('M&E Visits')}</th></tr>
+						<tr><th colspan="5" class="text-center">${__('M&E Visits — User Wise')}</th></tr>
 						<tr>
 							<th>${__('Section')}</th>
 							<th>${__('User')}</th>
@@ -243,7 +408,7 @@ frappe.pages['field-staff-visit-mo'].on_page_load = function(wrapper) {
 		`;
 	}
 
-	function render_training_table(training) {
+	function render_training_user_table(training) {
 		const rows = training?.rows || [];
 		const totals = training?.totals || { schools: 0, participants: 0 };
 		const body = rows.length ? rows.map(row => `
@@ -258,7 +423,7 @@ frappe.pages['field-staff-visit-mo'].on_page_load = function(wrapper) {
 			<div class="table-responsive">
 				<table class="table table-bordered table-striped" style="font-size: 12px;">
 					<thead>
-						<tr><th colspan="4" class="text-center">${__('Training Sessions')}</th></tr>
+						<tr><th colspan="4" class="text-center">${__('Training Sessions — User Wise')}</th></tr>
 						<tr>
 							<th>${__('Section')}</th>
 							<th>${__('User')}</th>

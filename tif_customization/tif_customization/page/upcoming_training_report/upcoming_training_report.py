@@ -1,4 +1,5 @@
 import json
+from datetime import time, timedelta
 
 import frappe
 from frappe import _
@@ -23,7 +24,7 @@ def get_report_data(filters=None):
 	elif filters.get("to_date"):
 		db_filters["training_date"] = ["<=", getdate(filters.to_date)]
 
-	for fieldname in ("training_type", "school_name", "city"):
+	for fieldname in ("training_type", "mode_of_training", "participants_category", "school_name", "city"):
 		if filters.get(fieldname):
 			db_filters[fieldname] = filters.get(fieldname)
 
@@ -50,8 +51,15 @@ def get_report_data(filters=None):
 	)
 
 	today = getdate(nowdate())
+	formatted_rows = []
+	for row in rows:
+		row = frappe._dict(row)
+		row.training_date = format_report_date(row.training_date)
+		row.training_time = format_report_time(row.training_time)
+		formatted_rows.append(row)
+
 	return {
-		"rows": rows,
+		"rows": formatted_rows,
 		"summary": {
 			"total": len(rows),
 			"today": sum(getdate(row.training_date) == today for row in rows if row.training_date),
@@ -59,3 +67,27 @@ def get_report_data(filters=None):
 			"cities": len({row.city for row in rows if row.city}),
 		},
 	}
+
+
+def format_report_date(value):
+	if not value:
+		return ""
+
+	return getdate(value).strftime("%d-%m-%y")
+
+
+def format_report_time(value):
+	if not value:
+		return ""
+
+	if isinstance(value, timedelta):
+		total_seconds = int(value.total_seconds())
+		hours = total_seconds // 3600
+		minutes = (total_seconds % 3600) // 60
+		seconds = total_seconds % 60
+		return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+	if isinstance(value, time):
+		return value.strftime("%H:%M:%S")
+
+	return str(value).split(".")[0]

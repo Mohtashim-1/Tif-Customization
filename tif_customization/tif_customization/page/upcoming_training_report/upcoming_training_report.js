@@ -17,39 +17,61 @@ frappe.tif_customization.UpcomingTrainingReport = class UpcomingTrainingReport {
 	}
 
 	make() {
-		this.make_filters();
 		this.make_layout();
+		this.make_filters();
 		this.load_data();
 	}
 
 	make_filters() {
-		this.from_date = this.page.add_field({
+		this.from_date = this.make_filter_control({
 			label: __("From Date"),
 			fieldtype: "Date",
 			fieldname: "from_date",
+			change: () => this.load_data(),
 		});
-		this.to_date = this.page.add_field({
+		this.to_date = this.make_filter_control({
 			label: __("To Date"),
 			fieldtype: "Date",
 			fieldname: "to_date",
+			change: () => this.load_data(),
 		});
-		this.training_type = this.page.add_field({
+		this.training_type = this.make_filter_control({
 			label: __("Training Type"),
 			fieldtype: "Data",
 			fieldname: "training_type",
+			change: () => this.load_data(),
 		});
-		this.school_name = this.page.add_field({
+		this.mode_of_training = this.make_filter_control({
+			label: __("Mode of Training"),
+			fieldtype: "Select",
+			fieldname: "mode_of_training",
+			options: "\nOnline\nOnsite",
+			change: () => this.load_data(),
+		});
+		this.participants_category = this.make_filter_control({
+			label: __("Participants Category"),
+			fieldtype: "Data",
+			fieldname: "participants_category",
+			change: () => this.load_data(),
+		});
+		this.school_name = this.make_filter_control({
 			label: __("School Name"),
 			fieldtype: "Link",
 			fieldname: "school_name",
 			options: "School",
+			change: () => this.load_data(),
 		});
-		this.city = this.page.add_field({
+		this.city = this.make_filter_control({
 			label: __("City"),
 			fieldtype: "Link",
 			fieldname: "city",
 			options: "City",
+			change: () => this.load_data(),
 		});
+
+		$(this.page.body)
+			.find("#upcoming-training-clear-filters")
+			.on("click", () => this.clear_filters());
 
 		this.page.set_primary_action(__("Refresh"), () => this.load_data(), "refresh");
 		this.page.add_inner_button(__("New Training"), () => frappe.new_doc("Upcoming Training"));
@@ -57,9 +79,27 @@ frappe.tif_customization.UpcomingTrainingReport = class UpcomingTrainingReport {
 		this.page.add_action_item(__("Export CSV"), () => this.export_csv());
 	}
 
+	make_filter_control(df) {
+		const field_area = $(`<div class="col-md-3 col-sm-6"></div>`).appendTo(
+			$(this.page.body).find("#upcoming-training-filters")
+		);
+
+		return frappe.ui.form.make_control({
+			df,
+			parent: field_area,
+			render_input: true,
+		});
+	}
+
 	make_layout() {
 		$(this.page.body).html(`
 			<div style="padding: 16px;">
+				<div class="frappe-card" style="padding: 14px; margin-bottom: 16px; border-radius: 8px;">
+					<div id="upcoming-training-filters" class="row"></div>
+					<div class="text-right" style="margin-top: 8px;">
+						<button class="btn btn-default btn-sm" id="upcoming-training-clear-filters">${__("Clear Filters")}</button>
+					</div>
+				</div>
 				<div id="upcoming-training-summary" class="row" style="margin-bottom: 16px;"></div>
 				<div class="table-responsive" style="background: #fff; border: 1px solid #d1d8dd; border-radius: 8px;">
 					<table class="table table-bordered" style="margin-bottom: 0; white-space: nowrap;">
@@ -95,15 +135,23 @@ frappe.tif_customization.UpcomingTrainingReport = class UpcomingTrainingReport {
 			from_date: this.from_date.get_value(),
 			to_date: this.to_date.get_value(),
 			training_type: this.training_type.get_value(),
+			mode_of_training: this.mode_of_training.get_value(),
+			participants_category: this.participants_category.get_value(),
 			school_name: this.school_name.get_value(),
 			city: this.city.get_value(),
 		};
 	}
 
 	clear_filters() {
-		[this.from_date, this.to_date, this.training_type, this.school_name, this.city].forEach((field) =>
-			field.set_value("")
-		);
+		[
+			this.from_date,
+			this.to_date,
+			this.training_type,
+			this.mode_of_training,
+			this.participants_category,
+			this.school_name,
+			this.city,
+		].forEach((field) => field.set_value(""));
 		this.load_data();
 	}
 

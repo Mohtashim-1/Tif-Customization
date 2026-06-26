@@ -352,6 +352,16 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "Expense from Zakat Account (UAT)",
+   "link_count": 0,
+   "link_to": "expense-from-zakat-a",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "Purchase",
    "link_count": 1,
    "onboard": 0,
@@ -426,7 +436,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-06-24 17:28:11.708166",
+ "modified": "2026-06-24 17:55:42.239796",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Reports",
