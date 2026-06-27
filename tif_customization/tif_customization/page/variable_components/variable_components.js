@@ -99,6 +99,9 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 							<span><i class="swatch-dirty"></i> ${__("Edited (not saved)")}</span>
 							<span><i class="swatch-payroll"></i> ${__("Included in payroll run")}</span>
 						</div>
+						<div class="vc-payroll-register-summary-wrap">
+							<div class="vc-payroll-register-summary"></div>
+						</div>
 						<div class="vc-sheet-wrap">
 							<div class="vc-sheet-content"></div>
 						</div>
@@ -119,6 +122,7 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 				this.$payroll_status = this.page.main.find(".vc-payroll-panel__status");
 				this.$payroll_count = this.page.main.find(".vc-payroll-count");
 				this.$link_pe = this.page.main.find(".vc-link-payroll-entry");
+				this.$payroll_register_summary = this.page.main.find(".vc-payroll-register-summary");
 				this.$payment_summary = this.page.main.find(".vc-payment-summary");
 				this.$roster_status = this.page.main.find(".vc-roster-status");
 			}
@@ -649,6 +653,7 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 							data-section="${sec_id}"
 							data-payroll-eligible="${can_payroll ? 1 : 0}"
 							data-default-bank="${frappe.utils.escape_html(row.default_bank_name || "")}"
+							data-department="${frappe.utils.escape_html(row.department || __("No Department"))}"
 							data-slip-net="${flt(sal.net_pay)}"
 							data-assignment-gross="${flt(sal.assignment_gross || sal.gross_pay)}"
 							data-base-gross="${flt(sal.gross_pay)}"
@@ -1151,6 +1156,44 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 				`);
 			}
 
+			render_payroll_register_summary(summary) {
+				if (!this.$payroll_register_summary || !this.$payroll_register_summary.length) return;
+				const s = summary || {};
+				const departments = s.by_department || [];
+				let department_rows = "";
+
+				departments.forEach((row) => {
+					department_rows += `<tr>
+						<td>${frappe.utils.escape_html(row.label)}</td>
+						<td class="text-right">${row.headcount}</td>
+						<td class="text-right">${this.fmt_plain(row.amount)}</td>
+					</tr>`;
+				});
+
+				this.$payroll_register_summary.html(`
+					<div class="vc-payroll-register-summary__head">
+						<div>
+							<h4>${__("Payroll Register")}</h4>
+							<div class="text-muted">${__("Department wise headcount and payable amount for selected payroll employees")}</div>
+						</div>
+						<div class="vc-payroll-register-summary__totals">
+							<span><strong>${s.total_headcount || 0}</strong> ${__("Headcount")}</span>
+							<span><strong>${this.fmt_plain(s.total_amount || 0)}</strong> ${__("Amount")}</span>
+						</div>
+					</div>
+					<table class="table table-bordered table-sm vc-summary-table">
+						<thead>
+							<tr>
+								<th>${__("Department")}</th>
+								<th class="text-right">${__("Headcount")}</th>
+								<th class="text-right">${__("Amount")}</th>
+							</tr>
+						</thead>
+						<tbody>${department_rows || `<tr><td colspan="3" class="text-muted">${__("No payroll employees selected")}</td></tr>`}</tbody>
+					</table>
+				`);
+			}
+
 			_init_payroll_selection() {
 				this._payroll_selected = new Set(this._data.payroll_eligible || []);
 			}
@@ -1314,6 +1357,7 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 					total_amount: 0,
 					by_mode: {},
 					by_bank: {},
+					by_department: {},
 				};
 
 				const self = this;
@@ -1373,6 +1417,13 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 						if (payable > 0) {
 							summary.total_headcount += 1;
 							summary.total_amount += payable;
+							const department = $tr.attr("data-department") || __("No Department");
+							if (!summary.by_department[department]) {
+								summary.by_department[department] = { label: department, headcount: 0, amount: 0 };
+							}
+							summary.by_department[department].headcount += 1;
+							summary.by_department[department].amount += payable;
+
 							const mode = $tr.find(".vc-payment-mode").val() || "Cheque";
 							if (!summary.by_mode[mode]) {
 								summary.by_mode[mode] = { label: mode, headcount: 0, amount: 0 };
@@ -1414,6 +1465,10 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 				summary.by_bank = Object.values(summary.by_bank).sort((a, b) =>
 					a.label.localeCompare(b.label),
 				);
+				summary.by_department = Object.values(summary.by_department).sort((a, b) =>
+					a.label.localeCompare(b.label),
+				);
+				this.render_payroll_register_summary(summary);
 				this.render_payment_summary(summary);
 
 				const fmt_salary = (key, val) => {

@@ -365,6 +365,8 @@ def get_variable_sheet_data(month=None, year=None, company=None, start_date=None
 		return flt((item.get("salary") or {}).get(sk))
 
 	for section_label in SECTION_ORDER:
+		if section_label == UNASSIGNED_SECTION:
+			continue
 		items = section_rows.get(section_label) or []
 		if not items and section_label not in HEADER_ONLY_SECTIONS:
 			continue
