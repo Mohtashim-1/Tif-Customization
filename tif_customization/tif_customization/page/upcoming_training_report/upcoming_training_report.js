@@ -94,6 +94,34 @@ frappe.tif_customization.UpcomingTrainingReport = class UpcomingTrainingReport {
 	make_layout() {
 		$(this.page.body).html(`
 			<div style="padding: 16px;">
+				<style>
+					.upcoming-training-kpi {
+						position: relative;
+						overflow: hidden;
+						padding: 14px 16px;
+						border-radius: 10px;
+						min-height: 92px;
+						border: 1px solid var(--border-color, #e5e7eb);
+					}
+					.upcoming-training-kpi:before {
+						content: "";
+						position: absolute;
+						inset: 0 0 auto 0;
+						height: 4px;
+						background: var(--accent);
+					}
+					.upcoming-training-kpi__label {
+						font-size: 12px;
+						font-weight: 600;
+						color: var(--text-muted, #6b7280);
+					}
+					.upcoming-training-kpi__value {
+						margin-top: 8px;
+						font-size: 28px;
+						line-height: 1;
+						font-weight: 700;
+					}
+				</style>
 				<div class="frappe-card" style="padding: 14px; margin-bottom: 16px; border-radius: 8px;">
 					<div id="upcoming-training-filters" class="row"></div>
 					<div class="text-right" style="margin-top: 8px;">
@@ -176,21 +204,53 @@ frappe.tif_customization.UpcomingTrainingReport = class UpcomingTrainingReport {
 	}
 
 	render_summary(summary) {
+		const row_summary = this.get_row_summary();
+		const onsite = summary.onsite ?? row_summary.onsite;
+		const online = summary.online ?? row_summary.online;
+		const in_person = summary.in_person ?? row_summary.in_person;
+		const areas = summary.areas ?? row_summary.areas;
 		const cards = [
-			[__("Total Trainings"), summary.total || 0],
-			[__("Training Today"), summary.today || 0],
-			[__("Schools"), summary.schools || 0],
-			[__("Cities"), summary.cities || 0],
+			[__("Total Trainings"), summary.total || 0, "#2563eb"],
+			[__("Training Today"), summary.today || 0, "#7c3aed"],
+			[__("Total Onsite"), onsite || 0, "#059669"],
+			[__("Total Online"), online || 0, "#0284c7"],
+			[__("Total In-person"), in_person || 0, "#ea580c"],
+			[__("Total Area"), areas || 0, "#be123c"],
+			[__("Schools"), summary.schools || 0, "#4f46e5"],
+			[__("Cities"), summary.cities || 0, "#0f766e"],
 		];
 		$(this.page.body)
 			.find("#upcoming-training-summary")
 			.html(
 				cards
 					.map(
-						([label, value]) => `<div class="col-md-3"><div class="frappe-card" style="padding: 14px; border-radius: 8px;"><div class="text-muted">${label}</div><div style="font-size: 26px; font-weight: 600;">${value}</div></div></div>`
+						([label, value, color]) => `
+							<div class="col-lg-3 col-md-4 col-sm-6" style="margin-bottom: 12px;">
+								<div class="frappe-card upcoming-training-kpi" style="--accent:${color}">
+									<div class="upcoming-training-kpi__label">${label}</div>
+									<div class="upcoming-training-kpi__value">${value}</div>
+								</div>
+							</div>`
 					)
 					.join("")
 			);
+	}
+
+	get_row_summary() {
+		const areas = new Set();
+		return this.rows.reduce(
+			(summary, row) => {
+				const mode = String(row.mode_of_training || "").trim().toLowerCase();
+				if (mode === "onsite") summary.onsite += 1;
+				if (mode === "online") summary.online += 1;
+				if (mode === "in-person" || mode === "in person") summary.in_person += 1;
+				const area = String(row.area || "").trim().toLowerCase();
+				if (area) areas.add(area);
+				summary.areas = areas.size;
+				return summary;
+			},
+			{ onsite: 0, online: 0, in_person: 0, areas: 0 }
+		);
 	}
 
 	render_rows() {

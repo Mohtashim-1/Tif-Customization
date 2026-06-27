@@ -125,7 +125,7 @@ frappe.pages['field-staff-visit-mo'].on_page_load = function(wrapper) {
 					$('#fs-report').html(`<p class="text-danger">${__('Failed to load report.')}</p>`);
 					return;
 				}
-				add_submission_ratio(r.message, filters, render_report);
+				render_report(r.message);
 			},
 			error: function() {
 				$('#fs-report').html(`<p class="text-danger">${__('Failed to load report.')}</p>`);
@@ -133,6 +133,7 @@ frappe.pages['field-staff-visit-mo'].on_page_load = function(wrapper) {
 		});
 	}
 
+	/*
 	function add_submission_ratio(data, filters, callback) {
 		const submittedUsers = get_submitted_users(data);
 
@@ -171,6 +172,7 @@ frappe.pages['field-staff-visit-mo'].on_page_load = function(wrapper) {
 			}
 		});
 	}
+	*/
 
 	function filter_enabled_field_staff_users(roleUsers, filters, callback) {
 		if (!roleUsers.length) {

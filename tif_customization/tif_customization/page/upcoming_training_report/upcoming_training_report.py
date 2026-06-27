@@ -65,6 +65,10 @@ def get_report_data(filters=None):
 			"today": sum(getdate(row.training_date) == today for row in rows if row.training_date),
 			"schools": len({row.school_name for row in rows if row.school_name}),
 			"cities": len({row.city for row in rows if row.city}),
+			"onsite": sum(_norm(row.mode_of_training) == "onsite" for row in rows),
+			"online": sum(_norm(row.mode_of_training) == "online" for row in rows),
+			"in_person": sum(_norm(row.mode_of_training) in ("in-person", "in person") for row in rows),
+			"areas": len({_norm(row.area) for row in rows if _norm(row.area)}),
 		},
 	}
 
@@ -91,3 +95,7 @@ def format_report_time(value):
 		return value.strftime("%H:%M:%S")
 
 	return str(value).split(".")[0]
+
+
+def _norm(value):
+	return (value or "").strip().lower()
