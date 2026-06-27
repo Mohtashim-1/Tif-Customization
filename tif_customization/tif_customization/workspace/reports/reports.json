@@ -1,7 +1,7 @@
 {
  "charts": [],
  "content": "[{\"id\":\"oABt4p_ANs\",\"type\":\"custom_block\",\"data\":{\"custom_block_name\":\"Reports Menu\",\"col\":12}}]",
- "creation": "2025-12-29 00:25:08.999696",
+ "creation": "2026-06-27 17:02:42.705759",
  "custom_blocks": [
   {
    "custom_block_name": "Reports Menu",
@@ -41,6 +41,16 @@
    "label": "School Database Dashboard (UAT)",
    "link_count": 0,
    "link_to": "school-dashboard",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "School Location Report (UAT)",
+   "link_count": 0,
+   "link_to": "school-location-report",
    "link_type": "Page",
    "onboard": 0,
    "type": "Link"

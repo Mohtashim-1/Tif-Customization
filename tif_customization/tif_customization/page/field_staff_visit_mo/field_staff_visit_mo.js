@@ -290,8 +290,8 @@ frappe.pages['field-staff-visit-mo'].on_page_load = function(wrapper) {
 		const trainingSection = render_training_section_table(data.training);
 
 		const marketingUsers = render_marketing_user_table(data.marketing);
-		const meUsers = render_me_user_table(data.me);
-		const trainingUsers = render_training_user_table(data.training);
+		// const meUsers = render_me_user_table(data.me);
+		// const trainingUsers = render_training_user_table(data.training);
 
 		$('#fs-report').html(`
 			${header}
@@ -306,8 +306,8 @@ frappe.pages['field-staff-visit-mo'].on_page_load = function(wrapper) {
 			</div>
 			<div class="row">
 				<div class="col-md-12 mb-3">${marketingUsers}</div>
-				<div class="col-md-6">${meUsers}</div>
-				<div class="col-md-6">${trainingUsers}</div>
+				<!-- M&E Visits — User Wise table intentionally hidden -->
+				<!-- Training Sessions — User Wise table intentionally hidden -->
 			</div>
 		`);
 	}
