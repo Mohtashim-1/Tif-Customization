@@ -21,6 +21,13 @@ def get_report_data(filters=None):
 		marketing = _get_marketing_visits(from_date, to_date, user=user, section=section)
 		me_visits = _get_me_visits(from_date, to_date, user=user, section=section)
 		training = _get_training_sessions(from_date, to_date, user=user, section=section)
+		submission_ratio = _get_submission_ratio(
+			marketing=marketing,
+			me_visits=me_visits,
+			training=training,
+			user=user,
+			section=section,
+		)
 
 		return {
 			"from_date": str(from_date),
@@ -30,6 +37,7 @@ def get_report_data(filters=None):
 			"marketing": marketing,
 			"me": me_visits,
 			"training": training,
+			"submission_ratio": submission_ratio,
 		}
 	except Exception as e:
 		frappe.log_error(f"Error in get_report_data: {str(e)}", "Field Staff Visit Report")
@@ -66,6 +74,64 @@ def _user_names(users):
 		return {}
 	rows = frappe.get_all("User", filters={"name": ["in", users]}, fields=["name", "full_name"])
 	return {row.name: (row.full_name or row.name) for row in rows}
+
+
+def _get_submission_ratio(marketing, me_visits, training, user=None, section=None):
+	submitter_users = set()
+	for group in (marketing, me_visits, training):
+		for row in (group or {}).get("rows") or []:
+			row_user = row.get("user")
+			if row_user and row_user != "Unassigned":
+				submitter_users.add(row_user)
+
+	eligible_users = _get_eligible_submission_users(user=user, section=section)
+	submitted_users = len(submitter_users)
+	eligible_count = len(eligible_users)
+	ratio = (submitted_users / eligible_count * 100) if eligible_count else 0
+
+	return {
+		"submitted_users": submitted_users,
+		"eligible_users": eligible_count,
+		"ratio": round(ratio, 1),
+	}
+
+
+def _get_eligible_submission_users(user=None, section=None):
+	role_rows = frappe.get_all(
+		"Has Role",
+		filters={"role": "Field Staff", "parenttype": "User"},
+		pluck="parent",
+	)
+	if not role_rows:
+		return set()
+
+	user_filters = {"name": ["in", role_rows], "enabled": 1}
+	if user:
+		user_filters["name"] = user
+
+	eligible_users = {
+		row.name
+		for row in frappe.get_all("User", filters=user_filters, fields=["name"])
+		if row.name
+	}
+
+	if not section or not eligible_users:
+		return eligible_users
+
+	section_users = {
+		row.user_id
+		for row in frappe.get_all(
+			"Employee",
+			filters={
+				"status": "Active",
+				"department": section,
+				"user_id": ["in", list(eligible_users)],
+			},
+			fields=["user_id"],
+		)
+		if row.user_id
+	}
+	return section_users
 
 
 def _section_user_filters(user=None, section=None):

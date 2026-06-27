@@ -1,7 +1,7 @@
 frappe.pages["upcoming-training-report"].on_page_load = function (wrapper) {
 	const page = frappe.ui.make_app_page({
 		parent: wrapper,
-		title: __("Upcoming Training Report"),
+		title: __("Upcoming Training and Workshop"),
 		single_column: true,
 	});
 

@@ -28,7 +28,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Upcoming Training (UAT)",
+   "label": "Upcoming Training and Workshop (UAT)",
    "link_count": 0,
    "link_to": "upcoming-training-report",
    "link_type": "Page",
@@ -106,6 +106,16 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "WASA Printers Dashboard (UAT)",
+   "link_count": 0,
+   "link_to": "wasa-printers-dashboard",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "HR",
    "link_count": 10,
    "onboard": 0,
@@ -154,7 +164,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Organization Chart (UAT) 24-Jun-26",
+   "label": "Organization Chart (UAT) 29-Jun-26",
    "link_count": 0,
    "link_to": "organization-chart-grouped",
    "link_type": "Page",
@@ -174,7 +184,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Salary Register (UAT) 24-Jun-26",
+   "label": "Salary Register (UAT) 29-Jun-26",
    "link_count": 0,
    "link_to": "salary-register",
    "link_type": "Page",
@@ -194,7 +204,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Salary Report (UAT) 24-Jun-26",
+   "label": "Salary Report (UAT) 29-Jun-26",
    "link_count": 0,
    "link_to": "variable-components",
    "link_type": "Page",
@@ -204,7 +214,7 @@
   {
    "hidden": 0,
    "is_query_report": 1,
-   "label": "Full and Final Clearance (UAT) 24-Jun-26",
+   "label": "Full and Final Clearance (UAT) 29-Jun-26",
    "link_count": 0,
    "link_to": "Full and Final Clearance",
    "link_type": "DocType",
@@ -234,7 +244,7 @@
   {
    "hidden": 0,
    "is_query_report": 1,
-   "label": "Full and Final Settlement (UAT) 24-Jun-26",
+   "label": "Full and Final Settlement (UAT) 29-Jun-26",
    "link_count": 0,
    "link_to": "Full and Final Statement",
    "link_type": "DocType",
@@ -244,7 +254,7 @@
   {
    "hidden": 0,
    "is_query_report": 1,
-   "label": "Leave Application 24-Jun-26 (UAT)",
+   "label": "Leave Application ",
    "link_count": 0,
    "link_to": "Leave Application",
    "link_type": "DocType",
@@ -262,7 +272,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Expense Report and Dashboard (UAT) 24-Jun-26",
+   "label": "Expense Report and Dashboard (UAT) 29-Jun-26",
    "link_count": 0,
    "link_to": "procurement-expense",
    "link_type": "Page",
@@ -272,7 +282,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Donation Received Bank Wise (UAT) 24-Jun-26",
+   "label": "Donation Received Bank Wise (UAT) 29-Jun-26",
    "link_count": 0,
    "link_to": "bank-wise-fund-distribution",
    "link_type": "Page",
@@ -282,7 +292,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Donation Received Donor Wise (UAT) 24-Jun-26",
+   "label": "Donation Received Donor Wise (UAT) 29-Jun-26",
    "link_count": 0,
    "link_to": "bank-balance-reconci",
    "link_type": "Page",
@@ -292,7 +302,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Donor Receipt Report (UAT) 24-Jun-26",
+   "label": "Donor Receipt Report (UAT) 29-Jun-26",
    "link_count": 0,
    "link_to": "donor-receipt-report",
    "link_type": "Page",
@@ -302,7 +312,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Donation Analytics (UAT) 24-Jun-26",
+   "label": "Donation Analytics (UAT) 29-Jun-26",
    "link_count": 0,
    "link_to": "donation-analytics",
    "link_type": "Page",
@@ -436,7 +446,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-06-24 17:55:42.239796",
+ "modified": "2026-06-27 15:21:35.141214",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Reports",

@@ -125,12 +125,115 @@ frappe.pages['field-staff-visit-mo'].on_page_load = function(wrapper) {
 					$('#fs-report').html(`<p class="text-danger">${__('Failed to load report.')}</p>`);
 					return;
 				}
-				render_report(r.message);
+				add_submission_ratio(r.message, filters, render_report);
 			},
 			error: function() {
 				$('#fs-report').html(`<p class="text-danger">${__('Failed to load report.')}</p>`);
 			}
 		});
+	}
+
+	function add_submission_ratio(data, filters, callback) {
+		const submittedUsers = get_submitted_users(data);
+
+		frappe.call({
+			method: 'frappe.client.get_list',
+			args: {
+				doctype: 'Has Role',
+				fields: ['parent'],
+				filters: {
+					role: 'Field Staff',
+					parenttype: 'User'
+				},
+				limit_page_length: 1000
+			},
+			callback: function(r) {
+				const roleUsers = [...new Set((r.message || []).map(row => row.parent).filter(Boolean))];
+				filter_enabled_field_staff_users(roleUsers, filters, function(eligibleUsers) {
+					const eligibleCount = eligibleUsers.size;
+					const submittedCount = submittedUsers.size;
+					data.submission_ratio = {
+						submitted_users: submittedCount,
+						eligible_users: eligibleCount,
+						ratio: eligibleCount ? Number((submittedCount / eligibleCount * 100).toFixed(1)) : 0
+					};
+					callback(data);
+				});
+			},
+			error: function() {
+				const submittedCount = submittedUsers.size;
+				data.submission_ratio = {
+					submitted_users: submittedCount,
+					eligible_users: submittedCount,
+					ratio: submittedCount ? 100 : 0
+				};
+				callback(data);
+			}
+		});
+	}
+
+	function filter_enabled_field_staff_users(roleUsers, filters, callback) {
+		if (!roleUsers.length) {
+			callback(new Set());
+			return;
+		}
+
+		frappe.call({
+			method: 'frappe.client.get_list',
+			args: {
+				doctype: 'User',
+				fields: ['name'],
+				filters: {
+					name: ['in', roleUsers],
+					enabled: 1,
+					...(filters.user ? { name: filters.user } : {})
+				},
+				limit_page_length: 1000
+			},
+			callback: function(r) {
+				const enabledUsers = new Set((r.message || []).map(row => row.name).filter(Boolean));
+				if (!filters.section || !enabledUsers.size) {
+					callback(enabledUsers);
+					return;
+				}
+
+				frappe.call({
+					method: 'frappe.client.get_list',
+					args: {
+						doctype: 'Employee',
+						fields: ['user_id'],
+						filters: {
+							status: 'Active',
+							department: filters.section,
+							user_id: ['in', [...enabledUsers]]
+						},
+						limit_page_length: 1000
+					},
+					callback: function(employeeResponse) {
+						callback(new Set((employeeResponse.message || []).map(row => row.user_id).filter(Boolean)));
+					},
+					error: function() {
+						callback(enabledUsers);
+					}
+				});
+			},
+			error: function() {
+				callback(new Set(roleUsers));
+			}
+		});
+	}
+
+	function get_submitted_users(data) {
+		const submittedUsers = new Set();
+		[data.marketing, data.me, data.training].forEach((group) => {
+			(group?.rows || []).forEach((row) => {
+				const user = String(row.user_name || row.user || '').trim();
+				if (user && user !== 'Unassigned') {
+					submittedUsers.add(user.toLowerCase());
+				}
+			});
+		});
+		return submittedUsers;
 	}
 
 	function rollup_marketing_by_section(rows) {
@@ -180,6 +283,7 @@ frappe.pages['field-staff-visit-mo'].on_page_load = function(wrapper) {
 				${__('SME Visits Summary')} (${fromLabel} ${__('to')} ${toLabel})
 			</div>
 		`;
+		const submissionRatio = render_submission_ratio(data.submission_ratio);
 
 		const marketingSection = render_marketing_section_table(data.marketing);
 		const meSection = render_me_section_table(data.me);
@@ -191,6 +295,7 @@ frappe.pages['field-staff-visit-mo'].on_page_load = function(wrapper) {
 
 		$('#fs-report').html(`
 			${header}
+			${submissionRatio}
 			<div class="row">
 				<div class="col-md-4">${marketingSection}</div>
 				<div class="col-md-4">${meSection}</div>
@@ -205,6 +310,35 @@ frappe.pages['field-staff-visit-mo'].on_page_load = function(wrapper) {
 				<div class="col-md-6">${trainingUsers}</div>
 			</div>
 		`);
+	}
+
+	function render_submission_ratio(summary) {
+		const submitted = summary?.submitted_users || 0;
+		const eligible = summary?.eligible_users || 0;
+		const ratio = Number(summary?.ratio || 0).toFixed(1);
+
+		return `
+			<div class="row" style="margin-bottom: 18px;">
+				<div class="col-md-4">
+					<div class="border rounded p-3 text-center">
+						<div class="text-muted">${__('Submitted Users')}</div>
+						<div style="font-size: 24px; font-weight: 700;">${submitted}</div>
+					</div>
+				</div>
+				<div class="col-md-4">
+					<div class="border rounded p-3 text-center">
+						<div class="text-muted">${__('Eligible Users')}</div>
+						<div style="font-size: 24px; font-weight: 700;">${eligible}</div>
+					</div>
+				</div>
+				<div class="col-md-4">
+					<div class="border rounded p-3 text-center">
+						<div class="text-muted">${__('Submission Ratio')}</div>
+						<div style="font-size: 24px; font-weight: 700;">${ratio}%</div>
+					</div>
+				</div>
+			</div>
+		`;
 	}
 
 	function render_marketing_section_table(marketing) {
