@@ -390,6 +390,16 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "Purchase from Endowment Fund (UAT)",
+   "link_count": 0,
+   "link_to": "purchase-from-endowment-fund",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "Purchase",
    "link_count": 1,
    "onboard": 0,
