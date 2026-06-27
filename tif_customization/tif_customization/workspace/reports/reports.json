@@ -86,6 +86,14 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "Book Purchase and Printing",
+   "link_count": 3,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "Millat Publishers Dashboard (UAT)",
    "link_count": 0,
    "link_to": "millat-publisher-dashboard",
@@ -322,6 +330,16 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "Purchase from Zakat (UAT) 29-Jun-26",
+   "link_count": 0,
+   "link_to": "expense-from-zakat-a",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "Reconciliation with Bank Statements Summary (UAT) 29-06-2026",
    "link_count": 0,
    "link_to": "reconcillation-with-",
@@ -362,7 +380,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Expense from Zakat Account (UAT)",
+   "label": "Purchase from Zakat (UAT)",
    "link_count": 0,
    "link_to": "expense-from-zakat-a",
    "link_type": "Page",
@@ -446,7 +464,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-06-27 15:21:35.141214",
+ "modified": "2026-06-27 16:32:24.919282",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Reports",

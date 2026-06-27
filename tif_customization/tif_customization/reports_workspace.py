@@ -3,7 +3,7 @@ import json
 import frappe
 
 
-CARD_ORDER = ["Programs", "HR", "Supply Chain", "Purchase", "Accounts", "QPS"]
+CARD_ORDER = ["HR", "Supply Chain", "Purchase", "Accounts", "Program", "SME", "Book Purchase and Printing"]
 
 
 @frappe.whitelist()
