@@ -8,13 +8,11 @@ from tif_customization.tif_customization.page.smes_target_base___k.smes_target_b
 	FISCAL_MONTHS,
 	INCREMENT_SCALE,
 	KPI_ACTIVITIES,
+	REGION_KEYS,
 	REGION_LABELS,
 	REGION_SUMMARY,
 	WORKING_DAYS_DEFAULT,
 )
-
-
-REGION_KEYS = ("sindh", "urban", "rural")
 
 
 @frappe.whitelist()
@@ -39,14 +37,18 @@ def get_report_data(filters=None):
 		for rk in REGION_KEYS
 	}
 
-	# Increment tier reference uses Sindh column (same as spreadsheet default region).
-	sindh_percent = (region_totals.get("sindh") or {}).get("percent") or 0
+	# Increment tier reference uses Karachi column (same as spreadsheet default region).
+	karachi_percent = (region_totals.get("karachi") or {}).get("percent") or 0
 
 	return {
 		"foundation_title": _("The ILM Foundation"),
 		"sheet_title": _("SMEs Target Base - KPIs"),
 		"regions": [
-			{"key": rk, "label": REGION_LABELS[rk], "theme": "tan" if rk != "urban" else "blue"}
+			{
+				"key": rk,
+				"label": REGION_LABELS[rk],
+				"theme": "blue" if rk in ("punjab", "urban") else "tan",
+			}
 			for rk in REGION_KEYS
 		],
 		"per_day_points_row": {
@@ -63,7 +65,7 @@ def get_report_data(filters=None):
 				"values": {rk: REGION_SUMMARY[rk]["per_day_target_points"] for rk in REGION_KEYS},
 			},
 			{
-				"label": _("Total Expected Targets Points Monthly *"),
+				"label": _("Total Expected Targets Points Monthly ***"),
 				"values": {rk: region_totals[rk]["expected"] for rk in REGION_KEYS},
 				"bold": True,
 			},
@@ -88,9 +90,9 @@ def get_report_data(filters=None):
 		"working_days": working_days,
 		"fiscal_by_region": fiscal_by_region,
 		"increment_scale": INCREMENT_SCALE,
-		"increment_tier": _increment_tier(sindh_percent),
+		"increment_tier": _increment_tier(karachi_percent),
 		"footnotes": [
-			_("* Model School A: Affiliated with at least one Program of 2 departments."),
+			_("* Model School A: Affiliated with at least one Program of 3 departments."),
 			_("** Model School B: Affiliated with at least one Program of 2 departments."),
 			_("Total expected target points depend on total number of working days."),
 		],
@@ -124,15 +126,16 @@ def _build_activity_rows(actuals, working_days):
 		regions = {}
 		for rk in REGION_KEYS:
 			cfg = (activity.get("targets") or {}).get(rk) or {}
-			per_day_target = flt(cfg.get("per_day_target"))
-			points = flt(cfg.get("points"))
+			per_day_target = _display_value(cfg.get("per_day_target"))
+			points = _display_value(cfg.get("points"))
+			scoring_points = _points_for_scoring(cfg)
 			actual = flt(actuals.get(activity["metric"], 0))
 			regions[rk] = {
-				"per_day_target": per_day_target if per_day_target else None,
-				"points": points if points else None,
+				"per_day_target": per_day_target,
+				"points": points,
 				"yearly": cfg.get("yearly"),
 				"actual": actual,
-				"achieved_points": actual * points,
+				"achieved_points": actual * scoring_points,
 			}
 		rows.append(
 			{
@@ -422,7 +425,7 @@ def _scalar_count(query, params):
 
 
 def _build_fiscal_month_scores(staff, fiscal_year_start, region, working_days):
-	region_summary = REGION_SUMMARY.get(region, REGION_SUMMARY["sindh"])
+	region_summary = REGION_SUMMARY.get(region, REGION_SUMMARY["karachi"])
 	expected = working_days * region_summary["per_day_target_points"]
 	results = []
 
@@ -434,7 +437,7 @@ def _build_fiscal_month_scores(staff, fiscal_year_start, region, working_days):
 		score = 0.0
 		for activity in KPI_ACTIVITIES:
 			target_cfg = (activity.get("targets") or {}).get(region) or {}
-			points = flt(target_cfg.get("points"))
+			points = _points_for_scoring(target_cfg)
 			score += flt(actuals.get(activity["metric"], 0)) * points
 		pct = (score / expected * 100) if expected else 0
 		results.append(
@@ -458,3 +461,19 @@ def _increment_tier(percent):
 		if percent < max_p:
 			return row
 	return INCREMENT_SCALE[-1]
+
+
+def _display_value(value):
+	if value in (None, "", 0, "0"):
+		return None
+	return value
+
+
+def _points_for_scoring(cfg):
+	if cfg.get("calc_points") not in (None, ""):
+		return flt(cfg.get("calc_points"))
+
+	points = cfg.get("points")
+	if isinstance(points, str) and "-" in points:
+		return flt(points.split("-")[-1])
+	return flt(points)

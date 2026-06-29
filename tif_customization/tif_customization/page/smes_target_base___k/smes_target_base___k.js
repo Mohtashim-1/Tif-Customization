@@ -2,7 +2,7 @@ frappe.pages["smes-target-base---k"].on_page_load = function (wrapper) {
 	new SmesTargetBasePage(wrapper);
 };
 
-const SME_REGIONS = ["sindh", "urban", "rural"];
+const SME_REGIONS = ["karachi", "punjab", "urban", "rural"];
 
 class SmesTargetBasePage {
 	constructor(wrapper) {
@@ -60,7 +60,7 @@ class SmesTargetBasePage {
 				.sme-sheet {
 					border-collapse: collapse;
 					width: 100%;
-					min-width: 1100px;
+					min-width: 1400px;
 					font-size: 12px;
 					font-family: Calibri, Arial, sans-serif;
 				}
@@ -227,6 +227,9 @@ class SmesTargetBasePage {
 
 	fmt(val, opts = {}) {
 		if (val === null || val === undefined || val === "") return "";
+		if (typeof val === "string" && !/^-?\d+(\.\d+)?$/.test(val)) {
+			return frappe.utils.escape_html(val);
+		}
 		if (opts.suffix === "%") return `${format_number(val, null, { precision: 2 })}%`;
 		const precision = opts.precision != null ? opts.precision : 0;
 		return format_number(val, null, { precision });
@@ -246,6 +249,11 @@ class SmesTargetBasePage {
 
 	render_main_table(data) {
 		const regions = data.regions || [];
+		const regionKeys = regions.length ? regions.map((r) => r.key) : SME_REGIONS;
+		const themeMap = {};
+		regions.forEach((r) => {
+			themeMap[r.key] = r.theme || "tan";
+		});
 		const regionHeader = regions
 			.map(
 				(r) =>
@@ -267,14 +275,13 @@ class SmesTargetBasePage {
 		const activityRows = (data.activity_rows || [])
 			.map((row) => {
 				const trClass = row.is_header ? "row-header" : "";
-				const themeMap = { sindh: "tan", urban: "blue", rural: "tan" };
 				return `
 					<tr class="${trClass}">
 						<td class="left">${frappe.utils.escape_html(row.label)}</td>
 						<td class="left">${frappe.utils.escape_html(row.category || "")}</td>
-						${SME_REGIONS.map((rk) => {
+						${regionKeys.map((rk) => {
 							const reg = (row.regions || {})[rk] || {};
-							const theme = themeMap[rk];
+							const theme = themeMap[rk] || "tan";
 							const cls = theme === "blue" ? "col-blue" : "col-tan";
 							const pdt = row.is_header
 								? ""
@@ -297,9 +304,9 @@ class SmesTargetBasePage {
 				return `
 					<tr class="${trClass}">
 						<td class="left" colspan="2">${frappe.utils.escape_html(row.label)}</td>
-						${SME_REGIONS.map((rk) => {
+						${regionKeys.map((rk) => {
 							const v = (row.values || {})[rk];
-							const theme = rk === "urban" ? "blue" : "tan";
+							const theme = themeMap[rk] || "tan";
 							const cls = theme === "blue" ? "col-blue" : "col-tan";
 							return `<td colspan="3" class="${cls}">${this.fmt(v, { suffix: row.suffix })}</td>`;
 						}).join("")}
@@ -308,7 +315,7 @@ class SmesTargetBasePage {
 			})
 			.join("");
 
-		const colSpan = 2 + SME_REGIONS.length * 3;
+		const colSpan = 2 + regionKeys.length * 3;
 
 		return `
 			<div class="sme-sheet-wrap">

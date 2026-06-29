@@ -4,4 +4,5 @@ frappe.pages['target-base-kpi'].on_page_load = function(wrapper) {
 		title: 'Target Base KPI',
 		single_column: true
 	});
+	frappe.set_route('smes-target-base---k');
 }
