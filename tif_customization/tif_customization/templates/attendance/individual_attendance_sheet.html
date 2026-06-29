@@ -232,7 +232,7 @@ table tr { overflow:hidden; height:14px; white-space:nowrap; }
         <td>{{ row.day if row.day else "Sunday" }}</td>
         <td>{{ row.check_in_1 if row.check_in_1 else "00:00" }}</td>
         <td>{{ row.check_out_1 if row.check_out_1 else "00:00" }}</td>
-        <td>{{ row.late_sitting if row.late_sitting else "00:00" }}</td>
+        <td>{{ row.late_coming_hours if row.late_coming_hours else "00:00" }}</td>
         <td>{{ row.early_going_hours if row.early_going_hours else "00:00" }}</td>
         <td style="font-weight:700;">{{ narration }}</td>
         <td>{{ row.shift_start if row.shift_start else "00:00" }}</td>
