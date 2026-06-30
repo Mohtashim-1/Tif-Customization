@@ -86,9 +86,9 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Dispatch Report",
+   "label": "Dispatch Detail Report (UAT)",
    "link_count": 0,
-   "link_to": "dispatch-report",
+   "link_to": "dispatch-detail-report",
    "link_type": "Page",
    "onboard": 0,
    "type": "Link"
@@ -96,9 +96,9 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Dispatch Detail Report",
+   "label": "Dispatch Report",
    "link_count": 0,
-   "link_to": "dispatch-detail-report",
+   "link_to": "dispatch-report",
    "link_type": "Page",
    "onboard": 0,
    "type": "Link"
@@ -448,7 +448,7 @@
    "is_query_report": 0,
    "label": "SME Target Base KPI (UAT)",
    "link_count": 0,
-   "link_to": "smes-target-base---k",
+   "link_to": "target-base-kpi",
    "link_type": "Page",
    "onboard": 0,
    "type": "Link"
@@ -494,7 +494,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-06-27 16:32:24.919282",
+ "modified": "2026-06-30 17:20:42.678742",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Reports",

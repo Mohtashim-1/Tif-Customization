@@ -88,12 +88,11 @@ if (typeof window.DispatchDetailReport === "undefined") {
 								<th>${__("Courier")}</th>
 								<th class="text-right">${__("Books")}</th>
 								<th class="text-right">${__("Courier Payable")}</th>
-								<th class="text-right">${__("Customer Amount")}</th>
-								<th class="text-right">${__("Amount To Receive")}</th>
+								<th class="text-right">${__("Books Cost")}</th>
 							</tr>
 						</thead>
 						<tbody id="ddr-tbody">
-							<tr><td colspan="12" class="text-center text-muted">${__("Loading...")}</td></tr>
+							<tr><td colspan="11" class="text-center text-muted">${__("Loading...")}</td></tr>
 						</tbody>
 					</table>
 				</div>
@@ -188,7 +187,7 @@ if (typeof window.DispatchDetailReport === "undefined") {
 
 	load_data() {
 		const $tbody = this.page.main.find("#ddr-tbody");
-		$tbody.html(`<tr><td colspan="12" class="text-center text-muted">${__("Loading...")}</td></tr>`);
+		$tbody.html(`<tr><td colspan="11" class="text-center text-muted">${__("Loading...")}</td></tr>`);
 
 		frappe.call({
 			method:
@@ -213,19 +212,19 @@ if (typeof window.DispatchDetailReport === "undefined") {
 		const cards = [
 			{ label: __("Delivery Notes"), value: s.total_delivery_notes || 0, color: "#0F62FE" },
 			{ label: __("Total Books"), value: this.fmt_num(s.total_books), color: "#198038" },
-			{ label: __("Courier Payable"), value: this.fmt_currency(s.total_courier_payable), color: "#DA1E28" },
-			{ label: __("Customer Amount"), value: this.fmt_currency(s.total_customer_amount), color: "#8A3FFC" },
-			{ label: __("Amount To Receive"), value: this.fmt_currency(s.total_amount_to_receive), color: "#FF832B" },
+			{ label: __("Courier Payable"), value: this.fmt_currency(s.total_courier_payable), color: "#DA1E28", hint: __("Actual JV expense (matches Courier Report)") },
+			{ label: __("Total Books Cost"), value: this.fmt_currency(s.total_books_cost), color: "#8A3FFC" },
 		];
 
 		this.page.main.find("#ddr-kpis").html(
 			cards
 				.map(
 					(c) => `
-				<div class="col-md-2 col-sm-4 col-xs-6" style="margin-bottom:8px;">
+				<div class="col-md-3 col-sm-6 col-xs-6" style="margin-bottom:8px;">
 					<div style="background:#fff;border-left:4px solid ${c.color};padding:12px 14px;border-radius:6px;box-shadow:0 1px 3px rgba(0,0,0,.08);">
 						<div style="font-size:11px;color:#666;text-transform:uppercase;">${c.label}</div>
 						<div style="font-size:20px;font-weight:600;margin-top:4px;">${c.value}</div>
+						${c.hint ? `<div style="font-size:10px;color:#888;margin-top:4px;">${c.hint}</div>` : ""}
 					</div>
 				</div>`
 				)
@@ -238,7 +237,7 @@ if (typeof window.DispatchDetailReport === "undefined") {
 		const $tbody = this.page.main.find("#ddr-tbody");
 
 		if (!rows.length) {
-			$tbody.html(`<tr><td colspan="12" class="text-center text-muted">${__("No records found")}</td></tr>`);
+			$tbody.html(`<tr><td colspan="11" class="text-center text-muted">${__("No records found")}</td></tr>`);
 			return;
 		}
 
@@ -259,11 +258,10 @@ if (typeof window.DispatchDetailReport === "undefined") {
 					<td style="font-size:12px;">${frappe.utils.escape_html([row.courier, row.courier_service].filter(Boolean).join(" / "))}</td>
 					<td class="text-right">${this.fmt_num(row.total_books)}</td>
 					<td class="text-right">${this.fmt_currency(row.courier_payable)}</td>
-					<td class="text-right">${this.fmt_currency(row.customer_amount)}</td>
-					<td class="text-right"><strong>${this.fmt_currency(row.amount_to_receive)}</strong></td>
+					<td class="text-right"><strong>${this.fmt_currency(row.books_cost)}</strong></td>
 				</tr>
 				<tr id="ddr-detail-${frappe.utils.escape_html(dn)}" style="display:none;">
-					<td colspan="12" style="background:#fafbfc;padding:0;">
+					<td colspan="11" style="background:#fafbfc;padding:0;">
 						${this.render_item_drilldown(row)}
 					</td>
 				</tr>
@@ -287,8 +285,8 @@ if (typeof window.DispatchDetailReport === "undefined") {
 				<td>${frappe.utils.escape_html(it.warehouse || "")}</td>
 				<td class="text-right">${this.fmt_num(it.qty)}</td>
 				<td class="text-right">${this.fmt_num(it.custom_cartons)}</td>
-				<td class="text-right">${this.fmt_currency(it.rate)}</td>
-				<td class="text-right">${this.fmt_currency(it.amount)}</td>
+				<td class="text-right">${this.fmt_currency(it.unit_cost)}</td>
+				<td class="text-right">${this.fmt_currency(it.book_cost)}</td>
 			</tr>`
 			)
 			.join("");
@@ -298,7 +296,7 @@ if (typeof window.DispatchDetailReport === "undefined") {
 			row.area && `${__("Area")}: ${row.area}`,
 			row.province && `${__("Province")}: ${row.province}`,
 			row.courier_mode_of_payment && `${__("Courier Payment")}: ${row.courier_mode_of_payment}`,
-			row.invoiced_outstanding > 0 && `${__("Invoiced Outstanding")}: ${this.fmt_currency(row.invoiced_outstanding)}`,
+			row.courier_expense_source === "jv" && `${__("Courier expense")}: ${__("Journal Entry")}`,
 		]
 			.filter(Boolean)
 			.join(" · ");
@@ -315,8 +313,8 @@ if (typeof window.DispatchDetailReport === "undefined") {
 							<th>${__("Warehouse")}</th>
 							<th class="text-right">${__("Qty")}</th>
 							<th class="text-right">${__("Cartons")}</th>
-							<th class="text-right">${__("Rate")}</th>
-							<th class="text-right">${__("Amount")}</th>
+							<th class="text-right">${__("Unit Cost")}</th>
+							<th class="text-right">${__("Book Cost")}</th>
 						</tr>
 					</thead>
 					<tbody>${item_rows}</tbody>
@@ -348,11 +346,10 @@ if (typeof window.DispatchDetailReport === "undefined") {
 				"Item Warehouse",
 				"Qty",
 				"Cartons",
-				"Rate",
-				"Amount",
+				"Unit Cost",
+				"Book Cost",
 				"Courier Payable",
-				"Customer Amount",
-				"Amount To Receive",
+				"DN Books Cost",
 			].join(","),
 		];
 
@@ -375,11 +372,10 @@ if (typeof window.DispatchDetailReport === "undefined") {
 						this.csv_cell(it.warehouse),
 						it.qty || 0,
 						it.custom_cartons || 0,
-						it.rate || 0,
-						it.amount || 0,
+						it.unit_cost || 0,
+						it.book_cost || 0,
 						row.courier_payable || 0,
-						row.customer_amount || 0,
-						row.amount_to_receive || 0,
+						row.books_cost || 0,
 					].join(",")
 				);
 			});

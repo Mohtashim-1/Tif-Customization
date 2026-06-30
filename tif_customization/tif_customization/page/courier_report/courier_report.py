@@ -3,6 +3,8 @@ from frappe import _
 from frappe.utils import flt, cint, getdate, today, add_days, date_diff
 from datetime import datetime, timedelta
 
+_SUBMITTED_DN_JV_FILTER = "AND (dn.name IS NULL OR dn.docstatus = 1)"
+
 @frappe.whitelist()
 def get_courier_report_data(filters=None):
 	"""Main API endpoint to get all courier report data"""
@@ -206,6 +208,7 @@ def get_kpi_data(filters):
 			LEFT JOIN `tabDelivery Note` dn ON dn.name = je.cheque_no
 			WHERE je.docstatus = 1
 			AND COALESCE(dn.posting_date, je.posting_date) BETWEEN %(from_date)s AND %(to_date)s
+			{_SUBMITTED_DN_JV_FILTER}
 			AND (jea.account LIKE '%%Courier%%' OR jea.account LIKE '%%Courier Expense%%')
 			{cost_center_filter}
 		"""
@@ -224,6 +227,7 @@ def get_kpi_data(filters):
 			LEFT JOIN `tabDelivery Note` dn ON dn.name = je.cheque_no
 			WHERE je.docstatus = 1
 			AND COALESCE(dn.posting_date, je.posting_date) BETWEEN %(from_date)s AND %(to_date)s
+			{_SUBMITTED_DN_JV_FILTER}
 			AND (jea.account LIKE '%%Courier%%' OR jea.account LIKE '%%Courier Expense%%')
 			{cost_center_filter}
 		"""
@@ -340,6 +344,7 @@ def get_cost_center_allocation(filters, total_expense):
 			LEFT JOIN `tabDelivery Note` dn ON dn.name = je.cheque_no
 			WHERE je.docstatus = 1
 			AND COALESCE(dn.posting_date, je.posting_date) BETWEEN %(from_date)s AND %(to_date)s
+			{_SUBMITTED_DN_JV_FILTER}
 			AND (jea.account LIKE '%%Courier%%' OR jea.account LIKE '%%Courier Expense%%')
 			AND jea.cost_center IS NOT NULL
 			AND jea.cost_center != ''
@@ -391,6 +396,7 @@ def get_cost_center_summary(filters):
 			LEFT JOIN `tabDelivery Note` dn ON dn.name = je.cheque_no
 			WHERE je.docstatus = 1
 			AND COALESCE(dn.posting_date, je.posting_date) BETWEEN %(from_date)s AND %(to_date)s
+			{_SUBMITTED_DN_JV_FILTER}
 			AND (jea.account LIKE '%%Courier%%' OR jea.account LIKE '%%Courier Expense%%')
 			AND jea.cost_center IS NOT NULL
 			AND jea.cost_center != ''
@@ -524,6 +530,7 @@ def get_journal_entries(filters):
 			LEFT JOIN `tabDelivery Note` dn ON dn.name = je.cheque_no
 			WHERE je.docstatus = 1
 			AND COALESCE(dn.posting_date, je.posting_date) BETWEEN %(from_date)s AND %(to_date)s
+			{_SUBMITTED_DN_JV_FILTER}
 			AND (jea.account LIKE '%%Courier%%' OR jea.account LIKE '%%Courier Expense%%')
 			AND jea.cost_center IS NOT NULL
 			AND jea.cost_center != ''
@@ -805,6 +812,7 @@ def get_monthly_trend(filters):
 			LEFT JOIN `tabDelivery Note` dn ON dn.name = je.cheque_no
 			WHERE je.docstatus = 1
 			AND COALESCE(dn.posting_date, je.posting_date) BETWEEN %(from_date)s AND %(to_date)s
+			{_SUBMITTED_DN_JV_FILTER}
 			AND (jea.account LIKE '%%Courier%%' OR jea.account LIKE '%%Courier Expense%%')
 			{cost_center_filter}
 			GROUP BY DATE_FORMAT(COALESCE(dn.posting_date, je.posting_date), '%%Y-%%m')
@@ -893,6 +901,7 @@ def get_expense_by_cost_center(filters):
 			LEFT JOIN `tabDelivery Note` dn ON dn.name = je.cheque_no
 			WHERE je.docstatus = 1
 			AND COALESCE(dn.posting_date, je.posting_date) BETWEEN %(from_date)s AND %(to_date)s
+			{_SUBMITTED_DN_JV_FILTER}
 			AND (jea.account LIKE '%%Courier%%' OR jea.account LIKE '%%Courier Expense%%')
 			AND jea.cost_center IS NOT NULL
 			AND jea.cost_center != ''
@@ -1014,6 +1023,7 @@ def get_delivery_mode_data(filters):
 			LEFT JOIN `tabDelivery Note` dn ON dn.name = je.cheque_no
 			WHERE je.docstatus = 1
 			AND COALESCE(dn.posting_date, je.posting_date) BETWEEN %(from_date)s AND %(to_date)s
+			{_SUBMITTED_DN_JV_FILTER}
 			AND (jea.account LIKE '%%Courier%%' OR jea.account LIKE '%%Courier Expense%%')
 			{cost_center_filter}
 			GROUP BY COALESCE(dn.custom_delivery_mode, 'Not Set')
@@ -1229,6 +1239,7 @@ def get_courier_data(filters):
 			LEFT JOIN `tabDelivery Note` dn ON dn.name = je.cheque_no
 			WHERE je.docstatus = 1
 			AND COALESCE(dn.posting_date, je.posting_date) BETWEEN %(from_date)s AND %(to_date)s
+			{_SUBMITTED_DN_JV_FILTER}
 			AND (jea.account LIKE '%%Courier%%' OR jea.account LIKE '%%Courier Expense%%')
 			{cost_center_filter}
 			GROUP BY COALESCE(dn.custom_courier, 'Not Set')
@@ -1276,6 +1287,7 @@ def get_courier_service_data(filters):
 			LEFT JOIN `tabDelivery Note` dn ON dn.name = je.cheque_no
 			WHERE je.docstatus = 1
 			AND COALESCE(dn.posting_date, je.posting_date) BETWEEN %(from_date)s AND %(to_date)s
+			{_SUBMITTED_DN_JV_FILTER}
 			AND (jea.account LIKE '%%Courier%%' OR jea.account LIKE '%%Courier Expense%%')
 			{cost_center_filter}
 			GROUP BY COALESCE(dn.custom_courier_service, 'Not Set')
@@ -1323,6 +1335,7 @@ def get_courier_payment_mode_data(filters):
 			LEFT JOIN `tabDelivery Note` dn ON dn.name = je.cheque_no
 			WHERE je.docstatus = 1
 			AND COALESCE(dn.posting_date, je.posting_date) BETWEEN %(from_date)s AND %(to_date)s
+			{_SUBMITTED_DN_JV_FILTER}
 			AND (jea.account LIKE '%%Courier%%' OR jea.account LIKE '%%Courier Expense%%')
 			{cost_center_filter}
 			GROUP BY COALESCE(dn.custom_courier_mode_of_payment, 'Not Set')
@@ -1500,6 +1513,7 @@ def _get_item_category_maps(filters):
 		LEFT JOIN `tabDelivery Note` dn ON dn.name = je.cheque_no
 		WHERE je.docstatus = 1
 		AND dn.name IS NOT NULL
+		AND dn.docstatus = 1
 		AND dn.posting_date BETWEEN %(from_date)s AND %(to_date)s
 		AND (jea.account LIKE '%%Courier%%' OR jea.account LIKE '%%Courier Expense%%')
 		{cost_center_filter}
