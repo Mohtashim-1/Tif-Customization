@@ -63,6 +63,7 @@ page_js = {
 	"stock-detail" : "tif_customization/page/stock_detail/stock_detail.js",
 	"courier-report" : "tif_customization/page/courier_report/courier_report.js",
 	"dispatch-report" : "tif_customization/page/dispatch_report/dispatch_report.js",
+	"dispatch-detail-report" : "tif_customization/page/dispatch_detail_report/dispatch_detail_report.js",
 	"procurement-expense" : "tif_customization/page/procurement_expense/procurement_expense.js",
 	"funds-dashboard" : "tif_customization/page/funds_dashboard/funds_dashboard.js",
 }

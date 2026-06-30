@@ -106,6 +106,7 @@ def get_dashboard_data(filters=None):
 	data["cnic_upcoming_days"] = cint(cnic_days)
 	data.update(_cnic_upcoming_stats_and_rows(company, branch, department, today=today, days=cnic_days, limit=25))
 	data.update(_workforce_card_counts(company, branch, department))
+	data.update(_eobi_added_stats(company, branch, department, limit=500))
 	data.update(_pak_qatar_enrolled_stats(company, branch, department, limit=500))
 	data.update(_upcoming_confirmation_stats(company, branch, department, today=today, days=60, limit=500))
 
@@ -154,6 +155,7 @@ def get_card_drilldown(card_key=None, filters=None):
 		"new_hires_this_year": lambda: _drill_new_hires(year_start, today, company, branch, department),
 		"left_employees_this_month": lambda: _drill_left_employees(month_start, month_end, company, branch, department),
 		"left_employees_this_year": lambda: _drill_left_employees(year_start, today, company, branch, department),
+		"eobi_added": lambda: _drill_eobi_added(company, branch, department),
 		"pak_qatar_enrolled": lambda: _drill_pak_qatar_enrolled(company, branch, department),
 		"cnic_expired_count": lambda: _drill_cnic_expired(company, branch, department),
 		"cnic_upcoming_count": lambda: _drill_cnic_upcoming(
@@ -247,6 +249,8 @@ def _empty_payload(from_date, to_date, company, branch, department="", employee=
 		"emp_part_time_probation": 0,
 		"emp_contract_as_per_need": 0,
 		"emp_contract_fixed_salary": 0,
+		"eobi_added_count": 0,
+		"eobi_added_employees": [],
 		"pak_qatar_enrolled_count": 0,
 		"upcoming_confirmation_count": 0,
 		"total_male": 0,
@@ -1630,6 +1634,38 @@ def _fetch_left_rows(from_date, to_date, company, branch, department, limit=500)
 	return rows or []
 
 
+def _eobi_added_stats(company, branch, department, limit=500):
+	out = {"eobi_added_count": 0, "eobi_added_employees": []}
+	if not frappe.db.table_exists("Employee") or not _has_field("Employee", "eobi"):
+		return out
+	rows = _fetch_eobi_added_rows(company, branch, department, limit=limit)
+	out["eobi_added_count"] = len(rows)
+	out["eobi_added_employees"] = rows[:25]
+	return out
+
+
+def _fetch_eobi_added_rows(company, branch, department, limit=500):
+	where_sql, params = _emp_filters_sql(company, branch, department)
+	lim = cint(limit)
+	return frappe.db.sql(
+		f"""
+		SELECT {_employee_row_select_extra()}, e.eobi AS eobi
+		FROM `tabEmployee` e
+		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}
+		  AND UPPER(COALESCE(NULLIF(TRIM(e.eobi), ''), '')) NOT IN ('', '-', 'N/A', 'NA', 'NONE', 'NIL', 'NO')
+		ORDER BY e.employee_name ASC
+		LIMIT {lim}
+		""",
+		params,
+		as_dict=True,
+	) or []
+
+
+def _drill_eobi_added(company, branch, department, limit=500):
+	rows = _fetch_eobi_added_rows(company, branch, department, limit=limit)
+	return _drill_payload("EOBI Added", rows)
+
+
 def _pak_qatar_enrolled_stats(company, branch, department, limit=500):
 	out = {"pak_qatar_enrolled_count": 0, "pak_qatar_enrolled_employees": []}
 	if not frappe.db.table_exists("Employee"):
@@ -1836,6 +1872,7 @@ def _columns_from_rows(rows):
 		"status": "Status",
 		"cnic_expiry": "CNIC Expiry",
 		"scheduled_confirmation_date": "Confirmation Date",
+		"eobi": "EOBI",
 		"health_insurance_provider": "Health Insurance",
 		"medical_card": "Medical Card",
 		"attendance_id": "Attendance ID",

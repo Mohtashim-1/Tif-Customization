@@ -96,6 +96,16 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "Dispatch Detail Report",
+   "link_count": 0,
+   "link_to": "dispatch-detail-report",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "Book Purchase and Printing",
    "link_count": 3,
    "onboard": 0,
