@@ -41,8 +41,10 @@ def get_dashboard_data(filters=None):
 	delivery_notes = []
 	if warehouse:
 		date_sql_dn, date_params_dn = _date_clause("dn.posting_date", from_date, to_date)
-		summary.update(_get_delivery_note_summary(warehouse, date_sql_dn, date_params_dn))
-		delivery_notes = _get_delivery_notes(warehouse, date_sql_dn, date_params_dn)
+		summary.update(
+			_get_delivery_note_summary(warehouse, supplier, date_sql_dn, date_params_dn)
+		)
+		delivery_notes = _get_delivery_notes(warehouse, supplier, date_sql_dn, date_params_dn)
 
 	return {
 		"supplier": supplier,
@@ -324,7 +326,17 @@ def _get_payments(supplier, date_sql_pe, date_params_pe):
 	)
 
 
-def _get_delivery_note_summary(warehouse, date_sql_dn, date_params_dn):
+def _delivery_note_scope_clause():
+	return """
+		  AND (
+			dn.set_warehouse = %s
+			OR dni.warehouse = %s
+			OR dn.custom_book_purchase_supplier = %s
+		  )
+	"""
+
+
+def _get_delivery_note_summary(warehouse, supplier, date_sql_dn, date_params_dn):
 	row = frappe.db.sql(
 		f"""
 		SELECT
@@ -334,9 +346,9 @@ def _get_delivery_note_summary(warehouse, date_sql_dn, date_params_dn):
 		FROM `tabDelivery Note` dn
 		INNER JOIN `tabDelivery Note Item` dni ON dni.parent = dn.name
 		WHERE dn.docstatus = 1
-		  AND (dn.set_warehouse = %s OR dni.warehouse = %s) {date_sql_dn}
+		{_delivery_note_scope_clause()} {date_sql_dn}
 		""",
-		tuple([warehouse, warehouse] + date_params_dn),
+		tuple([warehouse, warehouse, supplier] + date_params_dn),
 		as_dict=True,
 	)
 	data = (row or [{}])[0]
@@ -347,7 +359,7 @@ def _get_delivery_note_summary(warehouse, date_sql_dn, date_params_dn):
 	}
 
 
-def _get_delivery_notes(warehouse, date_sql_dn, date_params_dn):
+def _get_delivery_notes(warehouse, supplier, date_sql_dn, date_params_dn):
 	return frappe.db.sql(
 		f"""
 		SELECT
@@ -361,11 +373,11 @@ def _get_delivery_notes(warehouse, date_sql_dn, date_params_dn):
 		FROM `tabDelivery Note` dn
 		INNER JOIN `tabDelivery Note Item` dni ON dni.parent = dn.name
 		WHERE dn.docstatus = 1
-		  AND (dn.set_warehouse = %s OR dni.warehouse = %s) {date_sql_dn}
+		{_delivery_note_scope_clause()} {date_sql_dn}
 		GROUP BY dn.name, dn.posting_date, dn.customer, dn.status, dn.grand_total
 		ORDER BY dn.posting_date DESC, dn.name DESC
 		LIMIT 100
 		""",
-		tuple([warehouse, warehouse] + date_params_dn),
+		tuple([warehouse, warehouse, supplier] + date_params_dn),
 		as_dict=True,
 	)

@@ -13,8 +13,52 @@ from tif_customization.tif_customization.doctype.leave_application.leave_applica
 	get_leave_details as custom_get_leave_details,
 )
 
-APPROVED_WORKFLOW_STATES = frozenset({"Approved By CEO"})
-LOAN_APPLICATION_ASSIGNMENT_ROLES = ("CEO", "COO", "HR User")
+APPROVED_WORKFLOW_STATES = frozenset({"Approved", "Approved By CEO", "Approved by Accounts"})
+REJECTED_WORKFLOW_STATES = frozenset(
+	{
+		"Rejected by HOD",
+		"Rejected by HR",
+		"Rejected by COO",
+		"Rejected By CEO",
+		"Rejected by Accounts",
+	}
+)
+
+# Only these users are assigned at each workflow step (not every user with the role).
+LOAN_HR_ASSIGNEES = frozenset(
+	{
+		"anas.khan@tif.edu.pk",
+		"shahid.khan@tif.edu.pk",
+	}
+)
+LOAN_CEO_ASSIGNEES = frozenset(
+	{
+		"arif@tif.edu.pk",
+	}
+)
+LOAN_ACCOUNTS_ASSIGNEES = frozenset(
+	{
+		"muhammad.raza@tif.edu.pk",
+		"irfan@tif.edu.pk",
+	}
+)
+
+# Maps workflow_state → assignment stage (only current-step users get ToDos).
+WORKFLOW_ASSIGNMENT_STAGE = {
+	"Request For HOD Approval": "hod",
+	"Request for HR Approval": "hr",
+	"Request For HR Approval": "hr",
+	"Approved by HOD": "hr",
+	"Request for COO Approval": "hr",
+	"Request For CEO Approval": "ceo",
+	"Approved by COO": "ceo",
+	"Request For Accounts Approval": "accounts",
+	"Approved By CEO": "accounts",
+}
+
+_NORMALIZED_ASSIGNMENT_STAGE = {
+	state.strip().lower(): stage for state, stage in WORKFLOW_ASSIGNMENT_STAGE.items()
+}
 
 
 def on_loan_application_submit(doc, method=None):
@@ -29,20 +73,44 @@ def on_loan_application_submit(doc, method=None):
 
 
 def sync_loan_application_todo(doc, method=None):
-	"""Assign Loan Application to applicant approvers, CEO, COO, and HR users."""
+	"""Add assignees for the current workflow step without removing earlier assignees."""
+	debug = _sync_loan_application_todo(doc)
+	if frappe.flags.loan_assignment_debug:
+		return debug
+
+
+def _sync_loan_application_todo(doc):
+	debug = _build_assignment_debug(doc)
+
 	if getattr(doc, "status", None) == "Rejected" or doc.docstatus == 2:
 		_close_all_todos(doc.doctype, doc.name)
-		return
+		debug["action"] = "closed_all_cancelled"
+		_log_assignment_debug(doc, debug)
+		return debug
+
+	if (doc.workflow_state or "") in REJECTED_WORKFLOW_STATES:
+		debug["action"] = "skipped_rejected_state_keep_assignments"
+		_log_assignment_debug(doc, debug)
+		return debug
+
+	if doc.docstatus == 1:
+		debug["action"] = "skipped_approved_keep_assignments"
+		_log_assignment_debug(doc, debug)
+		return debug
 
 	assignees = _get_loan_application_assignees(doc)
-	_cleanup_other_open_todos(doc.doctype, doc.name, keep_users=assignees)
+	debug["resolved_assignees"] = sorted(assignees)
 
 	if not assignees:
-		return
+		debug["action"] = "no_assignees_for_state"
+		_log_assignment_debug(doc, debug)
+		return debug
 
 	from frappe.desk.form.assign_to import add as add_assignment
 
-	description = f"Loan Application {doc.name} has been assigned to you."
+	description = f"Loan Application {doc.name} requires your action ({doc.workflow_state})."
+	created = []
+	skipped = []
 	for user in assignees:
 		if frappe.get_all(
 			"ToDo",
@@ -54,6 +122,7 @@ def sync_loan_application_todo(doc, method=None):
 			},
 			limit=1,
 		):
+			skipped.append(user)
 			continue
 
 		add_assignment(
@@ -66,89 +135,135 @@ def sync_loan_application_todo(doc, method=None):
 			},
 			ignore_permissions=True,
 		)
+		created.append(user)
+
+	debug["action"] = "assigned"
+	debug["created_assignments"] = created
+	debug["skipped_existing"] = skipped
+	debug["open_todos_after"] = _get_open_todo_users(doc.doctype, doc.name)
+	_log_assignment_debug(doc, debug)
+	return debug
 
 
-def _get_loan_application_assignees(doc):
-	assignees = set()
+@frappe.whitelist()
+def get_loan_application_sidebar_assignments(loan_application_name):
+	"""Return open assignments for the form sidebar."""
+	from frappe.desk.form.load import get_assignments
+
+	return get_assignments("Loan Application", loan_application_name)
+
+
+@frappe.whitelist()
+def debug_loan_application_assignment(loan_application_name, resync=0):
+	"""Return assignment diagnostics and optionally re-run sync (for browser console debugging)."""
+	doc = frappe.get_doc("Loan Application", loan_application_name)
+	resync = frappe.parse_json(resync) if isinstance(resync, str) else resync
+	debug = _build_assignment_debug(doc)
+	debug["open_todos_before"] = _get_open_todo_users(doc.doctype, doc.name)
+
+	if resync:
+		frappe.flags.loan_assignment_debug = True
+		sync_result = _sync_loan_application_todo(doc)
+		debug["sync_result"] = sync_result
+		frappe.db.commit()
+
+	debug["open_todos_after"] = _get_open_todo_users(doc.doctype, doc.name)
+	return debug
+
+
+def _get_assignment_stage(workflow_state):
+	return _NORMALIZED_ASSIGNMENT_STAGE.get((workflow_state or "").strip().lower())
+
+
+def _build_assignment_debug(doc):
 	employee = _resolve_employee(doc.applicant_type, doc.applicant)
+	reports_to = frappe.db.get_value("Employee", employee, "reports_to") if employee else None
+	hod_user = None
+	if reports_to:
+		hod_user = frappe.db.get_value("Employee", reports_to, "user_id")
 
-	if employee:
-		assignees.update(_get_employee_approvers(employee))
-
-	for role in LOAN_APPLICATION_ASSIGNMENT_ROLES:
-		assignees.update(_get_enabled_users_with_role(role))
-
-	return {user for user in assignees if user and frappe.db.exists("User", user)}
-
-
-def _get_employee_approvers(employee):
-	approvers = set()
-	employee_doc = frappe.get_doc("Employee", employee)
-
-	for fieldname in ("leave_approver", "expense_approver", "shift_request_approver"):
-		if employee_doc.get(fieldname):
-			approvers.add(employee_doc.get(fieldname))
-
-	if employee_doc.reports_to:
-		reports_to_user = frappe.db.get_value("Employee", employee_doc.reports_to, "user_id")
-		if reports_to_user:
-			approvers.add(reports_to_user)
-
-	if employee_doc.department:
-		department = frappe.get_doc("Department", employee_doc.department)
-		for table_fieldname in ("leave_approvers", "expense_approvers", "shift_request_approver"):
-			for row in department.get(table_fieldname) or []:
-				if row.approver:
-					approvers.add(row.approver)
-
-	return approvers
-
-
-def _get_enabled_users_with_role(role):
-	users = frappe.get_all(
-		"Has Role",
-		filters={"role": role, "parenttype": "User"},
-		pluck="parent",
-	)
+	stage = _get_assignment_stage(doc.workflow_state)
 	return {
-		user
-		for user in users
-		if frappe.db.get_value("User", user, "enabled")
+		"loan_application": doc.name,
+		"workflow_state": doc.workflow_state,
+		"docstatus": doc.docstatus,
+		"status": doc.status,
+		"applicant": doc.applicant,
+		"employee": employee,
+		"reports_to": reports_to,
+		"hod_user": hod_user,
+		"assignment_stage": stage,
+		"stage_mapped": bool(stage),
 	}
 
 
-def _cleanup_other_open_todos(doctype: str, name: str, keep_users: set[str] | None):
-	if not name:
-		return
-
-	open_todos = frappe.get_all(
+def _get_open_todo_users(doctype, name):
+	return frappe.get_all(
 		"ToDo",
-		filters={
-			"reference_type": doctype,
-			"reference_name": name,
-			"status": "Open",
-		},
-		fields=["name", "allocated_to"],
+		filters={"reference_type": doctype, "reference_name": name, "status": "Open"},
+		pluck="allocated_to",
 	)
 
-	keep_users = keep_users or set()
-	for todo in open_todos:
-		if todo.allocated_to not in keep_users:
-			frappe.db.set_value("ToDo", todo.name, "status", "Cancelled", update_modified=False)
+
+def _log_assignment_debug(doc, debug):
+	frappe.logger("loan_application_assignment").info(
+		"Loan Application assignment sync for {name}: {debug}".format(
+			name=doc.name, debug=frappe.as_json(debug)
+		)
+	)
+
+
+def _get_loan_application_assignees(doc):
+	stage = _get_assignment_stage(doc.workflow_state)
+	if not stage:
+		return set()
+
+	employee = _resolve_employee(doc.applicant_type, doc.applicant)
+
+	if stage == "hod":
+		return _get_employee_hod_users(employee)
+	if stage == "hr":
+		return _filter_valid_users(LOAN_HR_ASSIGNEES)
+	if stage == "ceo":
+		return _filter_valid_users(LOAN_CEO_ASSIGNEES)
+	if stage == "accounts":
+		return _filter_valid_users(LOAN_ACCOUNTS_ASSIGNEES)
+	if stage == "coo":
+		return _filter_valid_users(LOAN_CEO_ASSIGNEES)
+
+	return set()
+
+
+def _filter_valid_users(users):
+	return {
+		user
+		for user in users
+		if user and frappe.db.get_value("User", user, "enabled")
+	}
+
+
+def _get_employee_hod_users(employee):
+	if not employee:
+		return set()
+
+	reports_to = frappe.db.get_value("Employee", employee, "reports_to")
+	if not reports_to:
+		return set()
+
+	user = frappe.db.get_value("Employee", reports_to, "user_id")
+	if not user or not frappe.db.get_value("User", user, "enabled"):
+		return set()
+
+	return {user}
 
 
 def _close_all_todos(doctype: str, name: str):
 	if not name:
 		return
 
-	frappe.db.sql(
-		"""
-		UPDATE `tabToDo`
-		SET status='Closed'
-		WHERE reference_type=%s AND reference_name=%s AND status='Open'
-		""",
-		(doctype, name),
-	)
+	from frappe.desk.form.assign_to import close_all_assignments
+
+	close_all_assignments(doctype, name, ignore_permissions=True)
 
 
 @frappe.whitelist()
