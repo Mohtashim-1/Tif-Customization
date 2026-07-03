@@ -3,14 +3,18 @@
  "creation": "2026-02-16 17:01:26.126930",
  "docstatus": 0,
  "doctype": "Page",
- "idx": 0,
- "modified": "2026-02-16 17:01:26.126930",
+ "idx": 10,
+ "modified": "2026-07-04 00:31:00.638000",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "field-staff-report",
  "owner": "Administrator",
  "page_name": "field-staff-report",
- "roles": [],
+ "roles": [
+  {
+   "role": "SME User"
+  }
+ ],
  "script": null,
  "standard": "Yes",
  "style": null,

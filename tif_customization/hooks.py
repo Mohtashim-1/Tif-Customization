@@ -65,6 +65,7 @@ page_js = {
 	"dispatch-report" : "tif_customization/page/dispatch_report/dispatch_report.js",
 	"dispatch-detail-report" : "tif_customization/page/dispatch_detail_report/dispatch_detail_report.js",
 	"late-coming-report" : "tif_customization/page/late_coming_report/late_coming_report.js",
+	"book-purchase-printing-dashboard" : "tif_customization/page/book_purchase_printing_dashboard/book_purchase_printing_dashboard.js",
 	"procurement-expense" : "tif_customization/page/procurement_expense/procurement_expense.js",
 	"funds-dashboard" : "tif_customization/page/funds_dashboard/funds_dashboard.js",
 }

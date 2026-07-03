@@ -107,16 +107,16 @@
    "hidden": 0,
    "is_query_report": 0,
    "label": "Book Purchase and Printing",
-   "link_count": 3,
+   "link_count": 2,
    "onboard": 0,
    "type": "Card Break"
   },
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Millat Publishers Dashboard (UAT)",
+   "label": "Material Request and Purchase Order",
    "link_count": 0,
-   "link_to": "millat-publisher-dashboard",
+   "link_to": "items-receiving-repo",
    "link_type": "Page",
    "onboard": 0,
    "type": "Link"
@@ -124,19 +124,9 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Moon Bright Publishers Dashboard (UAT)",
+   "label": "Book Purchase & Printing Dashboard (UAT)",
    "link_count": 0,
-   "link_to": "moon-bright-publisher-dashboard",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "WASA Printers Dashboard (UAT)",
-   "link_count": 0,
-   "link_to": "wasa-printers-dashboard",
+   "link_to": "book-purchase-printing-dashboard",
    "link_type": "Page",
    "onboard": 0,
    "type": "Link"
@@ -433,24 +423,6 @@
    "label": "Purchase from Endowment Fund (UAT)",
    "link_count": 0,
    "link_to": "purchase-from-endowment-fund",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Purchase",
-   "link_count": 1,
-   "onboard": 0,
-   "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Material Request and Purchase Order",
-   "link_count": 0,
-   "link_to": "items-receiving-repo",
    "link_type": "Page",
    "onboard": 0,
    "type": "Link"
