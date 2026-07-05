@@ -1,7 +1,8 @@
 import frappe
-from frappe.utils import flt, nowdate
+from frappe.utils import flt, getdate, nowdate
 
 from hrms.hr.doctype.leave_encashment.leave_encashment import LeaveEncashment
+from hrms.hr.utils import set_employee_name, validate_active_employee
 
 
 def _get_employee_base_salary(employee, company=None, reference_date=None) -> float:
@@ -38,6 +39,13 @@ def _get_employee_base_salary(employee, company=None, reference_date=None) -> fl
 
 
 class CustomLeaveEncashment(LeaveEncashment):
+	def validate(self):
+		set_employee_name(self)
+		validate_active_employee(self.employee)
+		self.encashment_date = self.encashment_date or getdate()
+		self.get_leave_details_for_encashment()
+		self.set_status()
+
 	def set_encashment_amount(self):
 		# Company policy: (monthly base salary / 30) * encashment_days
 		base_salary = _get_employee_base_salary(

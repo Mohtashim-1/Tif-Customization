@@ -33,6 +33,7 @@ function tif_export_leave_encashment_bulk_employees(frm) {
 		"Encashment Days",
 		"Encashment Amount",
 		"Leave Encashment",
+		"Payment Entry",
 		"Status",
 		"Remarks",
 	];
@@ -49,6 +50,7 @@ function tif_export_leave_encashment_bulk_employees(frm) {
 				row.encashment_days,
 				row.encashment_amount,
 				row.leave_encashment,
+				row.payment_entry,
 				row.status,
 				row.remarks,
 			].map(tif_csv_escape)
@@ -60,6 +62,36 @@ function tif_export_leave_encashment_bulk_employees(frm) {
 }
 
 frappe.ui.form.on("Leave Encashment Bulk", {
+	onload(frm) {
+		frm.set_query("payable_account", () => ({
+			filters: { company: frm.doc.company, is_group: 0 },
+		}));
+		frm.set_query("expense_account", () => ({
+			filters: { company: frm.doc.company, is_group: 0 },
+		}));
+		frm.set_query("bank_account", () => ({
+			filters: { company: frm.doc.company, account_type: "Bank", is_group: 0 },
+		}));
+	},
+
+	company(frm) {
+		if (!frm.doc.company) return;
+		frappe.db.get_value("Company", frm.doc.company, "default_payroll_payable_account", (r) => {
+			if (r?.default_payroll_payable_account) {
+				frm.set_value("payable_account", r.default_payroll_payable_account);
+			}
+		});
+	},
+
+	encashment_date(frm) {
+		if ((frm.doc.employees || []).length && !frm.is_new()) {
+			frappe.show_alert({
+				message: __("Encashment Date changed — click Recalculate to refresh leave balances."),
+				indicator: "orange",
+			});
+		}
+	},
+
 	refresh(frm) {
 		if (frm.doc.docstatus === 0) {
 			frm.add_custom_button(__("Fetch Employees"), () => {
@@ -69,6 +101,22 @@ frappe.ui.form.on("Leave Encashment Bulk", {
 					return frm.reload_doc();
 				});
 			});
+
+			if ((frm.doc.employees || []).length) {
+				frm.add_custom_button(__("Recalculate"), () => {
+					return frm.call("recalculate_employees").then((r) => {
+						const updated = r?.message?.updated ?? 0;
+						frappe.show_alert({
+							message: __("Recalculated {0} employee row(s) for {1}.", [
+								updated,
+								frappe.datetime.str_to_user(frm.doc.encashment_date),
+							]),
+							indicator: "green",
+						});
+						return frm.reload_doc();
+					});
+				});
+			}
 
 			frm.add_custom_button(__("Create Leave Encashments"), () => {
 				return frm.call("create_leave_encashments").then((r) => {
