@@ -108,6 +108,7 @@ def get_late_coming_report_data(filters=None):
 		for row in result_rows:
 			row["total_late_minutes"] = flt(row["total_late_minutes"])
 			row["late_minutes_label"] = _minutes_label(row["total_late_minutes"])
+			row["monthly_history"] = _build_monthly_history(row["late_days"])
 
 		summary = _build_summary(result_rows)
 		return {"rows": result_rows, "summary": summary}
@@ -163,6 +164,29 @@ def _minutes_label(minutes):
 	if hours:
 		return f"{hours}h"
 	return f"{mins}m"
+
+
+def _build_monthly_history(late_days):
+	"""Group late days by calendar month for employee history view."""
+	months = {}
+	for day in late_days or []:
+		dt = getdate(day.get("date"))
+		if not dt:
+			continue
+		key = dt.strftime("%Y-%m")
+		if key not in months:
+			months[key] = {
+				"month_key": key,
+				"month_label": dt.strftime("%B %Y"),
+				"year": dt.year,
+				"month": dt.strftime("%B"),
+				"late_count": 0,
+				"days": [],
+			}
+		months[key]["late_count"] += 1
+		months[key]["days"].append(day)
+
+	return sorted(months.values(), key=lambda row: row["month_key"])
 
 
 def _empty_summary():
