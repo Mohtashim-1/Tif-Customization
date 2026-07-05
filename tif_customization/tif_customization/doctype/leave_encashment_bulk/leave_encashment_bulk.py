@@ -39,7 +39,36 @@ def _allocation_diagnostics(employee: str, leave_type: str, on_date) -> str | No
 class LeaveEncashmentBulk(Document):
 	def validate(self):
 		self._set_default_payment_accounts()
+		self._set_default_cost_center()
+		self._remove_empty_employee_rows()
 		self._recompute_totals()
+
+	def before_submit(self):
+		if not self.get("employees"):
+			frappe.throw("Please fetch employees before submitting.")
+		self._validate_encashment_accounts()
+		pending = [
+			row
+			for row in self.get("employees") or []
+			if not row.leave_encashment and row.status != "Skipped"
+		]
+		if pending:
+			self._process_leave_encashments()
+		failed = [
+			row
+			for row in self.get("employees") or []
+			if not row.leave_encashment and flt(row.encashment_days) and row.status != "Skipped"
+		]
+		if failed:
+			frappe.throw(
+				"Could not create Leave Encashment for all employees. "
+				"Check the Remarks column, set Cost Center if needed, and try again."
+			)
+
+	def _remove_empty_employee_rows(self):
+		rows = [row for row in self.get("employees") or [] if row.employee]
+		if len(rows) != len(self.get("employees") or []):
+			self.set("employees", rows)
 
 	def before_insert(self):
 		if not self.encashment_date:
@@ -60,12 +89,47 @@ class LeaveEncashmentBulk(Document):
 				"name",
 			)
 
+	def _set_default_cost_center(self):
+		if self.cost_center or not self.company:
+			return
+		import erpnext
+
+		self.cost_center = erpnext.get_default_cost_center(self.company)
+		if not self.cost_center:
+			self.cost_center = frappe.db.get_value(
+				"Cost Center",
+				{"company": self.company, "name": ("like", "%Salary%"), "is_group": 0},
+				"name",
+				order_by="name asc",
+			)
+
+	def _validate_encashment_accounts(self):
+		if not self.pay_via_payment_entry:
+			return
+		if not self.payable_account:
+			frappe.throw("Payable Account is required when paying via Payment Entry.")
+		if not self.expense_account:
+			frappe.throw("Expense Account is required when paying via Payment Entry.")
+		self._set_default_cost_center()
+		if not self.cost_center:
+			frappe.throw(
+				"Cost Center is required for leave encashment accounting entries. "
+				"Please set Cost Center on this document."
+			)
+
 	def _recompute_totals(self):
 		total = 0.0
 		for row in self.get("employees") or []:
 			total += flt(row.encashment_amount)
 		self.total_employees = len(self.get("employees") or [])
 		self.total_encashment_amount = total
+
+	def _employees_table_payload(self) -> dict:
+		return {
+			"employees": [row.as_dict() for row in self.get("employees") or []],
+			"total_employees": self.total_employees,
+			"total_encashment_amount": self.total_encashment_amount,
+		}
 
 	@frappe.whitelist()
 	def fetch_employees(self):
@@ -131,14 +195,11 @@ class LeaveEncashmentBulk(Document):
 				continue
 
 		self._recompute_totals()
-		# Save only when rows exist; otherwise mandatory validation may fail in older schema.
-		if self.get("employees"):
-			self.save(ignore_permissions=True)
+		self.save(ignore_permissions=True)
 		return {
-			"total_employees": self.total_employees,
-			"total_encashment_amount": self.total_encashment_amount,
 			"skipped": skipped,
 			"skipped_reasons": skipped_reasons,
+			**self._employees_table_payload(),
 		}
 
 	@frappe.whitelist()
@@ -154,7 +215,7 @@ class LeaveEncashmentBulk(Document):
 			if row.leave_encashment:
 				continue
 			try:
-				details = _get_row_encashment_details(self, row.employee, flt(row.encashment_days) or None)
+				details = _get_row_encashment_details(self, row.employee)
 				row.leave_balance = details["leave_balance"]
 				row.actual_encashable_days = details["actual_encashable_days"]
 				row.encashment_days = details["encashment_days"]
@@ -166,7 +227,11 @@ class LeaveEncashmentBulk(Document):
 
 		self._recompute_totals()
 		self.save(ignore_permissions=True)
-		return {"updated": updated, "total": len(self.get("employees") or [])}
+		return {
+			"updated": updated,
+			"total": len(self.get("employees") or []),
+			**self._employees_table_payload(),
+		}
 
 	def _create_leave_encashment_for_row(self, row):
 		if row.leave_encashment:
@@ -208,15 +273,56 @@ class LeaveEncashmentBulk(Document):
 			frappe.throw("Encashment Date is required.")
 		if not (self.get("employees") or []):
 			frappe.throw("Please add employees first (use Fetch Employees).")
-		if self.pay_via_payment_entry:
-			if not self.payable_account:
-				frappe.throw("Payable Account is required when paying via Payment Entry.")
-			if not self.expense_account:
-				frappe.throw("Expense Account is required when paying via Payment Entry.")
+		self._validate_encashment_accounts()
+		created = self._process_leave_encashments()
+		self.save(ignore_permissions=True)
+		return {
+			"created": created,
+			"total": len(self.get("employees") or []),
+			**self._employees_table_payload(),
+		}
 
-		# Always recalculate using the selected encashment date before creating records.
-		self.recalculate_employees()
+	@frappe.whitelist()
+	def process_pending_encashments(self):
+		"""Create Leave Encashment / Payment Entry for a submitted bulk document."""
+		if self.docstatus != 1:
+			frappe.throw("This action is only available after the document is submitted.")
+		if not any(not row.leave_encashment for row in self.get("employees") or []):
+			frappe.throw("No pending employees to process.")
 
+		self._validate_encashment_accounts()
+		created = self._process_leave_encashments()
+		for row in self.get("employees") or []:
+			self._persist_employee_row(row)
+		self._recompute_totals()
+		self.db_set(
+			{
+				"total_employees": self.total_employees,
+				"total_encashment_amount": self.total_encashment_amount,
+			}
+		)
+		return {
+			"created": created,
+			"total": len(self.get("employees") or []),
+			**self._employees_table_payload(),
+		}
+
+	def _recalculate_employee_rows(self):
+		for row in self.get("employees") or []:
+			if row.leave_encashment:
+				continue
+			try:
+				details = _get_row_encashment_details(self, row.employee)
+				row.leave_balance = details["leave_balance"]
+				row.actual_encashable_days = details["actual_encashable_days"]
+				row.encashment_days = details["encashment_days"]
+				row.encashment_amount = details["encashment_amount"]
+			except Exception as exc:
+				row.remarks = _safe_error_message(exc)
+				row.status = "Skipped"
+
+	def _process_leave_encashments(self):
+		self._recalculate_employee_rows()
 		created = 0
 		for row in self.get("employees") or []:
 			try:
@@ -226,10 +332,27 @@ class LeaveEncashmentBulk(Document):
 			except Exception as exc:
 				row.status = "Skipped"
 				row.remarks = _safe_error_message(exc)
-
 		self._recompute_totals()
-		self.save(ignore_permissions=True)
-		return {"created": created, "total": len(self.get("employees") or [])}
+		return created
+
+	def _persist_employee_row(self, row):
+		if not row.name:
+			return
+		frappe.db.set_value(
+			"Leave Encashment Bulk Employee",
+			row.name,
+			{
+				"leave_encashment": row.leave_encashment,
+				"payment_entry": row.payment_entry,
+				"status": row.status,
+				"remarks": row.remarks,
+				"leave_balance": row.leave_balance,
+				"actual_encashable_days": row.actual_encashable_days,
+				"encashment_days": row.encashment_days,
+				"encashment_amount": row.encashment_amount,
+			},
+			update_modified=True,
+		)
 
 
 def _get_row_encashment_details(bulk_doc, employee, encashment_days=None):
@@ -256,6 +379,34 @@ def _get_row_encashment_details(bulk_doc, employee, encashment_days=None):
 	}
 
 
+def _resolve_cost_center(bulk_doc, employee):
+	if bulk_doc.cost_center:
+		return bulk_doc.cost_center
+
+	cost_center = frappe.db.get_value("Employee", employee, "payroll_cost_center")
+	if cost_center:
+		return cost_center
+
+	department = frappe.db.get_value("Employee", employee, "department")
+	if department:
+		cost_center = frappe.db.get_value("Department", department, "payroll_cost_center")
+		if cost_center:
+			return cost_center
+
+	import erpnext
+
+	cost_center = erpnext.get_default_cost_center(bulk_doc.company)
+	if cost_center:
+		return cost_center
+
+	return frappe.db.get_value(
+		"Cost Center",
+		{"company": bulk_doc.company, "name": ("like", "%Salary%"), "is_group": 0},
+		"name",
+		order_by="name asc",
+	)
+
+
 def _apply_payment_entry_settings(bulk_doc, leave_encashment):
 	if not bulk_doc.pay_via_payment_entry:
 		leave_encashment.pay_via_payment_entry = 0
@@ -265,11 +416,11 @@ def _apply_payment_entry_settings(bulk_doc, leave_encashment):
 	leave_encashment.payable_account = bulk_doc.payable_account
 	leave_encashment.expense_account = bulk_doc.expense_account
 	leave_encashment.posting_date = getdate(bulk_doc.encashment_date)
-	if bulk_doc.cost_center:
-		leave_encashment.cost_center = bulk_doc.cost_center
-	elif not leave_encashment.cost_center:
-		leave_encashment.cost_center = frappe.db.get_value(
-			"Employee", leave_encashment.employee, "payroll_cost_center"
+	leave_encashment.cost_center = _resolve_cost_center(bulk_doc, leave_encashment.employee)
+	if not leave_encashment.cost_center:
+		frappe.throw(
+			f"Cost Center is required for Employee {leave_encashment.employee}. "
+			"Set Cost Center on this bulk document."
 		)
 
 

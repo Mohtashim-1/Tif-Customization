@@ -17,6 +17,42 @@ function tif_download_csv(filename, rows) {
 	window.URL.revokeObjectURL(url);
 }
 
+function tif_save_if_dirty(frm) {
+	if (frm.is_dirty()) {
+		return frm.save();
+	}
+	return Promise.resolve();
+}
+
+function tif_reload_from_server(frm) {
+	if (!frm.doc.name || frm.doc.__islocal) {
+		return Promise.resolve();
+	}
+	frappe.model.clear_doc(frm.doctype, frm.doc.name);
+	return frappe.model.with_doc(frm.doctype, frm.doc.name, () => {
+		frm.refresh();
+		frm.dirty = false;
+	});
+}
+
+function tif_call_bulk_method(frm, method, { freeze_message, on_success } = {}) {
+	return tif_save_if_dirty(frm).then(() =>
+		frappe
+			.call({
+				doc: frm.doc,
+				method,
+				freeze: true,
+				freeze_message: freeze_message || __("Please wait..."),
+			})
+			.then((r) => {
+				if (r.exc) {
+					return;
+				}
+				return tif_reload_from_server(frm).then(() => on_success?.(r));
+			})
+	);
+}
+
 function tif_export_leave_encashment_bulk_employees(frm) {
 	const employees = frm.doc.employees || [];
 	if (!employees.length) {
@@ -61,6 +97,12 @@ function tif_export_leave_encashment_bulk_employees(frm) {
 	tif_download_csv(`leave-encashment-bulk-employees-${safe_name}.csv`, rows);
 }
 
+function tif_has_pending_encashments(frm) {
+	return (frm.doc.employees || []).some(
+		(row) => !row.leave_encashment && row.status !== "Skipped" && flt(row.encashment_days)
+	);
+}
+
 frappe.ui.form.on("Leave Encashment Bulk", {
 	onload(frm) {
 		frm.set_query("payable_account", () => ({
@@ -72,6 +114,9 @@ frappe.ui.form.on("Leave Encashment Bulk", {
 		frm.set_query("bank_account", () => ({
 			filters: { company: frm.doc.company, account_type: "Bank", is_group: 0 },
 		}));
+		frm.set_query("cost_center", () => ({
+			filters: { company: frm.doc.company, is_group: 0 },
+		}));
 	},
 
 	company(frm) {
@@ -81,50 +126,104 @@ frappe.ui.form.on("Leave Encashment Bulk", {
 				frm.set_value("payable_account", r.default_payroll_payable_account);
 			}
 		});
+		if (!frm.doc.cost_center) {
+			frappe.db.get_value(
+				"Cost Center",
+				{ company: frm.doc.company, name: ["like", "%Salary%"], is_group: 0 },
+				"name",
+				(r) => {
+					if (r?.name) {
+						frm.set_value("cost_center", r.name);
+					}
+				}
+			);
+		}
 	},
 
 	encashment_date(frm) {
 		if ((frm.doc.employees || []).length && !frm.is_new()) {
 			frappe.show_alert({
-				message: __("Encashment Date changed — click Recalculate to refresh leave balances."),
+				message: __(
+					"Encashment Date changed — click Recalculate to refresh leave balances for the selected Leave Period."
+				),
+				indicator: "orange",
+			});
+		}
+	},
+
+	leave_period(frm) {
+		if ((frm.doc.employees || []).length && !frm.is_new()) {
+			frappe.show_alert({
+				message: __("Leave Period changed — click Recalculate to refresh leave balances."),
 				indicator: "orange",
 			});
 		}
 	},
 
 	refresh(frm) {
-		if (frm.doc.docstatus === 0) {
-			frm.add_custom_button(__("Fetch Employees"), () => {
-				return frm.call("fetch_employees").then((r) => {
-					const total = r?.message?.total_employees ?? frm.doc.total_employees ?? 0;
-					frappe.show_alert({ message: __("Fetched {0} employee(s).", [total]), indicator: "green" });
-					return frm.reload_doc();
-				});
-			});
+		// Employee rows are populated only via Fetch Employees — block blank manual rows.
+		frm.set_df_property("employees", "cannot_add_rows", 1);
 
-			if ((frm.doc.employees || []).length) {
-				frm.add_custom_button(__("Recalculate"), () => {
-					return frm.call("recalculate_employees").then((r) => {
-						const updated = r?.message?.updated ?? 0;
+		if (frm.doc.docstatus === 0) {
+			frm.add_custom_button(__("Fetch Employees"), () =>
+				tif_call_bulk_method(frm, "fetch_employees", {
+					freeze_message: __("Fetching employees..."),
+					on_success: (r) => {
+						const total = r.message?.total_employees ?? 0;
+						const skipped = r.message?.skipped ?? 0;
 						frappe.show_alert({
-							message: __("Recalculated {0} employee row(s) for {1}.", [
-								updated,
-								frappe.datetime.str_to_user(frm.doc.encashment_date),
-							]),
+							message: __("Fetched {0} employee(s).", [total]),
 							indicator: "green",
 						});
-						return frm.reload_doc();
-					});
-				});
+						if (skipped) {
+							frappe.msgprint({
+								title: __("Some employees skipped"),
+								message: __("Skipped {0} employee(s). Check server logs or try Recalculate.", [
+									skipped,
+								]),
+								indicator: "orange",
+							});
+						}
+					},
+				})
+			);
+
+			if ((frm.doc.employees || []).length) {
+				frm.add_custom_button(__("Recalculate"), () =>
+					tif_call_bulk_method(frm, "recalculate_employees", {
+						freeze_message: __("Recalculating leave balances..."),
+						on_success: (r) => {
+							const updated = r.message?.updated ?? 0;
+							frappe.show_alert({
+								message: __("Recalculated {0} employee row(s).", [updated]),
+								indicator: "green",
+							});
+						},
+					})
+				);
 			}
 
-			frm.add_custom_button(__("Create Leave Encashments"), () => {
-				return frm.call("create_leave_encashments").then((r) => {
-					const created = r?.message?.created ?? 0;
-					frappe.msgprint(__("Created {0} Leave Encashment record(s).", [created]));
-					return frm.reload_doc();
-				});
-			});
+			frm.add_custom_button(__("Create Leave Encashments"), () =>
+				tif_call_bulk_method(frm, "create_leave_encashments", {
+					freeze_message: __("Creating Leave Encashments..."),
+					on_success: (r) => {
+						const created = r.message?.created ?? 0;
+						frappe.msgprint(__("Created {0} Leave Encashment record(s).", [created]));
+					},
+				})
+			);
+		}
+
+		if (frm.doc.docstatus === 1 && tif_has_pending_encashments(frm)) {
+			frm.add_custom_button(__("Process Pending Encashments"), () =>
+				tif_call_bulk_method(frm, "process_pending_encashments", {
+					freeze_message: __("Creating Leave Encashments and Payment Entries..."),
+					on_success: (r) => {
+						const created = r.message?.created ?? 0;
+						frappe.msgprint(__("Created {0} Leave Encashment record(s).", [created]));
+					},
+				})
+			);
 		}
 
 		const grid = frm.get_field("employees")?.grid;

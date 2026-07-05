@@ -1,4 +1,5 @@
 import frappe
+from frappe.query_builder import Order
 from frappe.utils import flt, getdate, nowdate
 
 from hrms.hr.doctype.leave_encashment.leave_encashment import LeaveEncashment
@@ -45,6 +46,66 @@ class CustomLeaveEncashment(LeaveEncashment):
 		self.encashment_date = self.encashment_date or getdate()
 		self.get_leave_details_for_encashment()
 		self.set_status()
+
+	def get_balance_as_on_date(self):
+		"""Leave balance date — may differ from payment/encashment date.
+
+		When encashment is paid after a leave period ends (e.g. pay on 30-Jun but
+		period ended 25-Jun), use the period closing date so we don't pick up the
+		next year's allocation.
+		"""
+		encashment_date = getdate(self.encashment_date or nowdate())
+		if not self.leave_period:
+			return encashment_date
+
+		period_to = frappe.db.get_value("Leave Period", self.leave_period, "to_date")
+		if period_to and encashment_date > getdate(period_to):
+			return getdate(period_to)
+		return encashment_date
+
+	def get_leave_allocation(self):
+		date = self.get_balance_as_on_date()
+
+		LeaveAllocation = frappe.qb.DocType("Leave Allocation")
+		leave_allocation = (
+			frappe.qb.from_(LeaveAllocation)
+			.select(
+				LeaveAllocation.name,
+				LeaveAllocation.from_date,
+				LeaveAllocation.to_date,
+				LeaveAllocation.total_leaves_allocated,
+				LeaveAllocation.carry_forwarded_leaves_count,
+			)
+			.where(
+				((LeaveAllocation.from_date <= date) & (date <= LeaveAllocation.to_date))
+				& (LeaveAllocation.docstatus == 1)
+				& (LeaveAllocation.leave_type == self.leave_type)
+				& (LeaveAllocation.employee == self.employee)
+			)
+			.orderby(LeaveAllocation.from_date, order=Order.desc)
+		).run(as_dict=True)
+
+		return leave_allocation[0] if leave_allocation else None
+
+	def set_leave_balance(self):
+		allocation = self.get_leave_allocation()
+		if not allocation:
+			frappe.throw(
+				f"No Leaves Allocated to Employee: {self.employee} for Leave Type: {self.leave_type} "
+				f"as on {self.get_balance_as_on_date()}"
+			)
+
+		balance_date = self.get_balance_as_on_date()
+		from hrms.hr.doctype.leave_application.leave_application import get_leaves_for_period
+
+		self.leave_balance = (
+			allocation.total_leaves_allocated
+			- allocation.carry_forwarded_leaves_count
+			+ get_leaves_for_period(
+				self.employee, self.leave_type, allocation.from_date, balance_date
+			)
+		)
+		self.leave_allocation = allocation.name
 
 	def set_encashment_amount(self):
 		# Company policy: (monthly base salary / 30) * encashment_days
