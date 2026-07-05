@@ -11,6 +11,8 @@
   "employment_type",
   "base_salary",
   "bonus_amount",
+  "journal_entry",
+  "payment_entry",
   "additional_salary",
   "status",
   "remarks"
@@ -53,6 +55,22 @@
    "in_list_view": 1,
    "label": "Bonus Amount",
    "precision": "2"
+  },
+  {
+   "fieldname": "journal_entry",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Journal Entry",
+   "options": "Journal Entry",
+   "read_only": 1
+  },
+  {
+   "fieldname": "payment_entry",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Payment Entry",
+   "options": "Payment Entry",
+   "read_only": 1
   },
   {
    "fieldname": "additional_salary",

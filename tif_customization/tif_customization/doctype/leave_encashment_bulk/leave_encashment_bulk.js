@@ -31,7 +31,6 @@ function tif_reload_from_server(frm) {
 	frappe.model.clear_doc(frm.doctype, frm.doc.name);
 	return frappe.model.with_doc(frm.doctype, frm.doc.name, () => {
 		frm.refresh();
-		frm.dirty = false;
 	});
 }
 
