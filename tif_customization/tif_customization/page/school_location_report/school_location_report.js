@@ -1,7 +1,7 @@
 frappe.pages["school-location-report"].on_page_load = function (wrapper) {
 	const page = frappe.ui.make_app_page({
 		parent: wrapper,
-		title: __("School Location Report"),
+		title: __("School Database Dashboard"),
 		single_column: true,
 	});
 
