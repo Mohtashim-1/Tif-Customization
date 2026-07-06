@@ -49,7 +49,7 @@ frappe.pages["bank-balance-reconci"].on_page_load = function (wrapper) {
 							</div>
 						</div>
 					</div>
-					<div class="row" id="bank-recon-kpis"></div>
+					<div class="bank-recon-kpis" id="bank-recon-kpis"></div>
 					<div id="bank-recon-report"></div>
 				`);
 
@@ -129,14 +129,44 @@ frappe.pages["bank-balance-reconci"].on_page_load = function (wrapper) {
 					{ label: __("Total Donations"), value: this.money(totals.donation_amount), gradient: "#4facfe, #00f2fe" },
 					{ label: __("Total Zakat Donations"), value: this.money(totals.zakat_amount), gradient: "#43e97b, #38f9d7" },
 					{ label: __("Total Endowment Funds"), value: this.money(totals.endowment_funds_amount), gradient: "#fa709a, #fee140" },
-					{ label: __("Total Donors"), value: this.number(totals.total_donors), gradient: "#667eea, #764ba2" },
+					{
+						label: __("Total Donation"),
+						value: this.money(
+							totals.total_donation != null
+								? totals.total_donation
+								: flt(totals.donation_amount)
+									+ flt(totals.zakat_amount)
+									+ flt(totals.endowment_funds_amount)
+						),
+						gradient: "#f7971e, #ffd200",
+					},
+					{
+						label: __("Total Donors"),
+						value: this.number(totals.total_donors),
+						gradient: "#667eea, #764ba2",
+						breakdown: [
+							{ label: __("Donation"), value: this.number(totals.donation_donors) },
+							{ label: __("Zakat"), value: this.number(totals.zakat_donors) },
+							{ label: __("Endowment"), value: this.number(totals.endowment_donors) },
+						],
+					},
 				];
 				$("#bank-recon-kpis").html(
 					cards.map((card) => `
-						<div class="col-sm-6 col-lg-3 bank-recon-kpi-column">
+						<div class="bank-recon-kpi-column">
 							<div class="bank-recon-kpi" style="background: linear-gradient(135deg, ${card.gradient});">
 								<div class="bank-recon-kpi-label">${card.label}</div>
 								<div class="bank-recon-kpi-value">${card.value}</div>
+								${card.breakdown ? `
+									<div class="bank-recon-kpi-split">
+										${card.breakdown.map((item) => `
+											<div class="bank-recon-kpi-split-item">
+												<span class="bank-recon-kpi-split-label">${item.label}</span>
+												<span class="bank-recon-kpi-split-value">${item.value}</span>
+											</div>
+										`).join("")}
+									</div>
+								` : `<div class="bank-recon-kpi-split bank-recon-kpi-split-spacer"></div>`}
 							</div>
 						</div>
 					`).join("")
@@ -279,21 +309,72 @@ frappe.pages["bank-balance-reconci"].on_page_load = function (wrapper) {
 						}
 						.bank-recon-kpi-column {
 							margin-bottom: 14px;
+							flex: 1 1 180px;
+							max-width: 100%;
+							display: flex;
+						}
+						#bank-recon-kpis {
+							display: flex;
+							flex-wrap: wrap;
+							align-items: stretch;
+							margin-left: -8px;
+							margin-right: -8px;
+						}
+						#bank-recon-kpis > .bank-recon-kpi-column {
+							padding-left: 8px;
+							padding-right: 8px;
 						}
 						.bank-recon-kpi {
-							min-height: 108px;
+							width: 100%;
+							min-height: 168px;
+							height: 100%;
 							padding: 18px;
 							border-radius: 8px;
 							color: #fff;
 							box-shadow: 0 2px 4px rgba(15, 23, 42, 0.12);
+							display: flex;
+							flex-direction: column;
 						}
 						.bank-recon-kpi-label {
 							font-size: 13px;
 							opacity: 0.9;
 							margin-bottom: 10px;
+							flex-shrink: 0;
 						}
 						.bank-recon-kpi-value {
-							font-size: clamp(20px, 2vw, 28px);
+							font-size: clamp(18px, 1.8vw, 26px);
+							font-weight: 700;
+							white-space: nowrap;
+							flex: 1;
+							display: flex;
+							align-items: center;
+						}
+						.bank-recon-kpi-split {
+							display: flex;
+							gap: 8px;
+							margin-top: auto;
+							padding-top: 10px;
+							border-top: 1px solid rgba(255, 255, 255, 0.35);
+							flex-shrink: 0;
+						}
+						.bank-recon-kpi-split-spacer {
+							visibility: hidden;
+							border-top-color: transparent;
+							min-height: 44px;
+						}
+						.bank-recon-kpi-split-item {
+							flex: 1;
+							min-width: 0;
+						}
+						.bank-recon-kpi-split-label {
+							display: block;
+							font-size: 11px;
+							opacity: 0.85;
+							margin-bottom: 4px;
+						}
+						.bank-recon-kpi-split-value {
+							display: block;
+							font-size: 18px;
 							font-weight: 700;
 							white-space: nowrap;
 						}

@@ -168,17 +168,28 @@ def get_report_data(from_date=None, to_date=None, reference_date=None, donor=Non
 
 
 def _calculate_totals(rows, month_keys):
+	donation_donors = set()
+	zakat_donors = set()
+	endowment_donors = set()
+
 	totals = {
 		"month_values": {key: 0.0 for key in month_keys},
 		"total_received": 0.0,
 		"donation_amount": 0.0,
 		"zakat_amount": 0.0,
 		"endowment_funds_amount": 0.0,
-		"total_donors": len({_key(row.get("donor_name"), row.get("donor_id")) for row in rows}),
 		"budgeted_amount": 0.0,
 		"balance_commitment": 0.0,
 	}
 	for row in rows:
+		donor_key = _key(row.get("donor_name"), row.get("donor_id"))
+		if flt(row.get("donation_amount")) > 0:
+			donation_donors.add(donor_key)
+		if flt(row.get("zakat_amount")) > 0:
+			zakat_donors.add(donor_key)
+		if flt(row.get("endowment_funds_amount")) > 0:
+			endowment_donors.add(donor_key)
+
 		for key in month_keys:
 			totals["month_values"][key] += flt((row.get("month_values") or {}).get(key))
 		totals["total_received"] += flt(row.get("total_received"))
@@ -187,6 +198,14 @@ def _calculate_totals(rows, month_keys):
 		totals["endowment_funds_amount"] += flt(row.get("endowment_funds_amount"))
 		totals["budgeted_amount"] += flt(row.get("budgeted_amount"))
 		totals["balance_commitment"] += flt(row.get("balance_commitment"))
+
+	totals["donation_donors"] = len(donation_donors)
+	totals["zakat_donors"] = len(zakat_donors)
+	totals["endowment_donors"] = len(endowment_donors)
+	totals["total_donors"] = len(donation_donors | zakat_donors | endowment_donors)
+	totals["total_donation"] = (
+		totals["donation_amount"] + totals["zakat_amount"] + totals["endowment_funds_amount"]
+	)
 	return totals
 
 
