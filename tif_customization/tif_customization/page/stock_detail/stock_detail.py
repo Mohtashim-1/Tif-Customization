@@ -536,7 +536,7 @@ def get_item_stock_data(item_code, filters=None):
                 opening_sum = sum(flt(e.actual_qty) for e in opening_entries)
                 print(f"[DEBUG get_item_stock_data] Sum of opening entries actual_qty: {opening_sum}")
         
-        # Get demand received (Material Requests) - date range
+        # Get demand received (Material Requests) - date range; exclude stopped/cancelled MRs
         demand_received = frappe.db.sql("""
             SELECT SUM(mr_item.qty) as qty
             FROM `tabMaterial Request Item` mr_item
@@ -544,6 +544,7 @@ def get_item_stock_data(item_code, filters=None):
             WHERE mr_item.item_code = %s
             AND mr.transaction_date BETWEEN %s AND %s
             AND mr.docstatus = 1
+            AND mr.status NOT IN ('Stopped', 'Cancelled')
         """, (item_code, from_date.strftime('%Y-%m-%d'), to_date.strftime('%Y-%m-%d')), as_dict=True)
         
         # Get books sale details - date range

@@ -32,7 +32,7 @@ frappe.pages["school-location-report"].on_page_load = function (wrapper) {
 						<div class="school-loc-hero">
 							<div>
 								<div class="school-loc-eyebrow">${__("School Analytics")}</div>
-								<h2>${__("School Location Report")}</h2>
+								<h2>${__("School Database Dashboard")}</h2>
 								<p>${__("Province, department, city and Karachi-wise school summary with TPS, QPS and CEE status split.")}</p>
 							</div>
 							<div class="school-loc-hero__stats" id="school-loc-hero-stats"></div>
