@@ -53,6 +53,23 @@ def get_report_data(filters=None):
 			}
 		)
 
+	total_donation = sum(
+		flt(b["donations"].get(key)) for b in banks for key in month_keys
+	)
+	total_expense = sum(
+		flt(b["expenses"].get(key)) for b in banks for key in month_keys
+	)
+	donation_banks = {
+		b["bank_account"]: sum(flt(b["donations"].get(key)) for key in month_keys) for b in banks
+	}
+	expense_banks = {
+		b["bank_account"]: sum(flt(b["expenses"].get(key)) for key in month_keys) for b in banks
+	}
+	difference_banks = {
+		bank_account: flt(donation_banks.get(bank_account)) - flt(expense_banks.get(bank_account))
+		for bank_account in donation_banks
+	}
+
 	return {
 		"title": _("Reconciliation with Bank Statements Summary"),
 		"company": company,
@@ -78,6 +95,14 @@ def get_report_data(filters=None):
 		"ending_balance": {
 			"date_label": formatdate(to_date, "dd MMM yyyy"),
 			"banks": {b["bank_account"]: flt(b["ending"]) for b in banks},
+		},
+		"totals": {
+			"total_donation": total_donation,
+			"total_expense": total_expense,
+			"total_difference": flt(total_donation) - flt(total_expense),
+			"donation_banks": donation_banks,
+			"expense_banks": expense_banks,
+			"difference_banks": difference_banks,
 		},
 	}
 
@@ -153,6 +178,19 @@ def download_reconciliation_excel(filters=None):
 			col += 1
 		row += 1
 
+	def write_summary_row(label, bank_values):
+		nonlocal row
+		ws.cell(row=row, column=1, value=label)
+		ws.cell(row=row, column=2, value="")
+		col = 3
+		for bank in banks:
+			cell = ws.cell(row=row, column=col, value=flt((bank_values or {}).get(bank["bank_account"])))
+			cell.font = bold
+			col += 1
+		for c in range(1, 3):
+			ws.cell(row=row, column=c).font = bold
+		row += 1
+
 	initial = report.get("initial_amount") or {}
 	write_amount_row(_("Initial Amount"), initial.get("date_label"), initial.get("banks"))
 
@@ -167,6 +205,7 @@ def download_reconciliation_excel(filters=None):
 		cell.alignment = Alignment(vertical="center", wrap_text=True)
 		for item in donations:
 			write_amount_row("", item.get("month_label"), item.get("banks"))
+	write_summary_row(_("Total Donation"), (report.get("totals") or {}).get("donation_banks"))
 
 	expenses = report.get("expenses") or []
 	if expenses:
@@ -179,6 +218,10 @@ def download_reconciliation_excel(filters=None):
 		cell.alignment = Alignment(vertical="center", wrap_text=True)
 		for item in expenses:
 			write_amount_row("", item.get("month_label"), item.get("banks"))
+	write_summary_row(_("Total Expense"), (report.get("totals") or {}).get("expense_banks"))
+
+	totals = report.get("totals") or {}
+	write_summary_row(_("Difference (Donation - Expense)"), totals.get("difference_banks"))
 
 	ending = report.get("ending_balance") or {}
 	write_amount_row(

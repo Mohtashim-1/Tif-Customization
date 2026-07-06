@@ -56,6 +56,7 @@ class ReconciliationWithBankPage {
 						</div>
 					</div>
 				</div>
+				<div class="recon-bank-kpis mb-3" id="recon-bank-kpis" style="display: none;"></div>
 				<div class="border rounded p-3">
 					<div class="d-flex align-items-center justify-content-between mb-2">
 						<h5 class="mb-0">${__("Report")}</h5>
@@ -101,6 +102,9 @@ class ReconciliationWithBankPage {
 				}
 				.recon-bank-table .recon-money { text-align: right; white-space: nowrap; }
 				.recon-bank-table .recon-ending td { font-weight: 700; background: #f1f5f9; }
+				.recon-bank-table .recon-summary td { font-weight: 700; background: #dbeafe; }
+				.recon-bank-table .recon-summary-expense td { font-weight: 700; background: #fee2e2; }
+				.recon-bank-table .recon-summary-diff td { font-weight: 700; background: #dcfce7; }
 				.recon-bank-scroll { overflow-x: auto; }
 				.recon-filter-grid .recon-filter-row {
 					margin-left: -8px;
@@ -169,6 +173,41 @@ class ReconciliationWithBankPage {
 				}
 				@media print {
 					.recon-bank-filters, .page-head { display: none !important; }
+				}
+				.recon-bank-kpis {
+					display: flex;
+					flex-wrap: wrap;
+					align-items: stretch;
+					margin-left: -8px;
+					margin-right: -8px;
+				}
+				.recon-bank-kpi-column {
+					flex: 1 1 220px;
+					max-width: 100%;
+					padding: 0 8px;
+					margin-bottom: 14px;
+					display: flex;
+				}
+				.recon-bank-kpi {
+					width: 100%;
+					min-height: 108px;
+					padding: 18px;
+					border-radius: 8px;
+					color: #fff;
+					box-shadow: 0 2px 4px rgba(15, 23, 42, 0.12);
+					display: flex;
+					flex-direction: column;
+					justify-content: center;
+				}
+				.recon-bank-kpi-label {
+					font-size: 13px;
+					opacity: 0.9;
+					margin-bottom: 10px;
+				}
+				.recon-bank-kpi-value {
+					font-size: clamp(20px, 2vw, 28px);
+					font-weight: 700;
+					white-space: nowrap;
 				}
 			</style>
 		`);
@@ -302,6 +341,7 @@ class ReconciliationWithBankPage {
 	}
 
 	show_help_placeholder() {
+		this.body.find("#recon-bank-kpis").hide().empty();
 		this.body.find(".recon-report").html(
 			`<div class="text-muted">${__(
 				"Select one or more Bank Accounts (or tick All Bank Accounts), then click Apply."
@@ -349,6 +389,35 @@ class ReconciliationWithBankPage {
 		return format_currency(flt(value || 0), frappe.defaults.get_default("currency"));
 	}
 
+	render_kpis(totals) {
+		const cards = [
+			{
+				label: __("Total Donation"),
+				value: this.money(totals.total_donation),
+				gradient: "#4facfe, #00f2fe",
+			},
+			{
+				label: __("Total Expense"),
+				value: this.money(totals.total_expense),
+				gradient: "#fa709a, #fee140",
+			},
+		];
+		this.body.find("#recon-bank-kpis").html(
+			cards
+				.map(
+					(card) => `
+				<div class="recon-bank-kpi-column">
+					<div class="recon-bank-kpi" style="background: linear-gradient(135deg, ${card.gradient});">
+						<div class="recon-bank-kpi-label">${card.label}</div>
+						<div class="recon-bank-kpi-value">${card.value}</div>
+					</div>
+				</div>
+			`
+				)
+				.join("")
+		).show();
+	}
+
 	bankCells(banks, bankValues) {
 		return banks
 			.map(
@@ -360,17 +429,31 @@ class ReconciliationWithBankPage {
 			.join("");
 	}
 
+	summaryRow(label, banks, bankValues, rowClass) {
+		return `
+			<tr class="${rowClass}">
+				<td>${frappe.utils.escape_html(label)}</td>
+				<td></td>
+				${this.bankCells(banks, bankValues)}
+			</tr>
+		`;
+	}
+
 	render_report(data) {
 		const banks = data.banks || [];
 		if (!banks.length) {
+			this.body.find("#recon-bank-kpis").hide().empty();
 			this.body.find(".recon-report").html(
 				`<div class="text-muted">${__("No bank accounts found for the selected filters.")}</div>`
 			);
 			return;
 		}
 
+		this.render_kpis(data.totals || {});
+
 		const donations = data.donations || [];
 		const expenses = data.expenses || [];
+		const totals = data.totals || {};
 		const initial = data.initial_amount || {};
 		const ending = data.ending_balance || {};
 		const title = frappe.utils.escape_html(data.title || __("Reconciliation with Bank Statements Summary"));
@@ -439,7 +522,15 @@ class ReconciliationWithBankPage {
 							${this.bankCells(banks, initial.banks)}
 						</tr>
 						${donationRows}
+						${this.summaryRow(__("Total Donation"), banks, totals.donation_banks, "recon-summary")}
 						${expenseRows}
+						${this.summaryRow(__("Total Expense"), banks, totals.expense_banks, "recon-summary-expense")}
+						${this.summaryRow(
+							__("Difference (Donation - Expense)"),
+							banks,
+							totals.difference_banks,
+							"recon-summary-diff"
+						)}
 						<tr class="recon-ending">
 							<td>${__("Ending balance {0}", [ending.date_label || ""])}</td>
 							<td></td>
