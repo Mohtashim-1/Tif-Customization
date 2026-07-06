@@ -400,17 +400,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Purchase from Zakat (UAT)",
-   "link_count": 0,
-   "link_to": "expense-from-zakat-a",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Purchase from Endowment Fund (UAT)",
+   "label": "Endowment Fund (UAT)",
    "link_count": 0,
    "link_to": "purchase-from-endowment-fund",
    "link_type": "Page",
@@ -476,7 +466,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-07-06 15:38:39.075652",
+ "modified": "2026-07-06 17:30:21.560162",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Reports",

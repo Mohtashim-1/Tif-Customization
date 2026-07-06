@@ -1,7 +1,7 @@
 frappe.pages["purchase-from-endowment-fund"].on_page_load = function (wrapper) {
 	const page = frappe.ui.make_app_page({
 		parent: wrapper,
-		title: __("Purchase from Endowment Fund"),
+		title: __("Endowment Fund"),
 		single_column: true,
 	});
 
@@ -28,10 +28,8 @@ frappe.pages["purchase-from-endowment-fund"].on_page_load = function (wrapper) {
 						<div class="zakat-hero">
 							<div class="zakat-hero__copy">
 								<div class="zakat-eyebrow">${__("Finance Report")}</div>
-								<h2>${__("Purchase from Endowment Fund")}</h2>
-								<p>${__(
-									"Track Endowment fund received and how much Endowment-marked money was used for supplier purchase invoices."
-								)}</p>
+								<h2>${__("Endowment Fund")}</h2>
+								
 							</div>
 							<div class="zakat-hero__side">
 								<div class="zakat-actions">
