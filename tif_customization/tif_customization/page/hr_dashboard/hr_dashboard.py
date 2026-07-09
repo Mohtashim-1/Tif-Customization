@@ -83,6 +83,12 @@ def get_dashboard_data(filters=None):
 	data["headcount_by_employee_branch"] = _active_employee_group_count("branch", company, branch, department, limit=15)
 	data["headcount_by_designation"] = _active_employee_group_count("designation", company, branch, department, limit=20)
 	data["headcount_by_department"] = _active_employee_group_count("department", company, branch, department, limit=25)
+	data["headcount_by_department_employment_type"] = _headcount_stacked_by_employment_type(
+		"department", company, branch, department, limit=25
+	)
+	data["headcount_by_branch_employment_type"] = _headcount_stacked_by_employment_type(
+		"branch", company, branch, department, limit=25
+	)
 	# City / Branch wise (Employee master; best-effort based on available fields)
 	data["headcount_by_city"] = _active_employee_city_count(company, branch, department, limit=15)
 	data["headcount_by_city_branch"] = _active_employee_city_branch_table(company, branch, department, limit=25)
@@ -223,6 +229,8 @@ def _empty_payload(from_date, to_date, company, branch, department="", employee=
 		"headcount_by_employee_branch": {"labels": [], "values": []},
 		"headcount_by_designation": {"labels": [], "values": []},
 		"headcount_by_department": {"labels": [], "values": []},
+		"headcount_by_department_employment_type": {"labels": [], "series": []},
+		"headcount_by_branch_employment_type": {"labels": [], "series": []},
 		"headcount_by_city": {"labels": [], "values": []},
 		"headcount_by_city_branch": [],
 		"punctuality_late_buckets": {"labels": [], "values": []},
@@ -1256,6 +1264,58 @@ def _active_employee_group_count(fieldname, company, branch, department, limit=1
 
 def _headcount_by_employment_type(company, branch, department, limit=12):
 	return _active_employee_group_count("employment_type", company, branch, department, limit=limit)
+
+
+def _headcount_stacked_by_employment_type(fieldname, company, branch, department, limit=25):
+	"""Stacked headcount: group_field (department/branch) × employment_type."""
+	fieldname = (fieldname or "").strip()
+	if fieldname not in _ALLOWED_EMP_GROUP_FIELDS:
+		return {"labels": [], "series": []}
+	if not frappe.db.table_exists("Employee"):
+		return {"labels": [], "series": []}
+	if not _has_field("Employee", fieldname) or not _has_field("Employee", "employment_type"):
+		return {"labels": [], "series": []}
+
+	where_sql, params = _emp_filters_sql(company, branch, department)
+	rows = frappe.db.sql(
+		f"""
+		SELECT
+			COALESCE(NULLIF(TRIM(e.`{fieldname}`), ''), 'Not set') AS group_label,
+			COALESCE(NULLIF(TRIM(e.employment_type), ''), 'Not set') AS employment_type,
+			COUNT(e.name) AS c
+		FROM `tabEmployee` e
+		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}
+		GROUP BY group_label, employment_type
+		""",
+		params,
+		as_dict=True,
+	)
+	if not rows:
+		return {"labels": [], "series": []}
+
+	group_totals = {}
+	type_totals = {}
+	matrix = {}
+	for row in rows:
+		group_label = row.get("group_label") or "Not set"
+		emp_type = row.get("employment_type") or "Not set"
+		count = cint(row.get("c"))
+		group_totals[group_label] = group_totals.get(group_label, 0) + count
+		type_totals[emp_type] = type_totals.get(emp_type, 0) + count
+		matrix.setdefault(group_label, {})
+		matrix[group_label][emp_type] = matrix[group_label].get(emp_type, 0) + count
+
+	top_groups = sorted(group_totals.keys(), key=lambda g: group_totals[g], reverse=True)[: cint(limit)]
+	emp_types = sorted(type_totals.keys(), key=lambda t: type_totals[t], reverse=True)
+
+	series = [
+		{
+			"name": emp_type,
+			"data": [cint(matrix.get(group_label, {}).get(emp_type, 0)) for group_label in top_groups],
+		}
+		for emp_type in emp_types
+	]
+	return {"labels": top_groups, "series": series}
 
 
 def _employee_city_source():

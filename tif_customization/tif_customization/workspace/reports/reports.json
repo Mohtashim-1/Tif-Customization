@@ -409,6 +409,39 @@
   },
   {
    "hidden": 0,
+   "is_query_report": 1,
+   "label": "Donor Ledger (UAT)",
+   "link_count": 0,
+   "link_to": "Donor Ledger",
+   "link_type": "Report",
+   "onboard": 0,
+   "report_ref_doctype": "Donor",
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Cash Book (UAT)",
+   "link_count": 0,
+   "link_to": "Cash Book",
+   "link_type": "Report",
+   "onboard": 0,
+   "report_ref_doctype": "GL Entry",
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Bank Book (UAT)",
+   "link_count": 0,
+   "link_to": "Bank Book",
+   "link_type": "Report",
+   "onboard": 0,
+   "report_ref_doctype": "GL Entry",
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
    "is_query_report": 0,
    "label": "SME",
    "link_count": 10,
@@ -466,7 +499,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-07-06 17:30:21.560162",
+ "modified": "2026-07-06 17:59:48.821732",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Reports",

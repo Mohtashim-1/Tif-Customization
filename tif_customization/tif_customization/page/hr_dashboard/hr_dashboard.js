@@ -214,11 +214,21 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 							
 							
 							<div class="tif-panel tif-panel--span2">
+								<div class="tif-panel__title">Branch (active count by employment type)</div>
+								<p class="tif-panel__hint">Each bar shows total employees per branch, split by employment type.</p>
+								<div id="tif-dash-wf-ebranch"></div>
+							</div>
+							<div class="tif-panel">
+								<div class="tif-panel__title">Branch headcount</div>
+								<div id="tif-dash-wf-branch-table"></div>
+							</div>
+							<div class="tif-panel tif-panel--span2">
 								<div class="tif-panel__title">Designation (active count)</div>
 								<div id="tif-dash-wf-desig"></div>
 							</div>
 							<div class="tif-panel tif-panel--span2">
-								<div class="tif-panel__title">Department (active count)</div>
+								<div class="tif-panel__title">Department (active count by employment type)</div>
+								<p class="tif-panel__hint">Each bar shows total employees per department, split by employment type.</p>
 								<div id="tif-dash-wf-dept"></div>
 							</div>
 							<div class="tif-panel tif-panel--span2" style="display:none">
@@ -505,6 +515,69 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 					const i = order.indexOf(lb);
 					return i >= 0 ? pal[i] : pal[pal.length - 1];
 				});
+			}
+
+			_stackedEmploymentColors(seriesCount) {
+				const base = [...TIF_HR_PALETTE.donut, "#0d9488", "#9333ea", "#b45309", "#be185d", "#1e40af"];
+				if (seriesCount <= base.length) {
+					return base.slice(0, seriesCount);
+				}
+				const colors = [...base];
+				while (colors.length < seriesCount) {
+					colors.push(base[colors.length % base.length]);
+				}
+				return colors;
+			}
+
+			_render_stacked_headcount_chart(key, selector, data, options = {}) {
+				const mode = this._apexMode();
+				const labels = data.labels || [];
+				const series = data.series || [];
+				const chartHeight = Math.max(options.height || 380, labels.length * 34);
+				const colors = this._stackedEmploymentColors(series.length);
+				const chart = this.ensure_chart(key, selector, {
+					chart: this._chartAnim({
+						type: "bar",
+						height: chartHeight,
+						stacked: true,
+						toolbar: { show: false },
+					}),
+					theme: { mode },
+					colors,
+					grid: { borderColor: "#e2e8f0", strokeDashArray: 4 },
+					tooltip: { theme: mode, shared: true, intersect: false },
+					noData: { text: options.noData || "No data" },
+					plotOptions: {
+						bar: {
+							horizontal: true,
+							borderRadius: 3,
+							barHeight: "72%",
+							dataLabels: { total: { enabled: true, style: { fontSize: "11px", fontWeight: 700 } } },
+						},
+					},
+					xaxis: this._xaxisCategoriesNoTrim(labels),
+					series,
+					dataLabels: {
+						enabled: true,
+						style: { fontSize: "10px", fontWeight: 600 },
+						formatter: (val) => (val > 0 ? String(Math.round(val)) : ""),
+					},
+					legend: { position: "top", fontWeight: 500, fontSize: "11px" },
+					yaxis: { labels: { maxWidth: 220 } },
+				});
+				if (chart) {
+					chart.updateOptions(
+						{
+							chart: { height: chartHeight },
+							colors,
+							xaxis: this._xaxisCategoriesNoTrim(labels),
+						},
+						false,
+						true,
+					);
+					chart.updateSeries(series, true);
+				}
+				return chart;
 			}
 
 			load_apexcharts() {
@@ -856,25 +929,20 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 					const d = data.headcount_by_employee_branch || {};
 					const labels = d.labels || [];
 					const values = d.values || [];
-					const chart = this.ensure_chart("wf_ebr", "#tif-dash-wf-ebranch", {
-						chart: this._chartAnim({
-							type: "bar",
-							height: Math.max(280, labels.length * 32),
-							toolbar: { show: false },
-						}),
-						theme: { mode },
-						colors: ["#0891b2"],
-						grid: { borderColor: "#e2e8f0", strokeDashArray: 4 },
-						noData: { text: "No branch data" },
-						plotOptions: { bar: { horizontal: true, borderRadius: 4, barHeight: "72%" } },
-						xaxis: this._xaxisCategoriesNoTrim(labels),
-						series: [{ name: "Employees", data: values }],
-						dataLabels: { enabled: false },
-					});
-					if (chart) {
-						chart.updateOptions({ xaxis: this._xaxisCategoriesNoTrim(labels) }, false, true);
-						chart.updateSeries([{ name: "Employees", data: values }], true);
-					}
+					this._render_stacked_headcount_chart(
+						"wf_ebr",
+						"#tif-dash-wf-ebranch",
+						data.headcount_by_branch_employment_type || { labels: [], series: [] },
+						{ noData: "No branch data", height: Math.max(320, labels.length * 34) },
+					);
+					const branchRows = labels.map((label, idx) => ({
+						branch: label,
+						count: values[idx] || 0,
+					}));
+					this.render_table("#tif-dash-wf-branch-table", branchRows, [
+						{ key: "branch", label: "Branch" },
+						{ key: "count", label: "Employees", format: "Int" },
+					]);
 				}
 
 				{
@@ -905,26 +973,12 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 				{
 					const d = data.headcount_by_department || {};
 					const labels = d.labels || [];
-					const values = d.values || [];
-					const chart = this.ensure_chart("wf_dep", "#tif-dash-wf-dept", {
-						chart: this._chartAnim({
-							type: "bar",
-							height: Math.max(380, labels.length * 30),
-							toolbar: { show: false },
-						}),
-						theme: { mode },
-						colors: ["#ea580c"],
-						grid: { borderColor: "#e2e8f0", strokeDashArray: 4 },
-						noData: { text: "No department data" },
-						plotOptions: { bar: { horizontal: true, borderRadius: 4, barHeight: "70%" } },
-						xaxis: this._xaxisCategoriesNoTrim(labels),
-						series: [{ name: "Employees", data: values }],
-						dataLabels: { enabled: false },
-					});
-					if (chart) {
-						chart.updateOptions({ xaxis: this._xaxisCategoriesNoTrim(labels) }, false, true);
-						chart.updateSeries([{ name: "Employees", data: values }], true);
-					}
+					this._render_stacked_headcount_chart(
+						"wf_dep",
+						"#tif-dash-wf-dept",
+						data.headcount_by_department_employment_type || { labels: [], series: [] },
+						{ noData: "No department data", height: Math.max(400, labels.length * 34) },
+					);
 				}
 
 				{

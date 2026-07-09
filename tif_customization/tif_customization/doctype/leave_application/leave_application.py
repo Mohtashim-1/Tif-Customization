@@ -13,6 +13,14 @@ ADDITIONAL_LEAVE_APPLICATION_ASSIGNEES = {
 	"anas.khan@tif.edu.pk",
 }
 
+LEAVE_REJECTED_WORKFLOW_STATES = frozenset(
+	{
+		"Rejected",
+		"Rejected by Leave Approver",
+		"Rejected by HR",
+	}
+)
+
 
 def payroll_months_between(start: date, end: date) -> int:
 	"""Returns number of 26th-to-25th periods between start and end (inclusive)."""
@@ -272,15 +280,22 @@ def _close_all_todos(doctype: str, name: str):
 
 
 def sync_leave_approver_todo(doc, method=None):
-	"""Ensure ToDos exist for Leave Approver and HR assignees on non-cancelled applications."""
+	"""Assign current workflow step only: Leave Approver first, then HR finalization."""
 	if getattr(doc, "status", None) == "Cancelled" or cint(doc.docstatus) == 2:
 		_close_all_todos(doc.doctype, doc.name)
 		return
 
+	workflow_state = (getattr(doc, "workflow_state", "") or "").strip()
+	if workflow_state in LEAVE_REJECTED_WORKFLOW_STATES or (getattr(doc, "status", "") or "").strip() == "Rejected":
+		_close_all_todos(doc.doctype, doc.name)
+		return
+
+	if cint(doc.docstatus) == 1:
+		_close_all_todos(doc.doctype, doc.name)
+		return
+
 	leave_approver = getattr(doc, "leave_approver", None)
-	assignees = set(ADDITIONAL_LEAVE_APPLICATION_ASSIGNEES)
-	if leave_approver:
-		assignees.add(leave_approver)
+	assignees = _get_leave_application_assignees(doc, leave_approver)
 
 	assignees = {user for user in assignees if frappe.db.exists("User", user)}
 
@@ -314,3 +329,15 @@ def sync_leave_approver_todo(doc, method=None):
 			},
 			ignore_permissions=True,
 		)
+
+
+def _get_leave_application_assignees(doc, leave_approver=None):
+	"""Resolve users for the current Leave Application step."""
+	workflow_state = (getattr(doc, "workflow_state", "") or "").strip().lower()
+
+	# HR finalization stage (for custom workflow states like "Request for HR Approval").
+	if "hr" in workflow_state:
+		return set(ADDITIONAL_LEAVE_APPLICATION_ASSIGNEES)
+
+	# Default first stage goes to Leave Approver only.
+	return {leave_approver} if leave_approver else set()
