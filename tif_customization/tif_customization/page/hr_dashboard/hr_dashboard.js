@@ -146,6 +146,11 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 									<div class="tif-card__value">—</div>
 									<div class="tif-card__hint">Joining this year</div>
 								</div>
+								<div class="tif-card tif-card--clickable" data-card="attrition_this_month" title="Click for detail">
+									<div class="tif-card__label">Attrition (This Month)</div>
+									<div class="tif-card__value">—</div>
+									<div class="tif-card__hint">Exits this month</div>
+								</div>
 								<div class="tif-card tif-card--clickable" data-card="left_employees_this_month" title="Click for detail">
 									<div class="tif-card__label">Left Employees (This Month)</div>
 									<div class="tif-card__value">—</div>
@@ -162,9 +167,8 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 									<div class="tif-card__hint">Active employees with EOBI</div>
 								</div>
 								<div class="tif-card tif-card--clickable" data-card="pak_qatar_enrolled" title="Click for detail">
-									<div class="tif-card__label">Pak Qatar (Enrolled Health Card, Paycon, GLI)</div>
+									<div class="tif-card__label">Pak Qatar (Enrolled Health Card, Paycon, GLT)</div>
 									<div class="tif-card__value">—</div>
-									<div class="tif-card__hint">Health card / Pak Qatar insurance</div>
 								</div>
 								<div class="tif-card tif-card--clickable" data-card="cnic_expired_count" title="Click for detail">
 									<div class="tif-card__label">CNIC Expired</div>
@@ -190,6 +194,16 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 									<div class="tif-card__label">Total Female</div>
 									<div class="tif-card__value">—</div>
 									<div class="tif-card__hint">Active employees</div>
+								</div>
+								<div class="tif-card tif-card--clickable" data-card="top_3_late_comers" title="Click for employee names">
+									<div class="tif-card__label">Top 3 Late Comers</div>
+									<div class="tif-card__value">—</div>
+									<div class="tif-card__hint">Full time · current payroll month</div>
+								</div>
+								<div class="tif-card tif-card--clickable" data-card="top_3_punctual_employees" title="Click for employee names">
+									<div class="tif-card__label">Top 3 Punctual Employees</div>
+									<div class="tif-card__value">—</div>
+									<div class="tif-card__hint">Full time · current payroll month</div>
 								</div>
 							</div>
 							
@@ -341,7 +355,8 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 					.tif-card[data-card="new_hires_this_month"],
 					.tif-card[data-card="new_hires_this_year"]{--tif-card-accent:#059669;--tif-card-accent-text:#047857;--tif-card-muted:#064e3b;background:linear-gradient(135deg,#ecfdf5 0%,#d1fae5 100%);border-color:#a7f3d0}
 					.tif-card[data-card="left_employees_this_month"],
-					.tif-card[data-card="left_employees_this_year"]{--tif-card-accent:#f97316;--tif-card-accent-text:#c2410c;--tif-card-muted:#7c2d12;background:linear-gradient(135deg,#fff7ed 0%,#ffedd5 100%);border-color:#fed7aa}
+					.tif-card[data-card="left_employees_this_year"],
+					.tif-card[data-card="attrition_this_month"]{--tif-card-accent:#f97316;--tif-card-accent-text:#c2410c;--tif-card-muted:#7c2d12;background:linear-gradient(135deg,#fff7ed 0%,#ffedd5 100%);border-color:#fed7aa}
 					.tif-card[data-card="eobi_added"]{--tif-card-accent:#ca8a04;--tif-card-accent-text:#a16207;--tif-card-muted:#713f12;background:linear-gradient(135deg,#fefce8 0%,#fef3c7 100%);border-color:#fde68a}
 					.tif-card[data-card="pak_qatar_enrolled"]{--tif-card-accent:#db2777;--tif-card-accent-text:#be185d;--tif-card-muted:#831843;background:linear-gradient(135deg,#fdf2f8 0%,#fce7f3 100%);border-color:#fbcfe8}
 					.tif-card[data-card="cnic_expired_count"]{--tif-card-accent:#dc2626;--tif-card-accent-text:#b91c1c;--tif-card-muted:#7f1d1d;background:linear-gradient(135deg,#fef2f2 0%,#fee2e2 100%);border-color:#fecaca}
@@ -349,6 +364,8 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 					.tif-card[data-card="upcoming_confirmation"]{--tif-card-accent:#0d9488;--tif-card-accent-text:#0f766e;--tif-card-muted:#134e4a;background:linear-gradient(135deg,#f0fdfa 0%,#ccfbf1 100%);border-color:#99f6e4}
 					.tif-card[data-card="total_male"],
 					.tif-card[data-card="total_female"]{--tif-card-accent:#64748b;--tif-card-accent-text:#475569;--tif-card-muted:#334155;background:linear-gradient(135deg,#f8fafc 0%,#e2e8f0 100%);border-color:#cbd5e1}
+					.tif-card[data-card="top_3_late_comers"]{--tif-card-accent:#dc2626;--tif-card-accent-text:#b91c1c;--tif-card-muted:#7f1d1d;background:linear-gradient(135deg,#fef2f2 0%,#fee2e2 100%);border-color:#fecaca}
+					.tif-card[data-card="top_3_punctual_employees"]{--tif-card-accent:#059669;--tif-card-accent-text:#047857;--tif-card-muted:#064e3b;background:linear-gradient(135deg,#ecfdf5 0%,#d1fae5 100%);border-color:#a7f3d0}
 					.tif-attdash__grid{display:grid;grid-template-columns:repeat(2,minmax(300px,1fr));gap:12px}
 					.tif-panel{border:1px solid var(--border-color);border-radius:10px;background:var(--card-bg);padding:12px;box-shadow:0 1px 2px rgba(15,23,42,.06)}
 					.tif-panel__title{font-size:13px;font-weight:600;margin-bottom:8px}
@@ -683,6 +700,16 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 				this.set_card("emp_contract_fixed_salary", data.emp_contract_fixed_salary);
 				this.set_card("new_hires_this_month", data.new_hires_this_month);
 				this.set_card("new_hires_this_year", data.new_hires_this_year);
+				this.set_card("attrition_this_month", data.attrition_this_month);
+				const attritionMonth = data.attrition_month_label || "";
+				const attritionRate = data.attrition_rate_this_month;
+				const attritionHint =
+					attritionMonth && attritionRate !== null && attritionRate !== undefined
+						? `${attritionMonth} · ${Number(attritionRate).toFixed(2)}% of active headcount`
+						: attritionMonth
+							? `Exits in ${attritionMonth}`
+							: "Exits this month";
+				this.set_card_hint("attrition_this_month", attritionHint);
 				this.set_card("left_employees_this_month", data.left_employees_this_month);
 				this.set_card("left_employees_this_year", data.left_employees_this_year);
 				this.set_card("eobi_added", data.eobi_added_count);
@@ -692,6 +719,17 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 				this.set_card("upcoming_confirmation", data.upcoming_confirmation_count);
 				this.set_card("total_male", data.total_male);
 				this.set_card("total_female", data.total_female);
+				this.set_card("top_3_late_comers", data.top_3_late_comers_count);
+				this.set_card("top_3_punctual_employees", data.top_3_punctual_employees_count);
+				const payrollLabel = data.payroll_month_label || "";
+				this.set_card_hint(
+					"top_3_late_comers",
+					payrollLabel ? `Full time · ${payrollLabel}` : "Full time · current payroll month",
+				);
+				this.set_card_hint(
+					"top_3_punctual_employees",
+					payrollLabel ? `Full time · ${payrollLabel}` : "Full time · current payroll month",
+				);
 
 				this.set_card("new_hires", data.new_hires);
 				this.set_card("left_employees", data.left_employees);

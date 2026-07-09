@@ -5,7 +5,7 @@ import json
 import re
 
 import frappe
-from frappe.utils import add_days, add_months, cint, flt, get_first_day, get_last_day, getdate, nowdate
+from frappe.utils import add_days, add_months, cint, flt, formatdate, get_first_day, get_last_day, getdate, nowdate
 
 
 EA_DOCTYPE = "Employee Attendance"
@@ -59,6 +59,23 @@ def get_dashboard_data(filters=None):
 	)
 	data["punctuality_incident_mix"] = _punctuality_incident_mix(totals)
 	data["top_by_lates"] = _ea_top_employees(month_keys, company, branch, department, employee, order_field="total_lates", limit=12)
+	payroll_month_keys = _current_payroll_ea_month_keys(today)
+	period_start, period_end, period_year, period_month = _get_payroll_period_bounds(today)
+	data["payroll_month_label"] = f"{formatdate(period_start, 'dd MMM yyyy')} – {formatdate(period_end, 'dd MMM yyyy')}"
+	data["payroll_month_period"] = {
+		"from_date": str(period_start),
+		"to_date": str(period_end),
+		"month": period_month,
+		"year": period_year,
+	}
+	data["top_3_late_comers"] = _ea_top_fulltime_employees(
+		payroll_month_keys, company, branch, department, employee, order_field="total_lates", limit=3, ascending=False
+	)
+	data["top_3_punctual_employees"] = _ea_top_fulltime_employees(
+		payroll_month_keys, company, branch, department, employee, order_field="total_lates", limit=3, ascending=True
+	)
+	data["top_3_late_comers_count"] = len(data["top_3_late_comers"])
+	data["top_3_punctual_employees_count"] = len(data["top_3_punctual_employees"])
 	data["top_by_absents"] = _ea_top_employees(month_keys, company, branch, department, employee, order_field="total_absents", limit=12)
 
 	data["leave_trend"] = _leave_trend(from_date, to_date, company=company, branch=branch, department=department, employee=employee)
@@ -99,6 +116,10 @@ def get_dashboard_data(filters=None):
 	year_start = getdate(f"{today.year}-01-01")
 	data["new_hires_this_month"] = _count_new_hires(month_start, month_end, company, branch, department)
 	data["left_employees_this_month"] = _count_left_employees(month_start, month_end, company, branch, department)
+	data["attrition_this_month"] = data["left_employees_this_month"]
+	hc_month = max(cint(data["active_headcount"]), 1)
+	data["attrition_rate_this_month"] = flt(data["attrition_this_month"]) / flt(hc_month) * 100.0
+	data["attrition_month_label"] = today.strftime("%b %Y")
 	data["new_hires_this_year"] = _count_new_hires(year_start, today, company, branch, department)
 	data["left_employees_this_year"] = _count_left_employees(year_start, today, company, branch, department)
 	data["total_left_employees"] = _count_total_left_employees(company, branch, department)
@@ -160,6 +181,10 @@ def get_card_drilldown(card_key=None, filters=None):
 		"new_hires_this_month": lambda: _drill_new_hires(month_start, month_end, company, branch, department),
 		"new_hires_this_year": lambda: _drill_new_hires(year_start, today, company, branch, department),
 		"left_employees_this_month": lambda: _drill_left_employees(month_start, month_end, company, branch, department),
+		"attrition_this_month": lambda: _drill_payload(
+			f"Attrition — {today.strftime('%b %Y')}",
+			_fetch_left_rows(month_start, month_end, company, branch, department, limit=500),
+		),
 		"left_employees_this_year": lambda: _drill_left_employees(year_start, today, company, branch, department),
 		"eobi_added": lambda: _drill_eobi_added(company, branch, department),
 		"pak_qatar_enrolled": lambda: _drill_pak_qatar_enrolled(company, branch, department),
@@ -175,6 +200,12 @@ def get_card_drilldown(card_key=None, filters=None):
 		"attendance_records": lambda: _drill_attendance_records(from_date, to_date, company, branch, department, filters.get("employee")),
 		"employees_covered": lambda: _drill_employees_covered(from_date, to_date, company, branch, department, filters.get("employee")),
 		"pending_leave_applications": lambda: _drill_pending_leaves(from_date, to_date, company, branch, department, filters.get("employee")),
+		"top_3_late_comers": lambda: _drill_top_fulltime_attendance(
+			company, branch, department, ascending=False, limit=3
+		),
+		"top_3_punctual_employees": lambda: _drill_top_fulltime_attendance(
+			company, branch, department, ascending=True, limit=3
+		),
 	}
 
 	handler = handlers.get(card_key)
@@ -212,6 +243,11 @@ def _empty_payload(from_date, to_date, company, branch, department="", employee=
 		"branch_breakdown": {"labels": [], "values": []},
 		"metrics_distribution": {"labels": [], "values": []},
 		"top_by_lates": [],
+		"top_3_late_comers": [],
+		"top_3_punctual_employees": [],
+		"top_3_late_comers_count": 0,
+		"top_3_punctual_employees_count": 0,
+		"payroll_month_label": "",
 		"top_by_absents": [],
 		"leave_trend": {"labels": [], "series": []},
 		"leaves_by_type": {"labels": [], "values": []},
@@ -237,6 +273,9 @@ def _empty_payload(from_date, to_date, company, branch, department="", employee=
 		"punctuality_incident_mix": {"labels": [], "values": []},
 		"new_hires_this_month": 0,
 		"left_employees_this_month": 0,
+		"attrition_this_month": 0,
+		"attrition_rate_this_month": 0.0,
+		"attrition_month_label": "",
 		"payroll_salary_slips_this_month": 0,
 		"payroll_net_pay_this_month": 0.0,
 		"new_hires_this_year": 0,
@@ -286,6 +325,10 @@ EMPLOYMENT_CARD_TYPES = {
 	],
 }
 
+FULL_TIME_EMPLOYMENT_TYPES = (
+	EMPLOYMENT_CARD_TYPES["emp_full_time_permanent"] + EMPLOYMENT_CARD_TYPES["emp_full_time_probation"]
+)
+
 
 def _has_field(doctype, fieldname):
 	try:
@@ -302,6 +345,54 @@ def _months_in_range(from_date, to_date):
 		out.append((str(cur.year), calendar.month_name[cur.month]))
 		cur = add_months(cur, 1)
 	return out
+
+
+def _payroll_period_settings():
+	for doctype in ("V HR Settings", "HR Settings"):
+		if not frappe.db.exists("DocType", doctype):
+			continue
+		doc = frappe.get_single(doctype)
+		period_from = cint(getattr(doc, "period_from", None) or 0)
+		period_to = cint(getattr(doc, "period_to", None) or 0)
+		if period_from and period_to:
+			return period_from, period_to
+	return 26, 25
+
+
+def _get_payroll_period_bounds(reference_date=None):
+	"""Payroll month window (default 26th to 25th) containing reference_date."""
+	from datetime import date as dt_date
+
+	reference_date = getdate(reference_date or nowdate())
+	period_from, period_to = _payroll_period_settings()
+	year = reference_date.year
+	month = reference_date.month
+	if reference_date.day < period_from:
+		month -= 1
+		if month == 0:
+			month = 12
+			year -= 1
+
+	period_start = dt_date(year, month, period_from)
+	if period_to < period_from:
+		next_month = month + 1
+		next_year = year
+		if next_month == 13:
+			next_month = 1
+			next_year += 1
+		period_end = dt_date(next_year, next_month, period_to)
+	else:
+		period_end = dt_date(year, month, period_to)
+
+	period_month = calendar.month_name[period_end.month]
+	period_year = str(period_end.year)
+	return period_start, period_end, period_year, period_month
+
+
+def _current_payroll_ea_month_keys(reference_date=None):
+	"""Employee Attendance month/year key for the current payroll period."""
+	_, _, period_year, period_month = _get_payroll_period_bounds(reference_date)
+	return [(period_year, period_month)]
 
 
 def _ea_where_months(month_keys):
@@ -611,21 +702,39 @@ def _punctuality_incident_mix(totals):
 	return {"labels": labels, "values": values}
 
 
-def _ea_top_employees(month_keys, company, branch, department, employee, order_field="total_lates", limit=10):
-	if not month_keys or not _has_field(EA_DOCTYPE, order_field):
+def _ea_top_fulltime_employees(
+	month_keys, company, branch, department, employee, order_field="total_lates", limit=3, ascending=False
+):
+	"""Top/bottom full-time employees by attendance metric for payroll month EA rows."""
+	if not month_keys or not _has_field(EA_DOCTYPE, order_field) or not _has_field("Employee", "employment_type"):
 		return []
+
 	join_sql, where_sql, params = _ea_join_and_where(company, branch, department, employee, month_keys)
+	if "LEFT JOIN `tabEmployee` e" not in join_sql:
+		join_sql = f"{join_sql} LEFT JOIN `tabEmployee` e ON e.name = a.employee "
+
+	where_sql = (
+		f"{where_sql} AND COALESCE(e.status, '') = 'Active' "
+		"AND e.employment_type IN %(employment_types)s"
+	)
+	params["employment_types"] = FULL_TIME_EMPLOYMENT_TYPES
+
 	num = _num_sql("a", order_field)
 	label_sql = "COALESCE(NULLIF(TRIM(a.employee_name), ''), a.employee, 'Unknown')"
+	employee_sql = "COALESCE(NULLIF(TRIM(a.employee), ''), '')" if _has_field(EA_DOCTYPE, "employee") else "''"
+	employment_sql = "COALESCE(NULLIF(TRIM(e.employment_type), ''), '')"
+	order_sql = "ASC" if ascending else "DESC"
 	rows = frappe.db.sql(
 		f"""
 		SELECT {label_sql} AS employee_label,
+			{employee_sql} AS employee_id,
+			{employment_sql} AS employment_type,
 			SUM({num}) AS metric,
-			COALESCE(NULLIF(TRIM(a.department), ''), '') AS department
+			COALESCE(NULLIF(TRIM(a.department), ''), NULLIF(TRIM(e.department), ''), '') AS department
 		FROM {EA_TABLE} a {join_sql}
 		WHERE {where_sql}
-		GROUP BY employee_label, department
-		ORDER BY metric DESC
+		GROUP BY employee_label, employee_id, employment_type, department
+		ORDER BY metric {order_sql}, employee_label ASC
 		LIMIT {cint(limit)}
 		""",
 		params,
@@ -636,6 +745,46 @@ def _ea_top_employees(month_keys, company, branch, department, employee, order_f
 		out.append(
 			{
 				"employee_name": r.get("employee_label"),
+				"employee_id": r.get("employee_id") or "",
+				"employment_type": r.get("employment_type") or "",
+				"department": r.get("department") or "—",
+				"value": flt(r.get("metric")),
+			}
+		)
+	return out
+
+
+def _ea_top_employees(
+	month_keys, company, branch, department, employee, order_field="total_lates", limit=10, ascending=False
+):
+	if not month_keys or not _has_field(EA_DOCTYPE, order_field):
+		return []
+	join_sql, where_sql, params = _ea_join_and_where(company, branch, department, employee, month_keys)
+	num = _num_sql("a", order_field)
+	label_sql = "COALESCE(NULLIF(TRIM(a.employee_name), ''), a.employee, 'Unknown')"
+	employee_sql = "COALESCE(NULLIF(TRIM(a.employee), ''), '')" if _has_field(EA_DOCTYPE, "employee") else "''"
+	order_sql = "ASC" if ascending else "DESC"
+	rows = frappe.db.sql(
+		f"""
+		SELECT {label_sql} AS employee_label,
+			{employee_sql} AS employee_id,
+			SUM({num}) AS metric,
+			COALESCE(NULLIF(TRIM(a.department), ''), '') AS department
+		FROM {EA_TABLE} a {join_sql}
+		WHERE {where_sql}
+		GROUP BY employee_label, employee_id, department
+		ORDER BY metric {order_sql}, employee_label ASC
+		LIMIT {cint(limit)}
+		""",
+		params,
+		as_dict=True,
+	)
+	out = []
+	for r in rows:
+		out.append(
+			{
+				"employee_name": r.get("employee_label"),
+				"employee_id": r.get("employee_id") or "",
 				"department": r.get("department") or "—",
 				"value": flt(r.get("metric")),
 			}
@@ -1908,6 +2057,30 @@ def _drill_pending_leaves(from_date, to_date, company, branch, department, emplo
 	return _drill_payload("Open Leave Applications", rows)
 
 
+def _drill_top_fulltime_attendance(company, branch, department, ascending=False, limit=3):
+	period_start, period_end, _, _ = _get_payroll_period_bounds()
+	month_keys = _current_payroll_ea_month_keys()
+	rows = _ea_top_fulltime_employees(
+		month_keys,
+		company,
+		branch,
+		department,
+		"",
+		order_field="total_lates",
+		limit=limit,
+		ascending=ascending,
+	)
+	title = (
+		"Top 3 Punctual Employees (Full Time)"
+		if ascending
+		else "Top 3 Late Comers (Full Time)"
+	)
+	return _drill_payload(
+		f"{title} — {formatdate(period_start, 'dd MMM yyyy')} to {formatdate(period_end, 'dd MMM yyyy')}",
+		rows,
+	)
+
+
 def _drill_payload(title, rows):
 	columns = _columns_from_rows(rows)
 	return {"title": title, "columns": columns, "rows": rows or []}
@@ -1944,6 +2117,7 @@ def _columns_from_rows(rows):
 		"from_date": "From Date",
 		"to_date": "To Date",
 		"total_leave_days": "Leave Days",
+		"value": "Σ Lates",
 	}
 	columns = []
 	for key in rows[0].keys():
@@ -1953,6 +2127,8 @@ def _columns_from_rows(rows):
 		elif key in ("attendance_records", "docstatus"):
 			fmt = "Int"
 		elif key == "total_leave_days":
+			fmt = "Float"
+		elif key == "value":
 			fmt = "Float"
 		columns.append(
 			{
