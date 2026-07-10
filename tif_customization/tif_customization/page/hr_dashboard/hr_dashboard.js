@@ -149,17 +149,17 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 								<div class="tif-card tif-card--clickable" data-card="attrition_this_month" title="Click for detail">
 									<div class="tif-card__label">Attrition (This Month)</div>
 									<div class="tif-card__value">—</div>
-									<div class="tif-card__hint">Exits this month</div>
+									<div class="tif-card__hint">Payroll month (26–25)</div>
 								</div>
 								<div class="tif-card tif-card--clickable" data-card="left_employees_this_month" title="Click for detail">
 									<div class="tif-card__label">Left Employees (This Month)</div>
 									<div class="tif-card__value">—</div>
-									<div class="tif-card__hint">Exits this month</div>
+									<div class="tif-card__hint">Payroll month (26–25)</div>
 								</div>
 								<div class="tif-card tif-card--clickable" data-card="left_employees_this_year" title="Click for detail">
 									<div class="tif-card__label">Left Employees (This Year)</div>
 									<div class="tif-card__value">—</div>
-									<div class="tif-card__hint">Exits this year</div>
+									<div class="tif-card__hint">Payroll year (26 Jun – 25 Jun)</div>
 								</div>
 								<div class="tif-card tif-card--clickable" data-card="eobi_added" title="Click for detail">
 									<div class="tif-card__label">EOBI Enrolled</div>
@@ -228,12 +228,12 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 							
 							
 							<div class="tif-panel tif-panel--span2">
-								<div class="tif-panel__title">Branch (active count by employment type)</div>
-								<p class="tif-panel__hint">Each bar shows total employees per branch, split by employment type.</p>
+								<div class="tif-panel__title">City (active count by employment type)</div>
+								<p class="tif-panel__hint">Each bar shows total employees per city, split by employment type.</p>
 								<div id="tif-dash-wf-ebranch"></div>
 							</div>
 							<div class="tif-panel">
-								<div class="tif-panel__title">Branch headcount</div>
+								<div class="tif-panel__title">City headcount</div>
 								<div id="tif-dash-wf-branch-table"></div>
 							</div>
 							<div class="tif-panel tif-panel--span2">
@@ -286,7 +286,7 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 								<div id="tif-attdash-dept"></div>
 							</div>
 							<div class="tif-panel" style="display:none">
-								<div class="tif-panel__title">Present days by branch (unit)</div>
+								<div class="tif-panel__title">Present days by city (unit)</div>
 								<div id="tif-attdash-branch"></div>
 							</div>
 							<div class="tif-panel" style="display:none">
@@ -701,17 +701,24 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 				this.set_card("new_hires_this_month", data.new_hires_this_month);
 				this.set_card("new_hires_this_year", data.new_hires_this_year);
 				this.set_card("attrition_this_month", data.attrition_this_month);
-				const attritionMonth = data.attrition_month_label || "";
+				const payrollMonthLabel = data.payroll_month_label || "";
+				const payrollYearLabel = data.payroll_year_label || "";
 				const attritionRate = data.attrition_rate_this_month;
 				const attritionHint =
-					attritionMonth && attritionRate !== null && attritionRate !== undefined
-						? `${attritionMonth} · ${Number(attritionRate).toFixed(2)}% of active headcount`
-						: attritionMonth
-							? `Exits in ${attritionMonth}`
-							: "Exits this month";
+					payrollMonthLabel && attritionRate !== null && attritionRate !== undefined
+						? `${payrollMonthLabel} · ${Number(attritionRate).toFixed(2)}% of active headcount`
+						: payrollMonthLabel || "Payroll month (26–25)";
 				this.set_card_hint("attrition_this_month", attritionHint);
 				this.set_card("left_employees_this_month", data.left_employees_this_month);
+				this.set_card_hint(
+					"left_employees_this_month",
+					payrollMonthLabel || "Payroll month (26–25)",
+				);
 				this.set_card("left_employees_this_year", data.left_employees_this_year);
+				this.set_card_hint(
+					"left_employees_this_year",
+					payrollYearLabel || "Payroll year (26 Jun – 25 Jun)",
+				);
 				this.set_card("eobi_added", data.eobi_added_count);
 				this.set_card("pak_qatar_enrolled", data.pak_qatar_enrolled_count);
 				this.set_card("cnic_expired_count", data.cnic_expired_count);
@@ -721,14 +728,13 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 				this.set_card("total_female", data.total_female);
 				this.set_card("top_3_late_comers", data.top_3_late_comers_count);
 				this.set_card("top_3_punctual_employees", data.top_3_punctual_employees_count);
-				const payrollLabel = data.payroll_month_label || "";
 				this.set_card_hint(
 					"top_3_late_comers",
-					payrollLabel ? `Full time · ${payrollLabel}` : "Full time · current payroll month",
+					payrollMonthLabel ? `Full time · ${payrollMonthLabel}` : "Full time · current payroll month",
 				);
 				this.set_card_hint(
 					"top_3_punctual_employees",
-					payrollLabel ? `Full time · ${payrollLabel}` : "Full time · current payroll month",
+					payrollMonthLabel ? `Full time · ${payrollMonthLabel}` : "Full time · current payroll month",
 				);
 
 				this.set_card("new_hires", data.new_hires);

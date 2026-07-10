@@ -6,12 +6,13 @@ import datetime
 
 EXEMPT_ROLES = {"HR Manager", "HR User", "System Manager"}
 ACCRUAL_EMPLOYMENT_TYPES = {"Full Time -  (Permanent)", "Full Time (Probation)"}
-ADDITIONAL_LEAVE_APPLICATION_ASSIGNEES = {
-	"Administrator",
-	"shoaibmohtashim973@gmail.com",
-	"shahid.khan@tif.edu.pk",
-	"anas.khan@tif.edu.pk",
-}
+LEAVE_HR_ASSIGNEES = frozenset(
+	{
+		"shahid.khan@tif.edu.pk",
+		"anas.khan@tif.edu.pk",
+	}
+)
+LEAVE_HR_OBSERVERS = LEAVE_HR_ASSIGNEES
 
 LEAVE_REJECTED_WORKFLOW_STATES = frozenset(
 	{
@@ -20,6 +21,14 @@ LEAVE_REJECTED_WORKFLOW_STATES = frozenset(
 		"Rejected by HR",
 	}
 )
+
+WORKFLOW_ASSIGNMENT_STAGE = {
+	"Request For Leave Approver Approval": "leave_approver",
+	"Request for HR Approval": "hr",
+}
+_NORMALIZED_ASSIGNMENT_STAGE = {
+	state.strip().lower(): stage for state, stage in WORKFLOW_ASSIGNMENT_STAGE.items()
+}
 
 
 def payroll_months_between(start: date, end: date) -> int:
@@ -280,33 +289,31 @@ def _close_all_todos(doctype: str, name: str):
 
 
 def sync_leave_approver_todo(doc, method=None):
-	"""Assign current workflow step only: Leave Approver first, then HR finalization."""
+	"""Assign current workflow step; HR observers keep read access throughout."""
 	if getattr(doc, "status", None) == "Cancelled" or cint(doc.docstatus) == 2:
 		_close_all_todos(doc.doctype, doc.name)
 		return
 
 	workflow_state = (getattr(doc, "workflow_state", "") or "").strip()
 	if workflow_state in LEAVE_REJECTED_WORKFLOW_STATES or (getattr(doc, "status", "") or "").strip() == "Rejected":
-		_close_all_todos(doc.doctype, doc.name)
 		return
 
 	if cint(doc.docstatus) == 1:
-		_close_all_todos(doc.doctype, doc.name)
 		return
+
+	_share_with_hr_observers(doc)
 
 	leave_approver = getattr(doc, "leave_approver", None)
 	assignees = _get_leave_application_assignees(doc, leave_approver)
-
-	assignees = {user for user in assignees if frappe.db.exists("User", user)}
-
-	# Keep only the current approver and configured HR ToDos open.
-	_cleanup_other_open_todos(doc.doctype, doc.name, keep_users=assignees)
+	assignees = {user for user in assignees if user and frappe.db.exists("User", user)}
+	if not assignees:
+		return
 
 	from frappe.desk.form.assign_to import add as add_assignment
 
-	description = f"Leave Application {doc.name} has been assigned to you."
+	description = f"Leave Application {doc.name} requires your action ({workflow_state or 'Pending'})."
 	for user in assignees:
-		exists = frappe.get_all(
+		if frappe.get_all(
 			"ToDo",
 			filters={
 				"reference_type": doc.doctype,
@@ -315,8 +322,7 @@ def sync_leave_approver_todo(doc, method=None):
 				"status": "Open",
 			},
 			limit=1,
-		)
-		if exists:
+		):
 			continue
 
 		add_assignment(
@@ -331,13 +337,37 @@ def sync_leave_approver_todo(doc, method=None):
 		)
 
 
+def prevent_non_hr_submit(doc, method=None):
+	"""Only HR Manager / HR User may submit Leave Applications."""
+	if frappe.flags.in_install or frappe.flags.in_patch or frappe.flags.in_migrate:
+		return
+
+	roles = set(frappe.get_roles(frappe.session.user))
+	if roles & {"HR Manager", "HR User", "System Manager", "Administrator"}:
+		return
+
+	frappe.throw(
+		frappe._("Only HR Manager or HR User can submit Leave Applications."),
+		frappe.PermissionError,
+	)
+
+
+def _share_with_hr_observers(doc):
+	for user in LEAVE_HR_OBSERVERS:
+		if not user or not frappe.db.exists("User", user):
+			continue
+		frappe.share.add(doc.doctype, doc.name, user, read=1, write=0, share=0, notify=0)
+
+
+def _get_assignment_stage(workflow_state):
+	return _NORMALIZED_ASSIGNMENT_STAGE.get((workflow_state or "").strip().lower())
+
+
 def _get_leave_application_assignees(doc, leave_approver=None):
-	"""Resolve users for the current Leave Application step."""
-	workflow_state = (getattr(doc, "workflow_state", "") or "").strip().lower()
-
-	# HR finalization stage (for custom workflow states like "Request for HR Approval").
-	if "hr" in workflow_state:
-		return set(ADDITIONAL_LEAVE_APPLICATION_ASSIGNEES)
-
-	# Default first stage goes to Leave Approver only.
-	return {leave_approver} if leave_approver else set()
+	"""Resolve users for the current Leave Application workflow step."""
+	stage = _get_assignment_stage(getattr(doc, "workflow_state", None))
+	if stage == "hr":
+		return set(LEAVE_HR_ASSIGNEES)
+	if stage == "leave_approver":
+		return {leave_approver} if leave_approver else set()
+	return set()

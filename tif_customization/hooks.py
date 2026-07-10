@@ -183,8 +183,8 @@ doc_events = {
     "Leave Application": {
         "validate": [
             "tif_customization.tif_customization.doctype.leave_application.leave_application.leave_apply_on_probabe_base",
-            # "tif_customization.tif_customization.doctype.leave_application.leave_application.sync_leave_approver_todo",
         ],
+        "before_submit": "tif_customization.tif_customization.doctype.leave_application.leave_application.prevent_non_hr_submit",
         "on_update": "tif_customization.tif_customization.doctype.leave_application.leave_application.sync_leave_approver_todo",
         "on_update_after_submit": "tif_customization.tif_customization.doctype.leave_application.leave_application.sync_leave_approver_todo",
         "on_cancel": "tif_customization.tif_customization.doctype.leave_application.leave_application.sync_leave_approver_todo",

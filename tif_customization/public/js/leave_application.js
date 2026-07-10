@@ -12,6 +12,16 @@ frappe.ui.form.on("Leave Application", {
 			// Run after HRMS make_dashboard so our accrual table is not overwritten.
 			setTimeout(() => build_allocated_leaves_dashboard(frm), 0);
 		}
+
+		// With workflow: line manager uses Approve action; only HR finalizes (submits).
+		if (frappe.model.has_workflow(frm.doctype) && frm.doc.docstatus === 0) {
+			const roles = frappe.user_roles || [];
+			const is_hr = roles.includes("HR Manager") || roles.includes("HR User");
+			const is_leave_approver = roles.includes("Leave Approver") && !is_hr;
+			if (is_leave_approver && frm.page.btn_primary) {
+				frm.page.btn_primary.hide();
+			}
+		}
 	},
 	employee(frm) {
 		if (frm.doc.docstatus === 0 && frm.doc.employee) {

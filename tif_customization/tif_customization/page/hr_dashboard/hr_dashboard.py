@@ -114,14 +114,18 @@ def get_dashboard_data(filters=None):
 	month_start = get_first_day(today)
 	month_end = get_last_day(today)
 	year_start = getdate(f"{today.year}-01-01")
+	payroll_year_start, payroll_year_end = _get_payroll_fiscal_year_bounds(today)
 	data["new_hires_this_month"] = _count_new_hires(month_start, month_end, company, branch, department)
-	data["left_employees_this_month"] = _count_left_employees(month_start, month_end, company, branch, department)
+	data["left_employees_this_month"] = _count_left_employees(period_start, period_end, company, branch, department)
 	data["attrition_this_month"] = data["left_employees_this_month"]
 	hc_month = max(cint(data["active_headcount"]), 1)
 	data["attrition_rate_this_month"] = flt(data["attrition_this_month"]) / flt(hc_month) * 100.0
-	data["attrition_month_label"] = today.strftime("%b %Y")
+	data["attrition_month_label"] = data["payroll_month_label"]
 	data["new_hires_this_year"] = _count_new_hires(year_start, today, company, branch, department)
-	data["left_employees_this_year"] = _count_left_employees(year_start, today, company, branch, department)
+	data["left_employees_this_year"] = _count_left_employees(
+		payroll_year_start, payroll_year_end, company, branch, department
+	)
+	data["payroll_year_label"] = _payroll_period_label(payroll_year_start, payroll_year_end)
 	data["total_left_employees"] = _count_total_left_employees(company, branch, department)
 	data.update(_payroll_month_summary(company, branch, department, month_start, month_end))
 	data["active_headcount_pakistan"] = _count_active_region_keyword(company, branch, department, "pakistan")
@@ -156,6 +160,10 @@ def get_card_drilldown(card_key=None, filters=None):
 	month_start = get_first_day(today)
 	month_end = get_last_day(today)
 	year_start = getdate(f"{today.year}-01-01")
+	payroll_month_start, payroll_month_end, _, _ = _get_payroll_period_bounds(today)
+	payroll_year_start, payroll_year_end = _get_payroll_fiscal_year_bounds(today)
+	payroll_month_label = _payroll_period_label(payroll_month_start, payroll_month_end)
+	payroll_year_label = _payroll_period_label(payroll_year_start, payroll_year_end)
 
 	card_key = (card_key or "").strip()
 	handlers = {
@@ -180,12 +188,18 @@ def get_card_drilldown(card_key=None, filters=None):
 		),
 		"new_hires_this_month": lambda: _drill_new_hires(month_start, month_end, company, branch, department),
 		"new_hires_this_year": lambda: _drill_new_hires(year_start, today, company, branch, department),
-		"left_employees_this_month": lambda: _drill_left_employees(month_start, month_end, company, branch, department),
-		"attrition_this_month": lambda: _drill_payload(
-			f"Attrition — {today.strftime('%b %Y')}",
-			_fetch_left_rows(month_start, month_end, company, branch, department, limit=500),
+		"left_employees_this_month": lambda: _drill_payload(
+			f"Left Employees — {payroll_month_label}",
+			_fetch_left_rows(payroll_month_start, payroll_month_end, company, branch, department, limit=500),
 		),
-		"left_employees_this_year": lambda: _drill_left_employees(year_start, today, company, branch, department),
+		"attrition_this_month": lambda: _drill_payload(
+			f"Attrition — {payroll_month_label}",
+			_fetch_left_rows(payroll_month_start, payroll_month_end, company, branch, department, limit=500),
+		),
+		"left_employees_this_year": lambda: _drill_payload(
+			f"Left Employees — {payroll_year_label}",
+			_fetch_left_rows(payroll_year_start, payroll_year_end, company, branch, department, limit=500),
+		),
 		"eobi_added": lambda: _drill_eobi_added(company, branch, department),
 		"pak_qatar_enrolled": lambda: _drill_pak_qatar_enrolled(company, branch, department),
 		"cnic_expired_count": lambda: _drill_cnic_expired(company, branch, department),
@@ -248,6 +262,7 @@ def _empty_payload(from_date, to_date, company, branch, department="", employee=
 		"top_3_late_comers_count": 0,
 		"top_3_punctual_employees_count": 0,
 		"payroll_month_label": "",
+		"payroll_year_label": "",
 		"top_by_absents": [],
 		"leave_trend": {"labels": [], "series": []},
 		"leaves_by_type": {"labels": [], "values": []},
@@ -393,6 +408,21 @@ def _current_payroll_ea_month_keys(reference_date=None):
 	"""Employee Attendance month/year key for the current payroll period."""
 	_, _, period_year, period_month = _get_payroll_period_bounds(reference_date)
 	return [(period_year, period_month)]
+
+
+def _payroll_period_label(period_start, period_end):
+	return f"{formatdate(period_start, 'dd MMM yyyy')} – {formatdate(period_end, 'dd MMM yyyy')}"
+
+
+def _get_payroll_fiscal_year_bounds(reference_date=None):
+	"""Full payroll year: 26 Jun (prior calendar year) to 25 Jun (current calendar year)."""
+	from datetime import date as dt_date
+
+	reference_date = getdate(reference_date or nowdate())
+	period_from, period_to = _payroll_period_settings()
+	year_end = dt_date(reference_date.year, 6, period_to)
+	year_start = dt_date(reference_date.year - 1, 6, period_from)
+	return year_start, year_end
 
 
 def _ea_where_months(month_keys):

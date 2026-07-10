@@ -242,7 +242,7 @@
   {
    "hidden": 0,
    "is_query_report": 1,
-   "label": "Full and Final Clearance (UAT) 29-Jun-26",
+   "label": "Full and Final Clearance",
    "link_count": 0,
    "link_to": "Full and Final Clearance",
    "link_type": "DocType",
@@ -262,7 +262,7 @@
   {
    "hidden": 0,
    "is_query_report": 1,
-   "label": "Loan Application  (UAT)",
+   "label": "Loan Application",
    "link_count": 0,
    "link_to": "Loan Application",
    "link_type": "DocType",
@@ -499,7 +499,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-07-06 17:59:48.821732",
+ "modified": "2026-07-09 13:16:31.514152",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Reports",
