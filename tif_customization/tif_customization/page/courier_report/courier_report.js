@@ -434,7 +434,7 @@ if (typeof window.CourierDashboard === 'undefined') {
 			{ label: 'Total Books Dispatch by Hand', value: format_number_value(kpi_data.books_sent_by_hand || 0), gradient: '#fa709a, #fee140' },
 
 			{ label: 'Total JVs Created', value: format_number_value(kpi_data.total_jvs_created || 0), gradient: '#43e97b, #38f9d7' },
-			{ label: 'Customers Served', value: format_number_value(kpi_data.total_customers_served || 0), gradient: '#30cfd0, #330867' },
+			{ label: 'Schools', value: format_number_value(kpi_data.total_customers_served || 0), gradient: '#30cfd0, #330867' },
 			{ label: 'Total Delivery Notes', value: format_number_value(kpi_data.total_delivery_notes || 0), gradient: '#f093fb, #f5576c' },
 		];
 

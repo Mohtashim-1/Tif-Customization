@@ -96,7 +96,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Book Purchase and Printing",
+   "label": "Procurement",
    "link_count": 2,
    "onboard": 0,
    "type": "Card Break"
@@ -499,7 +499,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-07-09 13:16:31.514152",
+ "modified": "2026-07-13 00:04:30.187458",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Reports",

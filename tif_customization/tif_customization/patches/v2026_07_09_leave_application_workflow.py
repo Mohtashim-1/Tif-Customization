@@ -148,6 +148,23 @@ def _revoke_leave_approver_submit():
 		WHERE parent = 'Leave Application' AND role = 'Leave Approver'
 		"""
 	)
+	if frappe.db.exists("Custom DocPerm", {"parent": "Leave Application"}):
+		frappe.db.sql(
+			"""
+			UPDATE `tabCustom DocPerm`
+			SET `submit` = 0
+			WHERE parent = 'Leave Application' AND role = 'Leave Approver'
+			"""
+		)
+		frappe.db.sql(
+			"""
+			UPDATE `tabCustom DocPerm`
+			SET `submit` = 1
+			WHERE parent = 'Leave Application'
+			  AND role IN ('HR User', 'HR Manager')
+			  AND permlevel = 0
+			"""
+		)
 
 
 def _map_existing_documents():

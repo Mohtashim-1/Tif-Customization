@@ -1065,6 +1065,7 @@ def _upsert_additional_salary(employee, company, component, amount, payroll_date
 			frappe.delete_doc("Additional Salary", ads_name, ignore_permissions=True)
 			return "cancelled"
 		if doc.docstatus == 1:
+			doc.flags.ignore_permissions = True
 			doc.cancel()
 			return "cancelled"
 		return "skipped"
@@ -1074,12 +1075,14 @@ def _upsert_additional_salary(employee, company, component, amount, payroll_date
 		if doc.docstatus == 1:
 			if flt(doc.amount) == amount:
 				return "skipped"
+			doc.flags.ignore_permissions = True
 			doc.cancel()
 			ads_name = None
 		else:
 			doc.amount = amount
 			doc.payroll_date = payroll_date
 			doc.save(ignore_permissions=True)
+			doc.flags.ignore_permissions = True
 			doc.submit()
 			return "updated"
 
@@ -1093,6 +1096,7 @@ def _upsert_additional_salary(employee, company, component, amount, payroll_date
 		doc.payroll_date = payroll_date
 		doc.overwrite_salary_structure_amount = 1
 		doc.insert(ignore_permissions=True)
+		doc.flags.ignore_permissions = True
 		doc.submit()
 		return "created"
 
