@@ -370,16 +370,6 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Donation Collection (UAT) 29-06-2026",
-   "link_count": 0,
-   "link_to": "donation-collection-",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
    "label": "Program Wise Expense (UAT)",
    "link_count": 0,
    "link_to": "program-wise-expense",
@@ -410,9 +400,9 @@
   {
    "hidden": 0,
    "is_query_report": 1,
-   "label": "Donor Ledger (UAT)",
+   "label": "Donor Ledger Statement (UAT)",
    "link_count": 0,
-   "link_to": "Donor Ledger",
+   "link_to": "Donor Ledger Statement",
    "link_type": "Report",
    "onboard": 0,
    "report_ref_doctype": "Donor",
@@ -499,7 +489,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-07-13 02:12:12.704753",
+ "modified": "2026-07-13 02:18:17.602957",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Reports",
