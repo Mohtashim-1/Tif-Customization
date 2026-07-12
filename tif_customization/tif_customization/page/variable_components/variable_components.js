@@ -7,23 +7,25 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 		single_column: true,
 	});
 
-	if (!window.VariableComponentsPage) {
-		window.VariableComponentsPage = class VariableComponentsPage {
-			constructor(page) {
-				this.page = page;
-				this._data = null;
-				this._dirty = new Set();
-				this._values = {};
-				this._payroll_selected = new Set();
-				this._payment_dirty = false;
-				this._bank_options = [];
-			}
+	// Always redefine so permission fixes apply after deploy (avoid stale class in desk session).
+	window.VariableComponentsPage = class VariableComponentsPage {
+		constructor(page) {
+			this.page = page;
+			this._data = null;
+			this._dirty = new Set();
+			this._values = {};
+			this._payroll_selected = new Set();
+			this._remove_selected = new Set();
+			this._payment_dirty = false;
+			this._bank_options = [];
+		}
 
-			make() {
-				this.render_shell();
-				this.bind_events();
-				this.load_periods();
-			}
+		make() {
+			this.render_shell();
+			this.bind_events();
+			this.apply_roster_manage_ui();
+			this.load_periods();
+		}
 
 			render_shell() {
 				this.page.main.html(`
@@ -65,7 +67,8 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 									<li>${__("Select payroll period and company")}</li>
 									<li>${__("Click Load active employees — all active staff are added from attendance")}</li>
 									<li>${__("Review days worked / leave deductions (from Employee Attendance)")}</li>
-									<li>${__("Uncheck or Remove employees who should not be paid this month")}</li>
+									<li>${__("Check Remove column for employees to take off sheet, then click Remove selected")}</li>
+									<li>${__("Payroll checkbox = include in payroll register (checked by default)")}</li>
 									<li>${__("Save draft (keeps your work) → Finalize when ready")}</li>
 								</ol>
 							</div>
@@ -129,9 +132,27 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 
 			bind_events() {
 				this.page.main.find(".btn-reload").on("click", () => this.confirm_reload(() => this.load_sheet()));
-				this.page.main.find(".btn-load-period").on("click", () => this.load_active_employees(true));
-				this.page.main.find(".btn-add-employee").on("click", () => this.add_employee_dialog());
-				this.page.main.find(".btn-remove-selected").on("click", () => this.remove_selected_employees());
+				this.page.main.find(".btn-load-period").on("click", () => {
+					if (!this._can_manage_roster()) {
+						this._roster_permission_alert();
+						return;
+					}
+					this.load_active_employees(true);
+				});
+				this.page.main.find(".btn-add-employee").on("click", () => {
+					if (!this._can_manage_roster()) {
+						this._roster_permission_alert();
+						return;
+					}
+					this.add_employee_dialog();
+				});
+				this.page.main.find(".btn-remove-selected").on("click", () => {
+					if (!this._can_manage_roster()) {
+						this._roster_permission_alert();
+						return;
+					}
+					this.remove_selected_employees();
+				});
 				this.page.main.find(".btn-new-period").on("click", () => this.new_period_dialog());
 				this.$save_draft.on("click", () => this.save_draft());
 				this.$finalize.on("click", () => this.finalize_period());
@@ -139,6 +160,55 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 				this.page.main.find(".btn-payroll-none").on("click", () => this.set_all_payroll_checkboxes(false));
 				this.$period.on("change", () => this.confirm_reload(() => this.load_sheet()));
 				this.$company.on("change", () => this.confirm_reload(() => this.load_sheet()));
+			}
+
+			_vc_log(label, data) {
+				const payload = data === undefined ? "" : data;
+				console.log(`[Variable Components] ${label}`, payload);
+			}
+
+			_can_manage_roster() {
+				const user = (frappe.session.user || "").toLowerCase();
+				const allowedUsers = ["muhammad.yasir@tif.edu.pk", "muhammad.raza@tif.edu.pk"];
+				if (allowedUsers.includes(user)) return true;
+				if (
+					frappe.user.has_role("System Manager") ||
+					frappe.user.has_role("HR Manager") ||
+					frappe.user.has_role("HR User") ||
+					frappe.user.has_role("Accounts Manager")
+				) {
+					return true;
+				}
+				const roster = (this._data && this._data.roster) || {};
+				if (Object.prototype.hasOwnProperty.call(roster, "can_manage")) {
+					return !!roster.can_manage;
+				}
+				return false;
+			}
+
+			apply_roster_manage_ui() {
+				const can_manage = this._can_manage_roster();
+				this._vc_log("roster manage", {
+					user: frappe.session.user,
+					can_manage,
+					server_flag: this._data?.roster?.can_manage,
+				});
+				this.page.main
+					.find(".btn-load-period, .btn-add-employee, .btn-remove-selected")
+					.toggle(true)
+					.prop("disabled", !can_manage)
+					.css("display", can_manage ? "" : "none");
+				return can_manage;
+			}
+
+			_roster_permission_alert() {
+				frappe.msgprint({
+					title: __("Not allowed"),
+					message: __(
+						"Only HR User, HR Manager, System Manager, Accounts Manager, or authorized payroll users (Yasir / Raza) can add or remove employees.",
+					),
+					indicator: "red",
+				});
 			}
 
 			confirm_reload(fn) {
@@ -382,6 +452,11 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 				if (roster.auto_initialized) {
 					msg += ` · ${__("auto-loaded on first open")}`;
 				}
+
+				const can_manage = this.apply_roster_manage_ui();
+				if (!can_manage) {
+					msg += ` · ${__("View only — cannot add/remove employees")}`;
+				}
 				this.$roster_status.text(msg);
 			}
 
@@ -405,20 +480,38 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 					const emp = $(this).data("employee");
 					if (emp) ids.push(emp);
 				});
+				this._vc_log("checked payroll employees", { count: ids.length, sample: ids.slice(0, 5) });
+				return ids;
+			}
+
+			get_employees_to_remove_from_sheet() {
+				const ids = [];
+				this.$sheet.find(".vc-remove-cb:checked").each(function () {
+					const emp = $(this).data("employee");
+					if (emp) ids.push(emp);
+				});
+				this._vc_log("employees marked for removal (checked)", {
+					count: ids.length,
+					sample: ids.slice(0, 5),
+				});
 				return ids;
 			}
 
 			remove_selected_employees() {
-				const employees = this.get_checked_employee_ids();
+				const employees = this.get_employees_to_remove_from_sheet();
 				if (!employees.length) {
 					frappe.show_alert({
-						message: __("Select employees using the checkboxes, then click Remove"),
+						message: __(
+							"Check the Remove column for employees you want off the sheet, then click Remove selected.",
+						),
 						indicator: "orange",
 					});
+					this._vc_log("remove blocked", "no employees checked in Remove column");
 					return;
 				}
+				this._vc_log("remove confirm", employees);
 				frappe.confirm(
-					__("Remove {0} employee(s) from this period sheet? You can add them back later.", [
+					__("Remove {0} selected employee(s) from this period sheet? You can add them back later.", [
 						employees.length,
 					]),
 					() => {
@@ -570,10 +663,22 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 				const earn_cols = earnings.length;
 				const ded_cols = deductions.length;
 				const payment_cols = (d.payment_columns || []).length || 4;
-				const info_cols = 6;
+				const can_manage_roster = this._can_manage_roster();
+				const info_cols = can_manage_roster ? 7 : 6;
 				const eligible = new Set((d.payroll_eligible || []).map((e) => e));
 				const pe_submitted = cint((d.payroll_info || {}).payroll_entry_docstatus) === 1;
+				const lock_payroll_checkboxes = pe_submitted && !can_manage_roster;
 				const bank_opts = d.bank_options || this._bank_options || [];
+
+				this._vc_log("render sheet payroll state", {
+					pe_submitted,
+					can_manage_roster,
+					lock_payroll_checkboxes,
+					is_finalized: !!d.is_finalized,
+					payroll_entry: d.payroll_info?.payroll_entry,
+					eligible_count: eligible.size,
+					selected_count: this._payroll_selected.size,
+				});
 
 				let thead = `<thead>
 					<tr class="hdr-row-1">
@@ -584,8 +689,13 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 						<th colspan="${payment_cols}" class="hdr-payment hdr-group-main">${__("Payment")}</th>
 					</tr>
 					<tr class="hdr-row-2">
-						<th class="hdr-info text-center col-payroll" title="${__("Include in Payroll Entry / Salary Slips")}">
-							<input type="checkbox" class="vc-payroll-select-all" ${pe_submitted ? "disabled" : ""} />
+						${can_manage_roster ? `<th class="hdr-info text-center col-remove" title="${__("Check to remove from sheet")}">
+							<span class="vc-col-remove-label">${__("Remove")}</span>
+							<input type="checkbox" class="vc-remove-select-all" />
+						</th>` : ""}
+						<th class="hdr-info text-center col-payroll" title="${__("Checked = include in payroll register")}">
+							<span class="vc-col-payroll-label">${__("Payroll")}</span>
+							<input type="checkbox" class="vc-payroll-select-all" ${lock_payroll_checkboxes ? "disabled" : ""} />
 						</th>
 						<th class="hdr-info text-center">S.#</th>
 						<th class="hdr-info text-center">${__("Sec")}</th>
@@ -639,7 +749,9 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 						const can_payroll = eligible.has(row.employee);
 						const checked = this._payroll_selected.has(row.employee);
 						const payroll_title = can_payroll
-							? __("Include in payroll")
+							? lock_payroll_checkboxes
+								? __("Payroll Entry submitted — checkbox locked")
+								: __("Include in payroll register")
 							: __("Not eligible (missing assignment or already payrolled)");
 						const row_class = can_payroll ? "" : " vc-emp-row-ineligible";
 						const pay_mode = pay.payment_mode || (row.default_bank_name ? "Bank" : "Cheque");
@@ -663,9 +775,13 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 							data-pf-rate="${flt(row.pf_rate)}"
 							data-pf-formula-base="${frappe.utils.escape_html(row.pf_formula_base || "Gross")}"
 							data-income-tax="${flt(row.income_tax)}">
+							${can_manage_roster ? `<td class="text-center col-remove col-sticky-remove">
+								<input type="checkbox" class="vc-remove-cb" data-employee="${frappe.utils.escape_html(row.employee)}"
+									title="${__("Check to remove this employee from sheet")}" />
+							</td>` : ""}
 							<td class="text-center col-payroll col-sticky-payroll">
 								<input type="checkbox" class="vc-payroll-cb" data-employee="${frappe.utils.escape_html(row.employee)}"
-									${checked ? "checked" : ""} ${!can_payroll || pe_submitted ? "disabled" : ""}
+									${checked ? "checked" : ""} ${!can_payroll || lock_payroll_checkboxes ? "disabled" : ""}
 									title="${frappe.utils.escape_html(payroll_title)}" />
 							</td>
 							<td class="text-center col-sticky">${row.serial || ""}</td>
@@ -852,20 +968,78 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 					self.recalc_totals();
 				});
 
-				this.$sheet.find(".vc-payroll-cb:not(:disabled)").on("change", function () {
+				this.$sheet.find(".vc-remove-cb").on("change", function () {
+					const emp = $(this).data("employee");
+					if (this.checked) {
+						self._remove_selected.add(emp);
+					} else {
+						self._remove_selected.delete(emp);
+					}
+					self._vc_log("remove checkbox changed", {
+						employee: emp,
+						checked: this.checked,
+						remove_selected_count: self._remove_selected.size,
+					});
+					self.sync_remove_select_all();
+				});
+
+				this.$sheet.find(".vc-remove-select-all").on("change", function () {
+					const checked = this.checked;
+					self._vc_log("remove select-all changed", { checked });
+					self.$sheet.find(".vc-remove-cb").each(function () {
+						$(this).prop("checked", checked);
+						const emp = $(this).data("employee");
+						if (checked) {
+							self._remove_selected.add(emp);
+						} else {
+							self._remove_selected.delete(emp);
+						}
+					});
+				});
+
+				this.$sheet.find(".vc-payroll-cb").on("change", function () {
+					if (this.disabled) {
+						self._vc_log("payroll checkbox blocked (disabled)", {
+							employee: $(this).data("employee"),
+							checked: this.checked,
+						});
+						return;
+					}
 					const emp = $(this).data("employee");
 					if (this.checked) {
 						self._payroll_selected.add(emp);
 					} else {
 						self._payroll_selected.delete(emp);
 					}
+					self._vc_log("payroll checkbox changed", {
+						employee: emp,
+						checked: this.checked,
+						selected_count: self._payroll_selected.size,
+					});
 					self.update_payroll_panel();
 					self.sync_payroll_select_all();
 					self.recalc_totals();
 				});
 
 				this.$sheet.find(".vc-payroll-select-all").on("change", function () {
+					if (this.disabled) {
+						self._vc_log("select-all blocked (disabled)");
+						return;
+					}
+					self._vc_log("select-all changed", { checked: this.checked });
 					self.set_all_payroll_checkboxes(this.checked);
+				});
+
+				const $all_cb = this.$sheet.find(".vc-payroll-cb");
+				const $enabled_cb = $all_cb.filter(":not(:disabled)");
+				const $checked_cb = $enabled_cb.filter(":checked");
+				const $remove_cb = this.$sheet.find(".vc-remove-cb");
+				this._vc_log("checkbox summary after render", {
+					payroll_total: $all_cb.length,
+					payroll_enabled: $enabled_cb.length,
+					payroll_disabled: $all_cb.length - $enabled_cb.length,
+					payroll_checked: $checked_cb.length,
+					remove_column: $remove_cb.length,
 				});
 
 				this.$sheet.find(".vc-payment-mode").on("change", function () {
@@ -1170,6 +1344,40 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 					</tr>`;
 				});
 
+				const month_kpis = this._get_month_kpis_for_display(s);
+				let month_kpi_html = "";
+				if (month_kpis.length) {
+					month_kpi_html = `<div class="vc-payroll-register-month-kpis">
+						${month_kpis
+							.map((m) => {
+								const current_cls = m.is_current ? " is-current" : "";
+								const status = m.status ? frappe.utils.escape_html(m.status) : "";
+								return `<div class="vc-month-kpi${current_cls}" title="${frappe.utils.escape_html(
+									m.period_label || m.label,
+								)}">
+									<div class="vc-month-kpi__label">${frappe.utils.escape_html(m.label)}</div>
+									<div class="vc-month-kpi__range text-muted">${frappe.utils.escape_html(
+										m.range || "",
+									)}</div>
+									<div class="vc-month-kpi__stats">
+										<div class="vc-month-kpi__stat">
+											<span class="vc-month-kpi__stat-label">${__("Headcount")}</span>
+											<span class="vc-month-kpi__stat-value">${m.headcount || 0}</span>
+										</div>
+										<div class="vc-month-kpi__stat">
+											<span class="vc-month-kpi__stat-label">${__("Amount")}</span>
+											<span class="vc-month-kpi__stat-value">${this.fmt_plain(m.amount || 0)}</span>
+										</div>
+									</div>
+									${status ? `<div class="vc-month-kpi__status">${status}</div>` : ""}
+								</div>`;
+							})
+							.join("")}
+					</div>`;
+				}
+
+				const dept_kpi_html = this._render_department_kpi_cards(departments);
+
 				this.$payroll_register_summary.html(`
 					<div class="vc-payroll-register-summary__head">
 						<div>
@@ -1181,6 +1389,8 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 							<span><strong>${this.fmt_plain(s.total_amount || 0)}</strong> ${__("Amount")}</span>
 						</div>
 					</div>
+					${month_kpi_html}
+					${dept_kpi_html}
 					<table class="table table-bordered table-sm vc-summary-table">
 						<thead>
 							<tr>
@@ -1194,8 +1404,77 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 				`);
 			}
 
+			_render_department_kpi_cards(departments) {
+				const rows = departments || [];
+				if (!rows.length) {
+					return `<div class="vc-dept-kpis vc-dept-kpis--empty text-muted">${__(
+						"No payroll employees selected",
+					)}</div>`;
+				}
+				const cards = rows
+					.map((row, idx) => {
+						const tone = idx % 8;
+						const short = this._short_department_label(row.label);
+						return `<div class="vc-dept-kpi vc-dept-kpi--tone-${tone}" title="${frappe.utils.escape_html(
+							row.label,
+						)}">
+							<div class="vc-dept-kpi__label">${frappe.utils.escape_html(short)}</div>
+							<div class="vc-dept-kpi__value">${row.headcount || 0}</div>
+							<div class="vc-dept-kpi__hint">${this.fmt_plain(row.amount || 0)} · ${__("Amount")}</div>
+						</div>`;
+					})
+					.join("");
+				return `<div class="vc-dept-kpis-wrap">
+					<div class="vc-dept-kpis-title">${__("Department wise KPIs")}</div>
+					<div class="vc-dept-kpis">${cards}</div>
+				</div>`;
+			}
+
+			_short_department_label(label) {
+				const raw = String(label || "").trim();
+				if (!raw) return __("No Department");
+				return raw.replace(/\s*-\s*TIF\s*$/i, "").trim() || raw;
+			}
+
+			_get_month_kpis_for_display(summary) {
+				const raw = (this._data && this._data.month_kpis) || [];
+				const start = this._data && this._data.start_date;
+				const end = this._data && this._data.end_date;
+				const live_hc = (summary && summary.total_headcount) || 0;
+				const live_amt = (summary && summary.total_amount) || 0;
+
+				return raw.map((m) => {
+					const is_current =
+						m.is_current || (start && end && m.start_date === start && m.end_date === end);
+					const range =
+						m.start_date && m.end_date
+							? `${frappe.datetime.str_to_user(m.start_date)} – ${frappe.datetime.str_to_user(m.end_date)}`
+							: "";
+					return {
+						...m,
+						is_current,
+						range,
+						headcount: is_current ? live_hc : m.headcount,
+						amount: is_current ? live_amt : m.amount,
+					};
+				});
+			}
+
+			sync_remove_select_all() {
+				const $all = this.$sheet.find(".vc-remove-cb");
+				if (!$all.length) return;
+				const all_checked = $all.length === $all.filter(":checked").length;
+				this.$sheet.find(".vc-remove-select-all").prop("checked", all_checked);
+			}
+
 			_init_payroll_selection() {
 				this._payroll_selected = new Set(this._data.payroll_eligible || []);
+				this._remove_selected = new Set();
+				this._vc_log("init payroll selection", {
+					payroll_default_selected: this._payroll_selected.size,
+					eligible: (this._data.payroll_eligible || []).length,
+					remove_default_selected: 0,
+				});
 			}
 
 			get_selected_payroll_employees() {
@@ -1625,7 +1904,6 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 				run_next();
 			}
 		};
-	}
 
 	page.variable_components = new window.VariableComponentsPage(page);
 	page.variable_components.make();

@@ -28,6 +28,7 @@ from tif_customization.tif_customization.page.variable_components.variable_compo
 	create_custom_period,
 	ensure_period_roster,
 	extended_period_options,
+	get_excluded_employee_ids,
 	get_included_employee_ids,
 	get_period_status,
 	initialize_period_roster,
@@ -37,6 +38,24 @@ from tif_customization.tif_customization.page.variable_components.variable_compo
 	roster_count,
 	set_roster_excluded,
 	tif_26th_cycle_dates,
+)
+
+# Only these roles may add / remove / reload period roster employees.
+ROSTER_MANAGE_ROLES = frozenset(
+	{
+		"System Manager",
+		"HR Manager",
+		"HR User",
+		"Accounts Manager",
+	}
+)
+
+# Explicitly allowed (Yasir / Raza) even without an allowed role.
+ROSTER_EDIT_ALLOWED_USERS = frozenset(
+	{
+		"muhammad.yasir@tif.edu.pk",
+		"muhammad.raza@tif.edu.pk",
+	}
 )
 from tif_customization.tif_customization.payroll_utils import get_assignment_base_by_employee
 from tif_customization.tif_customization.pf.pf_contribution import (
@@ -134,6 +153,7 @@ def create_variable_period(company=None, start_date=None, end_date=None, year=No
 
 @frappe.whitelist()
 def initialize_variable_period(month=None, year=None, company=None, start_date=None, end_date=None, force=0):
+	_assert_can_manage_roster()
 	start_date, end_date = _resolve_period_dates(month, year, start_date, end_date)
 	company = company or frappe.defaults.get_global_default("company")
 	return initialize_period_roster(company, start_date, end_date, force=force)
@@ -143,6 +163,7 @@ def initialize_variable_period(month=None, year=None, company=None, start_date=N
 def remove_employees_from_period(month=None, year=None, company=None, start_date=None, end_date=None, employees=None):
 	import json
 
+	_assert_can_manage_roster()
 	if isinstance(employees, str):
 		employees = json.loads(employees or "[]")
 	start_date, end_date = _resolve_period_dates(month, year, start_date, end_date)
@@ -156,6 +177,7 @@ def remove_employees_from_period(month=None, year=None, company=None, start_date
 def add_employees_to_period(month=None, year=None, company=None, start_date=None, end_date=None, employees=None):
 	import json
 
+	_assert_can_manage_roster()
 	if isinstance(employees, str):
 		employees = json.loads(employees or "[]")
 	if not employees:
@@ -165,6 +187,27 @@ def add_employees_to_period(month=None, year=None, company=None, start_date=None
 	result = set_roster_excluded(company, start_date, end_date, employees, excluded=0)
 	result["message"] = _("Added {0} employee(s) to this period sheet.").format(result.get("updated", 0))
 	return result
+
+
+def _user_can_manage_roster(user=None):
+	user = user or frappe.session.user
+	if user == "Administrator":
+		return True
+	if user in ROSTER_EDIT_ALLOWED_USERS:
+		return True
+	roles = set(frappe.get_roles(user))
+	return bool(roles & ROSTER_MANAGE_ROLES)
+
+
+def _assert_can_manage_roster():
+	if _user_can_manage_roster():
+		return
+	frappe.throw(
+		_(
+			"Only HR User, HR Manager, System Manager, or authorized payroll users can add or remove employees on Variable Components."
+		),
+		frappe.PermissionError,
+	)
 
 
 @frappe.whitelist()
@@ -193,7 +236,10 @@ def get_variable_sheet_data(month=None, year=None, company=None, start_date=None
 		},
 		pluck="employee",
 	)
-	# Keep employees who already have slips this period even if removed from default roster
+	# Keep slip employees on sheet unless explicitly removed via roster
+	excluded_ids = set(get_excluded_employee_ids(company, start_date, end_date))
+	if excluded_ids:
+		slip_employees = [e for e in (slip_employees or []) if e not in excluded_ids]
 	employee_ids = list(set(employee_ids) | set(slip_employees or []))
 
 	if not employee_ids:
@@ -458,9 +504,11 @@ def get_variable_sheet_data(month=None, year=None, company=None, start_date=None
 			"count": roster_count(company, start_date, end_date),
 			"on_sheet": len(employees),
 			"auto_initialized": bool((roster_meta or {}).get("auto_initialized")),
+			"can_manage": _user_can_manage_roster(),
 		},
 		"period_status": period_status,
 		"is_finalized": period_status.get("status") == "Finalized",
+		"month_kpis": _payroll_register_month_kpis(company, start_date, end_date, limit=6),
 	}
 
 
@@ -488,9 +536,11 @@ def _empty_response(month_label, start_date, end_date, company, earnings, deduct
 			"count": roster_count(company, start_date, end_date),
 			"on_sheet": 0,
 			"auto_initialized": bool((roster_meta or {}).get("auto_initialized")),
+			"can_manage": _user_can_manage_roster(),
 		},
 		"period_status": get_period_status(company, start_date, end_date),
 		"is_finalized": False,
+		"month_kpis": _payroll_register_month_kpis(company, start_date, end_date, limit=6),
 	}
 
 
@@ -1193,6 +1243,83 @@ def save_variable_components(company, payroll_date, entries):
 			created, updated, cancelled, skipped
 		),
 	}
+
+
+def _payroll_register_month_kpis(company, current_start=None, current_end=None, limit=6):
+	"""Month-wise headcount + payable totals for Payroll Register KPI cards."""
+	if not company or not frappe.db.exists("DocType", "Variable Components Period"):
+		return []
+
+	limit = cint(limit) or 6
+	current_start = str(getdate(current_start)) if current_start else ""
+	current_end = str(getdate(current_end)) if current_end else ""
+
+	periods = frappe.get_all(
+		"Variable Components Period",
+		filters={"company": company},
+		fields=[
+			"name",
+			"period_label",
+			"start_date",
+			"end_date",
+			"payroll_month",
+			"payroll_year",
+			"status",
+		],
+		order_by="start_date desc",
+		limit_page_length=limit,
+	)
+	if not periods:
+		return []
+
+	has_payment = frappe.db.exists("DocType", "Variable Components Payment")
+	out = []
+	for p in periods:
+		start = getdate(p.start_date)
+		end = getdate(p.end_date)
+		headcount = 0
+		amount = 0.0
+		if has_payment:
+			row = frappe.db.sql(
+				"""
+				SELECT
+					COUNT(CASE WHEN IFNULL(payable_amount, 0) > 0 THEN 1 END) AS headcount,
+					SUM(IFNULL(payable_amount, 0)) AS amount
+				FROM `tabVariable Components Payment`
+				WHERE company = %(company)s
+				  AND start_date = %(start)s
+				  AND end_date = %(end)s
+				""",
+				{"company": company, "start": start, "end": end},
+				as_dict=True,
+			)
+			if row:
+				headcount = cint(row[0].get("headcount"))
+				amount = flt(row[0].get("amount"))
+
+		# Prefer short month label (e.g. June 2026)
+		month_name = calendar.month_name[cint(p.payroll_month)] if cint(p.payroll_month) else ""
+		year = cint(p.payroll_year) or end.year
+		label = f"{month_name} {year}".strip() if month_name else (p.period_label or f"{end.year}-{end.month:02d}")
+
+		out.append(
+			{
+				"label": label,
+				"period_label": p.period_label or label,
+				"start_date": str(start),
+				"end_date": str(end),
+				"payroll_month": cint(p.payroll_month) or end.month,
+				"payroll_year": year,
+				"status": p.status or "Draft",
+				"headcount": headcount,
+				"amount": amount,
+				"is_current": str(start) == current_start and str(end) == current_end,
+			}
+		)
+
+	# Chronological (oldest → newest) for left-to-right reading
+	out.reverse()
+	return out
 
 
 def _find_payroll_entry(company, start_date, end_date):

@@ -146,6 +146,24 @@ def get_included_employee_ids(company, start_date, end_date):
 	return list(rows or [])
 
 
+def get_excluded_employee_ids(company, start_date, end_date):
+	"""Employees explicitly removed from this period sheet."""
+	if not _roster_doctype_exists():
+		return []
+
+	rows = frappe.get_all(
+		"Variable Components Roster",
+		filters={
+			"company": company,
+			"start_date": start_date,
+			"end_date": end_date,
+			"excluded": 1,
+		},
+		pluck="employee",
+	)
+	return list(rows or [])
+
+
 def ensure_period_roster(company, start_date, end_date):
 	"""Auto-create roster on first open of a period."""
 	if not _roster_doctype_exists():
