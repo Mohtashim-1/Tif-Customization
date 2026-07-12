@@ -11,6 +11,12 @@ from frappe.utils import add_days, add_months, cint, flt, formatdate, get_first_
 EA_DOCTYPE = "Employee Attendance"
 EA_TABLE = "`tabEmployee Attendance`"
 
+# Shown on a separate KPI; excluded from Active Employees headcount.
+SPECIAL_EDUCATION_DEPARTMENTS = (
+	"Special Education Center - TIF",
+	"Special Education S.EDU - TIF",
+)
+
 
 @frappe.whitelist()
 def get_dashboard_data(filters=None):
@@ -86,6 +92,7 @@ def get_dashboard_data(filters=None):
 
 	# Workforce (Employee master): same Company / Branch / Department — not scoped by single Employee link
 	data["active_headcount"] = _count_active_employees(company, branch, department)
+	data["special_education_staff"] = _count_special_education_staff(company, branch, department)
 	data["new_hires"] = _count_new_hires(from_date, to_date, company, branch, department)
 	data["left_employees"] = _count_left_employees(from_date, to_date, company, branch, department)
 	hc = max(cint(data["active_headcount"]), 1)
@@ -168,6 +175,7 @@ def get_card_drilldown(card_key=None, filters=None):
 	card_key = (card_key or "").strip()
 	handlers = {
 		"active_headcount": lambda: _drill_active_employees(company, branch, department),
+		"special_education_staff": lambda: _drill_special_education_staff(company, branch, department),
 		"emp_full_time_permanent": lambda: _drill_active_employment_types(
 			company, branch, department, EMPLOYMENT_CARD_TYPES["emp_full_time_permanent"]
 		),
@@ -270,6 +278,7 @@ def _empty_payload(from_date, to_date, company, branch, department="", employee=
 		"pending_leave_applications": 0,
 		"approved_leave_days": 0.0,
 		"active_headcount": 0,
+		"special_education_staff": 0,
 		"new_hires": 0,
 		"left_employees": 0,
 		"attrition_rate": 0.0,
@@ -1217,15 +1226,52 @@ def _cnic_upcoming_stats_and_rows(company, branch, department, today=None, days=
 	return out
 
 
+def _special_education_dept_clause(params, mode="exclude"):
+	"""SQL fragment for Special Education departments (include or exclude)."""
+	if not _has_field("Employee", "department") or not SPECIAL_EDUCATION_DEPARTMENTS:
+		return "", params
+	placeholders = []
+	for i, name in enumerate(SPECIAL_EDUCATION_DEPARTMENTS):
+		key = f"sedu_dept_{i}"
+		params[key] = name
+		placeholders.append(f"%({key})s")
+	in_list = ", ".join(placeholders)
+	if mode == "include":
+		return f" AND e.department IN ({in_list})", params
+	return f" AND COALESCE(e.department, '') NOT IN ({in_list})", params
+
+
 def _count_active_employees(company, branch, department):
+	"""Active headcount excluding Special Education departments."""
 	if not frappe.db.table_exists("Employee"):
 		return 0
 	where_sql, params = _emp_filters_sql(company, branch, department)
+	sedu_sql, params = _special_education_dept_clause(params, mode="exclude")
 	row = frappe.db.sql(
 		f"""
 		SELECT COUNT(e.name) AS c
 		FROM `tabEmployee` e
-		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}
+		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}{sedu_sql}
+		""",
+		params,
+		as_dict=True,
+	)
+	return cint((row or [{}])[0].get("c"))
+
+
+def _count_special_education_staff(company, branch, department):
+	"""Active employees in Special Education Center / S.EDU departments."""
+	if not frappe.db.table_exists("Employee"):
+		return 0
+	where_sql, params = _emp_filters_sql(company, branch, department)
+	sedu_sql, params = _special_education_dept_clause(params, mode="include")
+	if not sedu_sql:
+		return 0
+	row = frappe.db.sql(
+		f"""
+		SELECT COUNT(e.name) AS c
+		FROM `tabEmployee` e
+		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}{sedu_sql}
 		""",
 		params,
 		as_dict=True,
@@ -1755,8 +1801,17 @@ def _employee_row_select_extra():
 
 
 def _drill_active_employees(company, branch, department, limit=500):
-	rows = _fetch_active_employee_rows(company, branch, department, limit=limit)
+	rows = _fetch_active_employee_rows(
+		company, branch, department, limit=limit, special_education_mode="exclude"
+	)
 	return _drill_payload("Active Employees", rows)
+
+
+def _drill_special_education_staff(company, branch, department, limit=500):
+	rows = _fetch_active_employee_rows(
+		company, branch, department, limit=limit, special_education_mode="include"
+	)
+	return _drill_payload("Special Education Staff", rows)
 
 
 def _drill_active_by_gender(company, branch, department, gender, limit=500):
@@ -1772,7 +1827,15 @@ def _drill_active_employment_types(company, branch, department, employment_types
 	return _drill_payload(f"Employees — {label}", rows)
 
 
-def _fetch_active_employee_rows(company, branch, department, employment_types=None, gender=None, limit=500):
+def _fetch_active_employee_rows(
+	company,
+	branch,
+	department,
+	employment_types=None,
+	gender=None,
+	limit=500,
+	special_education_mode=None,
+):
 	if not frappe.db.table_exists("Employee"):
 		return []
 	where_sql, params = _emp_filters_sql(company, branch, department)
@@ -1786,12 +1849,15 @@ def _fetch_active_employee_rows(company, branch, department, employment_types=No
 	if gender and _has_field("Employee", "gender"):
 		params["gender"] = gender
 		gender_sql = " AND TRIM(COALESCE(e.gender, '')) = %(gender)s"
+	sedu_sql = ""
+	if special_education_mode in ("exclude", "include"):
+		sedu_sql, params = _special_education_dept_clause(params, mode=special_education_mode)
 	lim = cint(limit)
 	return frappe.db.sql(
 		f"""
 		SELECT {_employee_row_select_extra()}
 		FROM `tabEmployee` e
-		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}{type_sql}{gender_sql}
+		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}{type_sql}{gender_sql}{sedu_sql}
 		ORDER BY e.employee_name ASC
 		LIMIT {lim}
 		""",

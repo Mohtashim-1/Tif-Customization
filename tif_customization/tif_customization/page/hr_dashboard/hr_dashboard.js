@@ -102,7 +102,12 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 								<div class="tif-card tif-card--clickable" data-card="active_headcount" title="Click for detail">
 									<div class="tif-card__label">Active Employees</div>
 									<div class="tif-card__value">—</div>
-									<div class="tif-card__hint">Current Active</div>
+									<div class="tif-card__hint">Excl. Special Education</div>
+								</div>
+								<div class="tif-card tif-card--clickable" data-card="special_education_staff" title="Click for detail">
+									<div class="tif-card__label">Special Education Staff</div>
+									<div class="tif-card__value">—</div>
+									<div class="tif-card__hint">Center + S.EDU</div>
 								</div>
 								<div class="tif-card tif-card--clickable" data-card="emp_full_time_permanent" title="Click for detail">
 									<div class="tif-card__label">Full Time Permanent</div>
@@ -346,6 +351,7 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 					.tif-card[data-card] .tif-card__hint{color:var(--tif-card-muted, var(--text-muted))}
 					.tif-card--clickable:hover{transform:translateY(-1px)}
 					.tif-card[data-card="active_headcount"]{--tif-card-accent:#1e40af;--tif-card-accent-text:#ffffff;--tif-card-muted:#dbeafe;background:linear-gradient(135deg,#1d4ed8 0%,#1e3a8a 100%);border-color:#1e40af;box-shadow:0 6px 16px rgba(30,64,175,.18)}
+					.tif-card[data-card="special_education_staff"]{--tif-card-accent:#0f766e;--tif-card-accent-text:#ffffff;--tif-card-muted:#ccfbf1;background:linear-gradient(135deg,#0d9488 0%,#115e59 100%);border-color:#0f766e;box-shadow:0 6px 16px rgba(15,118,110,.18)}
 					.tif-card[data-card="emp_full_time_permanent"],
 					.tif-card[data-card="emp_part_time_permanent"],
 					.tif-card[data-card="emp_contract_fixed_salary"],
@@ -692,6 +698,7 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 				this.set_card("pending_leave_applications", data.pending_leave_applications);
 
 				this.set_card("active_headcount", data.active_headcount);
+				this.set_card("special_education_staff", data.special_education_staff);
 				this.set_card("emp_full_time_permanent", data.emp_full_time_permanent);
 				this.set_card("emp_part_time_permanent", data.emp_part_time_permanent);
 				this.set_card("emp_full_time_probation", data.emp_full_time_probation);
