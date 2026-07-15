@@ -165,7 +165,38 @@
   "column_break_toif",
   "ot_date",
   "ot_start_time",
-  "ot_end_time"
+  "ot_end_time",
+  "me_inactive_reasons",
+  "me_demand_from_school",
+  "me_mqh_book_part",
+  "me_assessment_from_multi",
+  "me_teachers_mqh_other",
+  "section_break_joint",
+  "joint_visit_with_smes",
+  "joint_sme_skill_rating",
+  "training_arrange_by",
+  "training_conducted_by",
+  "mt_meeting_type",
+  "mt_meeting_mode",
+  "mt_internal_meeting_with",
+  "mt_external_meeting_with",
+  "mt_venue",
+  "ot_type_of_task",
+  "ot_academic_task_types",
+  "ot_academic_task_other",
+  "ot_no_of_pages",
+  "ot_no_of_calls",
+  "ot_purpose_of_call",
+  "ot_follow_up_calls_attach",
+  "ot_other_official_task_detail",
+  "ot_visit_meeting_detail",
+  "ot_hours_spent",
+  "section_break_cocurricular",
+  "cc_activity",
+  "cc_venue",
+  "cc_no_of_schools",
+  "cc_no_of_participants",
+  "cc_participants_category"
  ],
  "fields": [
   {
@@ -209,8 +240,9 @@
   {
    "depends_on": "eval:doc.type == 'Training'",
    "fieldname": "training_session_category",
-   "fieldtype": "Data",
-   "label": "Session Category"
+   "fieldtype": "Select",
+   "label": "Training Category",
+   "options": "\nFull Day Session\nHalf Day Workshop\nTeachers Training Meeting (One to One)\nAwareness Session"
   },
   {
    "depends_on": "eval:doc.type == 'Training'",
@@ -380,14 +412,14 @@
    "fieldname": "me_activity_status",
    "fieldtype": "Select",
    "label": "Active / Inactive",
-   "options": "\nActive\nInactive"
+   "options": "\nActive\nIn-Active"
   },
   {
    "depends_on": "eval:doc.type == 'M&E'",
    "fieldname": "me_mqh_book_status",
    "fieldtype": "Select",
-   "label": "Mutalae Quran Hakeem Book Status",
-   "options": "\nGood\nAverage\nPoor\nNot Available"
+   "label": "Mutalae Quran Hakeem Book Status (M&E)",
+   "options": "\nActive\nIn-Active"
   },
   {
    "depends_on": "eval:doc.type == 'M&E'",
@@ -396,55 +428,63 @@
    "label": "Reason of Above"
   },
   {
-   "default": "0",
+   "default": "",
    "depends_on": "eval:doc.type == 'M&E'",
    "fieldname": "me_teachers_training_session",
-   "fieldtype": "Check",
-   "label": "Has any Teachers Training Session Occurred in School?"
+   "fieldtype": "Select",
+   "label": "Has any Teachers Training Session Occurred in School?",
+   "options": "\nYes\nNo"
   },
   {
    "depends_on": "eval:doc.type == 'M&E'",
    "fieldname": "me_number_of_teachers_mqh",
-   "fieldtype": "Int",
-   "label": "Number of Teachers designated for MQH"
+   "fieldtype": "Select",
+   "label": "Number of Teachers designated for MQH",
+   "options": "\n1\n2\n3\n4\n5\n6\n7\n8\n9\n10\nOthers"
   },
   {
-   "default": "0",
+   "default": "",
    "depends_on": "eval:doc.type == 'M&E'",
    "fieldname": "me_used_teachers_guide",
-   "fieldtype": "Check",
-   "label": "Did you use the Teacher's Guide of MQH for Teaching?"
+   "fieldtype": "Select",
+   "label": "Did you use the Teacher's Guide of MQH for Teaching?",
+   "options": "\nYes\nNo"
   },
   {
    "depends_on": "eval:doc.type == 'M&E'",
    "fieldname": "me_mqh_book_version",
-   "fieldtype": "Data",
-   "label": "Which version of Mutalae Quran-e-Hakeem Book Taught?"
+   "fieldtype": "Select",
+   "label": "Which Version / Language of Mutalae Quran-e-Hakeem Book Taught?",
+   "options": "\nUrdu Original Version\nKPK Edition\nEnglish Version\nSindhi Version\nBraille\nPunjab Edition\nBalochistan Edition\nAJK Edition"
   },
   {
    "depends_on": "eval:doc.type == 'M&E'",
    "fieldname": "me_classes_per_week",
-   "fieldtype": "Int",
-   "label": "How many classes allocated per week for MQH?"
+   "fieldtype": "Select",
+   "label": "How many classes allocated per week for MQH?",
+   "options": "\n1\n2\n3\n4\n5"
   },
   {
    "depends_on": "eval:doc.type == 'M&E'",
    "fieldname": "me_class_duration",
-   "fieldtype": "Data",
-   "label": "Duration of Class"
+   "fieldtype": "Select",
+   "label": "Duration of Class (in Minutes)",
+   "options": "\n20 Minutes\n25 Minutes\n30 Minutes\n35 Minutes\n40 Minutes\n45 Minutes\n50 Minutes\n55 Minutes\n60 Minutes"
   },
   {
-   "default": "0",
+   "default": "",
    "depends_on": "eval:doc.type == 'M&E'",
    "fieldname": "me_took_assessment",
-   "fieldtype": "Check",
-   "label": "Did you take assessment?"
+   "fieldtype": "Select",
+   "label": "Does the teacher conduct assessments for this course?",
+   "options": "\nYes\nNo"
   },
   {
    "depends_on": "eval:doc.type == 'M&E'",
    "fieldname": "me_student_behavior_changes",
-   "fieldtype": "Small Text",
-   "label": "What kind of changes you noticed in student behavior?"
+   "fieldtype": "Select",
+   "label": "What kind of changes noticed in students' behavior?",
+   "options": "\nNo Change\nMinor Change\nMajor Change"
   },
   {
    "depends_on": "eval:doc.type == 'M&E'",
@@ -591,7 +631,7 @@
    "fieldname": "school_type",
    "fieldtype": "Select",
    "label": "School Type",
-   "options": "\nPublic\nPrivate\nSemi Government\nMadrasa\nOther"
+   "options": "\nIndividual School\nChains of School"
   },
   {
    "depends_on": "eval:doc.type == 'Marketing'",
@@ -608,8 +648,9 @@
   {
    "depends_on": "eval:doc.type == 'Marketing'",
    "fieldname": "designation",
-   "fieldtype": "Data",
-   "label": "Designation"
+   "fieldtype": "Select",
+   "label": "Designation",
+   "options": "\nOwner\nDirector\nPrincipal\nAdmin\nCoordinator\nTeacher\nReceptionist"
   },
   {
    "depends_on": "eval:doc.type == 'Marketing'",
@@ -827,36 +868,36 @@
    "label": "Remarks"
   },
   {
-   "depends_on": "eval:doc.type == 'Other'",
+   "depends_on": "eval:doc.type=='Academic / Other Official Tasks'",
    "fieldname": "others_section",
    "fieldtype": "Section Break",
-   "label": "Other"
+   "label": "Academic / Other Official Tasks"
   },
   {
-   "depends_on": "eval:doc.type == 'Other'",
+   "depends_on": "eval:doc.type=='Academic / Other Official Tasks'",
    "fieldname": "ot_remarks",
    "fieldtype": "Small Text",
    "label": "Remarks"
   },
   {
-   "depends_on": "eval:doc.type == 'Other'",
+   "depends_on": "eval:doc.type=='Academic / Other Official Tasks'",
    "fieldname": "column_break_toif",
    "fieldtype": "Column Break"
   },
   {
-   "depends_on": "eval:doc.type == 'Other'",
+   "depends_on": "eval:doc.type=='Academic / Other Official Tasks'",
    "fieldname": "ot_date",
    "fieldtype": "Date",
    "label": "Date"
   },
   {
-   "depends_on": "eval:doc.type == 'Other'",
+   "depends_on": "eval:doc.type=='Academic / Other Official Tasks'",
    "fieldname": "ot_start_time",
    "fieldtype": "Time",
    "label": "Start Time"
   },
   {
-   "depends_on": "eval:doc.type == 'Other'",
+   "depends_on": "eval:doc.type=='Academic / Other Official Tasks'",
    "fieldname": "ot_end_time",
    "fieldtype": "Time",
    "label": "End Time"
@@ -877,20 +918,20 @@
    "fieldname": "section_break_school_detail",
    "fieldtype": "Section Break",
    "label": "School Related Detail",
-   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME'], doc.type)",
+   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training'], doc.type)",
    "collapsible": 0
   },
   {
    "fieldname": "school_address",
    "fieldtype": "Small Text",
    "label": "School Address",
-   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME'], doc.type)"
+   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training'], doc.type)"
   },
   {
    "fieldname": "school_additional_remarks",
    "fieldtype": "Small Text",
    "label": "Any Additional Remarks regarding School",
-   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME'], doc.type)"
+   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training'], doc.type)"
   },
   {
    "fieldname": "column_break_school_1",
@@ -900,56 +941,56 @@
    "fieldname": "qps_affiliated",
    "fieldtype": "Select",
    "label": "Is this school affiliated with QPS?",
-   "options": "\nYes\nNo",
-   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME'], doc.type)"
+   "options": "\nYes - Already Affiliated\nYes - Newly Registered\nNo - Not Affiliated",
+   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training'], doc.type)"
   },
   {
    "fieldname": "tps_affiliated",
    "fieldtype": "Select",
    "label": "Is this school affiliated with TPS?",
-   "options": "\nYes\nNo",
-   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME'], doc.type)"
+   "options": "\nYes - Already Affiliated\nYes - Newly Registered\nNo - Not Affiliated",
+   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training'], doc.type)"
   },
   {
    "fieldname": "cee_affiliated",
    "fieldtype": "Select",
    "label": "Is this school affiliated with Teachers Training Department (CEE)?",
-   "options": "\nYes\nNo",
-   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME'], doc.type)"
+   "options": "\nYes - Already Affiliated\nYes - Newly Registered\nNo - Not Affiliated",
+   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training'], doc.type)"
   },
   {
    "fieldname": "section_break_qps_services",
    "fieldtype": "Section Break",
    "label": "QPS Services Adopted",
-   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME'], doc.type) && doc.qps_affiliated=='Yes'"
+   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training'], doc.type) && in_list(['Yes - Already Affiliated','Yes - Newly Registered'], doc.qps_affiliated)"
   },
   {
    "fieldname": "qps_mqh_books",
    "fieldtype": "Select",
    "label": "MQH Books",
    "options": "\nYes\nNo",
-   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME'], doc.type) && doc.qps_affiliated=='Yes'"
+   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training'], doc.type) && in_list(['Yes - Already Affiliated','Yes - Newly Registered'], doc.qps_affiliated)"
   },
   {
    "fieldname": "qps_mqh_teachers_guides",
    "fieldtype": "Select",
    "label": "MQH Teachers Guides",
    "options": "\nYes\nNo",
-   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME'], doc.type) && doc.qps_affiliated=='Yes'"
+   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training'], doc.type) && in_list(['Yes - Already Affiliated','Yes - Newly Registered'], doc.qps_affiliated)"
   },
   {
    "fieldname": "qps_meeting_educationalist",
    "fieldtype": "Select",
    "label": "Meeting with Educationalist, Ulama-e-Kiram and Known Personalities",
    "options": "\nYes\nNo",
-   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME'], doc.type) && doc.qps_affiliated=='Yes'"
+   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training'], doc.type) && in_list(['Yes - Already Affiliated','Yes - Newly Registered'], doc.qps_affiliated)"
   },
   {
    "fieldname": "qps_onsite_training",
    "fieldtype": "Select",
    "label": "Onsite Training",
    "options": "\nYes\nNo",
-   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME'], doc.type) && doc.qps_affiliated=='Yes'"
+   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training'], doc.type) && in_list(['Yes - Already Affiliated','Yes - Newly Registered'], doc.qps_affiliated)"
   },
   {
    "fieldname": "column_break_qps",
@@ -960,28 +1001,28 @@
    "fieldtype": "Select",
    "label": "Online Training",
    "options": "\nYes\nNo",
-   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME'], doc.type) && doc.qps_affiliated=='Yes'"
+   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training'], doc.type) && in_list(['Yes - Already Affiliated','Yes - Newly Registered'], doc.qps_affiliated)"
   },
   {
    "fieldname": "qps_registration_lms",
    "fieldtype": "Select",
    "label": "Registration in LMS",
    "options": "\nYes\nNo",
-   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME'], doc.type) && doc.qps_affiliated=='Yes'"
+   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training'], doc.type) && in_list(['Yes - Already Affiliated','Yes - Newly Registered'], doc.qps_affiliated)"
   },
   {
    "fieldname": "qps_50_days_syllabus",
    "fieldtype": "Select",
    "label": "50 Days Short MQH Syllabus (Softcopy Available)",
    "options": "\nYes\nNo",
-   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME'], doc.type) && doc.qps_affiliated=='Yes'"
+   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training'], doc.type) && in_list(['Yes - Already Affiliated','Yes - Newly Registered'], doc.qps_affiliated)"
   },
   {
    "fieldname": "qps_mqh_quiz",
    "fieldtype": "Select",
    "label": "Participation in MQH Quiz Program",
    "options": "\nYes\nNo",
-   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME'], doc.type) && doc.qps_affiliated=='Yes'"
+   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training'], doc.type) && in_list(['Yes - Already Affiliated','Yes - Newly Registered'], doc.qps_affiliated)"
   },
   {
    "fieldname": "section_break_tps_services",
@@ -994,21 +1035,21 @@
    "fieldtype": "Select",
    "label": "Noorani Qaida",
    "options": "\nYes\nNo",
-   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME'], doc.type) && doc.tps_affiliated=='Yes'"
+   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training'], doc.type) && in_list(['Yes - Already Affiliated','Yes - Newly Registered'], doc.tps_affiliated)"
   },
   {
    "fieldname": "tps_noorani_qaida_guide",
    "fieldtype": "Select",
    "label": "Noorani Qaida Teacher's Guide",
    "options": "\nYes\nNo",
-   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME'], doc.type) && doc.tps_affiliated=='Yes'"
+   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training'], doc.type) && in_list(['Yes - Already Affiliated','Yes - Newly Registered'], doc.tps_affiliated)"
   },
   {
    "fieldname": "tps_1_day_tajweed_females",
    "fieldtype": "Select",
    "label": "1 Day session - Intro of Tajweed for Females (Onsite)",
    "options": "\nYes\nNo",
-   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME'], doc.type) && doc.tps_affiliated=='Yes'"
+   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training'], doc.type) && in_list(['Yes - Already Affiliated','Yes - Newly Registered'], doc.tps_affiliated)"
   },
   {
    "fieldname": "column_break_tps",
@@ -1019,14 +1060,14 @@
    "fieldtype": "Select",
    "label": "TTC Tajweed Training Course (For KHI)",
    "options": "\nYes\nNo",
-   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME'], doc.type) && doc.tps_affiliated=='Yes'"
+   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training'], doc.type) && in_list(['Yes - Already Affiliated','Yes - Newly Registered'], doc.tps_affiliated)"
   },
   {
    "fieldname": "tps_tajweed_customize",
    "fieldtype": "Select",
    "label": "Tajweed Customize Course 30/60/90 (Nazra Teachers)",
    "options": "\nYes\nNo",
-   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME'], doc.type) && doc.tps_affiliated=='Yes'"
+   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training'], doc.type) && in_list(['Yes - Already Affiliated','Yes - Newly Registered'], doc.tps_affiliated)"
   },
   {
    "fieldname": "section_break_cee_services",
@@ -1039,14 +1080,14 @@
    "fieldtype": "Select",
    "label": "ELP",
    "options": "\nYes\nNo",
-   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME'], doc.type) && doc.cee_affiliated=='Yes'"
+   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training'], doc.type) && in_list(['Yes - Already Affiliated','Yes - Newly Registered'], doc.cee_affiliated)"
   },
   {
    "fieldname": "cee_tecc_foundation",
    "fieldtype": "Select",
    "label": "TECC - Foundation",
    "options": "\nYes\nNo",
-   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME'], doc.type) && doc.cee_affiliated=='Yes'"
+   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training'], doc.type) && in_list(['Yes - Already Affiliated','Yes - Newly Registered'], doc.cee_affiliated)"
   },
   {
    "fieldname": "column_break_cee",
@@ -1057,14 +1098,14 @@
    "fieldtype": "Select",
    "label": "TECC - Professional",
    "options": "\nYes\nNo",
-   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME'], doc.type) && doc.cee_affiliated=='Yes'"
+   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training'], doc.type) && in_list(['Yes - Already Affiliated','Yes - Newly Registered'], doc.cee_affiliated)"
   },
   {
    "fieldname": "cee_one_day_workshop",
    "fieldtype": "Select",
    "label": "One Day Workshop",
    "options": "\nYes\nNo",
-   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME'], doc.type) && doc.cee_affiliated=='Yes'"
+   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training'], doc.type) && in_list(['Yes - Already Affiliated','Yes - Newly Registered'], doc.cee_affiliated)"
   },
   {
    "fieldname": "section_break_participants",
@@ -1076,7 +1117,7 @@
    "fieldname": "participant_names_enrolled",
    "fieldtype": "Small Text",
    "label": "Name of Participant enrolled in ELP/ TECC/ 90 Days TTC/ Online Tajweed Customize Course 30/60/90 (Nazra Teachers)/ Story Telling Session",
-   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME'], doc.type)",
+   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training'], doc.type)",
    "description": "If multiple participants in different courses, write like: Zaid - ELP, Nasir - TECC"
   },
   {
@@ -1087,21 +1128,21 @@
    "fieldname": "participant_contact_numbers",
    "fieldtype": "Data",
    "label": "Contact Number of Above Participant(s)",
-   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME'], doc.type)"
+   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training'], doc.type)"
   },
   {
    "fieldname": "model_school",
    "fieldtype": "Select",
    "label": "Is this a Model School",
    "options": "\nYes - Model School A: (Affiliated atleast 1 Program of all 3 Department of TIF)\nYes - Model School B: (Affiliated atleast 1 Program of all 2 Department of TIF)\nNo - This is not a Model School",
-   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME'], doc.type)"
+   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training'], doc.type)"
   },
   {
    "fieldname": "registered_volunteer",
    "fieldtype": "Select",
    "label": "Registered with TIF as a Volunteer",
    "options": "\nYes\nNo",
-   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME'], doc.type)",
+   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training'], doc.type)",
    "reqd": 0
   },
   {
@@ -1156,13 +1197,209 @@
    "label": "Reasons if not Agreed",
    "options": "\nBooks from other publishers are being taught\nUnavailability of Teacher\nLengthy Course\nShortage of time\nSect Issue\nWill start in new session\nOther",
    "depends_on": "eval:doc.type=='Marketing' && (doc.status=='Not Agree' || doc.status=='Other')"
+  },
+  {
+   "fieldname": "me_inactive_reasons",
+   "fieldtype": "Small Text",
+   "label": "Reason of Above (In-Active)",
+   "depends_on": "eval:doc.type=='M&E'"
+  },
+  {
+   "fieldname": "me_demand_from_school",
+   "fieldtype": "Select",
+   "label": "Did you received demand from School?",
+   "options": "\nYes (Please fill separate demand form)\nNo",
+   "depends_on": "eval:doc.type=='M&E'"
+  },
+  {
+   "fieldname": "me_mqh_book_part",
+   "fieldtype": "Select",
+   "label": "Which Part of Mutalae Quran-e-Hakeem Book Taught?",
+   "options": "\nPart-1\nPart-2\nPart-3\nPart-4\nPart-5\nPart-6\nPart-7\nOther",
+   "depends_on": "eval:doc.type=='M&E'"
+  },
+  {
+   "fieldname": "me_assessment_from_multi",
+   "fieldtype": "Small Text",
+   "label": "From whom have you taken assessment?",
+   "depends_on": "eval:doc.type=='M&E'"
+  },
+  {
+   "fieldname": "me_teachers_mqh_other",
+   "fieldtype": "Data",
+   "label": "Number of Teachers (Other)",
+   "depends_on": "eval:doc.type=='M&E'"
+  },
+  {
+   "fieldname": "section_break_joint",
+   "fieldtype": "Section Break",
+   "label": "Joint Visit with SME",
+   "depends_on": "eval:doc.type=='Joint Visit with SME'"
+  },
+  {
+   "fieldname": "joint_visit_with_smes",
+   "fieldtype": "Small Text",
+   "label": "Visit with (SME Name)",
+   "depends_on": "eval:doc.type=='Joint Visit with SME'"
+  },
+  {
+   "fieldname": "joint_sme_skill_rating",
+   "fieldtype": "Select",
+   "label": "SME Skill / Professional Level",
+   "options": "\nExcellent - Highly skilled and professional\nGood - Meets expectations\nAverage - Needs some improvement\nPoor - Requires immediate training/support",
+   "depends_on": "eval:doc.type=='Joint Visit with SME'"
+  },
+  {
+   "fieldname": "training_arrange_by",
+   "fieldtype": "Small Text",
+   "label": "Training Arrange By",
+   "depends_on": "eval:doc.type=='Training'"
+  },
+  {
+   "fieldname": "training_conducted_by",
+   "fieldtype": "Data",
+   "label": "Training Conducted By",
+   "depends_on": "eval:doc.type=='Training'"
+  },
+  {
+   "fieldname": "mt_meeting_type",
+   "fieldtype": "Select",
+   "label": "Meeting Type",
+   "options": "\nInternal Meeting (Meeting with TIF Staff)\nExternal Meeting (Meeting with Others)\nInvitation of Personalities to the Head Office\nInvitation of Personalities to the Regional Office",
+   "depends_on": "eval:doc.type=='Meeting'"
+  },
+  {
+   "fieldname": "mt_meeting_mode",
+   "fieldtype": "Select",
+   "label": "Meeting Mode",
+   "options": "\nOnline\nOnsite / In Person",
+   "depends_on": "eval:doc.type=='Meeting'"
+  },
+  {
+   "fieldname": "mt_internal_meeting_with",
+   "fieldtype": "Select",
+   "label": "Internal Meeting with",
+   "options": "\nRegional Office Staff / Supervisors\nMeeting with SMEs\nHead Office Staff",
+   "depends_on": "eval:doc.type=='Meeting'"
+  },
+  {
+   "fieldname": "mt_external_meeting_with",
+   "fieldtype": "Select",
+   "label": "External Meeting with",
+   "options": "\nUlma Karam\nEducationalist\nOwner / Director of Chain of School\nGovt officials\nInfluential Personalities\nSocial Media Activist\nTeachers Training",
+   "depends_on": "eval:doc.type=='Meeting'"
+  },
+  {
+   "fieldname": "mt_venue",
+   "fieldtype": "Data",
+   "label": "Venue of Meeting",
+   "depends_on": "eval:doc.type=='Meeting'"
+  },
+  {
+   "fieldname": "ot_type_of_task",
+   "fieldtype": "Select",
+   "label": "Type of Task",
+   "options": "\nAcademic Tasks\nHead Office Visit\nRegional Office Visit\nOut of Station Visit\nMeeting of Regional Staff (Supervisors) and SMEs\nFollow up Calls / Calls to Schools\nOther Official Tasks",
+   "depends_on": "eval:doc.type=='Academic / Other Official Tasks'"
+  },
+  {
+   "fieldname": "ot_academic_task_types",
+   "fieldtype": "Small Text",
+   "label": "Type of Academic Tasks",
+   "depends_on": "eval:doc.type=='Academic / Other Official Tasks'"
+  },
+  {
+   "fieldname": "ot_academic_task_other",
+   "fieldtype": "Data",
+   "label": "Other Academic Task",
+   "depends_on": "eval:doc.type=='Academic / Other Official Tasks'"
+  },
+  {
+   "fieldname": "ot_no_of_pages",
+   "fieldtype": "Data",
+   "label": "No of Pages (Regarding Above Academic Task)",
+   "depends_on": "eval:doc.type=='Academic / Other Official Tasks'"
+  },
+  {
+   "fieldname": "ot_no_of_calls",
+   "fieldtype": "Data",
+   "label": "No of Calls / No Follow up Calls",
+   "depends_on": "eval:doc.type=='Academic / Other Official Tasks'"
+  },
+  {
+   "fieldname": "ot_purpose_of_call",
+   "fieldtype": "Data",
+   "label": "Purpose of Call",
+   "depends_on": "eval:doc.type=='Academic / Other Official Tasks'"
+  },
+  {
+   "fieldname": "ot_follow_up_calls_attach",
+   "fieldtype": "Attach",
+   "label": "Follow up Call Details Sheet",
+   "depends_on": "eval:doc.type=='Academic / Other Official Tasks'"
+  },
+  {
+   "fieldname": "ot_other_official_task_detail",
+   "fieldtype": "Small Text",
+   "label": "Detail of other Official Task",
+   "depends_on": "eval:doc.type=='Academic / Other Official Tasks'"
+  },
+  {
+   "fieldname": "ot_visit_meeting_detail",
+   "fieldtype": "Small Text",
+   "label": "Detail of Head Office / Regional / Out of Station Visit / Meeting",
+   "depends_on": "eval:doc.type=='Academic / Other Official Tasks'"
+  },
+  {
+   "fieldname": "ot_hours_spent",
+   "fieldtype": "Select",
+   "label": "Hours Spent on Academic / Other Official Tasks / Visits / Meeting / Follow up Calls etc.",
+   "options": "\n1 Hour\n2 Hours\n3 Hours\n4 Hours\n5 Hours\n6 Hours\n7 Hours\n8 Hours\nFull Day",
+   "depends_on": "eval:doc.type=='Academic / Other Official Tasks'"
+  },
+  {
+   "fieldname": "section_break_cocurricular",
+   "fieldtype": "Section Break",
+   "label": "Co-curricular Activities Detail",
+   "depends_on": "eval:doc.type=='Co-curricular Activity'"
+  },
+  {
+   "fieldname": "cc_activity",
+   "fieldtype": "Select",
+   "label": "Co-curricular Activities",
+   "options": "\nArrange Quiz in School\nInter School Quiz Competition\nConduct / Arrange Demo Class\nIntroduce TIF in School Functions\nIntroduce TIF in Exhibition",
+   "depends_on": "eval:doc.type=='Co-curricular Activity'"
+  },
+  {
+   "fieldname": "cc_venue",
+   "fieldtype": "Data",
+   "label": "Venue of Co-curricular Activities",
+   "depends_on": "eval:doc.type=='Co-curricular Activity'"
+  },
+  {
+   "fieldname": "cc_no_of_schools",
+   "fieldtype": "Data",
+   "label": "No of Schools regarding Co-curricular Activities",
+   "depends_on": "eval:doc.type=='Co-curricular Activity'"
+  },
+  {
+   "fieldname": "cc_no_of_participants",
+   "fieldtype": "Data",
+   "label": "No of Participants regarding Co-curricular Activities",
+   "depends_on": "eval:doc.type=='Co-curricular Activity'"
+  },
+  {
+   "fieldname": "cc_participants_category",
+   "fieldtype": "Small Text",
+   "label": "Participants Category who participated in Co-curricular Activities",
+   "depends_on": "eval:doc.type=='Co-curricular Activity'"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-07-15 15:30:00.000000",
+ "modified": "2026-07-15 16:40:00.000000",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Field Visit",

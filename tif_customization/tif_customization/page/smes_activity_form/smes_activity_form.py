@@ -6,6 +6,31 @@ from frappe import _
 from frappe.utils import get_url, getdate, today
 
 
+def _as_list(value):
+	"""Normalize portal multi-select / checkbox values to a list of strings."""
+	if value is None or value == "":
+		return []
+	if isinstance(value, list):
+		return [cstr(v).strip() for v in value if cstr(v).strip()]
+	if isinstance(value, str):
+		# JSON array or newline / comma separated
+		raw = value.strip()
+		if raw.startswith("["):
+			try:
+				parsed = frappe.parse_json(raw)
+				if isinstance(parsed, list):
+					return [cstr(v).strip() for v in parsed if cstr(v).strip()]
+			except Exception:
+				pass
+		parts = [p.strip() for p in raw.replace("\r", "\n").replace(",", "\n").split("\n")]
+		return [p for p in parts if p]
+	return [cstr(value).strip()]
+
+
+def cstr(v):
+	return "" if v is None else str(v)
+
+
 PROVINCE_MAP = {
 	"Sindh": "Sindh",
 	"Punjab": "Punjab",
@@ -186,11 +211,91 @@ def get_form_meta():
 			"Will start in new session",
 			"Other",
 		],
-		"school_types": ["Public", "Private", "Semi Government", "Madrasa", "Other"],
+		"school_types": ["Individual School", "Chains of School"],
+		"designations": [
+			"Owner",
+			"Director",
+			"Principal",
+			"Admin",
+			"Coordinator",
+			"Teacher",
+			"Receptionist",
+		],
+		"affiliation_options": [
+			"Yes - Already Affiliated",
+			"Yes - Newly Registered",
+			"No - Not Affiliated",
+		],
 		"model_school_options": [
 			"Yes - Model School A: (Affiliated atleast 1 Program of all 3 Department of TIF)",
 			"Yes - Model School B: (Affiliated atleast 1 Program of all 2 Department of TIF)",
 			"No - This is not a Model School",
+		],
+		"meeting_types": [
+			"Internal Meeting (Meeting with TIF Staff)",
+			"External Meeting (Meeting with Others)",
+			"Invitation of Personalities to the Head Office",
+			"Invitation of Personalities to the Regional Office",
+		],
+		"meeting_modes": ["Online", "Onsite / In Person"],
+		"internal_meeting_with": [
+			"Regional Office Staff / Supervisors",
+			"Meeting with SMEs",
+			"Head Office Staff",
+		],
+		"external_meeting_with": [
+			"Ulma Karam",
+			"Educationalist",
+			"Owner / Director of Chain of School",
+			"Govt officials",
+			"Influential Personalities",
+			"Social Media Activist",
+			"Teachers Training",
+		],
+		"academic_task_types": [
+			"Academic Tasks",
+			"Head Office Visit",
+			"Regional Office Visit",
+			"Out of Station Visit",
+			"Meeting of Regional Staff (Supervisors) and SMEs",
+			"Follow up Calls / Calls to Schools",
+			"Other Official Tasks",
+		],
+		"academic_work_types": [
+			"Typing",
+			"Proofreading",
+			"Review",
+			"Matching",
+			"Correction",
+			"Formatting",
+			"Designing",
+			"Translation",
+			"Other",
+		],
+		"hours_spent_options": [
+			"1 Hour",
+			"2 Hours",
+			"3 Hours",
+			"4 Hours",
+			"5 Hours",
+			"6 Hours",
+			"7 Hours",
+			"8 Hours",
+			"Full Day",
+		],
+		"cocurricular_activities": [
+			"Arrange Quiz in School",
+			"Inter School Quiz Competition",
+			"Conduct / Arrange Demo Class",
+			"Introduce TIF in School Functions",
+			"Introduce TIF in Exhibition",
+		],
+		"cocurricular_participant_categories": [
+			"Higher management of school",
+			"Teachers",
+			"Students",
+			"Parents",
+			"General public",
 		],
 		"qps_services": [
 			{"field": "qps_mqh_books", "label": "MQH Books"},
@@ -224,7 +329,122 @@ def get_form_meta():
 			{"field": "cee_tecc_professional", "label": "TECC - Professional"},
 			{"field": "cee_one_day_workshop", "label": "One Day Workshop"},
 		],
+		# Activity-section option lists (Google Form sections 2–5)
+		"me_inactive_reasons": [
+			"Books not receive or late delivery of books",
+			"Books from other publishers have replaced MQH",
+			"Change of Management",
+			"Unavailability of Teacher",
+			"Untrained Teachers",
+			"Change in Government Policy",
+			"Sect issue",
+			"Lengthy Course",
+			"Shortage of time",
+			"Course Permanently Stop due to Parents Request",
+			"School closed",
+			"Stop due to Negative Propaganda",
+			"Others",
+		],
+		"me_demand_options": [
+			"Yes (Please fill separate demand form)",
+			"No",
+		],
+		"me_teachers_count": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "Others"],
+		"me_mqh_versions": [
+			"Urdu Original Version",
+			"KPK Edition",
+			"English Version",
+			"Sindhi Version",
+			"Braille",
+			"Punjab Edition",
+			"Balochistan Edition",
+			"AJK Edition",
+		],
+		"me_mqh_parts": [
+			"Part-1",
+			"Part-2",
+			"Part-3",
+			"Part-4",
+			"Part-5",
+			"Part-6",
+			"Part-7",
+			"Other",
+		],
+		"me_classes_per_week": ["1", "2", "3", "4", "5"],
+		"me_class_durations": [
+			"20 Minutes",
+			"25 Minutes",
+			"30 Minutes",
+			"35 Minutes",
+			"40 Minutes",
+			"45 Minutes",
+			"50 Minutes",
+			"55 Minutes",
+			"60 Minutes",
+		],
+		"me_behavior_changes": ["No Change", "Minor Change", "Major Change"],
+		"me_assessment_from": [
+			"Principal",
+			"Class Teacher",
+			"Management (Incharge / Coordinator / HOO etc)",
+			"Students",
+		],
+		"me_tif_office_changes": [
+			"School Name",
+			"Contact Person",
+			"Contact Number",
+			"Address",
+			"Email",
+		],
+		"joint_skill_ratings": [
+			"Excellent - Highly skilled and professional",
+			"Good - Meets expectations",
+			"Average - Needs some improvement",
+			"Poor - Requires immediate training/support",
+		],
+		"training_categories": [
+			"Full Day Session",
+			"Half Day Workshop",
+			"Teachers Training Meeting (One to One)",
+			"Awareness Session",
+		],
+		"sme_name_options": _sme_display_names(staff_list),
+		"training_conducted_by_options": _training_conducted_by_options(staff_list),
 	}
+
+
+def _sme_display_names(staff_list):
+	names = []
+	for s in staff_list:
+		n = (s.get("employee_name") or "").strip()
+		if not n:
+			continue
+		if n.lower().startswith("sme"):
+			names.append(n)
+		else:
+			names.append(f"SME - {n}")
+	# Extra labels seen on Google Form that may not be employees
+	for extra in ("Sohail Athar", "Volunteer"):
+		if extra not in names and f"SME - {extra}" not in names:
+			names.append(extra)
+	return names
+
+
+def _training_conducted_by_options(staff_list):
+	fixed = [
+		"Shujauddin Shaikh",
+		"Arif Irfanullah",
+		"Hafiz Shah Nawaz Awan",
+		"Syed Wajahat Ali",
+	]
+	smes = _sme_display_names(staff_list)
+	seen = set()
+	out = []
+	for n in fixed + smes:
+		if n and n not in seen:
+			seen.add(n)
+			out.append(n)
+	return out
 
 
 @frappe.whitelist()
@@ -335,6 +555,41 @@ def submit_smes_activity(data):
 		doc.me_meeting_with_person_name = doc.meeting_with
 		doc.me_designation_meeting_with = doc.designation
 		doc.me_contact_no_meeting_with = doc.contact_number
+
+		doc.me_mqh_book_status = data.get("me_mqh_book_status")
+		doc.me_activity_status = data.get("me_mqh_book_status")
+		inactive = _as_list(data.get("me_inactive_reasons"))
+		doc.me_inactive_reasons = "\n".join(inactive)
+		doc.me_reason_of_above = doc.me_inactive_reasons
+		doc.me_demand_from_school = data.get("me_demand_from_school")
+		doc.me_teachers_training_session = data.get("me_teachers_training_session")
+		doc.me_number_of_teachers_mqh = data.get("me_number_of_teachers_mqh")
+		doc.me_teachers_mqh_other = data.get("me_teachers_mqh_other")
+		doc.me_used_teachers_guide = data.get("me_used_teachers_guide")
+		doc.me_mqh_book_version = data.get("me_mqh_book_version")
+		doc.me_mqh_book_part = data.get("me_mqh_book_part")
+		doc.me_classes_per_week = data.get("me_classes_per_week")
+		doc.me_class_duration = data.get("me_class_duration")
+		doc.me_took_assessment = data.get("me_took_assessment")
+		doc.me_student_behavior_changes = data.get("me_student_behavior_changes")
+		assessment_from = _as_list(data.get("me_assessment_from"))
+		doc.me_assessment_from_multi = "\n".join(assessment_from)
+		doc.me_assessment_taken_from = ", ".join(assessment_from)
+		changes = _as_list(data.get("me_changes_made"))
+		doc.me_changes_made = "\n".join(changes)
+		doc.me_details_of_changes_made = data.get("me_details_of_changes_made")
+		doc.me_new_school_address = data.get("me_new_school_address")
+		doc.me_new_person_name = data.get("me_new_person_name")
+		doc.me_new_person_designation = data.get("me_new_person_designation")
+		doc.me_new_person_mobile_number = data.get("me_new_person_mobile_number")
+		doc.me_new_person_email = data.get("me_new_person_email")
+	elif doc_type == "Joint Visit with SME":
+		joint_smes = _as_list(data.get("joint_visit_with_smes"))
+		doc.joint_visit_with_smes = "\n".join(joint_smes)
+		doc.joint_sme_skill_rating = data.get("joint_sme_skill_rating")
+		# Marketing-style fields also collected on joint visits in Google Form
+		doc.frequency_of_visits = data.get("frequency_of_visits") or doc.frequency_of_visits
+		doc.status = data.get("status") or doc.status
 	elif doc_type == "Meeting":
 		doc.mt_visit_by = doc.visit_by
 		doc.mt_month = doc.month
@@ -343,12 +598,41 @@ def submit_smes_activity(data):
 		doc.mt_meeting_ending_time = doc.visit_ending_time
 		doc.mt_city = doc.city
 		doc.mt_area = doc.area
-		doc.mt_meeting_with_person_name = doc.meeting_with
-		doc.mt_designation = doc.designation
-		doc.mt_contact_no = doc.contact_number
-		doc.mt_institute_or_organization_name = doc.school_name
+		doc.mt_meeting_type = data.get("mt_meeting_type")
+		doc.mt_meeting_mode = data.get("mt_meeting_mode")
+		doc.mt_internal_meeting_with = data.get("mt_internal_meeting_with")
+		doc.mt_external_meeting_with = data.get("mt_external_meeting_with")
+		doc.mt_meeting_with_person_name = data.get("mt_person_name") or doc.meeting_with
+		doc.mt_contact_no = data.get("mt_contact_number") or doc.contact_number
+		doc.mt_venue = data.get("mt_venue")
+		doc.mt_remarks = data.get("mt_meeting_detail")
 		doc.mt_reference = doc.reference
-	elif doc_type in ("Academic / Other Official Tasks", "Co-curricular Activity", "Other"):
+		doc.mt_visiting_card = data.get("visiting_card_attach")
+		doc.mt_meeting_picture = data.get("meeting_picture")
+	elif doc_type == "Academic / Other Official Tasks":
+		doc.ot_date = doc.visit_date
+		doc.ot_start_time = doc.visiting_starting_time
+		doc.ot_end_time = doc.visit_ending_time
+		doc.ot_type_of_task = data.get("ot_type_of_task")
+		academic_types = _as_list(data.get("ot_academic_task_types"))
+		doc.ot_academic_task_types = "\n".join(academic_types)
+		doc.ot_academic_task_other = data.get("ot_academic_task_other")
+		doc.ot_no_of_pages = data.get("ot_no_of_pages")
+		doc.ot_no_of_calls = data.get("ot_no_of_calls")
+		doc.ot_purpose_of_call = data.get("ot_purpose_of_call")
+		doc.ot_follow_up_calls_attach = data.get("ot_follow_up_calls_attach")
+		doc.ot_other_official_task_detail = data.get("ot_other_official_task_detail")
+		doc.ot_visit_meeting_detail = data.get("ot_visit_meeting_detail")
+		doc.ot_hours_spent = data.get("ot_hours_spent")
+		doc.ot_remarks = data.get("ot_visit_meeting_detail") or data.get("ot_other_official_task_detail")
+	elif doc_type == "Co-curricular Activity":
+		doc.cc_activity = data.get("cc_activity")
+		doc.cc_venue = data.get("cc_venue")
+		doc.cc_no_of_schools = data.get("cc_no_of_schools")
+		doc.cc_no_of_participants = data.get("cc_no_of_participants")
+		cats = _as_list(data.get("cc_participants_category"))
+		doc.cc_participants_category = "\n".join(cats)
+	elif doc_type == "Other":
 		doc.ot_date = doc.visit_date
 		doc.ot_start_time = doc.visiting_starting_time
 		doc.ot_end_time = doc.visit_ending_time
@@ -360,7 +644,13 @@ def submit_smes_activity(data):
 		doc.training_entry_filled_by = doc.visit_by
 		doc.training_city = doc.city
 		doc.training_province = doc.province
-		doc.training_venue_name = doc.school_name
+		doc.training_session_category = data.get("training_session_category")
+		doc.training_venue_name = data.get("training_venue_name") or doc.school_name
+		doc.training_no_of_participants = data.get("training_no_of_participants")
+		doc.training_no_of_schools_attended = data.get("training_no_of_schools_attended")
+		arrange = _as_list(data.get("training_arrange_by"))
+		doc.training_arrange_by = "\n".join(arrange)
+		doc.training_conducted_by = data.get("training_conducted_by")
 
 	doc.insert(ignore_permissions=False)
 	frappe.db.commit()

@@ -1,5 +1,5 @@
-const SMES_LS_META = "smes_activity_form_meta_v1";
-const SMES_LS_DRAFT = "smes_activity_form_draft_v1";
+const SMES_LS_META = "smes_activity_form_meta_v3";
+const SMES_LS_DRAFT = "smes_activity_form_draft_v3";
 const SMES_LS_QUEUE = "smes_activity_form_queue_v1";
 
 frappe.pages["smes-activity-form"].on_page_load = function (wrapper) {
@@ -39,7 +39,15 @@ class SmesActivityForm {
 		this.step = 0;
 		this.meta = null;
 		this.controls = {};
-		this.data = {
+		this.data = this.empty_data();
+		this.steps = [];
+		this._online = navigator.onLine !== false;
+		this._bind_offline_events();
+		this.load();
+	}
+
+	empty_data() {
+		return {
 			visit_by: "",
 			staff_employee: "",
 			month: "",
@@ -50,12 +58,72 @@ class SmesActivityForm {
 			city: "",
 			area: "",
 			province: "",
+			// Marketing
 			frequency_of_visits: "",
 			marketing_material_provided: "",
 			status: "",
 			reasons_if_not_agreed: "",
 			reasons_if_not_agreed_other: "",
 			school_remarks_follow_up: "",
+			// M&E
+			me_mqh_book_status: "",
+			me_inactive_reasons: [],
+			me_demand_from_school: "",
+			me_teachers_training_session: "",
+			me_number_of_teachers_mqh: "",
+			me_teachers_mqh_other: "",
+			me_used_teachers_guide: "",
+			me_mqh_book_version: "",
+			me_mqh_book_part: "",
+			me_classes_per_week: "",
+			me_class_duration: "",
+			me_took_assessment: "",
+			me_student_behavior_changes: "",
+			me_assessment_from: [],
+			me_changes_made: [],
+			me_details_of_changes_made: "",
+			me_new_school_address: "",
+			me_new_person_name: "",
+			me_new_person_designation: "",
+			me_new_person_mobile_number: "",
+			me_new_person_email: "",
+			// Joint
+			joint_visit_with_smes: [],
+			joint_sme_skill_rating: "",
+			// Training
+			training_arrange_by: [],
+			training_conducted_by: "",
+			training_session_category: "",
+			training_venue_name: "",
+			training_no_of_participants: "",
+			training_no_of_schools_attended: "",
+			// Meetings
+			mt_meeting_type: "",
+			mt_meeting_mode: "",
+			mt_internal_meeting_with: "",
+			mt_external_meeting_with: "",
+			mt_person_name: "",
+			mt_contact_number: "",
+			mt_venue: "",
+			mt_meeting_detail: "",
+			// Academic / Other
+			ot_type_of_task: "",
+			ot_academic_task_types: [],
+			ot_academic_task_other: "",
+			ot_no_of_pages: "",
+			ot_no_of_calls: "",
+			ot_purpose_of_call: "",
+			ot_follow_up_calls_attach: "",
+			ot_other_official_task_detail: "",
+			ot_visit_meeting_detail: "",
+			ot_hours_spent: "",
+			// Co-curricular
+			cc_activity: "",
+			cc_venue: "",
+			cc_no_of_schools: "",
+			cc_no_of_participants: "",
+			cc_participants_category: [],
+			// School
 			school_name: "",
 			contact_person_name: "",
 			contact_number: "",
@@ -71,6 +139,7 @@ class SmesActivityForm {
 			participant_contact_numbers: "",
 			model_school: "",
 			registered_volunteer: "",
+			// Attachments
 			meeting_picture: "",
 			school_picture: "",
 			visiting_card_attach: "",
@@ -78,15 +147,6 @@ class SmesActivityForm {
 			training_awareness_pictures: "",
 			attendance_sheet_excel: "",
 		};
-		this.steps = [
-			{ key: "general", label: __("General") },
-			{ key: "marketing", label: __("Visit Detail") },
-			{ key: "school", label: __("School Detail") },
-			{ key: "attachments", label: __("Attachments") },
-		];
-		this._online = navigator.onLine !== false;
-		this._bind_offline_events();
-		this.load();
 	}
 
 	_bind_offline_events() {
@@ -138,7 +198,7 @@ class SmesActivityForm {
 	restore_draft() {
 		const draft = this.storage_get(SMES_LS_DRAFT, null);
 		if (!draft || !draft.data) return false;
-		Object.assign(this.data, draft.data);
+		Object.assign(this.data, this.empty_data(), draft.data);
 		if (typeof draft.step === "number") this.step = draft.step;
 		return true;
 	}
@@ -250,6 +310,7 @@ class SmesActivityForm {
 				const m = new Date().toLocaleString("en-US", { month: "long" });
 				if ((this.meta.months || []).includes(m)) this.data.month = m;
 			}
+			this.rebuild_steps();
 			this.render();
 			if (from_cache) {
 				frappe.show_alert(
@@ -291,17 +352,52 @@ class SmesActivityForm {
 		});
 	}
 
-	is_school_visit() {
+	activity_kind() {
 		const t = this.data.activity_type || "";
-		return (
-			t.includes("Marketing") ||
-			t.includes("M&E") ||
-			t.includes("Joint Visit") ||
-			t.includes("Training")
-		);
+		if (t.includes("Marketing")) return "marketing";
+		if (t.includes("M&E")) return "me";
+		if (t.includes("Joint Visit")) return "joint";
+		if (t.includes("Training")) return "training";
+		if (t.includes("Meetings") || t === "Meeting") return "meeting";
+		if (t.includes("Academic")) return "academic";
+		if (t.includes("Co-curricular")) return "cocurricular";
+		return "";
+	}
+
+	is_school_visit() {
+		const k = this.activity_kind();
+		return ["marketing", "me", "joint", "training"].includes(k);
+	}
+
+	is_affiliated_yes(value) {
+		return cstr(value).startsWith("Yes");
+	}
+
+	rebuild_steps() {
+		const steps = [{ key: "general", label: __("General") }];
+		const kind = this.activity_kind();
+		const labels = {
+			marketing: __("Marketing Visit"),
+			me: __("M&E Visit"),
+			joint: __("Joint Visit"),
+			training: __("Trainings & Workshops"),
+			meeting: __("Meetings"),
+			academic: __("Academic / Other"),
+			cocurricular: __("Co-curricular"),
+		};
+		if (kind) {
+			steps.push({ key: kind, label: labels[kind] });
+		}
+		if (this.is_school_visit()) {
+			steps.push({ key: "school", label: __("School Detail") });
+		}
+		steps.push({ key: "attachments", label: __("Attachments") });
+		this.steps = steps;
+		if (this.step >= this.steps.length) this.step = Math.max(0, this.steps.length - 1);
 	}
 
 	render() {
+		this.rebuild_steps();
 		const pills = this.steps
 			.map((s, i) => {
 				const cls = i === this.step ? "is-active" : i < this.step ? "is-done" : "";
@@ -372,7 +468,6 @@ class SmesActivityForm {
 		});
 		this.$root.find(".smes-open-list").on("click", () => frappe.set_route("List", "Field Visit"));
 
-		// Auto-save draft as user types (debounced)
 		clearTimeout(this._draft_timer);
 		this.$root
 			.find(".smes-body")
@@ -385,6 +480,23 @@ class SmesActivityForm {
 
 	val(name, fallback = "") {
 		return this.data[name] != null ? this.data[name] : fallback;
+	}
+
+	as_list(name) {
+		const v = this.data[name];
+		if (Array.isArray(v)) return v;
+		if (!v) return [];
+		if (typeof v === "string") {
+			return v
+				.split(/[\n,]+/)
+				.map((s) => s.trim())
+				.filter(Boolean);
+		}
+		return [String(v)];
+	}
+
+	has_change(label) {
+		return this.as_list("me_changes_made").includes(label);
 	}
 
 	field(name, label, type = "text", opts = {}) {
@@ -418,6 +530,14 @@ class SmesActivityForm {
 				.map((o) => {
 					const checked = this.val(name) === o ? "checked" : "";
 					return `<label><input type="radio" name="${name}" data-field="${name}" value="${frappe.utils.escape_html(o)}" ${checked}/><span>${frappe.utils.escape_html(o)}</span></label>`;
+				})
+				.join("")}</div>`;
+		} else if (type === "checkboxes") {
+			const selected = this.as_list(name);
+			control = `<div class="smes-check-group" data-check-field="${name}">${(opts.options || [])
+				.map((o) => {
+					const checked = selected.includes(o) ? "checked" : "";
+					return `<label><input type="checkbox" data-field="${name}" data-multi="1" value="${frappe.utils.escape_html(o)}" ${checked}/><span>${frappe.utils.escape_html(o)}</span></label>`;
 				})
 				.join("")}</div>`;
 		} else {
@@ -454,7 +574,6 @@ class SmesActivityForm {
 			const fieldtype = $el.data("frappe-type");
 			const $fallback = $el.siblings(".smes-native-fallback");
 
-			// On mobile use native OS date/time pickers (best UX on phones)
 			if (is_mobile) {
 				$el.addClass("smes-hidden");
 				$fallback.removeClass("smes-hidden");
@@ -502,7 +621,7 @@ class SmesActivityForm {
 		});
 	}
 
-	yn_matrix(services, prefix) {
+	yn_matrix(services) {
 		const rows = (services || [])
 			.map((s) => {
 				const v = this.val(s.field);
@@ -524,15 +643,47 @@ class SmesActivityForm {
 	render_step() {
 		const $body = this.$root.find(".smes-body");
 		const key = this.steps[this.step].key;
-		if (key === "general") $body.html(this.html_general());
-		else if (key === "marketing") $body.html(this.html_marketing());
-		else if (key === "school") $body.html(this.html_school());
-		else $body.html(this.html_attachments());
+		const html_map = {
+			general: () => this.html_general(),
+			marketing: () => this.html_marketing(),
+			me: () => this.html_me(),
+			joint: () => this.html_joint(),
+			training: () => this.html_training(),
+			meeting: () => this.html_meeting(),
+			academic: () => this.html_academic(),
+			cocurricular: () => this.html_cocurricular(),
+			school: () => this.html_school(),
+			attachments: () => this.html_attachments(),
+		};
+		$body.html((html_map[key] || (() => ""))());
+
+		const refresh_fields = new Set([
+			"activity_type",
+			"city",
+			"status",
+			"reasons_if_not_agreed",
+			"me_mqh_book_status",
+			"me_number_of_teachers_mqh",
+			"me_took_assessment",
+			"me_changes_made",
+			"mt_meeting_type",
+			"ot_type_of_task",
+			"ot_academic_task_types",
+			"qps_affiliated",
+			"tps_affiliated",
+			"cee_affiliated",
+		]);
 
 		$body.find("[data-field]").on("change input", (e) => {
 			const $el = $(e.target);
 			const field = $el.data("field");
-			if ($el.attr("type") === "radio") {
+			if ($el.attr("type") === "checkbox" && $el.data("multi")) {
+				const values = [];
+				$body.find(`input[data-field="${field}"][type="checkbox"]:checked`).each((_, cb) => {
+					values.push($(cb).val());
+				});
+				this.data[field] = values;
+			} else if ($el.attr("type") === "radio") {
 				if ($el.is(":checked")) this.data[field] = $el.val();
 			} else if ($el.attr("type") === "time") {
 				this.data[field] = this.normalize_time_for_frappe($el.val());
@@ -543,8 +694,13 @@ class SmesActivityForm {
 				const match = (this.meta.staff_options || []).find((s) => s.employee_name === this.data.visit_by);
 				this.data.staff_employee = match ? match.employee : "";
 			}
-			if (["activity_type", "status", "qps_affiliated", "tps_affiliated", "cee_affiliated"].includes(field)) {
+			if (refresh_fields.has(field)) {
 				this.collect();
+				if (field === "activity_type") {
+					this.rebuild_steps();
+					this.render();
+					return;
+				}
 				this.render_step();
 				this.bind_uploads();
 			}
@@ -586,38 +742,286 @@ class SmesActivityForm {
 	}
 
 	html_marketing() {
-		const show_mkt =
-			(this.data.activity_type || "").includes("Marketing") ||
-			(this.data.activity_type || "").includes("Joint Visit");
 		const status = this.data.status;
 		return `
-			<h3>${__("Visit Details")}</h3>
+			<h3>${__("Marketing Visit")}</h3>
+			${this.field("frequency_of_visits", __("Frequency of Visits"), "radio", { reqd: 1, options: this.meta.frequencies || [] })}
+			${this.field("marketing_material_provided", __("Does Marketing Material Provided?"), "radio", { reqd: 1, options: ["Yes", "No"] })}
+			${this.field("status", __("Status"), "radio", { reqd: 1, options: this.meta.statuses || [] })}
 			${
-				show_mkt
-					? `
-				${this.field("frequency_of_visits", __("Frequency of Visits"), "radio", { reqd: 1, options: this.meta.frequencies || [] })}
-				${this.field("marketing_material_provided", __("Does Marketing Material Provided?"), "radio", { reqd: 1, options: ["Yes", "No"] })}
-				${this.field("status", __("Status"), "radio", { reqd: 1, options: this.meta.statuses || [] })}
-				${
-					status === "Not Agree" || status === "Other"
-						? this.field("reasons_if_not_agreed", __("Reasons if not Agreed"), "radio", {
-								options: this.meta.not_agree_reasons || [],
-							})
-						: ""
-				}
-				${
-					this.data.reasons_if_not_agreed === "Other"
-						? this.field("reasons_if_not_agreed_other", __("Other reason"), "textarea")
-						: ""
-				}
-				${
-					status === "Need follow up visit"
-						? this.field("school_remarks_follow_up", __("School Remarks (If Need Follow up visit)"), "textarea")
-						: ""
-				}
-			`
-					: `<p class="text-muted">${__("No marketing-specific questions for this activity type. Click Next to continue.")}</p>`
+				status === "Not Agree" || status === "Other"
+					? this.field("reasons_if_not_agreed", __("Reasons if not Agreed"), "radio", {
+							reqd: 1,
+							options: this.meta.not_agree_reasons || [],
+						})
+					: ""
 			}
+			${
+				this.data.reasons_if_not_agreed === "Other"
+					? this.field("reasons_if_not_agreed_other", __("Other reason"), "textarea", { reqd: 1 })
+					: ""
+			}
+			${
+				status === "Need follow up visit"
+					? this.field("school_remarks_follow_up", __("School Remarks (If Need Follow up visit)"), "textarea")
+					: ""
+			}
+		`;
+	}
+
+	html_me() {
+		const inactive = this.data.me_mqh_book_status === "In-Active";
+		const show_assessment = this.data.me_took_assessment === "Yes";
+		const changes = this.as_list("me_changes_made");
+		return `
+			<h3>${__("M&E Visit")}</h3>
+			${this.field("me_mqh_book_status", __("Mutalae Quran Hakeem Book Status (M&E)"), "radio", {
+				reqd: 1,
+				options: ["Active", "In-Active"],
+			})}
+			${
+				inactive
+					? this.field(
+							"me_inactive_reasons",
+							__("Reason of Above (In Active) (Please tick any reason)"),
+							"checkboxes",
+							{ reqd: 1, options: this.meta.me_inactive_reasons || [] },
+						)
+					: ""
+			}
+			${this.field("me_demand_from_school", __("Did you received demand from School?"), "radio", {
+				reqd: 1,
+				options: this.meta.me_demand_options || [],
+			})}
+			${this.field("me_teachers_training_session", __("Has any Teachers Training Session Occurred in School?"), "radio", {
+				reqd: 1,
+				options: ["Yes", "No"],
+			})}
+			${this.field("me_number_of_teachers_mqh", __("Number of Teachers designated for MQH"), "radio", {
+				reqd: 1,
+				options: this.meta.me_teachers_count || [],
+			})}
+			${
+				this.data.me_number_of_teachers_mqh === "Others"
+					? this.field("me_teachers_mqh_other", __("Specify number of teachers"), "text", { reqd: 1 })
+					: ""
+			}
+			${this.field("me_used_teachers_guide", __("Did you use the Teacher's Guide of MQH for Teaching?"), "radio", {
+				reqd: 1,
+				options: ["Yes", "No"],
+			})}
+			${this.field("me_mqh_book_version", __("Which Version / Language of Mutalae Quran-e-Hakeem Book Taught?"), "radio", {
+				reqd: 1,
+				options: this.meta.me_mqh_versions || [],
+			})}
+			${this.field("me_mqh_book_part", __("Which Part of Mutalae Quran-e-Hakeem Book Taught?"), "radio", {
+				reqd: 1,
+				options: this.meta.me_mqh_parts || [],
+			})}
+			${this.field("me_classes_per_week", __("How many classes allocated per week for MQH?"), "radio", {
+				reqd: 1,
+				options: this.meta.me_classes_per_week || [],
+			})}
+			${this.field("me_class_duration", __("Duration of Class (in Minutes)"), "radio", {
+				reqd: 1,
+				options: this.meta.me_class_durations || [],
+			})}
+			${this.field("me_took_assessment", __("Does the teacher conduct assessments for this course?"), "radio", {
+				reqd: 1,
+				options: ["Yes", "No"],
+			})}
+			${this.field("me_student_behavior_changes", __("What kind of changes have the teacher or principal noticed in students' behavior?"), "radio", {
+				reqd: 1,
+				options: this.meta.me_behavior_changes || [],
+			})}
+			${
+				show_assessment
+					? this.field("me_assessment_from", __("From whom have you taken assessment?"), "checkboxes", {
+							reqd: 1,
+							options: this.meta.me_assessment_from || [],
+						})
+					: ""
+			}
+			<div class="smes-section-note">
+				<strong>${__("Updates for TIF Office (If Any Changes)")}</strong>
+				<span>${__("(School Name, Contact Person, Contact Number, Address)")}</span>
+			</div>
+			${this.field("me_changes_made", __("What changes have been Made?"), "checkboxes", {
+				options: this.meta.me_tif_office_changes || [],
+			})}
+			${
+				changes.length
+					? this.field("me_details_of_changes_made", __("Details of Changes Made"), "textarea")
+					: ""
+			}
+			${this.has_change("Address") ? this.field("me_new_school_address", __("New School Address"), "text") : ""}
+			${
+				this.has_change("Contact Person") || this.has_change("Contact Number") || this.has_change("Email")
+					? `
+				${this.field("me_new_person_name", __("New Person Name"), "text")}
+				${this.field("me_new_person_designation", __("New Person Designation"), "text")}
+				${this.has_change("Contact Number") ? this.field("me_new_person_mobile_number", __("New Person Mobile Number"), "tel") : ""}
+				${this.has_change("Email") ? this.field("me_new_person_email", __("New Person Email"), "email") : ""}
+			`
+					: ""
+			}
+		`;
+	}
+
+	html_joint() {
+		return `
+			<h3>${__("Joint Visit with SME (Only for Supervisor)")}</h3>
+			${this.field("joint_visit_with_smes", __("Visit with (SME Name)"), "checkboxes", {
+				reqd: 1,
+				options: this.meta.sme_name_options || [],
+			})}
+			${this.field("joint_sme_skill_rating", __("SME Skill / Professional Level"), "radio", {
+				reqd: 1,
+				options: this.meta.joint_skill_ratings || [],
+			})}
+		`;
+	}
+
+	html_training() {
+		return `
+			<h3>${__("Trainings & Workshops")}</h3>
+			${this.field("training_arrange_by", __("Training Arrange By"), "checkboxes", {
+				reqd: 1,
+				options: this.meta.sme_name_options || [],
+			})}
+			${this.field("training_conducted_by", __("Training Conducted By"), "radio", {
+				reqd: 1,
+				options: this.meta.training_conducted_by_options || [],
+			})}
+			${this.field("training_session_category", __("Training Category"), "radio", {
+				reqd: 1,
+				options: this.meta.training_categories || [],
+			})}
+			${this.field("training_venue_name", __("Venue Name"), "text", { reqd: 1 })}
+			${this.field("training_no_of_participants", __("No. of participants"), "text", { reqd: 1 })}
+			${this.field("training_no_of_schools_attended", __("No. of Schools Attended"), "text", { reqd: 1 })}
+		`;
+	}
+
+	html_meeting() {
+		const t = this.data.mt_meeting_type || "";
+		const is_internal = t.includes("Internal Meeting");
+		const is_external = t.includes("External Meeting");
+		return `
+			<h3>${__("Meetings")}</h3>
+			${this.field("mt_meeting_type", __("Meeting Type"), "radio", {
+				reqd: 1,
+				options: this.meta.meeting_types || [],
+			})}
+			${this.field("mt_meeting_mode", __("Meeting Mode"), "radio", {
+				reqd: 1,
+				options: this.meta.meeting_modes || [],
+			})}
+			${
+				is_internal
+					? this.field("mt_internal_meeting_with", __("Internal Meeting with"), "radio", {
+							reqd: 1,
+							options: this.meta.internal_meeting_with || [],
+						})
+					: ""
+			}
+			${
+				is_external
+					? this.field("mt_external_meeting_with", __("External Meeting with"), "radio", {
+							reqd: 1,
+							options: this.meta.external_meeting_with || [],
+						})
+					: ""
+			}
+			${this.field("mt_person_name", __("Name of Person"), "text")}
+			${this.field("mt_contact_number", __("Contact Number"), "tel")}
+			${this.field("mt_venue", __("Venue of Meeting"), "text")}
+			${this.field("mt_meeting_detail", __("Meeting Detail / Remarks"), "textarea")}
+		`;
+	}
+
+	html_academic() {
+		const task = this.data.ot_type_of_task || "";
+		const is_academic = task === "Academic Tasks";
+		const is_calls = task.includes("Follow up Calls");
+		const is_other = task === "Other Official Tasks";
+		const is_visit =
+			task.includes("Head Office") ||
+			task.includes("Regional Office") ||
+			task.includes("Out of Station") ||
+			task.includes("Meeting of Regional Staff");
+		return `
+			<h3>${__("Academic / Others Official Tasks")}</h3>
+			${this.field("ot_type_of_task", __("Type of Task"), "radio", {
+				reqd: 1,
+				options: this.meta.academic_task_types || [],
+			})}
+			${
+				is_academic
+					? `
+				${this.field("ot_academic_task_types", __("Type of Academic Tasks"), "checkboxes", {
+					reqd: 1,
+					options: this.meta.academic_work_types || [],
+				})}
+				${
+					this.as_list("ot_academic_task_types").includes("Other")
+						? this.field("ot_academic_task_other", __("Other academic task"), "text", { reqd: 1 })
+						: ""
+				}
+				${this.field("ot_no_of_pages", __("No of Pages (Regarding Above Academic Task)"), "text")}
+			`
+					: ""
+			}
+			${
+				is_calls
+					? `
+				${this.field("ot_no_of_calls", __("No of Calls / No Follow up Calls"), "text")}
+				${this.field("ot_purpose_of_call", __("Purpose of Call"), "text")}
+				${this.attach_field("ot_follow_up_calls_attach", __("Follow up Call Details (Excel / sheet)"), ".xlsx,.xls,.csv,image/*,.pdf")}
+			`
+					: ""
+			}
+			${
+				is_other
+					? this.field("ot_other_official_task_detail", __("Detail of other Official Task"), "textarea")
+					: ""
+			}
+			${
+				is_visit
+					? this.field(
+							"ot_visit_meeting_detail",
+							__(
+								"Detail of Head Office Visit / Regional Office Visit / Out of Station Visit / Meeting of Regional Staff (Supervisors) and SMEs",
+							),
+							"textarea",
+						)
+					: ""
+			}
+			${this.field(
+				"ot_hours_spent",
+				__("Hours Spent on Academic / Other Official Tasks / Visits / Meeting / Follow up Calls etc."),
+				"radio",
+				{ reqd: 1, options: this.meta.hours_spent_options || [] },
+			)}
+		`;
+	}
+
+	html_cocurricular() {
+		return `
+			<h3>${__("Co-curricular Activities Detail")}</h3>
+			${this.field("cc_activity", __("Co-curricular Activities"), "radio", {
+				reqd: 1,
+				options: this.meta.cocurricular_activities || [],
+			})}
+			${this.field("cc_venue", __("Venue of Co-curricular Activities"), "text")}
+			${this.field("cc_no_of_schools", __("No of Schools regarding Co-curricular Activities"), "text")}
+			${this.field("cc_no_of_participants", __("No of Participants regarding Co-curricular Activities"), "text")}
+			${this.field(
+				"cc_participants_category",
+				__("Participants Category who participated in Co-curricular Activities"),
+				"checkboxes",
+				{ options: this.meta.cocurricular_participant_categories || [] },
+			)}
 		`;
 	}
 
@@ -625,45 +1029,77 @@ class SmesActivityForm {
 		if (!this.is_school_visit()) {
 			return `<h3>${__("School Related Detail")}</h3><p class="text-muted">${__("School section is for Marketing / M&E / Joint / Training visits. Click Next.")}</p>`;
 		}
+		const aff = this.meta.affiliation_options || [
+			"Yes - Already Affiliated",
+			"Yes - Newly Registered",
+			"No - Not Affiliated",
+		];
 		return `
 			<h3>${__("School Related Detail")}</h3>
 			${this.field("school_name", __("School Name"), "text", { reqd: 1 })}
 			${this.field("contact_person_name", __("Contact Person Name"), "text")}
 			${this.field("contact_number", __("Contact Number"), "tel")}
-			${this.field("designation", __("Designation"), "text", {
-				hint: __("Optional — e.g. Owner, Director, Principal, Admin, Coordinator, Teacher"),
+			${this.field("designation", __("Designation"), "radio", {
+				reqd: 1,
+				options: this.meta.designations || [],
 			})}
 			${this.field("school_address", __("School Address"), "textarea", { reqd: 1 })}
-			${this.field("school_type", __("School Type"), "select", { reqd: 1, options: this.meta.school_types || [] })}
+			${this.field("school_type", __("School Type"), "radio", {
+				reqd: 1,
+				options: this.meta.school_types || [],
+			})}
 			${this.field("reference", __("Reference"), "text")}
 			${this.field("school_additional_remarks", __("Any Additional Remarks regarding School"), "textarea")}
-			${this.field("qps_affiliated", __("Is this school affiliated with QPS?"), "radio", { reqd: 1, options: ["Yes", "No"] })}
+			${this.field("qps_affiliated", __("Is this school affiliated with QPS?"), "radio", {
+				reqd: 1,
+				options: aff,
+			})}
 			${
-				this.data.qps_affiliated === "Yes"
+				this.is_affiliated_yes(this.data.qps_affiliated)
 					? `<div class="smes-field"><label>${__("Which QPS services are adopted by the school?")}</label>${this.yn_matrix(this.meta.qps_services)}</div>`
 					: ""
 			}
-			${this.field("tps_affiliated", __("Is this school affiliated with TPS?"), "radio", { reqd: 1, options: ["Yes", "No"] })}
+			${this.field("tps_affiliated", __("Is this school affiliated with TPS?"), "radio", {
+				reqd: 1,
+				options: aff,
+			})}
 			${
-				this.data.tps_affiliated === "Yes"
+				this.is_affiliated_yes(this.data.tps_affiliated)
 					? `<div class="smes-field"><label>${__("Which TPS services are adopted by the school?")}</label>${this.yn_matrix(this.meta.tps_services)}</div>`
 					: ""
 			}
-			${this.field("cee_affiliated", __("Is this school affiliated with Teachers Training Department (CEE)?"), "radio", { reqd: 1, options: ["Yes", "No"] })}
+			${this.field(
+				"cee_affiliated",
+				__("Is this school affiliated with Teachers Training Department (CEE)?"),
+				"radio",
+				{ reqd: 1, options: aff },
+			)}
 			${
-				this.data.cee_affiliated === "Yes"
+				this.is_affiliated_yes(this.data.cee_affiliated)
 					? `<div class="smes-field"><label>${__("Which CEE services are adopted by the school?")}</label>${this.yn_matrix(this.meta.cee_services)}</div>`
 					: ""
 			}
-			${this.field("participant_names_enrolled", __("Name of Participant enrolled in ELP/ TECC/ TTC / Tajweed courses"), "textarea", { hint: __("Example: Zaid - ELP, Nasir - TECC") })}
+			${this.field(
+				"participant_names_enrolled",
+				__(
+					"Name of Participant enrolled in ELP/ TECC/ 90 Days TTC / Online Tajweed Customize Course / Story Telling Session",
+				),
+				"textarea",
+				{ hint: __("Example: Zaid - ELP, Nasir - TECC") },
+			)}
 			${this.field("participant_contact_numbers", __("Contact Number of Above Participant(s)"), "text")}
-			${this.field("model_school", __("Is this a Model School"), "radio", { options: this.meta.model_school_options || [] })}
-			${this.field("registered_volunteer", __("Registered with TIF as a Volunteer"), "radio", { reqd: 1, options: ["Yes", "No"] })}
+			${this.field("model_school", __("Is this a Model School"), "radio", {
+				options: this.meta.model_school_options || [],
+			})}
+			${this.field("registered_volunteer", __("Registered with TIF as a Volunteer"), "radio", {
+				reqd: 1,
+				options: ["Yes", "No"],
+			})}
 		`;
 	}
 
-	html_attachments() {
-		const attach = (field, label, accept = "image/*") => `
+	attach_field(field, label, accept = "image/*") {
+		return `
 			<div class="smes-attach-item" data-attach="${field}">
 				<label>${frappe.utils.escape_html(label)}</label>
 				<button type="button" class="btn btn-sm btn-default smes-upload" data-field="${field}" data-accept="${accept}">
@@ -672,16 +1108,19 @@ class SmesActivityForm {
 				<div class="file-name">${this.val(field) ? frappe.utils.escape_html(this.val(field)) : __("No file selected")}</div>
 			</div>
 		`;
+	}
+
+	html_attachments() {
 		return `
 			<h3>${__("Attachments")}</h3>
-			<p class="text-muted">${__("Upload relevant pictures (optional). Max size follows ERP attach rules.")}</p>
+			<p class="text-muted">${__("Attach your relevant pictures")}</p>
 			<div class="smes-attach-row">
-				${attach("meeting_picture", __("Meeting Picture"), "image/*")}
-				${attach("school_picture", __("School Picture"), "image/*")}
-				${attach("visiting_card_attach", __("Visiting Card"), "image/*,.pdf")}
-				${attach("attendance_sheet_attach", __("Attendance Sheet"), "image/*,.pdf")}
-				${attach("training_awareness_pictures", __("Pictures of Training & Awareness Session"), "image/*,.pdf")}
-				${attach("attendance_sheet_excel", __("MS Excel of Attendance Sheet"), ".xlsx,.xls,.csv,image/*,.pdf")}
+				${this.attach_field("meeting_picture", __("Meeting Picture"), "image/*")}
+				${this.attach_field("school_picture", __("School Picture"), "image/*")}
+				${this.attach_field("visiting_card_attach", __("Visiting Card"), "image/*,.pdf")}
+				${this.attach_field("attendance_sheet_attach", __("Attendance Sheet (Not any other Pictures)"), "image/*,.pdf")}
+				${this.attach_field("training_awareness_pictures", __("Pictures of Training & Awareness Session"), "image/*,.pdf")}
+				${this.attach_field("attendance_sheet_excel", __("MS Excel of Attendance Sheet"), ".xlsx,.xls,.csv,image/*,.pdf")}
 			</div>
 		`;
 	}
@@ -715,6 +1154,9 @@ class SmesActivityForm {
 		this.$root.find("[data-field]").each((_, el) => {
 			const $el = $(el);
 			const field = $el.data("field");
+			if ($el.attr("type") === "checkbox" && $el.data("multi")) {
+				return;
+			}
 			if ($el.attr("type") === "radio") {
 				if ($el.is(":checked")) this.data[field] = $el.val();
 			} else if ($el.attr("type") === "time") {
@@ -723,40 +1165,126 @@ class SmesActivityForm {
 				this.data[field] = $el.val();
 			}
 		});
+		this.$root.find(".smes-check-group").each((_, group) => {
+			const $g = $(group);
+			const field = $g.data("check-field");
+			const values = [];
+			$g.find('input[type="checkbox"]:checked').each((__, cb) => values.push($(cb).val()));
+			this.data[field] = values;
+		});
+	}
+
+	need(fields, msg) {
+		for (const f of fields) {
+			const v = this.data[f];
+			const empty = Array.isArray(v) ? !v.length : !cstr(v).trim();
+			if (empty) {
+				frappe.show_alert({ message: msg || __("Please fill required fields"), indicator: "orange" }, 5);
+				return false;
+			}
+		}
+		return true;
 	}
 
 	validate_step() {
 		const key = this.steps[this.step].key;
-		const need = (fields, msg) => {
-			for (const f of fields) {
-				if (!cstr(this.data[f]).trim()) {
-					frappe.show_alert({ message: msg || __("Please fill required fields"), indicator: "orange" }, 5);
-					return false;
-				}
-			}
-			return true;
-		};
 		if (key === "general") {
-			return need(
+			return this.need(
 				["visit_by", "month", "visit_date", "activity_type", "city", "area", "province"],
 				__("Fill all required General fields"),
 			);
 		}
 		if (key === "marketing") {
-			const show_mkt =
-				(this.data.activity_type || "").includes("Marketing") ||
-				(this.data.activity_type || "").includes("Joint Visit");
-			if (show_mkt) {
-				return need(
+			if (
+				!this.need(
 					["frequency_of_visits", "marketing_material_provided", "status"],
 					__("Fill Marketing Visit required fields"),
-				);
+				)
+			) {
+				return false;
 			}
+			if (
+				(this.data.status === "Not Agree" || this.data.status === "Other") &&
+				!this.need(["reasons_if_not_agreed"], __("Select reason if not agreed"))
+			) {
+				return false;
+			}
+			if (this.data.reasons_if_not_agreed === "Other" && !this.need(["reasons_if_not_agreed_other"])) {
+				return false;
+			}
+			return true;
+		}
+		if (key === "me") {
+			const req = [
+				"me_mqh_book_status",
+				"me_demand_from_school",
+				"me_teachers_training_session",
+				"me_number_of_teachers_mqh",
+				"me_used_teachers_guide",
+				"me_mqh_book_version",
+				"me_mqh_book_part",
+				"me_classes_per_week",
+				"me_class_duration",
+				"me_took_assessment",
+				"me_student_behavior_changes",
+			];
+			if (!this.need(req, __("Fill M&E Visit required fields"))) return false;
+			if (this.data.me_mqh_book_status === "In-Active" && !this.need(["me_inactive_reasons"])) return false;
+			if (this.data.me_number_of_teachers_mqh === "Others" && !this.need(["me_teachers_mqh_other"])) return false;
+			if (this.data.me_took_assessment === "Yes" && !this.need(["me_assessment_from"])) return false;
+			return true;
+		}
+		if (key === "joint") {
+			return this.need(
+				["joint_visit_with_smes", "joint_sme_skill_rating"],
+				__("Fill Joint Visit required fields"),
+			);
+		}
+		if (key === "training") {
+			return this.need(
+				[
+					"training_arrange_by",
+					"training_conducted_by",
+					"training_session_category",
+					"training_venue_name",
+					"training_no_of_participants",
+					"training_no_of_schools_attended",
+				],
+				__("Fill Trainings & Workshops required fields"),
+			);
+		}
+		if (key === "meeting") {
+			if (!this.need(["mt_meeting_type", "mt_meeting_mode"], __("Fill Meetings required fields"))) {
+				return false;
+			}
+			const t = this.data.mt_meeting_type || "";
+			if (t.includes("Internal Meeting") && !this.need(["mt_internal_meeting_with"])) return false;
+			if (t.includes("External Meeting") && !this.need(["mt_external_meeting_with"])) return false;
+			return true;
+		}
+		if (key === "academic") {
+			if (!this.need(["ot_type_of_task", "ot_hours_spent"], __("Fill Academic / Other required fields"))) {
+				return false;
+			}
+			if (this.data.ot_type_of_task === "Academic Tasks") {
+				if (!this.need(["ot_academic_task_types"])) return false;
+				if (
+					this.as_list("ot_academic_task_types").includes("Other") &&
+					!this.need(["ot_academic_task_other"])
+				) {
+					return false;
+				}
+			}
+			return true;
+		}
+		if (key === "cocurricular") {
+			return this.need(["cc_activity"], __("Select Co-curricular Activity"));
 		}
 		if (key === "school" && this.is_school_visit()) {
-			return need(
+			return this.need(
 				[
 					"school_name",
+					"designation",
 					"school_address",
 					"school_type",
 					"qps_affiliated",
@@ -797,9 +1325,7 @@ class SmesActivityForm {
 		`);
 		this.$root.find(".smes-another").on("click", () => {
 			this.step = 0;
-			this.data.activity_type = "";
-			this.data.status = "";
-			this.data.school_name = "";
+			this.data = this.empty_data();
 			this.clear_draft();
 			this.load();
 		});
