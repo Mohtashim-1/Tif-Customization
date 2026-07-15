@@ -37,6 +37,7 @@ class SmesActivityForm {
 		this.controls = {};
 		this.data = {
 			visit_by: "",
+			staff_employee: "",
 			month: "",
 			visit_date: "",
 			activity_type: "",
@@ -97,6 +98,7 @@ class SmesActivityForm {
 			callback: (r) => {
 				this.meta = r.message || {};
 				this.data.visit_by = this.meta.staff_name || "";
+				this.data.staff_employee = this.meta.staff_employee || "";
 				this.data.visit_date = this.meta.today || "";
 				const m = new Date().toLocaleString("en-US", { month: "long" });
 				if ((this.meta.months || []).includes(m)) this.data.month = m;
@@ -338,6 +340,10 @@ class SmesActivityForm {
 			} else {
 				this.data[field] = $el.val();
 			}
+			if (field === "visit_by") {
+				const match = (this.meta.staff_options || []).find((s) => s.employee_name === this.data.visit_by);
+				this.data.staff_employee = match ? match.employee : "";
+			}
 			if (["activity_type", "status", "qps_affiliated", "tps_affiliated", "cee_affiliated"].includes(field)) {
 				this.collect();
 				this.render_step();
@@ -352,9 +358,14 @@ class SmesActivityForm {
 		const areas = (this.meta.areas || [])
 			.filter((a) => !this.data.city || !a.city || a.city === this.data.city)
 			.map((a) => a.name);
+		const staff_names = this.meta.staff_names || [];
 		return `
 			<h3>${__("General Information")}</h3>
-			${this.field("visit_by", __("Name of Staff"), "text", { reqd: 1 })}
+			${this.field("visit_by", __("Name of Staff"), "select", {
+				reqd: 1,
+				options: staff_names,
+				hint: __("Active employees with Field Officer / Field Staff rights only"),
+			})}
 			<div class="smes-row-2">
 				${this.field("month", __("Month"), "select", { reqd: 1, options: this.meta.months || [] })}
 				${this.field("visit_date", __("Date"), "date", { reqd: 1 })}
@@ -420,7 +431,9 @@ class SmesActivityForm {
 			${this.field("school_name", __("School Name"), "text", { reqd: 1 })}
 			${this.field("contact_person_name", __("Contact Person Name"), "text")}
 			${this.field("contact_number", __("Contact Number"), "tel")}
-			${this.field("designation", __("Designation"), "text", { reqd: 1 })}
+			${this.field("designation", __("Designation"), "text", {
+				hint: __("Optional — e.g. Owner, Director, Principal, Admin, Coordinator, Teacher"),
+			})}
 			${this.field("school_address", __("School Address"), "textarea", { reqd: 1 })}
 			${this.field("school_type", __("School Type"), "select", { reqd: 1, options: this.meta.school_types || [] })}
 			${this.field("reference", __("Reference"), "text")}
@@ -545,7 +558,6 @@ class SmesActivityForm {
 			return need(
 				[
 					"school_name",
-					"designation",
 					"school_address",
 					"school_type",
 					"qps_affiliated",

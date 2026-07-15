@@ -3,7 +3,7 @@
 
 import frappe
 from frappe import _
-from frappe.utils import get_fullname, getdate, today
+from frappe.utils import get_url, getdate, today
 
 
 PROVINCE_MAP = {
@@ -26,6 +26,80 @@ ACTIVITY_TYPE_MAP = {
 	"Co-curricular Activity": "Co-curricular Activity",
 }
 
+FIELD_OFFICER_ROLES = (
+	"Field Staff",
+	"Field Staff Manager",
+	"Supervisor Field Staff",
+)
+
+
+def get_active_field_officer_staff():
+	"""
+	Active employees who are Field Officers:
+	- Field Officer DocType (status Active) + Employee Active + User enabled
+	- OR user has Field Staff / Field Staff Manager / Supervisor Field Staff role,
+	  user enabled, and linked Employee is Active.
+	"""
+	by_employee = {}
+
+	# 1) Explicit Field Officer records
+	if frappe.db.exists("DocType", "Field Officer"):
+		officers = frappe.get_all(
+			"Field Officer",
+			filters={"status": "Active"},
+			fields=["name", "name1", "employee", "user"],
+		)
+		for row in officers:
+			emp = row.employee
+			if not emp:
+				continue
+			emp_row = frappe.db.get_value(
+				"Employee",
+				emp,
+				["name", "employee_name", "user_id", "status"],
+				as_dict=True,
+			)
+			if not emp_row or emp_row.status != "Active":
+				continue
+			user = row.user or emp_row.user_id
+			if user and not frappe.db.get_value("User", user, "enabled"):
+				continue
+			by_employee[emp_row.name] = {
+				"employee": emp_row.name,
+				"employee_name": emp_row.employee_name or row.name1 or emp_row.name,
+				"user": user or "",
+			}
+
+	# 2) Users with field officer roles
+	role_users = frappe.get_all(
+		"Has Role",
+		filters={
+			"role": ["in", list(FIELD_OFFICER_ROLES)],
+			"parenttype": "User",
+		},
+		pluck="parent",
+		distinct=True,
+	)
+	for user in role_users or []:
+		if not frappe.db.get_value("User", user, "enabled"):
+			continue
+		emp_row = frappe.db.get_value(
+			"Employee",
+			{"user_id": user, "status": "Active"},
+			["name", "employee_name", "user_id", "status"],
+			as_dict=True,
+		)
+		if not emp_row:
+			continue
+		by_employee[emp_row.name] = {
+			"employee": emp_row.name,
+			"employee_name": emp_row.employee_name or emp_row.name,
+			"user": user,
+		}
+
+	staff = sorted(by_employee.values(), key=lambda r: (r["employee_name"] or "").lower())
+	return staff
+
 
 @frappe.whitelist()
 def get_form_meta():
@@ -45,12 +119,30 @@ def get_form_meta():
 		}
 		for a in areas
 	]
-	staff_name = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "employee_name")
-	if not staff_name:
-		staff_name = frappe.db.get_value("User", frappe.session.user, "full_name") or frappe.session.user
+	staff_list = get_active_field_officer_staff()
+	staff_names = [s["employee_name"] for s in staff_list]
+
+	current_emp = frappe.db.get_value(
+		"Employee",
+		{"user_id": frappe.session.user, "status": "Active"},
+		["name", "employee_name"],
+		as_dict=True,
+	)
+	staff_name = ""
+	staff_employee = ""
+	if current_emp and current_emp.employee_name in staff_names:
+		staff_name = current_emp.employee_name
+		staff_employee = current_emp.name
+	elif current_emp:
+		# Logged-in employee not in FO list — still prefer name if matches list later
+		staff_name = current_emp.employee_name if current_emp.employee_name in staff_names else ""
+		staff_employee = current_emp.name if staff_name else ""
 
 	return {
 		"staff_name": staff_name,
+		"staff_employee": staff_employee,
+		"staff_options": staff_list,
+		"staff_names": staff_names,
 		"today": today(),
 		"cities": [c.name for c in cities],
 		"areas": areas,
@@ -147,6 +239,14 @@ def submit_smes_activity(data):
 		frappe.throw(_("Name of Staff is required."))
 	if not data.get("visit_date"):
 		frappe.throw(_("Date is required."))
+
+	allowed_staff = {s["employee_name"]: s for s in get_active_field_officer_staff()}
+	if data.get("visit_by") not in allowed_staff:
+		frappe.throw(
+			_("Name of Staff must be an Active employee with Field Officer / Field Staff rights.")
+		)
+	staff_meta = allowed_staff[data.get("visit_by")]
+	data["staff_employee"] = data.get("staff_employee") or staff_meta.get("employee")
 
 	activity_label = data.get("activity_type")
 	doc_type = ACTIVITY_TYPE_MAP.get(activity_label, activity_label)
