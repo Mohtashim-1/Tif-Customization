@@ -1,3 +1,7 @@
+const SMES_LS_META = "smes_activity_form_meta_v1";
+const SMES_LS_DRAFT = "smes_activity_form_draft_v1";
+const SMES_LS_QUEUE = "smes_activity_form_queue_v1";
+
 frappe.pages["smes-activity-form"].on_page_load = function (wrapper) {
 	frappe.require("/assets/tif_customization/css/smes_activity_form.css", () => {
 		const page = frappe.ui.make_app_page({
@@ -80,7 +84,150 @@ class SmesActivityForm {
 			{ key: "school", label: __("School Detail") },
 			{ key: "attachments", label: __("Attachments") },
 		];
+		this._online = navigator.onLine !== false;
+		this._bind_offline_events();
 		this.load();
+	}
+
+	_bind_offline_events() {
+		window.addEventListener("online", () => {
+			this._online = true;
+			this.update_connectivity_banner();
+			this.flush_offline_queue();
+			frappe.show_alert({ message: __("Back online — syncing saved visits…"), indicator: "green" }, 4);
+		});
+		window.addEventListener("offline", () => {
+			this._online = false;
+			this.update_connectivity_banner();
+			frappe.show_alert(
+				{
+					message: __("You are offline. You can keep filling — submit will sync later."),
+					indicator: "orange",
+				},
+				6,
+			);
+		});
+	}
+
+	storage_get(key, fallback) {
+		try {
+			const raw = localStorage.getItem(key);
+			return raw ? JSON.parse(raw) : fallback;
+		} catch (e) {
+			return fallback;
+		}
+	}
+
+	storage_set(key, value) {
+		try {
+			localStorage.setItem(key, JSON.stringify(value));
+		} catch (e) {
+			console.warn("SMEs offline storage failed", e);
+		}
+	}
+
+	save_draft() {
+		this.collect();
+		this.storage_set(SMES_LS_DRAFT, {
+			step: this.step,
+			data: this.data,
+			saved_at: new Date().toISOString(),
+		});
+	}
+
+	restore_draft() {
+		const draft = this.storage_get(SMES_LS_DRAFT, null);
+		if (!draft || !draft.data) return false;
+		Object.assign(this.data, draft.data);
+		if (typeof draft.step === "number") this.step = draft.step;
+		return true;
+	}
+
+	clear_draft() {
+		try {
+			localStorage.removeItem(SMES_LS_DRAFT);
+		} catch (e) {
+			/* ignore */
+		}
+	}
+
+	queue_offline_submit(payload) {
+		const queue = this.storage_get(SMES_LS_QUEUE, []);
+		queue.push({
+			id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+			data: payload,
+			queued_at: new Date().toISOString(),
+		});
+		this.storage_set(SMES_LS_QUEUE, queue);
+		return queue.length;
+	}
+
+	flush_offline_queue() {
+		if (!navigator.onLine) return;
+		const queue = this.storage_get(SMES_LS_QUEUE, []);
+		if (!queue.length) return;
+
+		const remaining = [];
+		let synced = 0;
+		const next = () => {
+			if (!queue.length) {
+				this.storage_set(SMES_LS_QUEUE, remaining);
+				this.update_connectivity_banner();
+				if (synced) {
+					frappe.show_alert(
+						{
+							message: __("Synced {0} offline visit(s) to ERP", [synced]),
+							indicator: "green",
+						},
+						5,
+					);
+				}
+				return;
+			}
+			const item = queue.shift();
+			frappe.call({
+				method:
+					"tif_customization.tif_customization.page.smes_activity_form.smes_activity_form.submit_smes_activity",
+				args: { data: item.data },
+				callback: (r) => {
+					if (!r.exc) synced += 1;
+					else remaining.push(item);
+					next();
+				},
+				error: () => {
+					remaining.push(item);
+					remaining.push(...queue);
+					this.storage_set(SMES_LS_QUEUE, remaining);
+					this.update_connectivity_banner();
+				},
+			});
+		};
+		next();
+	}
+
+	update_connectivity_banner() {
+		const $banner = this.$root.find(".smes-offline-banner");
+		if (!$banner.length) return;
+		const queue = this.storage_get(SMES_LS_QUEUE, []);
+		const online = navigator.onLine !== false;
+		if (online && !queue.length) {
+			$banner.addClass("smes-hidden").html("");
+			return;
+		}
+		$banner.removeClass("smes-hidden");
+		if (!online) {
+			$banner.html(
+				`<i class="fa fa-wifi"></i> ${__("Offline mode")} — ${__("drafts auto-save; submit will sync when online")}${
+					queue.length ? ` · ${__("Queued")}: ${queue.length}` : ""
+				}`,
+			);
+		} else {
+			$banner.html(
+				`<i class="fa fa-cloud-upload"></i> ${__("Online")} — ${__("pending sync")}: ${queue.length}
+				<button type="button" class="btn btn-xs btn-default smes-sync-now">${__("Sync now")}</button>`,
+			);
+			$banner.find(".smes-sync-now").on("click", () => this.flush_offline_queue());
+		}
 	}
 
 	load() {
@@ -92,20 +239,54 @@ class SmesActivityForm {
 				</div>
 			</div>
 		`);
-		frappe.call({
-			method:
-				"tif_customization.tif_customization.page.smes_activity_form.smes_activity_form.get_form_meta",
-			callback: (r) => {
-				this.meta = r.message || {};
+
+		const apply_meta = (meta, from_cache) => {
+			this.meta = meta || {};
+			const had_draft = this.restore_draft();
+			if (!had_draft) {
 				this.data.visit_by = this.meta.staff_name || "";
 				this.data.staff_employee = this.meta.staff_employee || "";
 				this.data.visit_date = this.meta.today || "";
 				const m = new Date().toLocaleString("en-US", { month: "long" });
 				if ((this.meta.months || []).includes(m)) this.data.month = m;
-				this.render();
+			}
+			this.render();
+			if (from_cache) {
+				frappe.show_alert(
+					{
+						message: __("Loaded cached form (offline / slow network). Lookups may be outdated."),
+						indicator: "orange",
+					},
+					5,
+				);
+			}
+			this.flush_offline_queue();
+		};
+
+		frappe.call({
+			method:
+				"tif_customization.tif_customization.page.smes_activity_form.smes_activity_form.get_form_meta",
+			callback: (r) => {
+				const meta = r.message || {};
+				this.storage_set(SMES_LS_META, { meta, cached_at: new Date().toISOString() });
+				apply_meta(meta, false);
 			},
 			error: () => {
-				this.$root.html(`<div class="smes-card">${__("Failed to load form meta.")}</div>`);
+				const cached = this.storage_get(SMES_LS_META, null);
+				if (cached && cached.meta) {
+					apply_meta(cached.meta, true);
+					return;
+				}
+				this.$root.html(`
+					<div class="smes-form-wrap">
+						<div class="smes-card">
+							<h3>${__("Cannot open form offline yet")}</h3>
+							<p>${__("Open this page once while online. After that, drafts and offline submit queue will work.")}</p>
+							<button class="btn btn-primary smes-retry">${__("Retry")}</button>
+						</div>
+					</div>
+				`);
+				this.$root.find(".smes-retry").on("click", () => this.load());
 			},
 		});
 	}
@@ -130,15 +311,17 @@ class SmesActivityForm {
 
 		this.$root.html(`
 			<div class="smes-form-wrap">
+				<div class="smes-offline-banner smes-hidden"></div>
 				<div class="smes-form-hero">
 					<h1>${__("SMEs Activity Form 2026–27")}</h1>
-					<p>${__("Mobile & desktop friendly — fill step by step and save to ERP.")}</p>
+					<p>${__("Works with offline drafts syncs to ERP when you are back online.")}</p>
 				</div>
 				<div class="smes-step-bar">${pills}</div>
 				<div class="smes-card smes-body"></div>
 				<div class="smes-actions">
 					<button type="button" class="btn btn-default smes-prev" ${this.step === 0 ? "disabled" : ""}>${__("Back")}</button>
 					<div class="smes-actions-right">
+						<button type="button" class="btn btn-default smes-save-draft">${__("Save draft")}</button>
 						<button type="button" class="btn btn-default smes-open-list">${__("Field Visits")}</button>
 						<button type="button" class="btn btn-primary smes-next">
 							${this.step === this.steps.length - 1 ? __("Submit") : __("Next")}
@@ -150,6 +333,7 @@ class SmesActivityForm {
 
 		this.render_step();
 		this.bind();
+		this.update_connectivity_banner();
 		this.scroll_top();
 	}
 
@@ -165,6 +349,7 @@ class SmesActivityForm {
 	bind() {
 		this.$root.find(".smes-prev").on("click", () => {
 			this.collect();
+			this.save_draft();
 			if (this.step > 0) {
 				this.step -= 1;
 				this.render();
@@ -172,16 +357,30 @@ class SmesActivityForm {
 		});
 		this.$root.find(".smes-next").on("click", () => {
 			this.collect();
+			this.save_draft();
 			if (!this.validate_step()) return;
 			if (this.step < this.steps.length - 1) {
 				this.step += 1;
-				// skip marketing-only extras for non-marketing? keep simple - all steps available
 				this.render();
 			} else {
 				this.submit();
 			}
 		});
+		this.$root.find(".smes-save-draft").on("click", () => {
+			this.save_draft();
+			frappe.show_alert({ message: __("Draft saved on this device"), indicator: "blue" }, 3);
+		});
 		this.$root.find(".smes-open-list").on("click", () => frappe.set_route("List", "Field Visit"));
+
+		// Auto-save draft as user types (debounced)
+		clearTimeout(this._draft_timer);
+		this.$root
+			.find(".smes-body")
+			.off("change.smesdraft input.smesdraft")
+			.on("change.smesdraft input.smesdraft", () => {
+				clearTimeout(this._draft_timer);
+				this._draft_timer = setTimeout(() => this.save_draft(), 600);
+			});
 	}
 
 	val(name, fallback = "") {
@@ -571,7 +770,60 @@ class SmesActivityForm {
 		return true;
 	}
 
+	show_success(m, offline_queued) {
+		this.$root.html(`
+			<div class="smes-form-wrap">
+				<div class="smes-form-hero">
+					<h1>${__("SMEs Activity Form 2026–27")}</h1>
+					<p>${
+						offline_queued
+							? __("Saved on this device. Will upload when you are online.")
+							: __("Your response has been recorded.")
+					}</p>
+				</div>
+				<div class="smes-card smes-success">
+					<h2>${offline_queued ? __("Queued offline") : __("Submitted")}</h2>
+					<p>${frappe.utils.escape_html(
+						m.message ||
+							(offline_queued
+								? __("Visit saved locally and will sync to ERP automatically.")
+								: __("Saved")),
+					)}</p>
+					${m.url ? `<p><a href="${m.url}">${frappe.utils.escape_html(m.name || "")}</a></p>` : ""}
+					<button class="btn btn-primary smes-another">${__("Submit another response")}</button>
+					${m.name ? `<button class="btn btn-default smes-open">${__("Open record")}</button>` : ""}
+				</div>
+			</div>
+		`);
+		this.$root.find(".smes-another").on("click", () => {
+			this.step = 0;
+			this.data.activity_type = "";
+			this.data.status = "";
+			this.data.school_name = "";
+			this.clear_draft();
+			this.load();
+		});
+		this.$root.find(".smes-open").on("click", () => {
+			if (m.name) frappe.set_route("Form", "Field Visit", m.name);
+		});
+	}
+
 	submit() {
+		this.collect();
+		this.save_draft();
+
+		if (!navigator.onLine) {
+			const count = this.queue_offline_submit({ ...this.data });
+			this.clear_draft();
+			this.show_success(
+				{
+					message: __("Queued offline ({0} pending). Connect internet to sync.", [count]),
+				},
+				true,
+			);
+			return;
+		}
+
 		frappe.call({
 			method:
 				"tif_customization.tif_customization.page.smes_activity_form.smes_activity_form.submit_smes_activity",
@@ -580,30 +832,21 @@ class SmesActivityForm {
 			freeze_message: __("Saving activity..."),
 			callback: (r) => {
 				const m = r.message || {};
-				this.$root.html(`
-					<div class="smes-form-wrap">
-						<div class="smes-form-hero">
-							<h1>${__("SMEs Activity Form 2026–27")}</h1>
-							<p>${__("Your response has been recorded.")}</p>
-						</div>
-						<div class="smes-card smes-success">
-							<h2>${__("Submitted")}</h2>
-							<p>${frappe.utils.escape_html(m.message || __("Saved"))}</p>
-							<p><a href="${m.url}">${frappe.utils.escape_html(m.name || "")}</a></p>
-							<button class="btn btn-primary smes-another">${__("Submit another response")}</button>
-							<button class="btn btn-default smes-open">${__("Open record")}</button>
-						</div>
-					</div>
-				`);
-				this.$root.find(".smes-another").on("click", () => {
-					this.step = 0;
-					this.data.activity_type = "";
-					this.data.status = "";
-					this.load();
-				});
-				this.$root.find(".smes-open").on("click", () => {
-					if (m.name) frappe.set_route("Form", "Field Visit", m.name);
-				});
+				this.clear_draft();
+				this.show_success(m, false);
+			},
+			error: () => {
+				const count = this.queue_offline_submit({ ...this.data });
+				this.clear_draft();
+				this.show_success(
+					{
+						message: __(
+							"Server unreachable. Saved offline ({0} pending) — will sync automatically.",
+							[count],
+						),
+					},
+					true,
+				);
 			},
 		});
 	}

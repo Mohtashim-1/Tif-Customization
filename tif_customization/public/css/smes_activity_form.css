@@ -25,6 +25,25 @@
 	-webkit-tap-highlight-color: transparent;
 }
 
+.smes-offline-banner {
+	margin-top: 8px;
+	padding: 10px 14px;
+	border-radius: 10px;
+	background: #fff7ed;
+	border: 1px solid #fdba74;
+	color: #9a3412;
+	font-size: 13px;
+	font-weight: 500;
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.smes-offline-banner .btn {
+	margin-left: auto;
+}
+
 .smes-form-hero {
 	background: linear-gradient(135deg, #673ab7 0%, #7e57c2 55%, #9575cd 100%);
 	color: #fff;
