@@ -1,9 +1,29 @@
 # Copyright (c) 2026, The ILM Foundation and contributors
 # For license information, please see license.txt
 
+import os
+
 import frappe
 from frappe import _
 from frappe.utils import get_url, getdate, today
+
+BULK_IMPORT_TEMPLATE = "Field_Visit_Bulk_Import_Template.xlsx"
+
+
+def _bulk_import_template_path():
+	for rel in (
+		("tif_customization", "page", "smes_activity_form", BULK_IMPORT_TEMPLATE),
+		("public", "files", BULK_IMPORT_TEMPLATE),
+	):
+		path = frappe.get_app_path("tif_customization", *rel)
+		if os.path.isfile(path):
+			return path
+	return None
+
+
+def get_bulk_import_template_url():
+	"""Public assets URL (nginx serves this without a File record)."""
+	return "/assets/tif_customization/files/" + BULK_IMPORT_TEMPLATE
 
 
 def _as_list(value):
@@ -168,6 +188,7 @@ def get_form_meta():
 		"staff_employee": staff_employee,
 		"staff_options": staff_list,
 		"staff_names": staff_names,
+		"bulk_import_template_url": get_bulk_import_template_url(),
 		"today": today(),
 		"cities": [c.name for c in cities],
 		"areas": areas,
@@ -445,6 +466,21 @@ def _training_conducted_by_options(staff_list):
 			seen.add(n)
 			out.append(n)
 	return out
+
+
+@frappe.whitelist()
+def download_bulk_import_template():
+	"""Download Excel template for Field Visit bulk import."""
+	path = _bulk_import_template_path()
+	if not path:
+		frappe.throw(_("Bulk import template file is missing on the server."))
+
+	with open(path, "rb") as handle:
+		content = handle.read()
+
+	frappe.local.response.filename = BULK_IMPORT_TEMPLATE
+	frappe.local.response.filecontent = content
+	frappe.local.response.type = "download"
 
 
 @frappe.whitelist()

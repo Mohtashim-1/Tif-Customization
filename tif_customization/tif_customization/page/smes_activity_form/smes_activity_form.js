@@ -411,6 +411,11 @@ class SmesActivityForm {
 				<div class="smes-form-hero">
 					<h1>${__("SMEs Activity Form 2026–27")}</h1>
 					<p>${__("Works with offline drafts syncs to ERP when you are back online.")}</p>
+					<p class="smes-template-link">
+						<a href="#" class="smes-download-template">
+							<i class="fa fa-download"></i> ${__("Download Bulk Import Excel Template")}
+						</a>
+					</p>
 				</div>
 				<div class="smes-step-bar">${pills}</div>
 				<div class="smes-card smes-body"></div>
@@ -467,6 +472,10 @@ class SmesActivityForm {
 			frappe.show_alert({ message: __("Draft saved on this device"), indicator: "blue" }, 3);
 		});
 		this.$root.find(".smes-open-list").on("click", () => frappe.set_route("List", "Field Visit"));
+		this.$root.find(".smes-download-template").on("click", (e) => {
+			e.preventDefault();
+			this.download_bulk_template();
+		});
 
 		clearTimeout(this._draft_timer);
 		this.$root
@@ -1296,6 +1305,13 @@ class SmesActivityForm {
 			);
 		}
 		return true;
+	}
+
+	download_bulk_template() {
+		const url = frappe.urllib.get_full_url(
+			"/api/method/tif_customization.tif_customization.page.smes_activity_form.smes_activity_form.download_bulk_import_template",
+		);
+		window.open(url, "_blank");
 	}
 
 	show_success(m, offline_queued) {

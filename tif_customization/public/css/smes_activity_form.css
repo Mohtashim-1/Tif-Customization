@@ -522,3 +522,17 @@
 	color: #666;
 	font-size: 13px;
 }
+
+.smes-template-link {
+	margin-top: 8px;
+}
+
+.smes-template-link a {
+	color: #fff;
+	text-decoration: underline;
+	font-weight: 500;
+}
+
+.smes-template-link a:hover {
+	opacity: 0.9;
+}
