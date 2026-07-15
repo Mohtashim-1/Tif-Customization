@@ -310,7 +310,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Donation Received Bank Wise (UAT) 29-Jun-26",
+   "label": "Donation Received Bank Wise",
    "link_count": 0,
    "link_to": "bank-wise-fund-distribution",
    "link_type": "Page",
@@ -320,7 +320,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Donation Received Donor Wise (UAT) 29-Jun-26",
+   "label": "Donation Received Donor Wise",
    "link_count": 0,
    "link_to": "bank-balance-reconci",
    "link_type": "Page",
@@ -330,7 +330,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Donor Receipt Report (UAT) 29-Jun-26",
+   "label": "Donor Receipt Report",
    "link_count": 0,
    "link_to": "donor-receipt-report",
    "link_type": "Page",
@@ -390,7 +390,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Endowment Fund (UAT)",
+   "label": "Endowment Fund",
    "link_count": 0,
    "link_to": "purchase-from-endowment-fund",
    "link_type": "Page",
@@ -400,7 +400,7 @@
   {
    "hidden": 0,
    "is_query_report": 1,
-   "label": "Donor Ledger Statement (UAT)",
+   "label": "Donor Ledger (UAT)",
    "link_count": 0,
    "link_to": "Donor Ledger Statement",
    "link_type": "Report",
@@ -489,7 +489,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-07-13 02:18:17.602957",
+ "modified": "2026-07-13 14:37:17.887833",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Reports",
