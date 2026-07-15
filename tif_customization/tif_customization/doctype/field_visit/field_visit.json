@@ -422,7 +422,7 @@
    "options": "\nActive\nIn-Active"
   },
   {
-   "depends_on": "eval:doc.type == 'M&E'",
+   "depends_on": "eval:doc.type=='M&E' && doc.me_mqh_book_status=='In-Active'",
    "fieldname": "me_reason_of_above",
    "fieldtype": "Small Text",
    "label": "Reason of Above"
@@ -529,7 +529,7 @@
    "label": "New Person Email"
   },
   {
-   "depends_on": "eval:doc.type == 'M&E'",
+   "depends_on": "eval:doc.type=='M&E' && doc.me_took_assessment=='Yes'",
    "fieldname": "me_assessment_taken_from",
    "fieldtype": "Data",
    "label": "From whom have you taken assessment?"
@@ -542,144 +542,144 @@
    "label": "School Closed"
   },
   {
-   "depends_on": "eval:doc.type == 'Marketing'",
+   "depends_on": "eval:doc.type=='Marketing'",
    "fieldname": "section_break_marketing",
    "fieldtype": "Section Break",
    "label": "Marketing"
   },
   {
-   "depends_on": "eval:doc.type == 'Marketing'",
+   "depends_on": "eval:in_list(['Marketing','Joint Visit with SME'], doc.type)",
    "fieldname": "timestamp",
    "fieldtype": "Datetime",
    "label": "Timestamp"
   },
   {
-   "depends_on": "eval:doc.type == 'Marketing'",
+   "depends_on": "eval:in_list(['Marketing','Joint Visit with SME'], doc.type)",
    "fieldname": "month",
    "fieldtype": "Select",
    "label": "Month",
    "options": "\nJanuary\nFebruary\nMarch\nApril\nMay\nJune\nJuly\nAugust\nSeptember\nOctober\nNovember\nDecember"
   },
   {
-   "depends_on": "eval:doc.type == 'Marketing'",
+   "depends_on": "eval:in_list(['Marketing','Joint Visit with SME'], doc.type)",
    "fieldname": "quarter",
    "fieldtype": "Select",
    "label": "Quarter",
    "options": "\nQ1\nQ2\nQ3\nQ4"
   },
   {
-   "depends_on": "eval:doc.type == 'Marketing'",
+   "depends_on": "eval:in_list(['Marketing','Joint Visit with SME'], doc.type)",
    "fieldname": "visit_by",
    "fieldtype": "Data",
    "label": "Name of Staff"
   },
   {
-   "depends_on": "eval:doc.type == 'Marketing'",
+   "depends_on": "eval:doc.type=='Marketing'",
    "fieldname": "marketing_visit_category",
    "fieldtype": "Select",
    "label": "Marketing Visit Category",
    "options": "\nNew\nFollowup & Other Visits\nTPS Visits"
   },
   {
-   "depends_on": "eval:doc.type == 'Marketing'",
+   "depends_on": "eval:doc.type=='Marketing'",
    "fieldname": "frequency_of_visits",
    "fieldtype": "Select",
    "label": "Frequency of Visits",
    "options": "\nNew\n1st Follow up visit\n2nd Follow up visit\n3rd Follow up visit\n4th Follow up visit\nOther Visits"
   },
   {
-   "depends_on": "eval:doc.type == 'Marketing'",
+   "depends_on": "eval:in_list(['Marketing','Joint Visit with SME'], doc.type)",
    "fieldname": "visit_date",
    "fieldtype": "Date",
    "label": "Visit Date"
   },
   {
-   "depends_on": "eval:doc.type == 'Marketing'",
+   "depends_on": "eval:in_list(['Marketing','Joint Visit with SME'], doc.type)",
    "fieldname": "visiting_starting_time",
    "fieldtype": "Time",
    "label": "Visiting Starting Time"
   },
   {
-   "depends_on": "eval:doc.type == 'Marketing'",
+   "depends_on": "eval:in_list(['Marketing','Joint Visit with SME'], doc.type)",
    "fieldname": "visit_ending_time",
    "fieldtype": "Time",
    "label": "Visit Ending Time"
   },
   {
-   "depends_on": "eval:doc.type == 'Marketing'",
+   "depends_on": "eval:in_list(['Marketing','Joint Visit with SME'], doc.type)",
    "fieldname": "city",
    "fieldtype": "Link",
    "label": "City",
    "options": "City"
   },
   {
-   "depends_on": "eval:doc.type == 'Marketing'",
+   "depends_on": "eval:in_list(['Marketing','Joint Visit with SME'], doc.type)",
    "fieldname": "area",
    "fieldtype": "Link",
    "label": "Area",
    "options": "Area"
   },
   {
-   "depends_on": "eval:doc.type == 'Marketing'",
+   "depends_on": "eval:in_list(['Marketing','Joint Visit with SME'], doc.type)",
    "fieldname": "province",
    "fieldtype": "Select",
    "label": "Province",
    "options": "Punjab\nSindh\nKhyber Pakhtunkhwa\nBalochistan\nAzad Jammu & Kashmir\nGilgit-Baltistan\nIslamabad Capital Territory"
   },
   {
-   "depends_on": "eval:doc.type == 'Marketing'",
+   "depends_on": "eval:in_list(['Marketing','Joint Visit with SME'], doc.type)",
    "fieldname": "school_type",
    "fieldtype": "Select",
    "label": "School Type",
    "options": "\nIndividual School\nChains of School"
   },
   {
-   "depends_on": "eval:doc.type == 'Marketing'",
+   "depends_on": "eval:in_list(['Marketing','Joint Visit with SME'], doc.type)",
    "fieldname": "school_name",
    "fieldtype": "Data",
    "label": "School Name"
   },
   {
-   "depends_on": "eval:doc.type == 'Marketing'",
+   "depends_on": "eval:in_list(['Marketing','Joint Visit with SME'], doc.type)",
    "fieldname": "meeting_with",
    "fieldtype": "Data",
    "label": "Contact Person Name"
   },
   {
-   "depends_on": "eval:doc.type == 'Marketing'",
+   "depends_on": "eval:in_list(['Marketing','Joint Visit with SME'], doc.type)",
    "fieldname": "designation",
    "fieldtype": "Select",
    "label": "Designation",
    "options": "\nOwner\nDirector\nPrincipal\nAdmin\nCoordinator\nTeacher\nReceptionist"
   },
   {
-   "depends_on": "eval:doc.type == 'Marketing'",
+   "depends_on": "eval:in_list(['Marketing','Joint Visit with SME'], doc.type)",
    "fieldname": "contact_number",
    "fieldtype": "Data",
    "label": "Contact Number"
   },
   {
    "default": "0",
-   "depends_on": "eval:doc.type == 'Marketing'",
+   "depends_on": "eval:doc.type=='Marketing'",
    "fieldname": "marketing_material_provided",
    "fieldtype": "Check",
    "label": "Does Marketing Material Provided"
   },
   {
-   "depends_on": "eval:doc.type == 'Marketing'",
+   "depends_on": "eval:in_list(['Marketing','Joint Visit with SME'], doc.type)",
    "fieldname": "reference",
    "fieldtype": "Data",
    "label": "Reference"
   },
   {
-   "depends_on": "eval:doc.type == 'Marketing'",
+   "depends_on": "eval:doc.type=='Marketing'",
    "fieldname": "status",
    "fieldtype": "Select",
    "label": "Status",
    "options": "\nAgree\nNot Agree\nNeed follow up visit\nWill Discuss with Higher Management\nOther"
   },
   {
-   "depends_on": "eval:doc.type == 'Marketing'",
+   "depends_on": "eval:doc.type=='Marketing' && in_list(['Not Agree','Other'], doc.status)",
    "fieldname": "reasons_if_not_agreed",
    "fieldtype": "Small Text",
    "label": "Reasons If Not Agreed (details)"
@@ -912,7 +912,7 @@
    "fieldname": "reasons_if_not_agreed_other",
    "fieldtype": "Small Text",
    "label": "Other Reason (if not Agreed)",
-   "depends_on": "eval:doc.type=='Marketing' && (doc.status=='Not Agree' || doc.status=='Other')"
+   "depends_on": "eval:doc.type=='Marketing' && in_list(['Not Agree','Other'], doc.status) && (doc.reason_not_agreed=='Other' || doc.reasons_if_not_agreed=='Other')"
   },
   {
    "fieldname": "section_break_school_detail",
@@ -1149,25 +1149,25 @@
    "fieldname": "section_break_attachments",
    "fieldtype": "Section Break",
    "label": "Attachments",
-   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME'], doc.type)"
+   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training','Meeting','Academic / Other Official Tasks','Co-curricular Activity','Other'], doc.type)"
   },
   {
    "fieldname": "meeting_picture",
    "fieldtype": "Attach Image",
    "label": "Meeting Picture",
-   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME'], doc.type)"
+   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training','Meeting','Academic / Other Official Tasks','Co-curricular Activity','Other'], doc.type)"
   },
   {
    "fieldname": "school_picture",
    "fieldtype": "Attach Image",
    "label": "School Picture",
-   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME'], doc.type)"
+   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training','Meeting','Academic / Other Official Tasks','Co-curricular Activity','Other'], doc.type)"
   },
   {
    "fieldname": "visiting_card_attach",
    "fieldtype": "Attach",
    "label": "Visiting Card",
-   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME'], doc.type)"
+   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training','Meeting','Academic / Other Official Tasks','Co-curricular Activity','Other'], doc.type)"
   },
   {
    "fieldname": "column_break_attach",
@@ -1177,32 +1177,32 @@
    "fieldname": "attendance_sheet_attach",
    "fieldtype": "Attach",
    "label": "Attendance Sheet",
-   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME'], doc.type)"
+   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training','Meeting','Academic / Other Official Tasks','Co-curricular Activity','Other'], doc.type)"
   },
   {
    "fieldname": "training_awareness_pictures",
    "fieldtype": "Attach",
    "label": "Pictures of Training & Awareness Session",
-   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME'], doc.type)"
+   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training','Meeting','Academic / Other Official Tasks','Co-curricular Activity','Other'], doc.type)"
   },
   {
    "fieldname": "attendance_sheet_excel",
    "fieldtype": "Attach",
    "label": "MS Excel of Attendance Sheet",
-   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME'], doc.type)"
+   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training','Meeting','Academic / Other Official Tasks','Co-curricular Activity','Other'], doc.type)"
   },
   {
    "fieldname": "reason_not_agreed",
    "fieldtype": "Select",
    "label": "Reasons if not Agreed",
    "options": "\nBooks from other publishers are being taught\nUnavailability of Teacher\nLengthy Course\nShortage of time\nSect Issue\nWill start in new session\nOther",
-   "depends_on": "eval:doc.type=='Marketing' && (doc.status=='Not Agree' || doc.status=='Other')"
+   "depends_on": "eval:doc.type=='Marketing' && in_list(['Not Agree','Other'], doc.status)"
   },
   {
    "fieldname": "me_inactive_reasons",
    "fieldtype": "Small Text",
    "label": "Reason of Above (In-Active)",
-   "depends_on": "eval:doc.type=='M&E'"
+   "depends_on": "eval:doc.type=='M&E' && doc.me_mqh_book_status=='In-Active'"
   },
   {
    "fieldname": "me_demand_from_school",
@@ -1222,13 +1222,13 @@
    "fieldname": "me_assessment_from_multi",
    "fieldtype": "Small Text",
    "label": "From whom have you taken assessment?",
-   "depends_on": "eval:doc.type=='M&E'"
+   "depends_on": "eval:doc.type=='M&E' && doc.me_took_assessment=='Yes'"
   },
   {
    "fieldname": "me_teachers_mqh_other",
    "fieldtype": "Data",
    "label": "Number of Teachers (Other)",
-   "depends_on": "eval:doc.type=='M&E'"
+   "depends_on": "eval:doc.type=='M&E' && doc.me_number_of_teachers_mqh=='Others'"
   },
   {
    "fieldname": "section_break_joint",
@@ -1280,14 +1280,14 @@
    "fieldtype": "Select",
    "label": "Internal Meeting with",
    "options": "\nRegional Office Staff / Supervisors\nMeeting with SMEs\nHead Office Staff",
-   "depends_on": "eval:doc.type=='Meeting'"
+   "depends_on": "eval:doc.type=='Meeting' && doc.mt_meeting_type=='Internal Meeting (Meeting with TIF Staff)'"
   },
   {
    "fieldname": "mt_external_meeting_with",
    "fieldtype": "Select",
    "label": "External Meeting with",
    "options": "\nUlma Karam\nEducationalist\nOwner / Director of Chain of School\nGovt officials\nInfluential Personalities\nSocial Media Activist\nTeachers Training",
-   "depends_on": "eval:doc.type=='Meeting'"
+   "depends_on": "eval:doc.type=='Meeting' && doc.mt_meeting_type=='External Meeting (Meeting with Others)'"
   },
   {
    "fieldname": "mt_venue",
@@ -1306,49 +1306,49 @@
    "fieldname": "ot_academic_task_types",
    "fieldtype": "Small Text",
    "label": "Type of Academic Tasks",
-   "depends_on": "eval:doc.type=='Academic / Other Official Tasks'"
+   "depends_on": "eval:doc.type=='Academic / Other Official Tasks' && doc.ot_type_of_task=='Academic Tasks'"
   },
   {
    "fieldname": "ot_academic_task_other",
    "fieldtype": "Data",
    "label": "Other Academic Task",
-   "depends_on": "eval:doc.type=='Academic / Other Official Tasks'"
+   "depends_on": "eval:doc.type=='Academic / Other Official Tasks' && doc.ot_type_of_task=='Academic Tasks'"
   },
   {
    "fieldname": "ot_no_of_pages",
    "fieldtype": "Data",
    "label": "No of Pages (Regarding Above Academic Task)",
-   "depends_on": "eval:doc.type=='Academic / Other Official Tasks'"
+   "depends_on": "eval:doc.type=='Academic / Other Official Tasks' && doc.ot_type_of_task=='Academic Tasks'"
   },
   {
    "fieldname": "ot_no_of_calls",
    "fieldtype": "Data",
    "label": "No of Calls / No Follow up Calls",
-   "depends_on": "eval:doc.type=='Academic / Other Official Tasks'"
+   "depends_on": "eval:doc.type=='Academic / Other Official Tasks' && doc.ot_type_of_task=='Follow up Calls / Calls to Schools'"
   },
   {
    "fieldname": "ot_purpose_of_call",
    "fieldtype": "Data",
    "label": "Purpose of Call",
-   "depends_on": "eval:doc.type=='Academic / Other Official Tasks'"
+   "depends_on": "eval:doc.type=='Academic / Other Official Tasks' && doc.ot_type_of_task=='Follow up Calls / Calls to Schools'"
   },
   {
    "fieldname": "ot_follow_up_calls_attach",
    "fieldtype": "Attach",
    "label": "Follow up Call Details Sheet",
-   "depends_on": "eval:doc.type=='Academic / Other Official Tasks'"
+   "depends_on": "eval:doc.type=='Academic / Other Official Tasks' && doc.ot_type_of_task=='Follow up Calls / Calls to Schools'"
   },
   {
    "fieldname": "ot_other_official_task_detail",
    "fieldtype": "Small Text",
    "label": "Detail of other Official Task",
-   "depends_on": "eval:doc.type=='Academic / Other Official Tasks'"
+   "depends_on": "eval:doc.type=='Academic / Other Official Tasks' && doc.ot_type_of_task=='Other Official Tasks'"
   },
   {
    "fieldname": "ot_visit_meeting_detail",
    "fieldtype": "Small Text",
    "label": "Detail of Head Office / Regional / Out of Station Visit / Meeting",
-   "depends_on": "eval:doc.type=='Academic / Other Official Tasks'"
+   "depends_on": "eval:doc.type=='Academic / Other Official Tasks' && in_list(['Head Office Visit','Regional Office Visit','Out of Station Visit','Meeting of Regional Staff (Supervisors) and SMEs'], doc.ot_type_of_task)"
   },
   {
    "fieldname": "ot_hours_spent",
@@ -1399,7 +1399,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-07-15 16:40:00.000000",
+ "modified": "2026-07-16 00:15:00.000000",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Field Visit",
