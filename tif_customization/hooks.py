@@ -174,8 +174,9 @@ doc_events = {
 		"validate": "tif_customization.tif_customization.overrides.workspace.sanitize_card_break_links",
 	},
 	"Delivery Note": {
-        "on_submit": "tif_customization.tif_customization.doctype.delivery_note.delivery_note.on_submit",
-        "validate": "tif_customization.tif_customization.doctype.delivery_note.delivery_note.sum_of_cartons"
+		"on_submit": "tif_customization.tif_customization.doctype.delivery_note.delivery_note.on_submit",
+		"on_cancel": "tif_customization.tif_customization.doctype.delivery_note.delivery_note.on_cancel",
+		"validate": "tif_customization.tif_customization.doctype.delivery_note.delivery_note.sum_of_cartons",
 	},
     "Material Request": {
         "validate": "tif_customization.tif_customization.doctype.material_request.material_request.get_employee"

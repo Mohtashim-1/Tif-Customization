@@ -2,6 +2,11 @@ import frappe
 from frappe import _
 from frappe.utils import flt, getdate, today, add_days
 
+from tif_customization.tif_customization.utils.supply_chain_books import (
+	sql_book_item_filter,
+	with_book_item_params,
+)
+
 @frappe.whitelist()
 def get_dispatch_report_data(filters=None):
 	"""Main API endpoint to get dispatch report data"""
@@ -61,16 +66,17 @@ def get_dispatch_data(filters):
 		country = filters.get('country')
 		book_type = filters.get('book_type')  # MQH or Qaida
 		
-		# Build filters
+		# Build filters — books only (Certificate / General Items excluded)
 		where_conditions = [
 			"dn.docstatus = 1",
-			"dn.posting_date BETWEEN %(from_date)s AND %(to_date)s"
+			"dn.posting_date BETWEEN %(from_date)s AND %(to_date)s",
+			sql_book_item_filter("dni.item_code").lstrip("AND ").strip(),
 		]
 		
-		params = {
+		params = with_book_item_params({
 			'from_date': from_date,
 			'to_date': to_date
-		}
+		})
 		
 		# Customer filter
 		if customer:

@@ -2,20 +2,10 @@ import frappe
 from frappe import _
 from frappe.utils import flt, cint
 
-# Specific items to filter for (from user requirements) - All items are item codes
-SPECIFIC_ITEM_CODES = [
-    'MQHWB-01/U/12', 'MQHWB-02/U/10', 'MQHWB-03/U/9', 'MQHWB-04/U/7', 'MQHWB-05/U/5',
-    'MQHWB-06/U/2', 'MQHWB-07/U/7', 'MQHTG-01U6', 'MQHTG-02U6', 'MQHTG-03U5',
-    'MQHTG-04U4', 'MQHTG-05U1', 'MQHWB-01S1', 'MQHWB-02S1', 'MQHWB-03S1',
-    'MQHWB-01E1', 'MQHWB-02E1', 'MB-U1', 'NQ1', 'NQW', 'NQTG', 'TQM6PE', 'TQM7PE',
-    # Additional items added
-    'MQKPUT6', 'MQKPUT7', 'MQKPUT8', 'MQKPUT9', 'MQKPUT10', 'MQKPUT11',
-    'MQKPUT12', 'TIFPV24', 'Panj Para 26-30', 'Panj Para 1-5', 'Para'
-]
-
-# TPS Department items (Noorani Qaida, Noorani Qaida Workbook, Panj Para, NQTG)
-# Note: 'Para' (TPS Para) is intentionally excluded from TPS department totals
-TPS_ITEM_CODES = ['NQ1', 'NQW', 'NQTG', 'Panj Para 26-30', 'Panj Para 1-5']
+from tif_customization.tif_customization.utils.supply_chain_books import (
+	SPECIFIC_ITEM_CODES,
+	TPS_ITEM_CODES,
+)
 
 
 def _as_list(value):

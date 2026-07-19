@@ -4,6 +4,9 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 		title: 'Stock Detail Report',
 		single_column: true
 	});
+
+	// Avoid duplicate content if page is re-initialized
+	page.main.find('.stock-detail-container').remove();
 	
 	// Create the main container
 	let container = $(`<div class="stock-detail-container">
@@ -326,8 +329,14 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 	let stock_detail_filters = null;
 
 	function setupStockDetailFilters() {
+		const $filterParent = container.find('#stock-detail-filter-fields');
+		if (!$filterParent.length) {
+			console.error('Stock Detail: filter container not found');
+			return;
+		}
+
 		stock_detail_filters = new frappe.ui.FieldGroup({
-			parent: $('#stock-detail-filter-fields'),
+			parent: $filterParent,
 			fields: [
 				{
 					fieldtype: 'Date',
@@ -401,6 +410,10 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 			]
 		});
 		stock_detail_filters.make();
+
+		// Ensure date defaults are applied (can be empty on first soft navigation)
+		stock_detail_filters.set_value('from_date', defaultFromDate);
+		stock_detail_filters.set_value('to_date', defaultToDate);
 	}
 
 	function getFilterValues() {
@@ -433,7 +446,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 	}
 
 	function renderSelectedWarehouseSections(warehouseList) {
-		const $wrap = $('#dynamic-warehouse-sections');
+		const $wrap = container.find('#dynamic-warehouse-sections');
 		$wrap.empty();
 		(warehouseList || []).forEach((wh, idx) => {
 			const safeId = `wh-dyn-${idx}`;
@@ -523,8 +536,6 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 		`);
 	}
 
-	setupStockDetailFilters();
-	
 	function loadStockData() {
 		$('#dynamic-warehouse-sections').empty();
 		
@@ -615,18 +626,24 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 	
 	// Hide custom loader overlay
 	function hideLoader() {
-		$('#stock-detail-loader').fadeOut(300, function() {
-			$(this).remove();
-		});
+		$('#stock-detail-loader').remove();
 	}
+
+	function resetApplyButton() {
+		container.find('#apply-filters')
+			.prop('disabled', false)
+			.html('Apply Filters');
+	}
+
+	// Guard against overlapping loads (init + on_page_show race)
+	let stockDetailLoadSeq = 0;
 	
 	// Apply filters
 	function applyFilters() {
-		console.log('Apply filters clicked');
+		const loadSeq = ++stockDetailLoadSeq;
+		console.log('Apply filters clicked', loadSeq);
 		
-		// Show loader and disable button
-		const applyButton = $('#apply-filters');
-		const originalButtonText = applyButton.html();
+		const applyButton = container.find('#apply-filters');
 		applyButton.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Loading...');
 		showLoader();
 		
@@ -642,34 +659,44 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 			method: 'tif_customization.tif_customization.page.stock_detail.stock_detail.get_stock_data',
 			args: { filters: JSON.stringify(filters) },
 			callback: function(r) {
-				console.log('Filter response:', r);
-				console.log('MQH Books Data Count:', r.message?.mqh_books_data?.length || 0);
-				
-				if (r.message && !r.message.error) {
-					if (r.message.kpi_data) {
-						renderKPIs(r.message.kpi_data);
+				// Ignore stale responses from an older overlapping request
+				if (loadSeq !== stockDetailLoadSeq) {
+					return;
+				}
+				try {
+					console.log('Filter response:', r);
+					console.log('MQH Books Data Count:', r.message?.mqh_books_data?.length || 0);
+					
+					if (r.message && !r.message.error) {
+						if (r.message.kpi_data) {
+							renderKPIs(r.message.kpi_data);
+						}
+						
+						populateMQHBooksTable(r.message.mqh_books_data || []);
+						populateMQHUrduBooksTable(r.message.mqh_urdu_books_data || []);
+						renderSelectedWarehouseSections(r.message.selected_warehouses_data || []);
+					} else {
+						console.log('Error in filter response:', r.message);
+						loadStockDataFallback();
 					}
-					
-					populateMQHBooksTable(r.message.mqh_books_data || []);
-					populateMQHUrduBooksTable(r.message.mqh_urdu_books_data || []);
-					renderSelectedWarehouseSections(r.message.selected_warehouses_data || []);
-					
-					requestAnimationFrame(function() {
-						setTimeout(function() {
-							hideLoader();
-							applyButton.prop('disabled', false).html(originalButtonText);
-						}, 200);
+				} catch (err) {
+					console.error('Error rendering stock detail:', err);
+					frappe.msgprint({
+						title: __('Error'),
+						message: __('Data loaded but display failed. Check browser console.'),
+						indicator: 'red'
 					});
-				} else {
-					console.log('Error in filter response:', r.message);
+				} finally {
 					hideLoader();
-					applyButton.prop('disabled', false).html(originalButtonText);
-					loadStockDataFallback();
+					resetApplyButton();
 				}
 			},
 			error: function(err) {
+				if (loadSeq !== stockDetailLoadSeq) {
+					return;
+				}
 				hideLoader();
-				applyButton.prop('disabled', false).html(originalButtonText);
+				resetApplyButton();
 				console.log('Filter error:', err);
 				loadStockDataFallback();
 			}
@@ -1237,30 +1264,53 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 		// Dynamic sections remain as-is after print
 	}
 	
-	// Event listeners - set up after container is added to DOM
-	setTimeout(function() {
-		$('#apply-filters').click(function(e) {
+	// Event listeners + initial load (scoped to this page container)
+	function bindStockDetailEvents() {
+		container.find('#apply-filters').off('click.stockdetail').on('click.stockdetail', function(e) {
 			e.preventDefault();
 			applyFilters();
 		});
-		$('#reset-filters').click(function(e) {
+		container.find('#reset-filters').off('click.stockdetail').on('click.stockdetail', function(e) {
 			e.preventDefault();
 			resetFilters();
 		});
-		$('#export-excel').click(function(e) {
+		container.find('#export-excel').off('click.stockdetail').on('click.stockdetail', function(e) {
 			e.preventDefault();
 			exportToExcel();
 		});
-		$('#print-report').click(function(e) {
+		container.find('#print-report').off('click.stockdetail').on('click.stockdetail', function(e) {
 			e.preventDefault();
 			printReport();
 		});
+	}
 
-		// Load current month data on page open
+	function initStockDetailPage() {
+		setupStockDetailFilters();
+		bindStockDetailEvents();
+		// Mark so on_page_show does not double-load on first open
+		wrapper._stock_detail_initial_load_pending = true;
 		setTimeout(function() {
+			if (!container.find('#mqh-books-tbody').length) {
+				console.error('Stock Detail: main table missing on init');
+				hideLoader();
+				resetApplyButton();
+				return;
+			}
 			applyFilters();
-		}, 200);
-	}, 300);
+			wrapper._stock_detail_initial_load_pending = false;
+		}, 100);
+	}
+
+	initStockDetailPage();
+
+	// Expose for on_page_show (soft navigation back to this page)
+	wrapper.stock_detail_page = {
+		reload: function() {
+			if (container.closest('body').length) {
+				applyFilters();
+			}
+		}
+	};
 	
 	function loadStockDataFallback() {
 		$('#dynamic-warehouse-sections').empty();
@@ -1398,8 +1448,8 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 		console.log('populateMQHBooksTable called with data:', data);
 		console.log('populateMQHBooksTable - Data length:', data ? data.length : 0);
 		
-		const tbody = $('#mqh-books-tbody');
-		const tfoot = $('#mqh-books-tfoot');
+		const tbody = container.find('#mqh-books-tbody');
+		const tfoot = container.find('#mqh-books-tfoot');
 		
 		// Check if elements exist
 		if (tbody.length === 0) {
@@ -1543,7 +1593,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 			return;
 		}
 		
-		const kpiSection = $('#kpi-section');
+		const kpiSection = container.find('#kpi-section');
 		kpiSection.empty();
 		
 		// Summary KPIs at the top
@@ -2324,3 +2374,13 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 		return format_currency(value, currency, precision);
 	}
 }
+
+// Soft navigation: reload when returning to this page (skip duplicate first-open load)
+frappe.pages['stock-detail'].on_page_show = function(wrapper) {
+	if (wrapper._stock_detail_initial_load_pending) {
+		return;
+	}
+	if (wrapper.stock_detail_page && typeof wrapper.stock_detail_page.reload === 'function') {
+		wrapper.stock_detail_page.reload();
+	}
+};

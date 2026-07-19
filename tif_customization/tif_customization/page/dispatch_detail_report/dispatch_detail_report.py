@@ -4,6 +4,11 @@ import frappe
 from frappe import _
 from frappe.utils import add_days, flt, getdate, today
 
+from tif_customization.tif_customization.utils.supply_chain_books import (
+	sql_book_item_filter,
+	with_book_item_params,
+)
+
 
 @frappe.whitelist()
 def get_dispatch_detail_data(filters=None):
@@ -16,11 +21,17 @@ def get_dispatch_detail_data(filters=None):
 		from_date = getdate(filters.get("from_date") or add_days(today(), -30))
 		to_date = getdate(filters.get("to_date") or today())
 
-		params = {"from_date": from_date, "to_date": to_date}
+		params = with_book_item_params({"from_date": from_date, "to_date": to_date})
 		where = [
 			"dn.docstatus = 1",
 			"IFNULL(dn.is_return, 0) = 0",
 			"dn.posting_date BETWEEN %(from_date)s AND %(to_date)s",
+			# Only DNs that dispatch Supply Chain books (exclude Certificate / General Items)
+			f"""EXISTS (
+				SELECT 1 FROM `tabDelivery Note Item` dni_b
+				WHERE dni_b.parent = dn.name
+				{sql_book_item_filter("dni_b.item_code")}
+			)""",
 		]
 
 		if filters.get("customer"):
@@ -37,9 +48,10 @@ def get_dispatch_detail_data(filters=None):
 
 		if filters.get("warehouse"):
 			where.append(
-				"""EXISTS (
+				f"""EXISTS (
 					SELECT 1 FROM `tabDelivery Note Item` dni_w
 					WHERE dni_w.parent = dn.name AND dni_w.warehouse = %(warehouse)s
+					{sql_book_item_filter("dni_w.item_code")}
 				)"""
 			)
 			params["warehouse"] = filters["warehouse"]
@@ -178,7 +190,7 @@ def _get_items_by_delivery_note(dn_names):
 		return items_by_dn
 
 	items = frappe.db.sql(
-		"""
+		f"""
 		SELECT
 			dni.parent,
 			dni.item_code,
@@ -197,9 +209,10 @@ def _get_items_by_delivery_note(dn_names):
 		FROM `tabDelivery Note Item` dni
 		LEFT JOIN `tabItem` it ON it.name = dni.item_code
 		WHERE dni.parent IN %(dn_names)s
+		{sql_book_item_filter("dni.item_code")}
 		ORDER BY dni.parent, dni.idx
 		""",
-		{"dn_names": tuple(dn_names)},
+		with_book_item_params({"dn_names": tuple(dn_names)}),
 		as_dict=True,
 	)
 

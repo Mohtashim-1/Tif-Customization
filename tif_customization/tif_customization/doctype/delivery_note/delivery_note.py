@@ -1,6 +1,7 @@
 import frappe
+from frappe import _
 from frappe.model.document import Document
-from frappe.utils import getdate, nowdate
+from frappe.utils import cint, getdate, nowdate
 from frappe.utils.data import flt
 
 @frappe.whitelist()
@@ -94,172 +95,271 @@ def fetch_courier_rates(docname):
     return doc
 
 def on_update(doc, method):
-    # Debug print: show all select values in child table
-    # frappe.msgprint(f"Courier Charges Select Values: {[(c.courier, c.courier_service, c.rate, c.select) for c in doc.custom_courier_charges]}")
-    if doc.custom_delivery_mode == "Courier" and doc.custom_courier_charges:
-        # Find all selected charges
-        selected_charges = []
-        for charge in doc.custom_courier_charges:
-            # Accepts True, 1, "1", "Yes", etc.
-            if str(charge.select) in ("1", "Yes", "true", "True", "on", "checked") or charge.select is True or charge.select == 1:
-                selected_charges.append(charge)
-        
-        # If multiple charges are selected, keep only the last one and unselect others
-        if len(selected_charges) > 1:
-            frappe.msgprint(f"Multiple charges selected. Keeping only the last selected charge.")
-            # Unselect all charges first
-            for charge in doc.custom_courier_charges:
-                charge.select = 0
-            
-            # Select only the last selected charge
-            selected_charges[-1].select = 1
-            selected_charge = selected_charges[-1]
-            frappe.msgprint(f"Selected Charge: {selected_charge.courier} - {selected_charge.courier_service} - {selected_charge.rate}")
-        elif len(selected_charges) == 1:
-            selected_charge = selected_charges[0]
-            frappe.msgprint(f"Selected Charge: {selected_charge.courier} - {selected_charge.courier_service} - {selected_charge.rate}")
-        else:
-            selected_charge = None
-            frappe.msgprint("No courier charge selected.")
-        
-        if selected_charge:
-            doc.custom_delivery_rate = selected_charge.rate
-            if doc.custom_courier_mode_of_payment:
-                frappe.msgprint(f"Creating Journal Entry for mode: {doc.custom_courier_mode_of_payment}")
-                create_journal_entry(doc, selected_charge)
-            else:
-                frappe.msgprint("No mode of payment selected, not creating Journal Entry.")
-        else:
-            frappe.msgprint("No courier charge selected.")
+	# Keep selection sync only — do not create Journal Entry on save.
+	# Courier JV is posted via post_courier_amount after partner bill is received.
+	if doc.custom_delivery_mode == "Courier" and doc.custom_courier_charges:
+		selected_charges = []
+		for charge in doc.custom_courier_charges:
+			if str(charge.select) in ("1", "Yes", "true", "True", "on", "checked") or charge.select is True or charge.select == 1:
+				selected_charges.append(charge)
+
+		if len(selected_charges) > 1:
+			for charge in doc.custom_courier_charges:
+				charge.select = 0
+			selected_charges[-1].select = 1
+			selected_charge = selected_charges[-1]
+		elif len(selected_charges) == 1:
+			selected_charge = selected_charges[0]
+		else:
+			selected_charge = None
+
+		if selected_charge:
+			doc.custom_delivery_rate = selected_charge.rate
 
 def on_submit(doc, method):
-    """Handle delivery note submission - process courier charges if applicable"""
-    if doc.custom_delivery_mode == "Courier" and doc.custom_courier_charges:
-        # Find the selected charge
-        selected_charge = None
-        for charge in doc.custom_courier_charges:
-            if str(charge.select) in ("1", "Yes", "true", "True", "on", "checked") or charge.select is True or charge.select == 1:
-                selected_charge = charge
-                break
-        
-        if selected_charge and doc.custom_courier_mode_of_payment:
-            frappe.msgprint(f"Creating Journal Entry for courier charges on submission")
-            create_journal_entry(doc, selected_charge)
-    elif doc.custom_delivery_mode == "Courier" and doc.custom_delivery_rate and doc.custom_delivery_rate > 0 and doc.custom_courier_mode_of_payment:
-        # Handle custom_delivery_rate when set directly (without courier_charges table)
-        frappe.msgprint(f"Creating Journal Entry for delivery rate on submission")
-        create_journal_entry(doc)
-    
-    # Handle transport charges if delivery mode is Transport
-    elif doc.custom_delivery_mode == "Transport" and doc.custom_transport_charges:
-        frappe.msgprint(f"Creating Journal Entry for transport charges on submission")
-        create_transport_journal_entry(doc)
-    
-    # Handle delivery rate entry table
-    if doc.custom_delivery_rate_entry and len(doc.custom_delivery_rate_entry) > 0:
-        frappe.msgprint(f"Creating Journal Entry for delivery rate entry on submission")
-        create_delivery_rate_entry_journal_entry(doc)
-    
-    # Send delivery confirmation email to school
-    send_delivery_confirmation_email(doc)
+	"""On submit: stock moves out.
+
+	Courier amount is NOT booked here — post it later via
+	\"Post Courier Amount\" once the courier partner bill is received.
+
+	Sales return Delivery Notes reverse the original courier Journal Entry.
+	"""
+	if cint(doc.is_return):
+		reverse_courier_amount_on_return(doc)
+	else:
+		# Transport charges are known at dispatch — keep existing submit booking.
+		if doc.custom_delivery_mode == "Transport" and doc.custom_transport_charges:
+			create_transport_journal_entry(doc)
+
+	# Send delivery confirmation email to school (outbound only)
+	if not cint(doc.is_return):
+		send_delivery_confirmation_email(doc)
+
+
+def on_cancel(doc, method):
+	"""Cancel linked courier JV when Delivery Note is cancelled."""
+	je_name = getattr(doc, "custom_courier_journal_entry", None)
+	if not je_name:
+		return
+	try:
+		je = frappe.get_doc("Journal Entry", je_name)
+		if je.docstatus == 1:
+			je.cancel()
+			doc.add_comment("Info", f"Courier Journal Entry {je_name} cancelled with Delivery Note")
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "Delivery Note Courier JV Cancel")
+
+
+@frappe.whitelist()
+def post_courier_amount(docname):
+	"""Book courier expense after partner bill is received (submitted DN only)."""
+	doc = frappe.get_doc("Delivery Note", docname)
+
+	if doc.docstatus != 1:
+		frappe.throw(_("Submit the Delivery Note first. Stock must go out before posting courier amount."))
+
+	if cint(doc.is_return):
+		frappe.throw(_("Courier amount on a return is reversed automatically from the original Delivery Note."))
+
+	if doc.custom_delivery_mode != "Courier":
+		frappe.throw(_("Delivery Mode must be Courier to post courier amount."))
+
+	if getattr(doc, "custom_courier_journal_entry", None):
+		frappe.throw(_("Courier Journal Entry {0} is already linked to this Delivery Note.").format(doc.custom_courier_journal_entry))
+
+	if not flt(doc.custom_delivery_rate):
+		frappe.throw(_("Enter Delivery Rate (courier amount received from partner) before posting."))
+
+	if not doc.custom_courier_mode_of_payment:
+		frappe.throw(_("Select Courier Mode of Payment before posting."))
+
+	selected_charge = _get_selected_courier_charge(doc)
+	create_journal_entry(doc, selected_charge)
+	return {"journal_entry": frappe.db.get_value("Delivery Note", doc.name, "custom_courier_journal_entry")}
+
+
+def _get_selected_courier_charge(doc):
+	if not doc.custom_courier_charges:
+		return None
+	for charge in doc.custom_courier_charges:
+		if str(charge.select) in ("1", "Yes", "true", "True", "on", "checked") or charge.select is True or charge.select == 1:
+			return charge
+	return None
+
+
+def reverse_courier_amount_on_return(doc):
+	"""On sales return DN: reverse courier amount booked against the original DN."""
+	if getattr(doc, "custom_courier_journal_entry", None):
+		return
+
+	original_dn = doc.return_against
+	if not original_dn:
+		frappe.msgprint(_("No Return Against Delivery Note — cannot reverse courier amount."))
+		return
+
+	original_je = frappe.db.get_value("Delivery Note", original_dn, "custom_courier_journal_entry")
+	original_rate = flt(frappe.db.get_value("Delivery Note", original_dn, "custom_delivery_rate"))
+
+	if not original_je:
+		if original_rate:
+			frappe.msgprint(
+				_("Original Delivery Note {0} has courier rate {1} but no Journal Entry yet — nothing to reverse.").format(
+					original_dn, original_rate
+				)
+			)
+		return
+
+	if frappe.db.get_value("Journal Entry", original_je, "docstatus") != 1:
+		frappe.msgprint(_("Original courier Journal Entry {0} is not submitted — skipping reverse.").format(original_je))
+		return
+
+	reverse_je = create_reverse_journal_entry(doc, original_je, original_dn)
+	if reverse_je:
+		frappe.db.set_value("Delivery Note", doc.name, "custom_courier_journal_entry", reverse_je, update_modified=False)
+		if original_rate and not flt(doc.custom_delivery_rate):
+			frappe.db.set_value("Delivery Note", doc.name, "custom_delivery_rate", original_rate, update_modified=False)
+		doc.add_comment(
+			"Info",
+			_("Courier amount returned via Journal Entry <a href='/app/journal-entry/{0}'>{0}</a> (reverses {1} from {2})").format(
+				reverse_je, original_je, original_dn
+			),
+		)
+		frappe.msgprint(_("Courier amount returned. Reverse Journal Entry {0} created.").format(reverse_je))
+
+
+def create_reverse_journal_entry(return_doc, original_je_name, original_dn):
+	"""Create a reversing Journal Entry for the original courier JV."""
+	original_je = frappe.get_doc("Journal Entry", original_je_name)
+
+	je = frappe.new_doc("Journal Entry")
+	je.voucher_type = "Journal Entry"
+	je.posting_date = getdate(return_doc.posting_date or nowdate())
+	je.company = return_doc.company
+	je.cheque_no = return_doc.name
+	je.cheque_date = getdate(return_doc.posting_date or nowdate())
+	je.user_remark = f"Courier return for {return_doc.name} (reverses {original_je_name} / {original_dn})"
+
+	for row in original_je.accounts:
+		je.append(
+			"accounts",
+			{
+				"account": row.account,
+				"debit_in_account_currency": flt(row.credit_in_account_currency),
+				"credit_in_account_currency": flt(row.debit_in_account_currency),
+				"party_type": row.party_type,
+				"party": row.party,
+				"cost_center": row.cost_center,
+				"against_account": row.against_account,
+			},
+		)
+
+	if not je.accounts:
+		return None
+
+	je.insert()
+	je.submit()
+	return je.name
 
 def create_journal_entry(doc, selected_charge=None):
-    """Create Journal Entry for custom_delivery_rate based on payment mode"""
-    
-    # Check if delivery rate is set
-    if not doc.custom_delivery_rate or doc.custom_delivery_rate <= 0:
-        frappe.msgprint("No delivery rate found or amount is zero.")
-        return
-    
-    # Check if courier is set
-    if not doc.custom_courier:
-        frappe.throw("Please select a Courier first.")
-    
-    # Get courier account from Courier doctype
-    courier_doc = frappe.get_doc("Courier", doc.custom_courier)
-    courier_account = courier_doc.account
-    courier_party = courier_doc.supplier
-    
-    if not courier_account:
-        frappe.throw("Please set Account in Courier doctype.")
-    
-    # Get company settings
-    company_settings = frappe.get_doc("Company", doc.company)
-    
-    # Create Journal Entry
-    je = frappe.new_doc("Journal Entry")
-    je.voucher_type = "Journal Entry"
-    je.posting_date = getdate(nowdate())
-    je.company = doc.company
-    je.cheque_no = doc.name
-    je.cheque_date = getdate(nowdate())
-    je.user_remark = f"Courier charges for {doc.name}"
-    
-    # Check payment mode
-    if doc.custom_courier_mode_of_payment == "Cash":
-        # Cash payment: Credit Cash, Debit Courier Account
-        cash_account = company_settings.default_cash_account
-        
-        if not cash_account:
-            frappe.throw("Please set Cash Account in Company Settings.")
-        
-        # Add debit entry (Courier Account)
-        je.append("accounts", {
-            "account": courier_account,
-            "debit_in_account_currency": doc.custom_delivery_rate,
-            "credit_in_account_currency": 0,
-            "cost_center": doc.custom_supply_chain_cost_center if hasattr(doc, 'custom_supply_chain_cost_center') and doc.custom_supply_chain_cost_center else None
-        })
-        
-        # Add credit entry (Cash Account)
-        je.append("accounts", {
-            "account": cash_account,
-            "debit_in_account_currency": 0,
-            "credit_in_account_currency": doc.custom_delivery_rate,
-            "cost_center": doc.custom_supply_chain_cost_center if hasattr(doc, 'custom_supply_chain_cost_center') and doc.custom_supply_chain_cost_center else None
-        })
-    else:
-        # Non-cash payment: Debit Courier Account (expense), Credit Payable Account (liability)
-        payable_account = company_settings.default_payable_account
-        
-        if not payable_account:
-            frappe.throw("Please set Payable Account in Company Settings.")
-        if not courier_party:
-            frappe.throw("Supplier is not set for the selected Courier. Please set it in the Courier doctype.")
-        
-        # Add debit entry (Courier Account - Expense)
-        je.append("accounts", {
-            "account": courier_account,
-            "debit_in_account_currency": doc.custom_delivery_rate,
-            "credit_in_account_currency": 0,
-            "cost_center": doc.custom_supply_chain_cost_center if hasattr(doc, 'custom_supply_chain_cost_center') and doc.custom_supply_chain_cost_center else None
-        })
-        
-        # Add credit entry (Payable Account - Liability with party)
-        je.append("accounts", {
-            "account": payable_account,
-            "debit_in_account_currency": 0,
-            "credit_in_account_currency": doc.custom_delivery_rate,
-            "party_type": "Supplier",
-            "party": courier_party,
-            "cost_center": doc.custom_supply_chain_cost_center if hasattr(doc, 'custom_supply_chain_cost_center') and doc.custom_supply_chain_cost_center else None
-        })
-    
-    je.insert()
-    je.submit()
-    
-    # Store Journal Entry name in custom field (if field exists)
-    try:
-        frappe.db.set_value("Delivery Note", doc.name, "custom_courier_journal_entry", je.name, update_modified=False)
-    except Exception:
-        # Field doesn't exist yet, will be created manually
-        pass
-    
-    # Add connection from Delivery Note to Journal Entry
-    delivery_note_doc = frappe.get_doc("Delivery Note", doc.name)
-    delivery_note_doc.add_comment("Info", f"Journal Entry <a href='/app/journal-entry/{je.name}'>{je.name}</a> created for courier charges")
-    
-    frappe.msgprint(f"Journal Entry {je.name} created successfully for delivery rate of {doc.custom_delivery_rate}")
+	"""Create Journal Entry for custom_delivery_rate based on payment mode"""
+
+	if getattr(doc, "custom_courier_journal_entry", None):
+		frappe.throw(_("Courier Journal Entry {0} already exists for this Delivery Note.").format(doc.custom_courier_journal_entry))
+
+	# Check if delivery rate is set
+	if not doc.custom_delivery_rate or doc.custom_delivery_rate <= 0:
+		frappe.msgprint("No delivery rate found or amount is zero.")
+		return
+
+	# Check if courier is set
+	if not doc.custom_courier:
+		frappe.throw("Please select a Courier first.")
+
+	# Get courier account from Courier doctype
+	courier_doc = frappe.get_doc("Courier", doc.custom_courier)
+	courier_account = courier_doc.account
+	courier_party = courier_doc.supplier
+
+	if not courier_account:
+		frappe.throw("Please set Account in Courier doctype.")
+
+	# Get company settings
+	company_settings = frappe.get_doc("Company", doc.company)
+
+	# Create Journal Entry
+	je = frappe.new_doc("Journal Entry")
+	je.voucher_type = "Journal Entry"
+	je.posting_date = getdate(nowdate())
+	je.company = doc.company
+	je.cheque_no = doc.name
+	je.cheque_date = getdate(nowdate())
+	je.user_remark = f"Courier charges for {doc.name}"
+
+	# Check payment mode
+	if doc.custom_courier_mode_of_payment == "Cash":
+		# Cash payment: Credit Cash, Debit Courier Account
+		cash_account = company_settings.default_cash_account
+
+		if not cash_account:
+			frappe.throw("Please set Cash Account in Company Settings.")
+
+		# Add debit entry (Courier Account)
+		je.append("accounts", {
+			"account": courier_account,
+			"debit_in_account_currency": doc.custom_delivery_rate,
+			"credit_in_account_currency": 0,
+			"cost_center": doc.custom_supply_chain_cost_center if hasattr(doc, 'custom_supply_chain_cost_center') and doc.custom_supply_chain_cost_center else None
+		})
+
+		# Add credit entry (Cash Account)
+		je.append("accounts", {
+			"account": cash_account,
+			"debit_in_account_currency": 0,
+			"credit_in_account_currency": doc.custom_delivery_rate,
+			"cost_center": doc.custom_supply_chain_cost_center if hasattr(doc, 'custom_supply_chain_cost_center') and doc.custom_supply_chain_cost_center else None
+		})
+	else:
+		# Non-cash payment: Debit Courier Account (expense), Credit Payable Account (liability)
+		payable_account = company_settings.default_payable_account
+
+		if not payable_account:
+			frappe.throw("Please set Payable Account in Company Settings.")
+		if not courier_party:
+			frappe.throw("Supplier is not set for the selected Courier. Please set it in the Courier doctype.")
+
+		# Add debit entry (Courier Account - Expense)
+		je.append("accounts", {
+			"account": courier_account,
+			"debit_in_account_currency": doc.custom_delivery_rate,
+			"credit_in_account_currency": 0,
+			"cost_center": doc.custom_supply_chain_cost_center if hasattr(doc, 'custom_supply_chain_cost_center') and doc.custom_supply_chain_cost_center else None
+		})
+
+		# Add credit entry (Payable Account - Liability with party)
+		je.append("accounts", {
+			"account": payable_account,
+			"debit_in_account_currency": 0,
+			"credit_in_account_currency": doc.custom_delivery_rate,
+			"party_type": "Supplier",
+			"party": courier_party,
+			"cost_center": doc.custom_supply_chain_cost_center if hasattr(doc, 'custom_supply_chain_cost_center') and doc.custom_supply_chain_cost_center else None
+		})
+
+	je.insert()
+	je.submit()
+
+	# Store Journal Entry name in custom field (if field exists)
+	try:
+		frappe.db.set_value("Delivery Note", doc.name, "custom_courier_journal_entry", je.name, update_modified=False)
+	except Exception:
+		# Field doesn't exist yet, will be created manually
+		pass
+
+	# Add connection from Delivery Note to Journal Entry
+	delivery_note_doc = frappe.get_doc("Delivery Note", doc.name)
+	delivery_note_doc.add_comment("Info", f"Journal Entry <a href='/app/journal-entry/{je.name}'>{je.name}</a> created for courier charges")
+
+	frappe.msgprint(f"Journal Entry {je.name} created successfully for delivery rate of {doc.custom_delivery_rate}")
 
 def create_transport_journal_entry(doc):
     """Create Journal Entry for transport charges - cash payment to transport expense account"""

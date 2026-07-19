@@ -51,6 +51,45 @@ frappe.ui.form.on('Delivery Note', {
                 });
             }, __('Actions'));
         }
+
+		// After stock-out submit: post courier amount when partner bill is received
+		if (
+			frm.doc.docstatus === 1
+			&& !frm.doc.is_return
+			&& frm.doc.custom_delivery_mode === 'Courier'
+			&& !frm.doc.custom_courier_journal_entry
+		) {
+			frm.add_custom_button(__('Post Courier Amount'), function() {
+				if (!flt(frm.doc.custom_delivery_rate)) {
+					frappe.msgprint(__('Enter Delivery Rate (amount from courier partner) first, then save.'));
+					return;
+				}
+				if (!frm.doc.custom_courier_mode_of_payment) {
+					frappe.msgprint(__('Select Courier Mode of Payment first, then save.'));
+					return;
+				}
+				frappe.confirm(
+					__('Post courier amount {0} to accounts for this Delivery Note?', [format_currency(frm.doc.custom_delivery_rate)]),
+					function() {
+						frappe.call({
+							method: 'tif_customization.tif_customization.doctype.delivery_note.delivery_note.post_courier_amount',
+							args: { docname: frm.doc.name },
+							freeze: true,
+							freeze_message: __('Posting courier amount...'),
+							callback: function(r) {
+								if (r.message && r.message.journal_entry) {
+									frappe.show_alert({
+										message: __('Courier Journal Entry {0} created', [r.message.journal_entry]),
+										indicator: 'green'
+									});
+									frm.reload_doc();
+								}
+							}
+						});
+					}
+				);
+			}, __('Actions'));
+		}
     }
 });
 

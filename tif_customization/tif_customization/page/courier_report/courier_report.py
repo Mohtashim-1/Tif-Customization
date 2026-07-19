@@ -3,7 +3,13 @@ from frappe import _
 from frappe.utils import flt, cint, getdate, today, add_days, date_diff
 from datetime import datetime, timedelta
 
+from tif_customization.tif_customization.utils.supply_chain_books import (
+	sql_book_item_filter,
+	with_book_item_params,
+)
+
 _SUBMITTED_DN_JV_FILTER = "AND (dn.name IS NULL OR dn.docstatus = 1)"
+_BOOK_ITEM_FILTER = sql_book_item_filter("dni.item_code")
 
 @frappe.whitelist()
 def get_courier_report_data(filters=None):
@@ -145,23 +151,25 @@ def get_delivery_notes_for_cost_center(filters=None, cost_center=None):
 			JOIN `tabDelivery Note Item` dni ON dni.parent = dn.name
 			WHERE dn.docstatus = 1
 			AND dn.posting_date BETWEEN %(from_date)s AND %(to_date)s
+			{_BOOK_ITEM_FILTER}
 			{cost_center_filter}
 			GROUP BY dn.name
 			ORDER BY dn.posting_date DESC, dn.name DESC
 		"""
 		
-		results = frappe.db.sql(query, params, as_dict=True)
+		results = frappe.db.sql(query, with_book_item_params(params), as_dict=True)
 		
 		# Fetch items for all delivery notes in one go
 		dn_names = [row.delivery_note_no for row in results if row.get('delivery_note_no')]
 		items_by_dn = {}
 		if dn_names:
-			items = frappe.db.sql("""
+			items = frappe.db.sql(f"""
 				SELECT parent, item_code, item_name, qty, rate, amount
 				FROM `tabDelivery Note Item`
 				WHERE parent IN %(dn_names)s
+				{_BOOK_ITEM_FILTER.replace('dni.item_code', 'item_code')}
 				ORDER BY parent, idx
-			""", {'dn_names': tuple(dn_names)}, as_dict=True)
+			""", with_book_item_params({'dn_names': tuple(dn_names)}), as_dict=True)
 			for item in items:
 				parent = item.get('parent')
 				items_by_dn.setdefault(parent, []).append({
@@ -273,13 +281,14 @@ def get_kpi_data(filters):
 			JOIN `tabDelivery Note Item` dni ON dni.parent = dn.name
 			WHERE dn.docstatus = 1
 			AND dn.posting_date BETWEEN %(from_date)s AND %(to_date)s
+			{_BOOK_ITEM_FILTER}
 			{dn_cost_center_filter if cost_centers else ''}
 		"""
 		
-		books = frappe.db.sql(books_query, {
+		books = frappe.db.sql(books_query, with_book_item_params({
 			'from_date': from_date,
 			'to_date': to_date
-		}, as_dict=True)
+		}), as_dict=True)
 		total_books = flt(books[0].total_books) if books else 0
 		books_sent_by_hand = flt(books[0].books_sent_by_hand) if books else 0
 		books_sent_by_courier = flt(books[0].books_sent_by_courier) if books else 0
@@ -287,11 +296,29 @@ def get_kpi_data(filters):
 		# Average Cost Per Book
 		avg_cost_per_book = total_courier_expense / total_books if total_books > 0 else 0
 		
-		# No. of Customers Served
-		# Count all customers from DNs in date range, even if cost center is not set
+		# Schools vs Individuals served (from Delivery Notes in date range)
+		# Prefer custom_type_of_customer; fall back to customer_type for blanks.
 		customers_query = f"""
-			SELECT COUNT(DISTINCT dn.customer) AS customer_count
+			SELECT
+				COUNT(DISTINCT dn.customer) AS customer_count,
+				COUNT(DISTINCT CASE
+					WHEN COALESCE(NULLIF(c.custom_type_of_customer, ''), '') IN ('Individual Person', 'Individual')
+						OR (
+							IFNULL(c.custom_type_of_customer, '') = ''
+							AND c.customer_type = 'Individual'
+						)
+					THEN dn.customer
+				END) AS individuals_count,
+				COUNT(DISTINCT CASE
+					WHEN COALESCE(NULLIF(c.custom_type_of_customer, ''), '') NOT IN ('', 'Individual Person', 'Individual')
+						OR (
+							IFNULL(c.custom_type_of_customer, '') = ''
+							AND IFNULL(c.customer_type, '') != 'Individual'
+						)
+					THEN dn.customer
+				END) AS schools_count
 			FROM `tabDelivery Note` dn
+			LEFT JOIN `tabCustomer` c ON c.name = dn.customer
 			WHERE dn.docstatus = 1
 			AND dn.posting_date BETWEEN %(from_date)s AND %(to_date)s
 			AND dn.customer IS NOT NULL
@@ -304,6 +331,8 @@ def get_kpi_data(filters):
 			'to_date': to_date
 		}, as_dict=True)
 		total_customers = flt(customers[0].customer_count) if customers else 0
+		schools_served = flt(customers[0].schools_count) if customers else 0
+		individuals_served = flt(customers[0].individuals_count) if customers else 0
 		
 		# Cost Center Wise Allocation %
 		cost_center_allocation = get_cost_center_allocation(filters, total_courier_expense)
@@ -317,6 +346,8 @@ def get_kpi_data(filters):
 			'total_jvs_created': total_jvs,
 			'avg_cost_per_book': avg_cost_per_book,
 			'total_customers_served': total_customers,
+			'schools_served': schools_served,
+			'individuals_served': individuals_served,
 			'cost_center_allocation': cost_center_allocation
 		}
 	except Exception as e:
@@ -420,14 +451,15 @@ def get_cost_center_summary(filters):
 			JOIN `tabDelivery Note Item` dni ON dni.parent = dn.name
 			WHERE dn.docstatus = 1
 			AND dn.posting_date BETWEEN %(from_date)s AND %(to_date)s
+			{_BOOK_ITEM_FILTER}
 			{dn_cost_center_filter if cost_centers else ''}
 			GROUP BY COALESCE(dni.cost_center, dn.cost_center, 'Not Set')
 		"""
 		
-		dn_data = frappe.db.sql(dn_query, {
+		dn_data = frappe.db.sql(dn_query, with_book_item_params({
 			'from_date': from_date,
 			'to_date': to_date
-		}, as_dict=True)
+		}), as_dict=True)
 		
 		# Combine data
 		summary = {}
@@ -605,16 +637,17 @@ def get_delivery_notes(filters):
 			JOIN `tabDelivery Note Item` dni ON dni.parent = dn.name
 			WHERE dn.docstatus = 1
 			AND dn.posting_date BETWEEN %(from_date)s AND %(to_date)s
+			{_BOOK_ITEM_FILTER}
 			{cost_center_filter}
 			{customer_filter}
 			GROUP BY dn.name, COALESCE(dni.cost_center, dn.cost_center, 'Not Set')
 			ORDER BY dn.posting_date DESC, dn.name DESC
 		"""
 		
-		params = {
+		params = with_book_item_params({
 			'from_date': from_date,
 			'to_date': to_date
-		}
+		})
 		if customer:
 			params['customer'] = customer
 		
@@ -624,12 +657,13 @@ def get_delivery_notes(filters):
 		dn_names = [row.delivery_note_no for row in results if row.get('delivery_note_no')]
 		items_by_dn = {}
 		if dn_names:
-			items = frappe.db.sql("""
+			items = frappe.db.sql(f"""
 				SELECT parent, item_code, item_name, qty, rate, amount
 				FROM `tabDelivery Note Item`
 				WHERE parent IN %(dn_names)s
+				{_BOOK_ITEM_FILTER.replace('dni.item_code', 'item_code')}
 				ORDER BY parent, idx
-			""", {'dn_names': tuple(dn_names)}, as_dict=True)
+			""", with_book_item_params({'dn_names': tuple(dn_names)}), as_dict=True)
 			for item in items:
 				parent = item.get('parent')
 				items_by_dn.setdefault(parent, []).append({
@@ -681,16 +715,17 @@ def get_top_customers(filters, limit=10):
 			AND dn.posting_date BETWEEN %(from_date)s AND %(to_date)s
 			AND dn.customer IS NOT NULL
 			AND dn.customer != ''
+			{_BOOK_ITEM_FILTER}
 			{cost_center_filter}
 			GROUP BY dn.customer
 			ORDER BY books_sent DESC
 			LIMIT {limit}
 		"""
 		
-		results = frappe.db.sql(query, {
+		results = frappe.db.sql(query, with_book_item_params({
 			'from_date': from_date,
 			'to_date': to_date
-		}, as_dict=True)
+		}), as_dict=True)
 		
 		# Add customer names
 		for row in results:
@@ -725,16 +760,17 @@ def get_top_items(filters, limit=10):
 			AND dn.posting_date BETWEEN %(from_date)s AND %(to_date)s
 			AND dni.item_code IS NOT NULL
 			AND dni.item_code != ''
+			{_BOOK_ITEM_FILTER}
 			{cost_center_filter}
 			GROUP BY dni.item_code
 			ORDER BY qty DESC
 			LIMIT {limit}
 		"""
 		
-		results = frappe.db.sql(query, {
+		results = frappe.db.sql(query, with_book_item_params({
 			'from_date': from_date,
 			'to_date': to_date
-		}, as_dict=True)
+		}), as_dict=True)
 		
 		# Add item names
 		for row in results:
@@ -767,15 +803,16 @@ def get_books_by_cost_center(filters):
 			JOIN `tabDelivery Note Item` dni ON dni.parent = dn.name
 			WHERE dn.docstatus = 1
 			AND dn.posting_date BETWEEN %(from_date)s AND %(to_date)s
+			{_BOOK_ITEM_FILTER}
 			{cost_center_filter}
 			GROUP BY COALESCE(dn.cost_center, 'Not Set')
 			ORDER BY books_sent DESC
 		"""
 		
-		results = frappe.db.sql(query, {
+		results = frappe.db.sql(query, with_book_item_params({
 			'from_date': from_date,
 			'to_date': to_date
-		}, as_dict=True)
+		}), as_dict=True)
 		
 		# Filter out "Not Set" cost centers
 		filtered_results = []
@@ -1427,7 +1464,7 @@ def get_item_category_drilldown(filters=None, category=None):
 		if not selected_dn_names:
 			return []
 
-		dn_rows = frappe.db.sql("""
+		dn_rows = frappe.db.sql(f"""
 			SELECT
 				dn.posting_date,
 				dn.name AS delivery_note_no,
@@ -1436,10 +1473,11 @@ def get_item_category_drilldown(filters=None, category=None):
 				COALESCE(SUM(dni.qty), 0) AS total_books
 			FROM `tabDelivery Note` dn
 			LEFT JOIN `tabDelivery Note Item` dni ON dni.parent = dn.name
+				{_BOOK_ITEM_FILTER}
 			WHERE dn.name IN %(dn_names)s
 			GROUP BY dn.name
 			ORDER BY dn.posting_date DESC, dn.name DESC
-		""", {'dn_names': tuple(selected_dn_names)}, as_dict=True)
+		""", with_book_item_params({'dn_names': tuple(selected_dn_names)}), as_dict=True)
 
 		for row in dn_rows:
 			dn_name = row.get('delivery_note_no')
@@ -1449,8 +1487,8 @@ def get_item_category_drilldown(filters=None, category=None):
 			row['total_expense'] = flt(row['courier_expense']) + flt(row['transport_expense'])
 			row['customer_name'] = frappe.db.get_value('Customer', row.get('customer'), 'customer_name') or row.get('customer')
 			
-			# Get book details (items) for this delivery note
-			book_details = frappe.db.sql("""
+			# Get book details (items) for this delivery note — Supply Chain books only
+			book_details = frappe.db.sql(f"""
 				SELECT 
 					dni.item_code,
 					dni.item_name,
@@ -1458,8 +1496,9 @@ def get_item_category_drilldown(filters=None, category=None):
 					dni.rate
 				FROM `tabDelivery Note Item` dni
 				WHERE dni.parent = %(dn_name)s
+				{_BOOK_ITEM_FILTER}
 				ORDER BY dni.idx
-			""", {'dn_name': dn_name}, as_dict=True)
+			""", with_book_item_params({'dn_name': dn_name}), as_dict=True)
 			
 			# Format book details as a string
 			book_details_list = []
@@ -1554,21 +1593,20 @@ def _get_item_category_maps(filters):
 	dn_names = set(courier_expense_by_dn.keys()) | set(transport_expense_by_dn.keys())
 	category_by_dn = {}
 	if dn_names:
-		dn_category_results = frappe.db.sql("""
+		dn_category_results = frappe.db.sql(f"""
 			SELECT
 				dn.name AS dn_name,
 				CASE
 					WHEN EXISTS (
 						SELECT 1 FROM `tabDelivery Note Item` dni2
-						JOIN `tabItem` i2 ON i2.item_code = dni2.item_code
 						WHERE dni2.parent = dn.name
-						AND (i2.item_group LIKE '%%Book%%' OR i2.item_group LIKE '%%MQH%%' OR i2.item_group LIKE '%%Qaida%%')
+						{sql_book_item_filter("dni2.item_code")}
 					) THEN 'Books'
 					ELSE 'General Courier Expense'
 				END AS category
 			FROM `tabDelivery Note` dn
 			WHERE dn.name IN %(dn_names)s
-		""", {'dn_names': tuple(dn_names)}, as_dict=True)
+		""", with_book_item_params({'dn_names': tuple(dn_names)}), as_dict=True)
 		category_by_dn = {row.get('dn_name'): row.get('category') for row in dn_category_results}
 
 	return category_by_dn, courier_expense_by_dn, transport_expense_by_dn
