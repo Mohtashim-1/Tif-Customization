@@ -1385,7 +1385,7 @@ def calculate_kpis_for_specific_items(data, filters=None):
         totals["qps_book_return"] = sum(flt(item.get("book_return", 0)) for item in qps_items)
         
         # Get pending dispatches count (submitted Sales Orders pending delivery)
-        pending_dispatches_count = get_pending_dispatches_count()
+        pending_dispatches_count = get_pending_dispatches_count(filters)
         totals["pending_dispatches_count"] = pending_dispatches_count
         
         # Get Sales Invoice statistics
@@ -1440,21 +1440,148 @@ def calculate_kpis_for_specific_items(data, filters=None):
             "items": []
         }
 
-def get_pending_dispatches_count():
+def get_pending_dispatches_count(filters=None):
     """Get count of submitted Sales Orders that are pending delivery"""
     try:
-        count = frappe.db.sql("""
+        if filters is None:
+            filters = {}
+
+        date_filter = ""
+        params = []
+        if filters.get("from_date") and filters.get("to_date"):
+            date_filter = "AND so.transaction_date BETWEEN %s AND %s"
+            params = [filters.get("from_date"), filters.get("to_date")]
+        elif filters.get("from_date"):
+            date_filter = "AND so.transaction_date >= %s"
+            params = [filters.get("from_date")]
+        elif filters.get("to_date"):
+            date_filter = "AND so.transaction_date <= %s"
+            params = [filters.get("to_date")]
+
+        count = frappe.db.sql(f"""
             SELECT COUNT(DISTINCT so.name) as count
             FROM `tabSales Order` so
             WHERE so.docstatus = 1
             AND so.status NOT IN ('Closed', 'Cancelled', 'Completed', 'Stopped', 'On Hold')
             AND (so.per_delivered < 100 OR so.per_delivered IS NULL)
-        """, as_dict=True)
+            {date_filter}
+        """, tuple(params) if params else (), as_dict=True)
         
         return cint(count[0].get('count', 0)) if count else 0
     except Exception as e:
         frappe.log_error(f"Error getting pending dispatches count: {str(e)}", "Pending Dispatches Count Error")
         return 0
+
+
+@frappe.whitelist()
+def get_pending_dispatches_details(filters=None):
+	"""List pending Sales Orders (submitted, not fully delivered)."""
+	try:
+		if isinstance(filters, str):
+			filters = frappe.parse_json(filters) or {}
+		filters = filters or {}
+
+		date_filter = ""
+		params = []
+		if filters.get("from_date") and filters.get("to_date"):
+			date_filter = "AND so.transaction_date BETWEEN %s AND %s"
+			params = [filters.get("from_date"), filters.get("to_date")]
+		elif filters.get("from_date"):
+			date_filter = "AND so.transaction_date >= %s"
+			params = [filters.get("from_date")]
+		elif filters.get("to_date"):
+			date_filter = "AND so.transaction_date <= %s"
+			params = [filters.get("to_date")]
+
+		rows = frappe.db.sql(
+			f"""
+			SELECT
+				so.name,
+				so.customer,
+				so.customer_name,
+				so.transaction_date,
+				so.delivery_date,
+				so.status,
+				so.per_delivered,
+				so.grand_total,
+				COALESCE(SUM(soi.qty - soi.delivered_qty), 0) AS pending_qty
+			FROM `tabSales Order` so
+			LEFT JOIN `tabSales Order Item` soi ON soi.parent = so.name
+			WHERE so.docstatus = 1
+			AND so.status NOT IN ('Closed', 'Cancelled', 'Completed', 'Stopped', 'On Hold')
+			AND (so.per_delivered < 100 OR so.per_delivered IS NULL)
+			{date_filter}
+			GROUP BY so.name
+			ORDER BY so.transaction_date DESC, so.name DESC
+			LIMIT 500
+			""",
+			tuple(params) if params else (),
+			as_dict=True,
+		)
+		return rows or []
+	except Exception as e:
+		frappe.log_error(
+			f"Error getting pending dispatches details: {str(e)}",
+			"Pending Dispatches Details Error",
+		)
+		return []
+
+
+@frappe.whitelist()
+def get_sales_invoice_details(filters=None):
+	"""List Sales Invoices for report items in the selected date range."""
+	try:
+		if isinstance(filters, str):
+			filters = frappe.parse_json(filters) or {}
+		filters = filters or {}
+
+		date_filter = ""
+		date_params = []
+		if filters.get("from_date") and filters.get("to_date"):
+			date_filter = "AND si.posting_date BETWEEN %s AND %s"
+			date_params = [filters.get("from_date"), filters.get("to_date")]
+		elif filters.get("from_date"):
+			date_filter = "AND si.posting_date >= %s"
+			date_params = [filters.get("from_date")]
+		elif filters.get("to_date"):
+			date_filter = "AND si.posting_date <= %s"
+			date_params = [filters.get("to_date")]
+
+		allowed_codes = get_filtered_item_codes(filters)
+		if not allowed_codes:
+			return []
+
+		placeholders = ",".join(["%s"] * len(allowed_codes))
+		rows = frappe.db.sql(
+			f"""
+			SELECT
+				si.name,
+				si.customer,
+				si.customer_name,
+				si.posting_date,
+				si.status,
+				COALESCE(SUM(sii.qty), 0) AS qty,
+				COALESCE(SUM(sii.base_amount), 0) AS amount
+			FROM `tabSales Invoice` si
+			INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
+			WHERE si.docstatus = 1
+			{date_filter}
+			AND sii.item_code IN ({placeholders})
+			GROUP BY si.name
+			ORDER BY si.posting_date DESC, si.name DESC
+			LIMIT 500
+			""",
+			tuple(date_params + list(allowed_codes)),
+			as_dict=True,
+		)
+		return rows or []
+	except Exception as e:
+		frappe.log_error(
+			f"Error getting sales invoice details: {str(e)}",
+			"Sales Invoice Details Error",
+		)
+		return []
+
 
 def get_sales_invoice_stats(filters=None):
     """Get Sales Invoice count, total quantity, and total amount filtered by date range and specific book items only"""

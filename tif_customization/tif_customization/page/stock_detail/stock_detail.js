@@ -153,6 +153,70 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 			.stock-detail-filters .frappe-control[data-fieldtype="MultiSelectList"] {
 				min-width: 220px;
 			}
+			.kpi-summary-row {
+				display: flex;
+				flex-wrap: nowrap;
+				align-items: stretch;
+				margin-bottom: 30px;
+				gap: 0;
+			}
+			.kpi-summary-row > .kpi-col {
+				flex: 1 1 0;
+				min-width: 0;
+				padding: 0 6px;
+				display: flex;
+			}
+			.kpi-card.summary-kpi {
+				width: 100%;
+				min-height: 130px;
+				height: 100%;
+				display: flex;
+				flex-direction: column;
+				justify-content: space-between;
+				padding: 14px 12px !important;
+				box-sizing: border-box;
+			}
+			.kpi-card.summary-kpi .kpi-title {
+				margin: 0;
+				font-size: 12px;
+				line-height: 1.25;
+				min-height: 30px;
+				opacity: 0.9;
+				display: -webkit-box;
+				-webkit-line-clamp: 2;
+				-webkit-box-orient: vertical;
+				overflow: hidden;
+			}
+			.kpi-card.summary-kpi .kpi-value {
+				margin: 8px 0;
+				font-size: 24px;
+				font-weight: bold;
+				line-height: 1.1;
+			}
+			.kpi-card.summary-kpi .kpi-sub {
+				margin: 0;
+				font-size: 11px;
+				line-height: 1.3;
+				min-height: 28px;
+				opacity: 0.85;
+				color: black;
+			}
+			.kpi-dept-row {
+				display: flex;
+				flex-wrap: wrap;
+				align-items: stretch;
+				margin-bottom: 30px;
+			}
+			.kpi-dept-row > .kpi-col {
+				flex: 1;
+				min-width: 300px;
+				padding: 0 8px;
+				display: flex;
+			}
+			.kpi-dept-row .kpi-card {
+				width: 100%;
+				height: 100%;
+			}
 			.report-section {
 				margin-bottom: 40px;
 			}
@@ -1485,72 +1549,69 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 		// Summary KPIs at the top
 		const summaryHtml = `
 			<h4 style="margin-bottom: 15px;">Overall Stock Summary</h4>
-			<div class="row" style="margin-bottom: 30px; display: flex; flex-wrap: nowrap;">
-				<div style="flex: 1; padding: 0 8px;">
-					<div class="kpi-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: black; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-						<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Total Items</h5>
-						<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${kpiData.total_items || 0}</h2>
-						<p style="margin: 5px 0 0 0;color: black; font-size: 12px; opacity: 0.8;">Items Tracked</p>
+			<div class="kpi-summary-row">
+				<div class="kpi-col">
+					<div class="kpi-card summary-kpi" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: black; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+						<h5 class="kpi-title">Total Items</h5>
+						<div class="kpi-value">${kpiData.total_items || 0}</div>
+						<p class="kpi-sub">Items Tracked</p>
 					</div>
 				</div>
-				<div style="flex: 1; padding: 0 8px;">
-					<div class="kpi-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: black; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-						<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Total Opening Stock</h5>
-						<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${formatNumber(kpiData.total_opening_stock || 0)}</h2>
-						<p style="margin: 5px 0 0 0; font-size: 12px;color: black; opacity: 0.8;">Units</p>
+				<div class="kpi-col">
+					<div class="kpi-card summary-kpi" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: black; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+						<h5 class="kpi-title">Total Opening Stock</h5>
+						<div class="kpi-value">${formatNumber(kpiData.total_opening_stock || 0)}</div>
+						<p class="kpi-sub">Units</p>
 					</div>
 				</div>
-				<div style="flex: 1; padding: 0 8px;">
-					<div class="kpi-card" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: black; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-						<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Total Available Stock</h5>
-						<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${formatNumber(kpiData.total_available_stock || 0)}</h2>
-						<p style="margin: 5px 0 0 0; font-size: 12px;color: black; opacity: 0.8;">Units</p>
+				<div class="kpi-col">
+					<div class="kpi-card summary-kpi" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: black; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+						<h5 class="kpi-title">Total Available Stock</h5>
+						<div class="kpi-value">${formatNumber(kpiData.total_available_stock || 0)}</div>
+						<p class="kpi-sub">Units</p>
 					</div>
 				</div>
-				<div style="flex: 1; padding: 0 8px;">
-					<div class="kpi-card" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: black; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-						<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Total Delivered</h5>
-						<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${formatNumber(kpiData.total_delivered || 0)}</h2>
-						<p style="margin: 5px 0 0 0; font-size: 12px;color: black; opacity: 0.8;">Units</p>
+				<div class="kpi-col">
+					<div class="kpi-card summary-kpi" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: black; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+						<h5 class="kpi-title">Total Delivered</h5>
+						<div class="kpi-value">${formatNumber(kpiData.total_delivered || 0)}</div>
+						<p class="kpi-sub">Units</p>
 					</div>
 				</div>
-				<div style="flex: 1; padding: 0 8px;">
-					<div class="kpi-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: black; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-						<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Pending Dispatches</h5>
-						<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${formatNumber(kpiData.pending_dispatches_count || 0)}</h2>
-						<p style="margin: 5px 0 0 0; font-size: 12px;color: black; opacity: 0.8;">Sales Orders</p>
+				<div class="kpi-col">
+					<div class="kpi-card summary-kpi pending-dispatches-kpi" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: black; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); cursor: pointer;" title="Click to view pending dispatches">
+						<h5 class="kpi-title">Pending Dispatches</h5>
+						<div class="kpi-value">${formatNumber(kpiData.pending_dispatches_count || 0)}</div>
+						<p class="kpi-sub">Sales Orders · Click for details</p>
 					</div>
 				</div>
-				<div style="flex: 1; padding: 0 8px;">
-					<div class="kpi-card" style="background: linear-gradient(135deg, #30cfd0 0%, #330867 100%); color: black; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-						<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Sales Invoices</h5>
-						<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${formatNumber(kpiData.sales_invoice_count || 0)}</h2>
-						<p style="margin: 5px 0 0 0; font-size: 12px;color: black;	 opacity: 0.8;">${formatNumber(kpiData.sales_invoice_total_qty || 0)} Qty | ${formatCurrency(kpiData.sales_invoice_total_amount || 0)}</p>
+				<div class="kpi-col">
+					<div class="kpi-card summary-kpi sales-invoices-kpi" style="background: linear-gradient(135deg, #30cfd0 0%, #330867 100%); color: black; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); cursor: pointer;" title="Click to view sales invoices">
+						<h5 class="kpi-title">Sales Invoices</h5>
+						<div class="kpi-value">${formatNumber(kpiData.sales_invoice_count || 0)}</div>
+						<p class="kpi-sub">${formatNumber(kpiData.sales_invoice_total_qty || 0)} Qty | ${formatCurrency(kpiData.sales_invoice_total_amount || 0)}</p>
 					</div>
 				</div>
-				<div style="flex: 1; padding: 0 8px;">
-					<div class="kpi-card return-books-kpi" style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); color: black; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;" onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 4px 8px rgba(0,0,0,0.2)';" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 2px 4px rgba(0,0,0,0.1)';">
-						<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Return Books</h5>
-						<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${formatNumber(kpiData.total_book_return || 0)}</h2>
-						<p style="margin: 5px 0 0 0; font-size: 12px;color: black; opacity: 0.8;">Total Books Returned</p>
+				<div class="kpi-col">
+					<div class="kpi-card summary-kpi return-books-kpi" style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); color: black; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); cursor: pointer;" title="Click for return books details">
+						<h5 class="kpi-title">Return Books</h5>
+						<div class="kpi-value">${formatNumber(kpiData.total_book_return || 0)}</div>
+						<p class="kpi-sub">Total Books Returned</p>
 					</div>
 				</div>
-
-
-				<div style="flex: 1; padding: 0 8px;">
-					<div class="kpi-card millat-purchase-kpi" style="background: linear-gradient(135deg, #f7971e 0%, #ffd200 100%); color: black; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;" onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 4px 8px rgba(0,0,0,0.2)';" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 2px 4px rgba(0,0,0,0.1)';">
-						<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Millat Publishers Purchase Details</h5>
-						<h2 style="margin: 0; font-size: 28px; font-weight: bold;">${formatNumber(kpiData.millat_po_total_qty || 0)}</h2>
-						<p style="margin: 5px 0 0 0; font-size: 12px;color: black; opacity: 0.8;">${formatNumber(kpiData.millat_po_count || 0)} POs | ${formatCurrency(kpiData.millat_po_total_amount || 0)}</p>
+				<div class="kpi-col">
+					<div class="kpi-card summary-kpi millat-purchase-kpi" style="background: linear-gradient(135deg, #f7971e 0%, #ffd200 100%); color: black; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); cursor: pointer;" title="Millat Publishers Purchase Details">
+						<h5 class="kpi-title">Millat Purchase</h5>
+						<div class="kpi-value">${formatNumber(kpiData.millat_po_total_qty || 0)}</div>
+						<p class="kpi-sub">${formatNumber(kpiData.millat_po_count || 0)} POs | ${formatCurrency(kpiData.millat_po_total_amount || 0)}</p>
 					</div>
 				</div>
 			</div>
 			
 			<!-- Department-wise Item Count and Totals KPIs -->
 			<h4 style="margin-bottom: 15px; margin-top: 30px;">Department-wise Summary</h4>
-			<div class="row" style="margin-bottom: 30px; display: flex; flex-wrap: wrap;">
-				<!-- TPS Department -->
-				<div style="flex: 1; padding: 0 8px; min-width: 300px;">
+			<div class="kpi-dept-row">
+				<div class="kpi-col">
 					<div class="kpi-card" style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); color: black; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 15px;">
 						<h5 style="margin: 0 0 15px 0; font-size: 16px; font-weight: bold; opacity: 0.95;">TPS Department</h5>
 						<div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
@@ -1580,8 +1641,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 						<p style="margin: 10px 0 0 0; font-size: 11px;color: black; opacity: 0.8; border-top: 1px solid rgba(0,0,0,0.1); padding-top: 8px;">Includes: Noorani Qaida, Noorani Qaida Workbook, Panj Para 26-30, Panj Para 1-5, NQTG</p>
 					</div>
 				</div>
-				<!-- QPS Department -->
-				<div style="flex: 1; padding: 0 8px; min-width: 300px;">
+				<div class="kpi-col">
 					<div class="kpi-card" style="background: linear-gradient(135deg, #4ecdc4 0%, #44a08d 100%); color: black; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 15px;">
 						<h5 style="margin: 0 0 15px 0; font-size: 16px; font-weight: bold; opacity: 0.95;">QPS Department</h5>
 						<div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
@@ -1855,21 +1915,149 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 
 		// Add click handler for Return Books KPI
 		$('.return-books-kpi').on('click', function() {
-			// Get current date filters
 			const fromDate = (stock_detail_filters && stock_detail_filters.get_value('from_date')) || frappe.datetime.month_start();
 			const toDate = (stock_detail_filters && stock_detail_filters.get_value('to_date')) || frappe.datetime.get_today();
-			
-			// Get current company (default company from user defaults)
 			const company = frappe.defaults.get_user_default("Company") || '';
-			
-			// Build URL with filters
 			let reportUrl = `/app/query-report/School Return Report?from_date=${encodeURIComponent(fromDate)}&to_date=${encodeURIComponent(toDate)}`;
 			if (company) {
 				reportUrl += `&company=${encodeURIComponent(company)}`;
 			}
-			
-			// Open the report in a new window/tab
 			window.open(reportUrl, '_blank');
+		});
+
+		$('.pending-dispatches-kpi').on('click', function() {
+			showPendingDispatchesDialog();
+		});
+
+		$('.sales-invoices-kpi').on('click', function() {
+			showSalesInvoicesDialog();
+		});
+	}
+
+	function showPendingDispatchesDialog() {
+		const filters = getFilterValues();
+		frappe.call({
+			method: 'tif_customization.tif_customization.page.stock_detail.stock_detail.get_pending_dispatches_details',
+			args: { filters: JSON.stringify(filters) },
+			freeze: true,
+			freeze_message: __('Loading pending dispatches...'),
+			callback: function(r) {
+				const rows = r.message || [];
+				let body = '';
+				if (!rows.length) {
+					body = `<p class="text-muted">${__('No pending dispatches found.')}</p>`;
+				} else {
+					body = `
+						<div style="max-height: 420px; overflow: auto;">
+							<table class="table table-bordered table-striped" style="font-size: 12px; margin: 0;">
+								<thead>
+									<tr>
+										<th>${__('Sales Order')}</th>
+										<th>${__('Customer')}</th>
+										<th>${__('Date')}</th>
+										<th>${__('Status')}</th>
+										<th class="text-right">${__('% Delivered')}</th>
+										<th class="text-right">${__('Pending Qty')}</th>
+										<th class="text-right">${__('Grand Total')}</th>
+									</tr>
+								</thead>
+								<tbody>
+									${rows.map(row => `
+										<tr>
+											<td><a href="/app/sales-order/${encodeURIComponent(row.name)}" target="_blank">${frappe.utils.escape_html(row.name)}</a></td>
+											<td>${frappe.utils.escape_html(row.customer_name || row.customer || '')}</td>
+											<td>${frappe.datetime.str_to_user(row.transaction_date) || ''}</td>
+											<td>${frappe.utils.escape_html(row.status || '')}</td>
+											<td class="text-right">${flt(row.per_delivered || 0).toFixed(1)}%</td>
+											<td class="text-right">${formatNumber(row.pending_qty || 0)}</td>
+											<td class="text-right">${formatCurrency(row.grand_total || 0)}</td>
+										</tr>
+									`).join('')}
+								</tbody>
+							</table>
+						</div>
+						<p class="text-muted" style="margin-top: 8px;">${rows.length} ${__('record(s)')}</p>
+					`;
+				}
+				const d = new frappe.ui.Dialog({
+					title: __('Pending Dispatches'),
+					size: 'extra-large',
+					fields: [{ fieldtype: 'HTML', fieldname: 'details', options: body }],
+					primary_action_label: __('Open Sales Order List'),
+					primary_action: function() {
+						window.open('/app/sales-order', '_blank');
+						d.hide();
+					}
+				});
+				d.show();
+			}
+		});
+	}
+
+	function showSalesInvoicesDialog() {
+		const filters = getFilterValues();
+		frappe.call({
+			method: 'tif_customization.tif_customization.page.stock_detail.stock_detail.get_sales_invoice_details',
+			args: { filters: JSON.stringify(filters) },
+			freeze: true,
+			freeze_message: __('Loading sales invoices...'),
+			callback: function(r) {
+				const rows = r.message || [];
+				let body = '';
+				if (!rows.length) {
+					body = `<p class="text-muted">${__('No sales invoices found for the selected filters.')}</p>`;
+				} else {
+					const totalQty = rows.reduce((s, row) => s + (flt(row.qty) || 0), 0);
+					const totalAmount = rows.reduce((s, row) => s + (flt(row.amount) || 0), 0);
+					body = `
+						<div style="max-height: 420px; overflow: auto;">
+							<table class="table table-bordered table-striped" style="font-size: 12px; margin: 0;">
+								<thead>
+									<tr>
+										<th>${__('Sales Invoice')}</th>
+										<th>${__('Customer')}</th>
+										<th>${__('Date')}</th>
+										<th>${__('Status')}</th>
+										<th class="text-right">${__('Qty')}</th>
+										<th class="text-right">${__('Amount')}</th>
+									</tr>
+								</thead>
+								<tbody>
+									${rows.map(row => `
+										<tr>
+											<td><a href="/app/sales-invoice/${encodeURIComponent(row.name)}" target="_blank">${frappe.utils.escape_html(row.name)}</a></td>
+											<td>${frappe.utils.escape_html(row.customer_name || row.customer || '')}</td>
+											<td>${frappe.datetime.str_to_user(row.posting_date) || ''}</td>
+											<td>${frappe.utils.escape_html(row.status || '')}</td>
+											<td class="text-right">${formatNumber(row.qty || 0)}</td>
+											<td class="text-right">${formatCurrency(row.amount || 0)}</td>
+										</tr>
+									`).join('')}
+								</tbody>
+								<tfoot>
+									<tr>
+										<td colspan="4"><strong>${__('Total')}</strong></td>
+										<td class="text-right"><strong>${formatNumber(totalQty)}</strong></td>
+										<td class="text-right"><strong>${formatCurrency(totalAmount)}</strong></td>
+									</tr>
+								</tfoot>
+							</table>
+						</div>
+						<p class="text-muted" style="margin-top: 8px;">${rows.length} ${__('invoice(s)')}</p>
+					`;
+				}
+				const d = new frappe.ui.Dialog({
+					title: __('Sales Invoices'),
+					size: 'extra-large',
+					fields: [{ fieldtype: 'HTML', fieldname: 'details', options: body }],
+					primary_action_label: __('Open Sales Invoice List'),
+					primary_action: function() {
+						window.open('/app/sales-invoice', '_blank');
+						d.hide();
+					}
+				});
+				d.show();
+			}
 		});
 	}
 	
