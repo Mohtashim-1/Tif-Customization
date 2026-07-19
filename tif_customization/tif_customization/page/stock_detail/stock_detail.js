@@ -12,51 +12,9 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 			<!-- <h3>MQH Books Stock Details - 2025-26</h3> -->
 		</div>
 		
-		<!-- Filter Section -->
-		<div class="filter-section">
-			<div class="row">
-				<div class="col-md-2">
-					<label>From Date:</label>
-					<input type="date" id="from-date" class="form-control">
-				</div>
-				<div class="col-md-2">
-					<label>To Date:</label>
-					<input type="date" id="to-date" class="form-control">
-				</div>
-				<div class="col-md-2">
-					<label>Item:</label>
-					<select id="item-filter" class="form-control">
-						<option value="">All Items</option>
-					</select>
-				</div>
-				<div class="col-md-2" style="display: none;">
-					<label>Warehouse:</label>
-					<select id="warehouse-filter" class="form-control">
-						<option value="">All Warehouses</option>
-					</select>
-				</div>
-				<div class="col-md-2">
-					<label>Item Group:</label>
-					<select id="item-group-filter" class="form-control">
-						<option value="">All Item Groups</option>
-						<option value="MQH Teacher Guides (Urdu Version)">MQH Teacher Guides (Urdu Version)</option>
-						<option value="MQH Books (Urdu Version)">MQH Books (Urdu Version)</option>
-						<option value="MQH Books (Sindhi Version)">MQH Books (Sindhi Version)</option>
-						<option value="MQH Books (English Version)">MQH Books (English Version)</option>
-						<option value="QPS">QPS</option>
-					</select>
-				</div>
-				<div class="col-md-2">
-					<label>Show Warehouse Stock:</label>
-					<select id="warehouse-stock-filter" class="form-control">
-						<option value="">Hide All</option>
-						<option value="head-office">TIF Head Office Stock</option>
-						<option value="old-office">TIF Old Office</option>
-						<option value="nazimabad">Nazimabad Warehouse</option>
-						<option value="all">Show All</option>
-					</select>
-				</div>
-			</div>
+		<!-- Filter Section (Frappe MultiSelectList like Stock Balance) -->
+		<div class="filter-section stock-detail-filters">
+			<div id="stock-detail-filter-fields"></div>
 			<div class="row" style="margin-top: 10px;">
 				<div class="col-md-12">
 					<button id="apply-filters" class="btn btn-primary">Apply Filters</button>
@@ -75,8 +33,8 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 		</div>
 		
 		<div class="report-content">
-			<!-- <div class="report-section">
-				<h4>MQH Books Stock Details - 2025-26</h4>
+			<div class="report-section mqh-books-section">
+				<h4>MQH Books Stock Details</h4>
 				<div class="table-container">
 					<table class="table table-bordered table-striped" id="mqh-books-table">
 						<thead>
@@ -84,14 +42,14 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 								<th>S.#</th>
 								<th>Item Code</th>
 								<th>Item Name</th>
-								<th>Opening Stock Sep-2025</th>
-								<th>Received Vendor till 30-Sep-2025</th>
-								<th>Book Return till 30-Sep-2025</th>
-								<th>Delivered till 30-Sep-2025</th>
-								<th>Available Stock till 30-Sep-2025</th>
-								<th>Demand Received till 30-Sep-2025</th>
-								<th>Books Sale Details till 30-Sep-2025</th>
-								<th>Total Amount of Books Sale till 30-Sep-2025</th>
+								<th>Opening Stock</th>
+								<th>Received Vendor</th>
+								<th>Book Return</th>
+								<th>Delivered</th>
+								<th>Available Stock</th>
+								<th>Demand Received</th>
+								<th>Books Sale Details</th>
+								<th>Total Amount of Books Sale</th>
 							</tr>
 						</thead>
 						<tbody id="mqh-books-tbody">
@@ -100,34 +58,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 						</tfoot>
 					</table>
 				</div>
-			</div> -->
-			
-			<!-- <div class="report-section">
-				<h4>MQH Books (Urdu Version) - 2025-26</h4>
-				<div class="table-container">
-					<table class="table table-bordered table-striped" id="mqh-urdu-books-table">
-						<thead>
-							<tr>
-								<th>S.#</th>
-								<th>Item Code</th>
-								<th>Item Name</th>
-								<th>Opening Stock Sep-2025</th>
-								<th>Received Vendor till 30-Sep-2025</th>
-								<th>Book Return till 30-Sep-2025</th>
-								<th>Delivered till 30-Sep-2025</th>
-								<th>Available Stock till 30-Sep-2025</th>
-								<th>Demand Received till 30-Sep-2025</th>
-								<th>Books Sale Details till 30-Sep-2025</th>
-								<th>Total Amount of Books Sale till 30-Sep-2025</th>
-							</tr>
-						</thead>
-						<tbody id="mqh-urdu-books-tbody">
-						</tbody>
-						<tfoot id="mqh-urdu-books-tfoot">
-						</tfoot>
-					</table>
-				</div>
-			</div> -->
+			</div>
 			
 			<!-- Single Warehouse Section (shown when specific warehouse is selected) -->
 			<div class="report-section single-warehouse-section" style="display: none;">
@@ -155,80 +86,8 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 				</div>
 			</div>
 			
-			<div class="report-section head-office-section" style="display: none;">
-				<h4>TIF Head Office Stock</h4>
-				<div class="table-container">
-					<table class="table table-bordered table-striped" id="head-office-table">
-						<thead>
-							<tr>
-								<th>S.#</th>
-								<th>Particulars</th>
-								<th>Opening Balance</th>
-								<th>Received (Vendor)</th>
-								<th>Courier Returned</th>
-								<th>Transferred In Warehouse</th>
-								<th>Transferred Out Warehouse</th>
-								<th>Delivered</th>
-								<th>Ending Balance</th>
-							</tr>
-						</thead>
-						<tbody id="head-office-tbody">
-						</tbody>
-						<tfoot id="head-office-tfoot">
-						</tfoot>
-					</table>
-				</div>
-			</div>
-			
-			<div class="report-section old-office-section" style="display: none;">
-				<h4>TIF Old Office</h4>
-				<div class="table-container">
-					<table class="table table-bordered table-striped" id="old-office-table">
-						<thead>
-							<tr>
-								<th>S.#</th>
-								<th>Particulars</th>
-								<th>Opening Balance</th>
-								<th>Received (Vendor)</th>
-								<th>Courier Returned</th>
-								<th>Transferred In Warehouse</th>
-								<th>Transferred Out Warehouse</th>
-								<th>Delivered</th>
-								<th>Ending Balance</th>
-							</tr>
-						</thead>
-						<tbody id="old-office-tbody">
-						</tbody>
-						<tfoot id="old-office-tfoot">
-						</tfoot>
-					</table>
-				</div>
-			</div>
-			
-			<div class="report-section nazimabad-section" style="display: none;">
-				<h4>Nazimabad Warehouse</h4>
-				<div class="table-container">
-					<table class="table table-bordered table-striped" id="nazimabad-table">
-						<thead>
-							<tr>
-								<th>S.#</th>
-								<th>Particulars</th>
-								<th>Opening Balance</th>
-								<th>Received (Vendor)</th>
-								<th>Courier Returned</th>
-								<th>Transferred In Warehouse</th>
-								<th>Transferred Out Warehouse</th>
-								<th>Delivered</th>
-								<th>Ending Balance</th>
-							</tr>
-						</thead>
-						<tbody id="nazimabad-tbody">
-						</tbody>
-						<tfoot id="nazimabad-tfoot">
-						</tfoot>
-					</table>
-				</div>
-			</div>
+			<!-- Dynamically rendered warehouse stock sections (based on MultiSelectList) -->
+			<div id="dynamic-warehouse-sections"></div>
 		</div>
 	</div>`);
 	
@@ -283,6 +142,16 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 				margin-right: 10px;
 				padding: 8px 16px;
 				font-size: 14px;
+			}
+			.stock-detail-filters .form-group {
+				margin-bottom: 12px;
+			}
+			.stock-detail-filters .multiselect-list .form-control {
+				min-height: 32px;
+				height: auto;
+			}
+			.stock-detail-filters .frappe-control[data-fieldtype="MultiSelectList"] {
+				min-width: 220px;
 			}
 			.report-section {
 				margin-bottom: 40px;
@@ -388,23 +257,219 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 	
 	// Set default dates to current month
 	const { fromDate: defaultFromDate, toDate: defaultToDate } = getCurrentMonthDates();
-	
-	// Set default date values immediately (before event listeners are set up)
-	// The values will be set once the DOM elements are available
-	setTimeout(function() {
-		$('#from-date').val(defaultFromDate);
-		$('#to-date').val(defaultToDate);
-	}, 100);
+
+	// Frappe-style filters (same MultiSelectList UX as Stock Balance report)
+	let stock_detail_filters = null;
+
+	function setupStockDetailFilters() {
+		stock_detail_filters = new frappe.ui.FieldGroup({
+			parent: $('#stock-detail-filter-fields'),
+			fields: [
+				{
+					fieldtype: 'Date',
+					fieldname: 'from_date',
+					label: __('From Date'),
+					default: defaultFromDate,
+					reqd: 1
+				},
+				{ fieldtype: 'Column Break' },
+				{
+					fieldtype: 'Date',
+					fieldname: 'to_date',
+					label: __('To Date'),
+					default: defaultToDate,
+					reqd: 1
+				},
+				{ fieldtype: 'Column Break' },
+				{
+					fieldtype: 'MultiSelectList',
+					fieldname: 'item_group',
+					label: __('Item Groups'),
+					options: 'Item Group',
+					get_data: function(txt) {
+						return frappe.call({
+							method: 'tif_customization.tif_customization.page.stock_detail.stock_detail.get_report_item_groups',
+							args: { txt: txt || '' }
+						}).then(r => r.message || []);
+					},
+					onchange: function() {
+						const item_field = stock_detail_filters.fields_dict.item;
+						if (item_field) {
+							item_field.set_value([]);
+						}
+					}
+				},
+				{ fieldtype: 'Section Break' },
+				{
+					fieldtype: 'MultiSelectList',
+					fieldname: 'item',
+					label: __('Items'),
+					options: 'Item',
+					get_data: function(txt) {
+						const item_groups = stock_detail_filters.get_value('item_group') || [];
+						return frappe.call({
+							method: 'tif_customization.tif_customization.page.stock_detail.stock_detail.get_items',
+							args: {
+								item_group: JSON.stringify(item_groups || []),
+								txt: txt || ''
+							}
+						}).then(r => {
+							return (r.message || []).map(item => ({
+								value: item.item_code,
+								description: item.item_name || ''
+							}));
+						});
+					}
+				},
+				{ fieldtype: 'Column Break' },
+				{
+					fieldtype: 'MultiSelectList',
+					fieldname: 'warehouses',
+					label: __('Warehouses'),
+					options: 'Warehouse',
+					get_data: function(txt) {
+						return frappe.call({
+							method: 'tif_customization.tif_customization.page.stock_detail.stock_detail.get_warehouses',
+							args: { txt: txt || '' }
+						}).then(r => r.message || []);
+					}
+				}
+			]
+		});
+		stock_detail_filters.make();
+	}
+
+	function getFilterValues() {
+		if (!stock_detail_filters) {
+			return {
+				from_date: defaultFromDate,
+				to_date: defaultToDate,
+				item: null,
+				item_group: null,
+				warehouses: [],
+				warehouse: null,
+				warehouse_sections: []
+			};
+		}
+		const selectedItems = stock_detail_filters.get_value('item') || [];
+		const selectedGroups = stock_detail_filters.get_value('item_group') || [];
+		const selectedWarehouses = stock_detail_filters.get_value('warehouses') || [];
+		const items = Array.isArray(selectedItems) ? selectedItems.filter(Boolean) : [];
+		const groups = Array.isArray(selectedGroups) ? selectedGroups.filter(Boolean) : [];
+		const warehouses = Array.isArray(selectedWarehouses) ? selectedWarehouses.filter(Boolean) : [];
+		return {
+			from_date: stock_detail_filters.get_value('from_date') || defaultFromDate,
+			to_date: stock_detail_filters.get_value('to_date') || defaultToDate,
+			item: items.length ? items : null,
+			item_group: groups.length ? groups : null,
+			warehouses: warehouses,
+			warehouse: null,
+			warehouse_sections: []
+		};
+	}
+
+	function renderSelectedWarehouseSections(warehouseList) {
+		const $wrap = $('#dynamic-warehouse-sections');
+		$wrap.empty();
+		(warehouseList || []).forEach((wh, idx) => {
+			const safeId = `wh-dyn-${idx}`;
+			const title = frappe.utils.escape_html(wh.warehouse_name || wh.warehouse || 'Warehouse');
+			const section = $(`
+				<div class="report-section dynamic-warehouse-section" data-warehouse="${frappe.utils.escape_html(wh.warehouse || '')}">
+					<h4>${title}</h4>
+					<div class="table-container">
+						<table class="table table-bordered table-striped" id="${safeId}-table">
+							<thead>
+								<tr>
+									<th>S.#</th>
+									<th>Particulars</th>
+									<th>Opening Balance</th>
+									<th>Received (Vendor)</th>
+									<th>Courier Returned</th>
+									<th>Transferred In Warehouse</th>
+									<th>Transferred Out Warehouse</th>
+									<th>Delivered</th>
+									<th>Ending Balance</th>
+								</tr>
+							</thead>
+							<tbody></tbody>
+							<tfoot></tfoot>
+						</table>
+					</div>
+				</div>
+			`);
+			$wrap.append(section);
+			populateDynamicWarehouseTable(section.find('tbody'), section.find('tfoot'), wh.data || []);
+		});
+	}
+
+	function populateDynamicWarehouseTable(tbody, tfoot, data) {
+		tbody.empty();
+		tfoot.empty();
+		data = data || [];
+
+		if (!data.length) {
+			tbody.append(`
+				<tr>
+					<td colspan="9" style="text-align:center; color:#888;">
+						No stock ledger entries found for this warehouse with the selected filters.
+					</td>
+				</tr>
+			`);
+			return;
+		}
+
+		data.forEach(item => {
+			tbody.append(`
+				<tr>
+					<td style="text-align: center;">${item.s_no}</td>
+					<td class="particulars-cell">${frappe.utils.escape_html(item.particulars || '')}</td>
+					<td class="number-cell">${formatNumber(item.opening_balance)}</td>
+					<td class="number-cell">${formatNumber(item.received_vendor)}</td>
+					<td class="number-cell">${formatNumber(item.courier_returned)}</td>
+					<td class="number-cell">${formatNumber(item.transferred_in)}</td>
+					<td class="number-cell">${formatNumber(item.transferred_out)}</td>
+					<td class="number-cell">${formatNumber(item.delivered)}</td>
+					<td class="number-cell">${formatNumber(item.ending_balance)}</td>
+				</tr>
+			`);
+		});
+
+		const totals = {
+			opening_balance: data.reduce((sum, item) => sum + (item.opening_balance || 0), 0),
+			received_vendor: data.reduce((sum, item) => sum + (item.received_vendor || 0), 0),
+			courier_returned: data.reduce((sum, item) => sum + (item.courier_returned || 0), 0),
+			transferred_in: data.reduce((sum, item) => sum + (item.transferred_in || 0), 0),
+			transferred_out: data.reduce((sum, item) => sum + (item.transferred_out || 0), 0),
+			delivered: data.reduce((sum, item) => sum + (item.delivered || 0), 0),
+			ending_balance: data.reduce((sum, item) => sum + (item.ending_balance || 0), 0)
+		};
+
+		tfoot.append(`
+			<tr>
+				<td colspan="2"><strong>Total Stock</strong></td>
+				<td class="number-cell"><strong>${formatNumber(totals.opening_balance)}</strong></td>
+				<td class="number-cell"><strong>${formatNumber(totals.received_vendor)}</strong></td>
+				<td class="number-cell"><strong>${formatNumber(totals.courier_returned)}</strong></td>
+				<td class="number-cell"><strong>${formatNumber(totals.transferred_in)}</strong></td>
+				<td class="number-cell"><strong>${formatNumber(totals.transferred_out)}</strong></td>
+				<td class="number-cell"><strong>${formatNumber(totals.delivered)}</strong></td>
+				<td class="number-cell"><strong>${formatNumber(totals.ending_balance)}</strong></td>
+			</tr>
+		`);
+	}
+
+	setupStockDetailFilters();
 	
 	function loadStockData() {
-		// Hide all warehouse sections by default
-		updateWarehouseSections('');
-		updateWarehouseStockVisibility(''); // Hide all warehouse stock tables by default
+		$('#dynamic-warehouse-sections').empty();
 		
-		// Get data from Python controller via AJAX
+		const filters = getFilterValues();
+		updateTableHeaders(filters.from_date, filters.to_date);
+
 		frappe.call({
 			method: 'tif_customization.tif_customization.page.stock_detail.stock_detail.get_stock_data',
-			args: {},
+			args: { filters: JSON.stringify(filters) },
 			callback: function(r) {
 				console.log('Initial load response:', r);
 				console.log('Response message:', r.message);
@@ -422,42 +487,15 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 						});
 					}
 					
-					// Render KPIs even if data is empty
 					if (r.message.kpi_data) {
 						renderKPIs(r.message.kpi_data);
 					}
 					
-					// Populate tables with dynamic data (even if empty arrays)
-					const mqhData = r.message.mqh_books_data || [];
-					const urduData = r.message.mqh_urdu_books_data || [];
-					const headOfficeData = r.message.head_office_data || [];
-					const oldOfficeData = r.message.old_office_data || [];
-					const nazimabadData = r.message.nazimabad_warehouse_data || [];
-					
-					console.log('Populating tables with:', {
-						mqh: mqhData.length,
-						urdu: urduData.length,
-						headOffice: headOfficeData.length,
-						oldOffice: oldOfficeData.length,
-						nazimabad: nazimabadData.length
-					});
-					
-					// populateMQHBooksTable(mqhData);
-					populateMQHUrduBooksTable(urduData);
-					populateHeadOfficeTable(headOfficeData);
-					populateOldOfficeTable(oldOfficeData);
-					populateNazimabadTable(nazimabadData);
-					
-					// Show message if no data
-					if (mqhData.length === 0 && urduData.length === 0 && !r.message.error) {
-						frappe.msgprint({
-							title: 'No Data Found',
-							message: 'No stock data found for the specified items. Please check:<br>1. Items exist in your system<br>2. Stock transactions exist<br>3. Check server logs for details',
-							indicator: 'orange'
-						});
-					}
+					populateMQHBooksTable(r.message.mqh_books_data || []);
+					populateMQHUrduBooksTable(r.message.mqh_urdu_books_data || []);
+					renderSelectedWarehouseSections(r.message.selected_warehouses_data || []);
 				} else {
-					console.error('No message in response');
+					console.log('No message in response, using fallback');
 					loadStockDataFallback();
 				}
 			},
@@ -467,97 +505,15 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 			}
 		});
 	}
-	
-	// Load filter options
+
 	function loadFilterOptions() {
-		console.log('Loading filter options...');
-		console.log('Filter section HTML:', $('.filter-section').html());
-		
-		// Load warehouses
-		frappe.call({
-			method: 'tif_customization.tif_customization.page.stock_detail.stock_detail.get_warehouses',
-			args: {},
-			callback: function(r) {
-				console.log('Warehouses response:', r);
-				if (r.message) {
-					const warehouseSelect = $('#warehouse-filter');
-					if (warehouseSelect.length) {
-						warehouseSelect.empty().append('<option value="">All Warehouses</option>');
-						r.message.forEach(warehouse => {
-							warehouseSelect.append(`<option value="${warehouse.name}">${warehouse.warehouse_name}</option>`);
-						});
-						console.log('Warehouses loaded:', r.message.length);
-					} else {
-						console.log('Warehouse select not found');
-					}
-				}
-			},
-			error: function(err) {
-				console.log('Error loading warehouses:', err);
-			}
-		});
-		
-		// Item group filter is already populated with predefined options in HTML
-		// No need to load from database - only using predefined filters:
-		// - MQH Teacher Guides (Urdu Version)
-		// - MQH Books (Urdu Version)
-		// - MQH Books (Sindhi Version)
-		// - MQH Books (English Version)
-		// - QPS
-		
-		// Load items initially (without item group filter)
-		loadItems();
+		// MultiSelectList loads warehouses/items on demand
 	}
-	
-	// Function to load items (optionally filtered by item group)
+
 	function loadItems(itemGroup = null) {
-		// Ensure itemGroup is null if empty string
-		if (itemGroup === '' || itemGroup === undefined) {
-			itemGroup = null;
-		}
-		
-		frappe.call({
-			method: 'tif_customization.tif_customization.page.stock_detail.stock_detail.get_items',
-			args: {
-				item_group: itemGroup
-			},
-			callback: function(r) {
-				console.log('Items response:', r);
-				console.log('Items response message:', r.message);
-				console.log('Items count:', r.message ? r.message.length : 0);
-				console.log('Filtered by item group:', itemGroup);
-				if (r.message && r.message.length > 0) {
-					const itemSelect = $('#item-filter');
-					console.log('Item select element found:', itemSelect.length > 0);
-					if (itemSelect.length) {
-						itemSelect.empty().append('<option value="">All Items</option>');
-						r.message.forEach(function(item, index) {
-							const optionValue = item.item_code || '';
-							const optionText = `${item.item_code || ''} - ${item.item_name || ''}`;
-							console.log(`Adding item ${index + 1}: value="${optionValue}", text="${optionText}"`);
-							itemSelect.append(`<option value="${optionValue}">${optionText}</option>`);
-						});
-						console.log('Items loaded:', r.message.length);
-						console.log('Total options in dropdown:', itemSelect.find('option').length);
-						console.log('First few options:', itemSelect.find('option').slice(0, 5).map(function() { return $(this).val() + ':' + $(this).text(); }).get());
-					} else {
-						console.log('Item select not found');
-					}
-				} else {
-					console.log('No items returned from backend');
-					const itemSelect = $('#item-filter');
-					if (itemSelect.length) {
-						itemSelect.empty().append('<option value="">All Items</option>');
-					}
-				}
-			},
-			error: function(err) {
-				console.log('Error loading items:', err);
-				console.error('Error details:', err);
-			}
-		});
+		// no-op: Item MultiSelectList refreshes options on open/search
 	}
-	
+
 	// Show custom loader overlay
 	function showLoader() {
 		// Remove existing loader if any
@@ -610,68 +566,30 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 		applyButton.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Loading...');
 		showLoader();
 		
-		const itemSelect = $('#item-filter');
-		const itemFilterValue = itemSelect.val();
-		const selectedOption = itemSelect.find('option:selected');
-		console.log('Item filter element:', itemSelect);
-		console.log('Item filter value:', itemFilterValue);
-		console.log('Item filter value type:', typeof itemFilterValue);
-		console.log('Item filter is empty string?', itemFilterValue === '');
-		console.log('Item filter selected option text:', selectedOption.text());
-		console.log('Item filter selected option value:', selectedOption.val());
-		console.log('All options in dropdown:', itemSelect.find('option').map(function() { return $(this).val() + ':' + $(this).text(); }).get());
-		
-		const filters = {
-			from_date: $('#from-date').val(),
-			to_date: $('#to-date').val(),
-			item: itemFilterValue && itemFilterValue !== '' ? itemFilterValue : null, // Convert empty string to null
-			warehouse: $('#warehouse-filter').val(),
-			item_group: $('#item-group-filter').val()
-		};
+		const filters = getFilterValues();
 		
 		console.log('Filters object:', filters);
 		console.log('Filters JSON:', JSON.stringify(filters));
-		console.log('Item filter in filters object:', filters.item);
 		
 		// Update table headers with selected date range
 		updateTableHeaders(filters.from_date, filters.to_date);
 		
-		// Show/hide warehouse sections based on filter
-		updateWarehouseSections(filters.warehouse);
-		
 		frappe.call({
 			method: 'tif_customization.tif_customization.page.stock_detail.stock_detail.get_stock_data',
-			args: filters,
+			args: { filters: JSON.stringify(filters) },
 			callback: function(r) {
 				console.log('Filter response:', r);
 				console.log('MQH Books Data Count:', r.message?.mqh_books_data?.length || 0);
-				console.log('MQH Books Data:', r.message?.mqh_books_data);
-				console.log('Head Office Data Count:', r.message?.head_office_data?.length || 0);
-				console.log('Head Office Data:', r.message?.head_office_data);
 				
 				if (r.message && !r.message.error) {
-					// Render KPIs
 					if (r.message.kpi_data) {
 						renderKPIs(r.message.kpi_data);
 					}
 					
-					// Populate tables with filtered data
 					populateMQHBooksTable(r.message.mqh_books_data || []);
 					populateMQHUrduBooksTable(r.message.mqh_urdu_books_data || []);
+					renderSelectedWarehouseSections(r.message.selected_warehouses_data || []);
 					
-					// Show warehouse data based on filter
-					if (filters.warehouse) {
-						// Show only selected warehouse data
-						populateWarehouseTable(r.message.warehouse_data || [], filters.warehouse);
-					} else {
-						// Show all warehouse data
-						populateHeadOfficeTable(r.message.head_office_data || []);
-						populateOldOfficeTable(r.message.old_office_data || []);
-						populateNazimabadTable(r.message.nazimabad_warehouse_data || []);
-					}
-					
-					// Hide loader and re-enable button after tables are rendered
-					// Use requestAnimationFrame to ensure DOM updates are complete
 					requestAnimationFrame(function() {
 						setTimeout(function() {
 							hideLoader();
@@ -686,10 +604,8 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 				}
 			},
 			error: function(err) {
-				// Hide loader and re-enable button on error
 				hideLoader();
 				applyButton.prop('disabled', false).html(originalButtonText);
-				
 				console.log('Filter error:', err);
 				loadStockDataFallback();
 			}
@@ -747,26 +663,34 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 		}
 	}
 	
-	// Update warehouse stock visibility based on filter selection
-	function updateWarehouseStockVisibility(selectedValue) {
+	// Update warehouse stock visibility based on multi-select filter
+	function updateWarehouseStockVisibility(selectedValues) {
+		const selected = Array.isArray(selectedValues)
+			? selectedValues.filter(Boolean)
+			: (selectedValues ? [selectedValues] : []);
+
 		// Hide all warehouse sections first
 		$('.head-office-section').hide();
 		$('.old-office-section').hide();
 		$('.nazimabad-section').hide();
-		
-		// Show selected warehouse section(s)
-		if (selectedValue === 'head-office') {
-			$('.head-office-section').show();
-		} else if (selectedValue === 'old-office') {
-			$('.old-office-section').show();
-		} else if (selectedValue === 'nazimabad') {
-			$('.nazimabad-section').show();
-		} else if (selectedValue === 'all') {
-			$('.head-office-section').show();
-			$('.old-office-section').show();
-			$('.nazimabad-section').show();
+		$('.millat-section').hide();
+
+		if (!selected.length) {
+			return;
 		}
-		// If selectedValue is empty or 'Hide All', all sections remain hidden
+
+		if (selected.includes('all')) {
+			$('.head-office-section').show();
+			$('.old-office-section').show();
+			$('.nazimabad-section').show();
+			$('.millat-section').show();
+			return;
+		}
+
+		if (selected.includes('head-office')) $('.head-office-section').show();
+		if (selected.includes('old-office')) $('.old-office-section').show();
+		if (selected.includes('nazimabad')) $('.nazimabad-section').show();
+		if (selected.includes('millat')) $('.millat-section').show();
 	}
 	
 	// Populate single warehouse table
@@ -828,35 +752,30 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 	// Reset filters
 	function resetFilters() {
 		const { fromDate, toDate } = getCurrentMonthDates();
-		$('#from-date').val(fromDate);
-		$('#to-date').val(toDate);
-		$('#item-filter').val('');
-		$('#warehouse-filter').val('');
-		$('#item-group-filter').val('');
+		if (stock_detail_filters) {
+			stock_detail_filters.set_values({
+				from_date: fromDate,
+				to_date: toDate,
+				item_group: [],
+				item: [],
+				warehouses: []
+			});
+		}
 		
-		// Reset table headers to default
 		updateTableHeaders(fromDate, toDate);
-		
-		// Show all warehouse sections
-		updateWarehouseSections('');
-		
-		loadStockData(); // Load with default filters
+		$('#dynamic-warehouse-sections').empty();
+		loadStockData();
 	}
 	
 	// Export to Excel
 	function exportToExcel() {
-		// Simple table export functionality
-		const tables = ['mqh-books-table', 'mqh-urdu-books-table', 'head-office-table', 'old-office-table', 'nazimabad-table'];
 		let csvContent = '';
-		
-		tables.forEach(tableId => {
-			const table = document.getElementById(tableId);
-			if (table) {
-				csvContent += table.outerHTML + '\n\n';
-			}
+		const main = document.getElementById('mqh-books-table');
+		if (main) csvContent += main.outerHTML + '\n\n';
+		$('#dynamic-warehouse-sections table').each(function() {
+			csvContent += this.outerHTML + '\n\n';
 		});
 		
-		// Create and download file
 		const blob = new Blob([csvContent], { type: 'text/csv' });
 		const url = window.URL.createObjectURL(blob);
 		const a = document.createElement('a');
@@ -868,35 +787,11 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 	
 	// Print Report
 	function printReport() {
-		// Get date range from filters
-		const { fromDate: defaultFromDate, toDate: defaultToDate } = getCurrentMonthDates();
-		const fromDate = $('#from-date').val() || defaultFromDate;
-		const toDate = $('#to-date').val() || defaultToDate;
-		
-		// Get selected warehouse filter value
-		const selectedWarehouse = $('#warehouse-stock-filter').val() || '';
-		
-		// Add data attribute to track which sections should be visible in print
-		$('.head-office-section, .old-office-section, .nazimabad-section').removeAttr('data-print-visible');
-		
-		// Hide warehouse sections that are not selected before printing
-		if (selectedWarehouse === 'head-office') {
-			$('.old-office-section, .nazimabad-section').hide().attr('data-print-visible', 'false');
-			$('.head-office-section').show().attr('data-print-visible', 'true');
-		} else if (selectedWarehouse === 'old-office') {
-			$('.head-office-section, .nazimabad-section').hide().attr('data-print-visible', 'false');
-			$('.old-office-section').show().attr('data-print-visible', 'true');
-		} else if (selectedWarehouse === 'nazimabad') {
-			$('.head-office-section, .old-office-section').hide().attr('data-print-visible', 'false');
-			$('.nazimabad-section').show().attr('data-print-visible', 'true');
-		} else if (selectedWarehouse === 'all') {
-			// Show all warehouse sections
-			$('.head-office-section, .old-office-section, .nazimabad-section').show().attr('data-print-visible', 'true');
-		} else {
-			// Hide all warehouse sections if nothing is selected
-			$('.head-office-section, .old-office-section, .nazimabad-section').hide().attr('data-print-visible', 'false');
-		}
-		
+		const filters = getFilterValues();
+		const fromDate = filters.from_date || defaultFromDate;
+		const toDate = filters.to_date || defaultToDate;
+		$('.dynamic-warehouse-section').attr('data-print-visible', 'true');
+
 		// Add print styles if not already added
 		if (!$('#print-styles-stock-detail').length) {
 			let printStyles = `
@@ -1074,7 +969,8 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 					/* Hide warehouse sections that are marked as not visible for print */
 					.head-office-section[data-print-visible="false"],
 					.old-office-section[data-print-visible="false"],
-					.nazimabad-section[data-print-visible="false"] {
+					.nazimabad-section[data-print-visible="false"],
+					.millat-section[data-print-visible="false"] {
 						display: none !important;
 					}
 					.report-section h4 {
@@ -1274,125 +1170,41 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 		window.print();
 		
 		// Restore warehouse sections visibility after print (in case user cancels)
-		setTimeout(function() {
-			updateWarehouseStockVisibility(selectedWarehouse);
-		}, 1000);
+		// Dynamic sections remain as-is after print
 	}
 	
 	// Event listeners - set up after container is added to DOM
 	setTimeout(function() {
-		console.log('Setting up event listeners...');
-		console.log('Apply button found:', $('#apply-filters').length);
-		console.log('Reset button found:', $('#reset-filters').length);
-		console.log('Export button found:', $('#export-excel').length);
-		console.log('Item filter found:', $('#item-filter').length);
-		
-		// Add change event listener for item filter to debug selection
-		$('#item-filter').on('change', function() {
-			const selectedValue = $(this).val();
-			const selectedText = $(this).find('option:selected').text();
-			console.log('=== Item filter changed ===');
-			console.log('Selected value:', selectedValue);
-			console.log('Selected text:', selectedText);
-			console.log('All options:', $(this).find('option').map(function() { return $(this).val() + ':' + $(this).text(); }).get());
-		});
-		
 		$('#apply-filters').click(function(e) {
 			e.preventDefault();
-			console.log('Apply button clicked');
 			applyFilters();
 		});
 		$('#reset-filters').click(function(e) {
 			e.preventDefault();
-			console.log('Reset button clicked');
 			resetFilters();
 		});
 		$('#export-excel').click(function(e) {
 			e.preventDefault();
-			console.log('Export button clicked');
 			exportToExcel();
 		});
-		
 		$('#print-report').click(function(e) {
 			e.preventDefault();
-			console.log('Print button clicked');
 			printReport();
 		});
-		
-		// Add change event listener for warehouse stock filter
-		$('#warehouse-stock-filter').on('change', function() {
-			const selectedValue = $(this).val();
-			console.log('Warehouse stock filter changed:', selectedValue);
-			updateWarehouseStockVisibility(selectedValue);
-		});
-		
-		$('#test-button').click(function(e) {
-			e.preventDefault();
-			alert('Test button works!');
-			console.log('Test button clicked');
-		});
-		
-		// Add change event listener to item group filter
-		const itemGroupFilter = $('#item-group-filter');
-		if (itemGroupFilter.length > 0) {
-			console.log('Setting up item group filter change listener');
-			itemGroupFilter.on('change', function() {
-				const selectedItemGroup = $(this).val();
-				console.log('=== Item group changed ===');
-				console.log('Selected item group:', selectedItemGroup);
-				console.log('Item group filter element:', $(this));
-				
-				// Reset item filter when item group changes
-				$('#item-filter').val('');
-				
-				// Reload items filtered by selected item group (pass null if empty string)
-				const itemGroupValue = selectedItemGroup && selectedItemGroup !== '' ? selectedItemGroup : null;
-				console.log('Calling loadItems with item_group:', itemGroupValue);
-				loadItems(itemGroupValue);
-			});
-			console.log('Item group filter change listener attached');
-		} else {
-			console.error('Item group filter element not found!');
-		}
-		
-		// Load filter options
-		loadFilterOptions();
-		
-		// Automatically apply filters with current month dates on page load
-		// This ensures the report shows current month data immediately without requiring manual filter application
+
+		// Load current month data on page open
 		setTimeout(function() {
-			// Get current month dates to ensure we have the latest values
-			const { fromDate: currentFromDate, toDate: currentToDate } = getCurrentMonthDates();
-			
-			// Ensure date fields have values before applying filters
-			if (!$('#from-date').val()) {
-				$('#from-date').val(currentFromDate);
-			}
-			if (!$('#to-date').val()) {
-				$('#to-date').val(currentToDate);
-			}
-			// Apply filters to load current month data
 			applyFilters();
 		}, 200);
-	}, 500);
+	}, 300);
 	
 	function loadStockDataFallback() {
-		// Hide all warehouse sections by default
-		updateWarehouseSections('');
-		updateWarehouseStockVisibility(''); // Hide all warehouse stock tables by default
-		
-		// Fallback hardcoded data
+		$('#dynamic-warehouse-sections').empty();
 		const mqhBooksData = [
 			{ s_no: 1, particulars: "No Data Found - Check Error Logs", opening_stock: 0, received_vendor: 0, book_return: 0, delivered: 0, available_stock: 0, demand_received: 0, books_sale: 0, total_amount: 0 }
 		];
-		
 		populateMQHBooksTable(mqhBooksData);
 		populateMQHUrduBooksTable([]);
-		populateHeadOfficeTable([]);
-		populateOldOfficeTable([]);
-		populateNazimabadTable([]);
-		
-		// Show error message
 		frappe.msgprint({
 			title: 'No Data Found',
 			message: 'No stock data found. Please check:<br>1. Items exist in your system<br>2. Warehouses are configured<br>3. Stock transactions exist<br>4. Check Error Log for details',
@@ -1608,6 +1420,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 	function populateMQHUrduBooksTable(data) {
 		const tbody = $('#mqh-urdu-books-tbody');
 		const tfoot = $('#mqh-urdu-books-tfoot');
+		if (!tbody.length) return;
 		
 		// Clear existing content
 		tbody.empty();
@@ -1764,7 +1577,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 							<span style="font-size: 13px; opacity: 0.9;">Book Return:</span>
 							<strong style="font-size: 13px;">${formatNumber(kpiData.tps_book_return || 0)}</strong>
 						</div>
-						<p style="margin: 10px 0 0 0; font-size: 11px;color: black; opacity: 0.8; border-top: 1px solid rgba(0,0,0,0.1); padding-top: 8px;">Includes: TPS Para, Noorani Qaida, Noorani Qaida Workbook, Panj Para 26-30, Panj Para 1-5, NQTG</p>
+						<p style="margin: 10px 0 0 0; font-size: 11px;color: black; opacity: 0.8; border-top: 1px solid rgba(0,0,0,0.1); padding-top: 8px;">Includes: Noorani Qaida, Noorani Qaida Workbook, Panj Para 26-30, Panj Para 1-5, NQTG</p>
 					</div>
 				</div>
 				<!-- QPS Department -->
@@ -2029,8 +1842,8 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 		kpiSection.html(summaryHtml + itemsHtml);
 		
 		$('.millat-purchase-kpi').on('click', function() {
-			const fromDate = $('#from-date').val() || frappe.datetime.month_start();
-			const toDate = $('#to-date').val() || frappe.datetime.get_today();
+			const fromDate = (stock_detail_filters && stock_detail_filters.get_value('from_date')) || frappe.datetime.month_start();
+			const toDate = (stock_detail_filters && stock_detail_filters.get_value('to_date')) || frappe.datetime.get_today();
 			let listUrl =
 				'/app/purchase-order?supplier=' +
 				encodeURIComponent('Millat Printers & Publishers Peshawar');
@@ -2043,8 +1856,8 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 		// Add click handler for Return Books KPI
 		$('.return-books-kpi').on('click', function() {
 			// Get current date filters
-			const fromDate = $('#from-date').val() || frappe.datetime.month_start();
-			const toDate = $('#to-date').val() || frappe.datetime.get_today();
+			const fromDate = (stock_detail_filters && stock_detail_filters.get_value('from_date')) || frappe.datetime.month_start();
+			const toDate = (stock_detail_filters && stock_detail_filters.get_value('to_date')) || frappe.datetime.get_today();
 			
 			// Get current company (default company from user defaults)
 			const company = frappe.defaults.get_user_default("Company") || '';
@@ -2231,6 +2044,68 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 			ending_balance: data.reduce((sum, item) => sum + item.ending_balance, 0)
 		};
 		
+		const totalRow = $(`
+			<tr>
+				<td colspan="2"><strong>Total Stock</strong></td>
+				<td class="number-cell"><strong>${formatNumber(totals.opening_balance)}</strong></td>
+				<td class="number-cell"><strong>${formatNumber(totals.received_vendor)}</strong></td>
+				<td class="number-cell"><strong>${formatNumber(totals.courier_returned)}</strong></td>
+				<td class="number-cell"><strong>${formatNumber(totals.transferred_in)}</strong></td>
+				<td class="number-cell"><strong>${formatNumber(totals.transferred_out)}</strong></td>
+				<td class="number-cell"><strong>${formatNumber(totals.delivered)}</strong></td>
+				<td class="number-cell"><strong>${formatNumber(totals.ending_balance)}</strong></td>
+			</tr>
+		`);
+		tfoot.append(totalRow);
+	}
+
+	function populateMillatTable(data) {
+		const tbody = $('#millat-tbody');
+		const tfoot = $('#millat-tfoot');
+		if (!tbody.length) return;
+
+		tbody.empty();
+		tfoot.empty();
+		data = data || [];
+
+		if (!data.length) {
+			tbody.append(`
+				<tr>
+					<td colspan="9" style="text-align:center; color:#888;">
+						No stock ledger entries found in Millat Warehouse for the selected filters.
+					</td>
+				</tr>
+			`);
+			return;
+		}
+
+		data.forEach(item => {
+			const row = $(`
+				<tr>
+					<td style="text-align: center;">${item.s_no}</td>
+					<td class="particulars-cell">${item.particulars}</td>
+					<td class="number-cell">${formatNumber(item.opening_balance)}</td>
+					<td class="number-cell">${formatNumber(item.received_vendor)}</td>
+					<td class="number-cell">${formatNumber(item.courier_returned)}</td>
+					<td class="number-cell">${formatNumber(item.transferred_in)}</td>
+					<td class="number-cell">${formatNumber(item.transferred_out)}</td>
+					<td class="number-cell">${formatNumber(item.delivered)}</td>
+					<td class="number-cell">${formatNumber(item.ending_balance)}</td>
+				</tr>
+			`);
+			tbody.append(row);
+		});
+
+		const totals = {
+			opening_balance: data.reduce((sum, item) => sum + (item.opening_balance || 0), 0),
+			received_vendor: data.reduce((sum, item) => sum + (item.received_vendor || 0), 0),
+			courier_returned: data.reduce((sum, item) => sum + (item.courier_returned || 0), 0),
+			transferred_in: data.reduce((sum, item) => sum + (item.transferred_in || 0), 0),
+			transferred_out: data.reduce((sum, item) => sum + (item.transferred_out || 0), 0),
+			delivered: data.reduce((sum, item) => sum + (item.delivered || 0), 0),
+			ending_balance: data.reduce((sum, item) => sum + (item.ending_balance || 0), 0)
+		};
+
 		const totalRow = $(`
 			<tr>
 				<td colspan="2"><strong>Total Stock</strong></td>

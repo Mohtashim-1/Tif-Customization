@@ -13,8 +13,73 @@ SPECIFIC_ITEM_CODES = [
     'MQKPUT12', 'TIFPV24', 'Panj Para 26-30', 'Panj Para 1-5', 'Para'
 ]
 
-# TPS Department items (TPS Para, Noorani Qaida, Noorani Qaida Workbook)
-TPS_ITEM_CODES = ['Para', 'NQ1', 'NQW', 'NQTG', 'Panj Para 26-30', 'Panj Para 1-5']
+# TPS Department items (Noorani Qaida, Noorani Qaida Workbook, Panj Para, NQTG)
+# Note: 'Para' (TPS Para) is intentionally excluded from TPS department totals
+TPS_ITEM_CODES = ['NQ1', 'NQW', 'NQTG', 'Panj Para 26-30', 'Panj Para 1-5']
+
+
+def _as_list(value):
+	"""Normalize filter values that may be str / list / JSON string into a clean list."""
+	if value is None or value == "" or value == []:
+		return []
+	if isinstance(value, (list, tuple)):
+		return [str(v).strip() for v in value if v is not None and str(v).strip() != ""]
+	if isinstance(value, str):
+		raw = value.strip()
+		if not raw:
+			return []
+		if raw.startswith("["):
+			try:
+				parsed = frappe.parse_json(raw)
+				if isinstance(parsed, list):
+					return [str(v).strip() for v in parsed if v is not None and str(v).strip() != ""]
+			except Exception:
+				pass
+		return [raw]
+	return [str(value).strip()]
+
+
+def get_filtered_item_codes(filters=None):
+	"""Return SPECIFIC_ITEM_CODES narrowed by item / item_group filters."""
+	filters = filters or {}
+	selected_items = _as_list(filters.get("item"))
+	item_groups = _as_list(filters.get("item_group"))
+
+	codes = list(SPECIFIC_ITEM_CODES)
+	if selected_items:
+		codes = [c for c in codes if c in selected_items]
+		if not codes:
+			return []
+
+	if item_groups:
+		# "QPS" = all non-TPS items in the report list
+		include_qps = "QPS" in item_groups
+		real_groups = [g for g in item_groups if g != "QPS"]
+
+		allowed = set()
+		if include_qps:
+			allowed.update(c for c in codes if c not in TPS_ITEM_CODES)
+
+		if real_groups and codes:
+			placeholders = ",".join(["%s"] * len(codes))
+			group_placeholders = ",".join(["%s"] * len(real_groups))
+			rows = frappe.db.sql(
+				f"""
+				SELECT item_code
+				FROM `tabItem`
+				WHERE item_code IN ({placeholders})
+				AND item_group IN ({group_placeholders})
+				AND disabled = 0
+				""",
+				tuple(codes) + tuple(real_groups),
+				as_dict=True,
+			)
+			allowed.update(r.item_code for r in rows)
+
+		codes = [c for c in codes if c in allowed]
+
+	return codes
+
 
 def get_item_department(item_code):
     """Determine if an item belongs to TPS or QPS department"""
@@ -85,42 +150,20 @@ def get_mqh_books_data(filters=None):
         if item_group_value == '':
             item_group_value = None
         
-        # ALWAYS filter for specific items only (all are item codes)
+        # Build item code filter from multi-item / item-group selection
         specific_items_filter = ""
-        
-        # If a specific item is selected, verify it's in our list and filter by it only
-        if item_filter_value:
-            # Verify the selected item is in our specific items list
-            if item_filter_value in SPECIFIC_ITEM_CODES:
-                item_code_filter = "AND item_code = %s"
-                sql_params.append(item_filter_value)
-                # Don't add specific_items_filter when filtering by specific item
-            else:
-                # If selected item is not in our list, return empty
-                print(f"[get_mqh_books_data] Selected item {item_filter_value} is not in specific items list")
-                return []
-        else:
-            # Build filter for all specific item codes
-            item_code_placeholders = ','.join(['%s'] * len(SPECIFIC_ITEM_CODES))
-            specific_items_filter = f"AND item_code IN ({item_code_placeholders})"
-            sql_params.extend(SPECIFIC_ITEM_CODES)
-        
-        # Build item group filter (only if NOT filtering by specific items)
-        # When filtering by specific items, don't apply item_group filter - show all items from the list
-        # Check if specific_items_filter is set (not empty string)
-        if specific_items_filter == "":
-            if item_group_value:
-                item_group_filter = f"AND item_group = '{item_group_value}'"
-            elif not item_filter_value:
-                # When "All Items" is selected and no item_group filter, use default item groups
-                item_group_filter = "AND item_group IN ('MQH Books (Urdu Version)', 'MQH Books (English Version)', 'MQH Books (Sindhi Version)', 'MQH Teacher Guides (Urdu Version)', 'Noorani Qaida Teacher Guide', 'Noorani Qaida Workbook', 'Books')"
-        # If specific_items_filter is set, item_group_filter remains empty (already initialized)
+        allowed_codes = get_filtered_item_codes(filters)
+
+        if not allowed_codes:
+            return []
+
+        item_code_placeholders = ",".join(["%s"] * len(allowed_codes))
+        specific_items_filter = f"AND item_code IN ({item_code_placeholders})"
+        sql_params.extend(allowed_codes)
+        # Item group already applied inside get_filtered_item_codes
+        item_group_filter = ""
         
         # Use the SAME query structure for ALL cases (whether item is selected or not)
-        # The item_group_filter is already set above (line 79) when "All Items" is selected
-        # This ensures consistency - same query structure whether item is selected or not
-        # When item is selected: item_code_filter is set, item_group_filter is empty
-        # When "All Items" is selected: item_code_filter is empty, item_group_filter is set (line 79)
         sql_query = "SELECT DISTINCT item_code, item_name, item_group FROM `tabItem` WHERE disabled = 0 " + item_code_filter + " " + item_group_filter + " " + specific_items_filter + " ORDER BY item_name"
         # Use empty tuple instead of None when no parameters
         query_params = tuple(sql_params) if sql_params else ()
@@ -129,6 +172,7 @@ def get_mqh_books_data(filters=None):
         print("[MQH Books] SQL Query:", sql_query)
         print(f"[MQH Books] SQL Params: {query_params}")
         print(f"[MQH Books] Item Filter: {item_filter_value}")
+        print(f"[MQH Books] Allowed codes: {allowed_codes}")
         print(f"[MQH Books] Specific Items Filter: {specific_items_filter}")
         print(f"[MQH Books] Item Group Filter: {item_group_filter}")
         
@@ -243,44 +287,19 @@ def get_mqh_urdu_books_data(filters=None):
         if item_group_value == '':
             item_group_value = None
         
-        # ALWAYS filter for specific items only (all are item codes)
+        # Build item code filter from multi-item / item-group selection
         specific_items_filter = ""
-        
-        # If a specific item is selected, verify it's in our list and filter by it only
-        if item_filter_value:
-            # Verify the selected item is in our specific items list
-            if item_filter_value in SPECIFIC_ITEM_CODES:
-                item_code_filter = "AND item_code = %s"
-                sql_params.append(item_filter_value)
-                # Don't add specific_items_filter when filtering by specific item
-            else:
-                # If selected item is not in our list, return empty
-                print(f"[get_mqh_urdu_books_data] Selected item {item_filter_value} is not in specific items list")
-                return []
-        else:
-            # Build filter for all specific item codes
-            item_code_placeholders = ','.join(['%s'] * len(SPECIFIC_ITEM_CODES))
-            specific_items_filter = f"AND item_code IN ({item_code_placeholders})"
-            sql_params.extend(SPECIFIC_ITEM_CODES)
-        
-        # Build item group filter (only if NOT filtering by specific items)
-        # When filtering by specific items, don't apply item_group filter - show all items from the list
-        # Check if specific_items_filter is set (not empty string)
-        if specific_items_filter == "":
-            if item_group_value:
-                if 'Urdu' in item_group_value:
-                    item_group_filter = f"AND item_group = '{item_group_value}'"
-                else:
-                    return []  # If specific item group selected and it's not Urdu, return empty
-            elif not item_filter_value:
-                item_group_filter = "AND item_group IN ('MQH Books (Urdu Version)', 'MQH Teacher Guides (Urdu Version)')"
-        # If specific_items_filter is set, item_group_filter remains empty (already initialized)
+        allowed_codes = get_filtered_item_codes(filters)
+
+        if not allowed_codes:
+            return []
+
+        item_code_placeholders = ",".join(["%s"] * len(allowed_codes))
+        specific_items_filter = f"AND item_code IN ({item_code_placeholders})"
+        sql_params.extend(allowed_codes)
+        item_group_filter = ""
         
         # Use the SAME query structure for ALL cases (whether item is selected or not)
-        # The item_group_filter is already set above (line 200) when "All Items" is selected
-        # This ensures consistency - same query structure whether item is selected or not
-        # When item is selected: item_code_filter is set, item_group_filter is empty
-        # When "All Items" is selected: item_code_filter is empty, item_group_filter is set (line 200)
         sql_query = "SELECT DISTINCT item_code, item_name, item_group FROM `tabItem` WHERE disabled = 0 " + item_code_filter + " " + item_group_filter + " " + specific_items_filter + " ORDER BY item_name"
         # Use empty tuple instead of None when no parameters
         query_params = tuple(sql_params) if sql_params else ()
@@ -289,6 +308,7 @@ def get_mqh_urdu_books_data(filters=None):
         print("[Urdu Books] SQL Query:", sql_query)
         print(f"[Urdu Books] SQL Params: {query_params}")
         print(f"[Urdu Books] Item Filter: {item_filter_value}")
+        print(f"[Urdu Books] Allowed codes: {allowed_codes}")
         print(f"[Urdu Books] Specific Items Filter: {specific_items_filter}")
         print(f"[Urdu Books] Item Group Filter: {item_group_filter}")
         
@@ -536,16 +556,16 @@ def get_item_stock_data(item_code, filters=None):
                 opening_sum = sum(flt(e.actual_qty) for e in opening_entries)
                 print(f"[DEBUG get_item_stock_data] Sum of opening entries actual_qty: {opening_sum}")
         
-        # Get demand received (Material Requests) - date range.
-        # Exclude stopped/cancelled and fully received MRs (already counted under Received Vendor).
+        # Get demand received (Purchase Orders) - date range.
+        # Exclude closed/cancelled and fully completed POs (already counted under Received Vendor).
         demand_received = frappe.db.sql("""
-            SELECT SUM(mr_item.qty) as qty
-            FROM `tabMaterial Request Item` mr_item
-            JOIN `tabMaterial Request` mr ON mr.name = mr_item.parent
-            WHERE mr_item.item_code = %s
-            AND mr.transaction_date BETWEEN %s AND %s
-            AND mr.docstatus = 1
-            AND mr.status NOT IN ('Stopped', 'Cancelled', 'Received')
+            SELECT SUM(po_item.qty) as qty
+            FROM `tabPurchase Order Item` po_item
+            JOIN `tabPurchase Order` po ON po.name = po_item.parent
+            WHERE po_item.item_code = %s
+            AND po.transaction_date BETWEEN %s AND %s
+            AND po.docstatus = 1
+            AND po.status NOT IN ('Closed', 'Cancelled', 'Completed', 'Delivered')
         """, (item_code, from_date.strftime('%Y-%m-%d'), to_date.strftime('%Y-%m-%d')), as_dict=True)
         
         # Get books sale details - date range
@@ -869,6 +889,49 @@ def get_nazimabad_warehouse_data(filters=None):
         print(f"Error getting nazimabad warehouse data: {str(e)}")
         return []
 
+
+def get_millat_warehouse_data(filters=None):
+    """Get Millat Warehouse stock data"""
+    try:
+        if not filters:
+            filters = {}
+
+        millat_warehouse = frappe.db.get_value("Warehouse", {"name": "Millat Warehouse - TIF"}, "name")
+        if not millat_warehouse:
+            millat_warehouse = frappe.db.get_value("Warehouse", {"warehouse_name": "Millat Warehouse"}, "name")
+        if not millat_warehouse:
+            rows = frappe.db.sql(
+                """
+                SELECT name, warehouse_name
+                FROM `tabWarehouse`
+                WHERE disabled = 0
+                AND IFNULL(is_group, 0) = 0
+                AND (
+                    LOWER(warehouse_name) LIKE '%%millat%%'
+                    OR LOWER(name) LIKE '%%millat%%'
+                    OR LOWER(warehouse_name) LIKE '%%milat%%'
+                    OR LOWER(name) LIKE '%%milat%%'
+                )
+                ORDER BY warehouse_name
+                LIMIT 1
+                """,
+                as_dict=True,
+            )
+            if rows:
+                millat_warehouse = rows[0].name
+
+        if not millat_warehouse:
+            return []
+
+        display_name = (
+            frappe.db.get_value("Warehouse", millat_warehouse, "warehouse_name") or "Millat Warehouse"
+        )
+        return get_warehouse_stock_data(millat_warehouse, display_name, filters)
+    except Exception as e:
+        print(f"Error getting Millat warehouse data: {str(e)}")
+        return []
+
+
 def get_specific_warehouse_data(filters):
     """Get data for a specific warehouse when selected in filters"""
     try:
@@ -893,125 +956,70 @@ def get_warehouse_stock_data(warehouse, warehouse_name, filters=None):
     try:
         if not filters:
             filters = {}
-            
+
         # Build date filter
         date_filter = ""
         if filters.get('from_date') and filters.get('to_date'):
             date_filter = f"AND sle.posting_date <= '{filters['to_date']}'"
         else:
             date_filter = "AND sle.posting_date <= '2025-09-30'"
-            
-        # Build item code filter first
-        item_code_filter = ""
-        item_code_param = None
-        item_filter_value = filters.get('item')
-        # Handle empty string as None
-        if item_filter_value == '':
-            item_filter_value = None
-        
-        # ALWAYS filter for specific items only (all are item codes)
-        specific_items_filter = ""
-        
-        if item_filter_value:
-            # Verify the selected item is in our specific items list
-            if item_filter_value in SPECIFIC_ITEM_CODES:
-                item_code_filter = "AND sle.item_code = %s"
-                item_code_param = item_filter_value
-            else:
-                # If selected item is not in our list, return empty
-                print(f"[get_warehouse_stock_data] Selected item {item_filter_value} is not in specific items list")
-                return []
-        else:
-            # Build filter for all specific item codes
-            item_code_placeholders = ','.join(['%s'] * len(SPECIFIC_ITEM_CODES))
-            specific_items_filter = f"AND sle.item_code IN ({item_code_placeholders})"
-        
-        # Build item group filter (skip if item filter is set)
-        item_group_filter = ""
-        if item_filter_value:
-            # When item is selected, skip item_group filter
-            item_group_filter = ""
-        elif filters.get('item_group'):
-            item_group_filter = f"AND i.item_group = '{filters['item_group']}'"
-            
-        # Get all items that have stock in this warehouse
-        # Exclude cancelled entries
-        sql_params = [warehouse]
-        if item_code_param:
-            sql_params.append(item_code_param)
-        elif specific_items_filter:
-            sql_params.extend(SPECIFIC_ITEM_CODES)
-        
-        # Build query using string concatenation
-        # Note: %s for warehouse parameter must remain for parameterized query
-        # Remove ORDER BY clause since we'll sort by SPECIFIC_ITEM_CODES order instead
-        sql_query_warehouse = "SELECT DISTINCT sle.item_code, i.item_name, i.item_group FROM `tabStock Ledger Entry` sle JOIN `tabItem` i ON i.item_code = sle.item_code WHERE sle.warehouse = %s AND sle.is_cancelled = 0 " + date_filter + " " + item_group_filter + " " + (item_code_filter if item_code_filter else '') + " " + (specific_items_filter if specific_items_filter else '')
-        
+
+        allowed_codes = get_filtered_item_codes(filters)
+        if not allowed_codes:
+            return []
+
+        item_code_placeholders = ",".join(["%s"] * len(allowed_codes))
+        specific_items_filter = f"AND sle.item_code IN ({item_code_placeholders})"
+        sql_params = [warehouse] + list(allowed_codes)
+
+        # Item / item-group already applied via allowed_codes (supports QPS and multi-item)
+        sql_query_warehouse = (
+            "SELECT DISTINCT sle.item_code, i.item_name, i.item_group "
+            "FROM `tabStock Ledger Entry` sle "
+            "JOIN `tabItem` i ON i.item_code = sle.item_code "
+            "WHERE sle.warehouse = %s AND sle.is_cancelled = 0 "
+            + date_filter + " " + specific_items_filter
+        )
+
         print(f"[Warehouse {warehouse}] SQL Query:", sql_query_warehouse)
         print(f"[Warehouse {warehouse}] SQL Params: {sql_params}")
-        print(f"[Warehouse {warehouse}] Item Filter: {item_filter_value}")
-        
+        print(f"[Warehouse {warehouse}] Allowed codes: {allowed_codes}")
+
         items = frappe.db.sql(sql_query_warehouse, tuple(sql_params), as_dict=True)
-        
         print(f"[Warehouse {warehouse}] Found {len(items)} items. Items: {[i.item_code for i in items[:10]]}")
-        
+
+        items_dict = {item.item_code: item for item in items}
         warehouse_data = []
         s_no = 1
-        
-        if item_filter_value:
-            # If filtering by specific item, just process that one item
-            if items:
-                item = items[0]
-                stock_data = get_warehouse_item_data(item.item_code, warehouse, filters)
-                
-                item_code = item.item_code or ""
-                item_name = item.item_name or ""
-                particulars = f"{item_code} - {item_name}" if item_code and item_name else (item_code or item_name)
-                
-                warehouse_data.append({
-                    "s_no": s_no,
-                    "item_code": item_code,
-                    "item_name": item_name,
-                    "particulars": particulars,
-                    "opening_balance": stock_data.get("opening_balance", 0),
-                    "received_vendor": stock_data.get("received_vendor", 0),
-                    "courier_returned": stock_data.get("courier_returned", 0),
-                    "transferred_in": stock_data.get("transferred_in", 0),
-                    "transferred_out": stock_data.get("transferred_out", 0),
-                    "delivered": stock_data.get("delivered", 0),
-                    "ending_balance": stock_data.get("ending_balance", 0)
-                })
-        else:
-            # Create a dictionary for quick lookup
-            items_dict = {item.item_code: item for item in items}
-            
-            # Process items in SPECIFIC_ITEM_CODES order (same as main report)
-            for item_code in SPECIFIC_ITEM_CODES:
-                if item_code in items_dict:
-                    item = items_dict[item_code]
-                    stock_data = get_warehouse_item_data(item.item_code, warehouse, filters)
-                    
-                    item_code = item.item_code or ""
-                    item_name = item.item_name or ""
-                    particulars = f"{item_code} - {item_name}" if item_code and item_name else (item_code or item_name)
-                    
-                    warehouse_data.append({
-                        "s_no": s_no,
-                        "item_code": item_code,
-                        "item_name": item_name,
-                        "particulars": particulars,
-                        "opening_balance": stock_data.get("opening_balance", 0),
-                        "received_vendor": stock_data.get("received_vendor", 0),
-                        "courier_returned": stock_data.get("courier_returned", 0),
-                        "transferred_in": stock_data.get("transferred_in", 0),
-                        "transferred_out": stock_data.get("transferred_out", 0),
-                        "delivered": stock_data.get("delivered", 0),
-                        "ending_balance": stock_data.get("ending_balance", 0)
-                    })
-                    s_no += 1
-            
+
+        # Keep report order; only include items that have SLE in this warehouse
+        for item_code in allowed_codes:
+            if item_code not in items_dict:
+                continue
+            item = items_dict[item_code]
+            stock_data = get_warehouse_item_data(item.item_code, warehouse, filters)
+
+            code = item.item_code or ""
+            name = item.item_name or ""
+            particulars = f"{code} - {name}" if code and name else (code or name)
+
+            warehouse_data.append({
+                "s_no": s_no,
+                "item_code": code,
+                "item_name": name,
+                "particulars": particulars,
+                "opening_balance": stock_data.get("opening_balance", 0),
+                "received_vendor": stock_data.get("received_vendor", 0),
+                "courier_returned": stock_data.get("courier_returned", 0),
+                "transferred_in": stock_data.get("transferred_in", 0),
+                "transferred_out": stock_data.get("transferred_out", 0),
+                "delivered": stock_data.get("delivered", 0),
+                "ending_balance": stock_data.get("ending_balance", 0),
+            })
+            s_no += 1
+
         return warehouse_data
-        
+
     except Exception as e:
         print(f"Error getting warehouse data for {warehouse_name}: {str(e)}")
         return []
@@ -1294,63 +1302,45 @@ def calculate_kpis_for_specific_items(data, filters=None):
             if item_code == 'MQHWB-01/U/12':
                 print(f"[DEBUG calculate_kpis] Added MQHWB-01/U/12 to KPI dict with available_stock: {items_kpi_dict[item_code]['available_stock']}")
         
-        # Ensure ALL items from SPECIFIC_ITEM_CODES are included (even if zero balance)
-        # Only when not filtering by a specific item
-        if not filters.get('item'):
-            for item_code in SPECIFIC_ITEM_CODES:
-                if item_code not in items_kpi_dict:
-                    # Get item name
-                    try:
-                        item_name = frappe.db.get_value('Item', item_code, 'item_name')
-                        if not item_name:
-                            item_name = item_code
-                    except:
-                        item_name = item_code
-                    
-                    # Get stock data for this item
-                    try:
-                        stock_data = get_item_stock_data(item_code, filters)
-                        if not isinstance(stock_data, dict):
-                            stock_data = {}
-                    except Exception as e:
-                        print(f"[calculate_kpis_for_specific_items] Error getting stock data for {item_code}: {str(e)}")
+        # Ensure filtered report items are included (even if zero balance)
+        allowed_codes = get_filtered_item_codes(filters)
+        for item_code in allowed_codes:
+            if item_code not in items_kpi_dict:
+                try:
+                    item_name = frappe.db.get_value('Item', item_code, 'item_name') or item_code
+                except Exception:
+                    item_name = item_code
+
+                try:
+                    stock_data = get_item_stock_data(item_code, filters)
+                    if not isinstance(stock_data, dict):
                         stock_data = {}
-                    
-                    items_kpi_dict[item_code] = {
-                        "item_code": item_code,
-                        "item_name": item_name,
-                        "opening_stock": flt(stock_data.get('opening_stock', 0)),
-                        "available_stock": flt(stock_data.get('available_stock', 0)),
-                        "delivered": flt(stock_data.get('delivered', 0)),
-                        "received_vendor": flt(stock_data.get('received_vendor', 0)),
-                        "book_return": flt(stock_data.get('book_return', 0)),
-                        "demand_received": flt(stock_data.get('demand_received', 0)),
-                        "books_sale": cint(stock_data.get('books_sale', 0)),
-                        "total_amount": flt(stock_data.get('total_amount', 0))
-                    }
-        
-        # Convert dictionary to list, maintaining order from SPECIFIC_ITEM_CODES
+                except Exception as e:
+                    print(f"[calculate_kpis_for_specific_items] Error getting stock data for {item_code}: {str(e)}")
+                    stock_data = {}
+
+                items_kpi_dict[item_code] = {
+                    "item_code": item_code,
+                    "item_name": item_name,
+                    "opening_stock": flt(stock_data.get('opening_stock', 0)),
+                    "available_stock": flt(stock_data.get('available_stock', 0)),
+                    "delivered": flt(stock_data.get('delivered', 0)),
+                    "received_vendor": flt(stock_data.get('received_vendor', 0)),
+                    "book_return": flt(stock_data.get('book_return', 0)),
+                    "demand_received": flt(stock_data.get('demand_received', 0)),
+                    "books_sale": cint(stock_data.get('books_sale', 0)),
+                    "total_amount": flt(stock_data.get('total_amount', 0))
+                }
+
+        # Convert dictionary to list in filtered SPECIFIC_ITEM_CODES order
         items_kpi = []
-        if filters.get('item'):
-            # If filtering by specific item, just return that item
-            if filters.get('item') in items_kpi_dict:
-                items_kpi = [items_kpi_dict[filters.get('item')]]
-        else:
-            # Return all items in SPECIFIC_ITEM_CODES order
-            seen_in_list = set()  # Track items already added to prevent duplicates
-            for item_code in SPECIFIC_ITEM_CODES:
-                if item_code in items_kpi_dict:
-                    if item_code in seen_in_list:
-                        # Debug: Log if we see a duplicate
-                        if item_code == 'MQHWB-01/U/12':
-                            print(f"[DEBUG calculate_kpis] MQHWB-01/U/12 already in items_kpi list, skipping duplicate")
-                        continue
-                    seen_in_list.add(item_code)
-                    items_kpi.append(items_kpi_dict[item_code])
-                    
-                    # Debug for MQHWB-01/U/12
-                    if item_code == 'MQHWB-01/U/12':
-                        print(f"[DEBUG calculate_kpis] Added MQHWB-01/U/12 to items_kpi list with available_stock: {items_kpi_dict[item_code]['available_stock']}")
+        seen_in_list = set()
+        for item_code in allowed_codes:
+            if item_code in items_kpi_dict and item_code not in seen_in_list:
+                seen_in_list.add(item_code)
+                items_kpi.append(items_kpi_dict[item_code])
+                if item_code == 'MQHWB-01/U/12':
+                    print(f"[DEBUG calculate_kpis] Added MQHWB-01/U/12 to items_kpi list with available_stock: {items_kpi_dict[item_code]['available_stock']}")
         
         # Final debug: Check for duplicates in items_kpi
         mqhwb01_in_list = [item for item in items_kpi if item.get('item_code') == 'MQHWB-01/U/12']
@@ -1486,9 +1476,16 @@ def get_sales_invoice_stats(filters=None):
             date_filter = "AND si.posting_date <= %s"
             date_params = [filters.get('to_date')]
         
-        # Create item code filter - only include specific book items
-        # Use placeholders for SQL IN clause (same pattern as other functions in this file)
-        item_code_placeholders = ','.join(['%s'] * len(SPECIFIC_ITEM_CODES))
+        # Create item code filter from multi-item / item-group selection
+        allowed_codes = get_filtered_item_codes(filters)
+        if not allowed_codes:
+            return {
+                "invoice_count": 0,
+                "total_qty": 0,
+                "total_amount": 0
+            }
+
+        item_code_placeholders = ','.join(['%s'] * len(allowed_codes))
         item_filter = f"AND sii.item_code IN ({item_code_placeholders})"
         
         # Query to get stats for book items only
@@ -1507,7 +1504,7 @@ def get_sales_invoice_stats(filters=None):
         """
         
         # Combine date params with item codes for the query (all positional parameters)
-        query_params = date_params + list(SPECIFIC_ITEM_CODES)
+        query_params = date_params + list(allowed_codes)
         
         # Debug logging
         print(f"[get_sales_invoice_stats] Filters: {filters}")
@@ -1610,12 +1607,11 @@ def get_stock_data(filters=None):
         # Try to get from form_dict if filters is empty
         if not filters or (isinstance(filters, dict) and len(filters) == 0):
             try:
-                import frappe
                 form_dict = frappe.form_dict
                 if form_dict and 'item' in form_dict:
                     filters = dict(form_dict)
                     print(f"[get_stock_data] Got filters from form_dict: {filters}")
-            except:
+            except Exception:
                 pass
         
         if isinstance(filters, str):
@@ -1679,53 +1675,54 @@ def get_stock_data(filters=None):
                 else:
                     combined_items_dict[item_code] = item
         
-        # Ensure ALL items from SPECIFIC_ITEM_CODES are included (even if they don't exist in DB)
-        # Only do this when not filtering by a specific item
-        if not filters.get('item'):
-            for item_code in SPECIFIC_ITEM_CODES:
-                if item_code not in combined_items_dict:
-                    # Item not found, try to get from database and create entry with zero stock
-                    try:
-                        item_name = frappe.db.get_value('Item', item_code, 'item_name')
-                        if not item_name:
-                            item_name = item_code
-                    except:
+        # Ensure filtered items from SPECIFIC_ITEM_CODES are included
+        allowed_codes = get_filtered_item_codes(filters)
+        for item_code in allowed_codes:
+            if item_code not in combined_items_dict:
+                # Item not found, try to get from database and create entry with zero stock
+                try:
+                    item_name = frappe.db.get_value('Item', item_code, 'item_name')
+                    if not item_name:
                         item_name = item_code
-                    
-                    # Get stock data even if item doesn't exist in query results
-                    try:
-                        stock_data = get_item_stock_data(item_code, filters)
-                        if not isinstance(stock_data, dict):
-                            stock_data = {}
-                    except Exception as e:
-                        print(f"[get_stock_data] Error getting stock data for {item_code}: {str(e)}")
+                except Exception:
+                    item_name = item_code
+
+                # Get stock data even if item doesn't exist in query results
+                try:
+                    stock_data = get_item_stock_data(item_code, filters)
+                    if not isinstance(stock_data, dict):
                         stock_data = {}
-                    
-                    particulars = f"{item_code} - {item_name}" if item_code and item_name else (item_code or item_name)
-                    
-                    combined_items_dict[item_code] = {
-                        'item_code': item_code,
-                        'item_name': item_name,
-                        'particulars': particulars,
-                        'opening_stock': flt(stock_data.get('opening_stock', 0)),
-                        'received_vendor': flt(stock_data.get('received_vendor', 0)),
-                        'book_return': flt(stock_data.get('book_return', 0)),
-                        'delivered': flt(stock_data.get('delivered', 0)),
-                        'available_stock': flt(stock_data.get('available_stock', 0)),
-                        'demand_received': flt(stock_data.get('demand_received', 0)),
-                        'books_sale': cint(stock_data.get('books_sale', 0)),
-                        'total_amount': flt(stock_data.get('total_amount', 0))
-                    }
-        
-        # Convert back to lists, maintaining order from SPECIFIC_ITEM_CODES
+                except Exception as e:
+                    print(f"[get_stock_data] Error getting stock data for {item_code}: {str(e)}")
+                    stock_data = {}
+
+                particulars = f"{item_code} - {item_name}" if item_code and item_name else (item_code or item_name)
+
+                combined_items_dict[item_code] = {
+                    'item_code': item_code,
+                    'item_name': item_name,
+                    'particulars': particulars,
+                    'opening_stock': flt(stock_data.get('opening_stock', 0)),
+                    'received_vendor': flt(stock_data.get('received_vendor', 0)),
+                    'book_return': flt(stock_data.get('book_return', 0)),
+                    'delivered': flt(stock_data.get('delivered', 0)),
+                    'available_stock': flt(stock_data.get('available_stock', 0)),
+                    'demand_received': flt(stock_data.get('demand_received', 0)),
+                    'books_sale': cint(stock_data.get('books_sale', 0)),
+                    'total_amount': flt(stock_data.get('total_amount', 0))
+                }
+
+        # Drop any items outside the current filter
+        combined_items_dict = {k: v for k, v in combined_items_dict.items() if k in allowed_codes}
+
+        # Convert back to lists, maintaining order from filtered SPECIFIC_ITEM_CODES
         mqh_books_final = []
         mqh_urdu_books_final = []
         seen_codes = set()
-        
-        # Add items in the order they appear in SPECIFIC_ITEM_CODES
-        # Assign s_no for proper ordering
+
+        # Add items in the order they appear in allowed_codes
         s_no = 1
-        for item_code in SPECIFIC_ITEM_CODES:
+        for item_code in allowed_codes:
             if item_code in combined_items_dict and item_code not in seen_codes:
                 item = combined_items_dict[item_code]
                 item['s_no'] = s_no
@@ -1746,26 +1743,42 @@ def get_stock_data(filters=None):
             # Note: Missing items should have been handled earlier (lines 1234-1268)
             # This is just for logging purposes
         
-        # If specific warehouse is selected, get only that warehouse data
-        if filters.get('warehouse'):
-            warehouse_data = get_specific_warehouse_data(filters)
-            head_office_data = []
-            old_office_data = []
-            nazimabad_warehouse_data = []
-        else:
-            warehouse_data = []
-            head_office_data = get_head_office_data(filters)
-            old_office_data = get_old_office_data(filters)
-            nazimabad_warehouse_data = get_nazimabad_warehouse_data(filters)
-        
-        print(f"[get_stock_data] Warehouse Data: {len(warehouse_data)}, Head Office: {len(head_office_data)}, Old Office: {len(old_office_data)}, Nazimabad: {len(nazimabad_warehouse_data)}")
-        
+        # Warehouses multi-select (Frappe MultiSelectList) — fetch only selected warehouses
+        selected_warehouses = _as_list(filters.get("warehouses"))
+        if not selected_warehouses and filters.get("warehouse"):
+            selected_warehouses = _as_list(filters.get("warehouse"))
+
+        selected_warehouses_data = []
+        warehouse_data = []
+        head_office_data = []
+        old_office_data = []
+        nazimabad_warehouse_data = []
+        millat_warehouse_data = []
+
+        for wh in selected_warehouses:
+            if not frappe.db.exists("Warehouse", wh):
+                continue
+            display_name = frappe.db.get_value("Warehouse", wh, "warehouse_name") or wh
+            data = get_warehouse_stock_data(wh, display_name, filters)
+            selected_warehouses_data.append({
+                "warehouse": wh,
+                "warehouse_name": display_name,
+                "data": data,
+                "totals": calculate_nazimabad_totals(data),
+            })
+
+        print(
+            f"[get_stock_data] Selected warehouses: {len(selected_warehouses_data)} "
+            f"({[w.get('warehouse') for w in selected_warehouses_data]})"
+        )
+
         # Calculate totals
         mqh_totals = calculate_mqh_totals(mqh_books_data)
         mqh_urdu_totals = calculate_mqh_totals(mqh_urdu_books_data)
         head_office_totals = calculate_head_office_totals(head_office_data)
         old_office_totals = calculate_old_office_totals(old_office_data)
         nazimabad_totals = calculate_nazimabad_totals(nazimabad_warehouse_data)
+        millat_totals = calculate_nazimabad_totals(millat_warehouse_data)
         
         # Calculate KPIs for specific items - ensure all items from SPECIFIC_ITEM_CODES are included
         # Use only mqh_books_data since mqh_urdu_books_data is empty after combining
@@ -1802,6 +1815,9 @@ def get_stock_data(filters=None):
             "old_office_totals": old_office_totals,
             "nazimabad_warehouse_data": nazimabad_warehouse_data,
             "nazimabad_totals": nazimabad_totals,
+            "millat_warehouse_data": millat_warehouse_data,
+            "millat_totals": millat_totals,
+            "selected_warehouses_data": selected_warehouses_data,
             "kpi_data": kpi_data
         }
         
@@ -1820,6 +1836,10 @@ def get_stock_data(filters=None):
             old_office_data = []
         if not nazimabad_warehouse_data:
             nazimabad_warehouse_data = []
+        if not millat_warehouse_data:
+            millat_warehouse_data = []
+        if not selected_warehouses_data:
+            selected_warehouses_data = []
         
         result = {
             "mqh_books_data": mqh_books_data,
@@ -1833,6 +1853,9 @@ def get_stock_data(filters=None):
             "old_office_totals": old_office_totals,
             "nazimabad_warehouse_data": nazimabad_warehouse_data,
             "nazimabad_totals": nazimabad_totals,
+            "millat_warehouse_data": millat_warehouse_data,
+            "millat_totals": millat_totals,
+            "selected_warehouses_data": selected_warehouses_data,
             "kpi_data": kpi_data
         }
         
@@ -1851,20 +1874,42 @@ def get_stock_data(filters=None):
             "head_office_data": [],
             "old_office_data": [],
             "nazimabad_warehouse_data": [],
+            "millat_warehouse_data": [],
+            "selected_warehouses_data": [],
             "kpi_data": {}
         }
 
 @frappe.whitelist()
-def get_warehouses():
-    """Get list of warehouses for filter dropdown"""
+def get_warehouses(txt=None):
+    """Get list of warehouses for MultiSelectList filter (all leaf warehouses)."""
     try:
-        warehouses = frappe.db.sql("""
+        txt = (txt or "").strip()
+        params = []
+        search_filter = ""
+        if txt:
+            search_filter = "AND (name LIKE %s OR warehouse_name LIKE %s)"
+            like = f"%{txt}%"
+            params.extend([like, like])
+
+        warehouses = frappe.db.sql(
+            f"""
             SELECT name, warehouse_name
             FROM `tabWarehouse`
             WHERE disabled = 0
+            AND IFNULL(is_group, 0) = 0
+            {search_filter}
             ORDER BY warehouse_name
-        """, as_dict=True)
-        return warehouses
+            """,
+            tuple(params) if params else (),
+            as_dict=True,
+        )
+        return [
+            {
+                "value": w.name,
+                "description": w.warehouse_name or w.name,
+            }
+            for w in warehouses
+        ]
     except Exception as e:
         print(f"Error getting warehouses: {str(e)}")
         return []
@@ -1886,50 +1931,93 @@ def get_item_groups():
         return []
 
 @frappe.whitelist()
-def get_items(item_group=None):
+def get_report_item_groups(txt=None):
+	"""Item groups for MultiSelectList filter (report-relevant + QPS)."""
+	txt = (txt or "").strip().lower()
+	# Prefer groups that actually appear on report items
+	codes = list(SPECIFIC_ITEM_CODES)
+	placeholders = ",".join(["%s"] * len(codes))
+	rows = frappe.db.sql(
+		f"""
+		SELECT DISTINCT item_group
+		FROM `tabItem`
+		WHERE item_code IN ({placeholders})
+		AND IFNULL(item_group, '') != ''
+		AND disabled = 0
+		ORDER BY item_group
+		""",
+		tuple(codes),
+		as_dict=True,
+	) if codes else []
+
+	groups = [r.item_group for r in rows]
+	# Always include virtual QPS group at the end
+	if "QPS" not in groups:
+		groups.append("QPS")
+
+	# Fallback curated list if DB returned nothing unexpected
+	fallback = [
+		"MQH Teacher Guides (Urdu Version)",
+		"MQH Books (Urdu Version)",
+		"MQH Books (Sindhi Version)",
+		"MQH Books (English Version)",
+		"Books",
+		"Noorani Qaida Workbook",
+		"Noorani Qaida Teacher Guide",
+		"Quran",
+		"Stationary",
+		"Marketing Booklet",
+		"QPS",
+	]
+	for g in fallback:
+		if g not in groups:
+			groups.append(g)
+
+	options = []
+	for g in groups:
+		if txt and txt not in g.lower():
+			continue
+		description = "All non-TPS items" if g == "QPS" else ""
+		options.append({"value": g, "description": description})
+	return options
+
+
+@frappe.whitelist()
+def get_items(item_group=None, txt=None):
     """Get list of items for filter dropdown (only specific items - all are item codes)
     
     Args:
-        item_group: Optional item group to filter items by
+        item_group: Optional item group (str) or list of groups to filter items by
+        txt: Optional search text for MultiSelectList
     """
     try:
-        # Handle item_group parameter - convert empty string or None to None
-        if item_group == '' or item_group == 'None' or item_group is None:
-            item_group = None
-        
-        print(f"[get_items] Called with item_group: {item_group} (type: {type(item_group)})")
-        
-        # Build filter for specific item codes only
-        item_code_placeholders = ','.join(['%s'] * len(SPECIFIC_ITEM_CODES))
-        
-        # Build item group filter if provided
-        item_group_filter = ""
-        sql_params = list(SPECIFIC_ITEM_CODES)
-        
-        if item_group:
-            item_group_filter = "AND i.item_group = %s"
-            sql_params.append(item_group)
-            print(f"[get_items] Filtering by item_group: {item_group}")
-        else:
-            print(f"[get_items] No item_group filter - returning all items from SPECIFIC_ITEM_CODES")
-        
+        groups = _as_list(item_group)
+        txt = (txt or "").strip()
+
+        print(f"[get_items] Called with item_group: {groups}, txt: {txt}")
+
+        codes = get_filtered_item_codes({"item_group": groups} if groups else {})
+        if not codes:
+            return []
+
+        item_code_placeholders = ",".join(["%s"] * len(codes))
+        params = list(codes)
+        search_filter = ""
+        if txt:
+            search_filter = "AND (i.item_code LIKE %s OR i.item_name LIKE %s)"
+            like = f"%{txt}%"
+            params.extend([like, like])
+
         query = f"""
             SELECT DISTINCT i.item_code, i.item_name, i.item_group
             FROM `tabItem` i
             WHERE i.item_code IN ({item_code_placeholders})
             AND i.disabled = 0
-            {item_group_filter}
+            {search_filter}
             ORDER BY i.item_name, i.item_code
         """
-        
-        print(f"[get_items] SQL Query: {query}")
-        print(f"[get_items] SQL Params: {sql_params}")
-        
-        items = frappe.db.sql(query, tuple(sql_params), as_dict=True)
-        print(f"[get_items] Found {len(items)} items (item_group: {item_group})")
-        if items:
-            print(f"[get_items] Sample items: {[i.item_code for i in items[:5]]}")
-            print(f"[get_items] Item groups in results: {set([i.item_group for i in items if i.item_group])}")
+        items = frappe.db.sql(query, tuple(params), as_dict=True)
+        print(f"[get_items] Found {len(items)} items (item_group: {groups})")
         return items
     except Exception as e:
         print(f"[ERROR] Error getting items: {str(e)}")
