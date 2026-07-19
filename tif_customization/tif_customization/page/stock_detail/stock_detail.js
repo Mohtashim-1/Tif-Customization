@@ -1282,6 +1282,15 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 			e.preventDefault();
 			printReport();
 		});
+		// Demand Received drill-down (main table + detailed KPI table)
+		container.off('click.demandReceived', '.demand-received-link')
+			.on('click.demandReceived', '.demand-received-link', function(e) {
+				e.preventDefault();
+				e.stopPropagation();
+				const itemCode = $(this).data('item-code') || '';
+				const itemName = $(this).data('item-name') || '';
+				showDemandReceivedDialog(itemCode, itemName);
+			});
 	}
 
 	function initStockDetailPage() {
@@ -1444,6 +1453,24 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 		populateNazimabadTable(nazimabadData);
 	}
 	
+	function demandReceivedCellHtml(item, cssClass) {
+		const qty = flt(item.demand_received || 0);
+		const code = item.item_code || '';
+		const name = item.item_name || '';
+		const formatted = formatNumber(qty);
+		if (!code) {
+			return `<td class="${cssClass}">${formatted}</td>`;
+		}
+		return `<td class="${cssClass}">
+			<a href="#" class="demand-received-link" data-item-code="${frappe.utils.escape_html(code)}"
+				data-item-name="${frappe.utils.escape_html(name)}"
+				title="${__('Click to view Purchase Order details')}"
+				style="color: #2490ef; text-decoration: underline; cursor: pointer; font-weight: 600;">
+				${formatted}
+			</a>
+		</td>`;
+	}
+
 	function populateMQHBooksTable(data) {
 		console.log('populateMQHBooksTable called with data:', data);
 		console.log('populateMQHBooksTable - Data length:', data ? data.length : 0);
@@ -1486,7 +1513,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 						<td class="number-cell">${formatNumber(item.book_return || 0)}</td>
 						<td class="number-cell">${formatNumber(item.delivered || 0)}</td>
 						<td class="number-cell">${formatNumber(item.available_stock || 0)}</td>
-						<td class="number-cell">${formatNumber(item.demand_received || 0)}</td>
+						${demandReceivedCellHtml(item, 'number-cell')}
 						<td class="number-cell">${formatNumber(item.books_sale || 0)}</td>
 						<td class="number-cell">${formatNumber(item.total_amount || 0)}</td>
 					</tr>
@@ -1897,7 +1924,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 									<td class="text-right">${formatNumber(item.delivered || 0)}</td>
 									<td class="text-right">${formatNumber(item.received_vendor || 0)}</td>
 									<td class="text-right">${formatNumber(item.book_return || 0)}</td>
-									<td class="text-right">${formatNumber(item.demand_received || 0)}</td>
+									${demandReceivedCellHtml(item, 'text-right')}
 									<td class="text-right">${formatNumber(item.books_sale || 0)}</td>
 									<td class="text-right">${formatNumber(item.total_amount || 0)}</td>
 								</tr>
@@ -1911,7 +1938,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 									<td class="text-right">${formatNumber(panjPara2630.delivered || 0)}</td>
 									<td class="text-right">${formatNumber(panjPara2630.received_vendor || 0)}</td>
 									<td class="text-right">${formatNumber(panjPara2630.book_return || 0)}</td>
-									<td class="text-right">${formatNumber(panjPara2630.demand_received || 0)}</td>
+									${demandReceivedCellHtml(panjPara2630, 'text-right')}
 									<td class="text-right">${formatNumber(panjPara2630.books_sale || 0)}</td>
 									<td class="text-right">${formatNumber(panjPara2630.total_amount || 0)}</td>
 								</tr>
@@ -1925,7 +1952,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 									<td class="text-right">${formatNumber(panjPara15.delivered || 0)}</td>
 									<td class="text-right">${formatNumber(panjPara15.received_vendor || 0)}</td>
 									<td class="text-right">${formatNumber(panjPara15.book_return || 0)}</td>
-									<td class="text-right">${formatNumber(panjPara15.demand_received || 0)}</td>
+									${demandReceivedCellHtml(panjPara15, 'text-right')}
 									<td class="text-right">${formatNumber(panjPara15.books_sale || 0)}</td>
 									<td class="text-right">${formatNumber(panjPara15.total_amount || 0)}</td>
 								</tr>
@@ -2111,6 +2138,88 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 		});
 	}
 	
+	function showDemandReceivedDialog(itemCode, itemName) {
+		const filters = getFilterValues();
+		const titleSuffix = itemCode
+			? `${itemCode}${itemName ? ' — ' + itemName : ''}`
+			: __('All Items');
+		frappe.call({
+			method: 'tif_customization.tif_customization.page.stock_detail.stock_detail.get_demand_received_details',
+			args: {
+				filters: JSON.stringify(filters),
+				item_code: itemCode || ''
+			},
+			freeze: true,
+			freeze_message: __('Loading demand received details...'),
+			callback: function(r) {
+				const rows = r.message || [];
+				let body = '';
+				if (!rows.length) {
+					body = `<p class="text-muted">${__('No open Purchase Orders found for Demand Received.')}</p>`;
+				} else {
+					const totalQty = rows.reduce((s, row) => s + (flt(row.qty) || 0), 0);
+					const totalPending = rows.reduce((s, row) => s + (flt(row.pending_qty) || 0), 0);
+					const totalAmount = rows.reduce((s, row) => s + (flt(row.amount) || 0), 0);
+					body = `
+						<div style="max-height: 420px; overflow: auto;">
+							<table class="table table-bordered table-striped" style="font-size: 12px; margin: 0;">
+								<thead>
+									<tr>
+										<th>${__('Purchase Order')}</th>
+										<th>${__('Supplier')}</th>
+										<th>${__('Date')}</th>
+										<th>${__('Status')}</th>
+										<th>${__('Item')}</th>
+										<th class="text-right">${__('Ordered Qty')}</th>
+										<th class="text-right">${__('Received Qty')}</th>
+										<th class="text-right">${__('Pending Qty')}</th>
+										<th class="text-right">${__('Amount')}</th>
+									</tr>
+								</thead>
+								<tbody>
+									${rows.map(row => `
+										<tr>
+											<td><a href="/app/purchase-order/${encodeURIComponent(row.purchase_order)}" target="_blank">${frappe.utils.escape_html(row.purchase_order)}</a></td>
+											<td>${frappe.utils.escape_html(row.supplier_name || row.supplier || '')}</td>
+											<td>${frappe.datetime.str_to_user(row.transaction_date) || ''}</td>
+											<td>${frappe.utils.escape_html(row.status || '')}</td>
+											<td>${frappe.utils.escape_html(row.item_code || '')}${row.item_name && row.item_name !== row.item_code ? '<br><span class="text-muted">' + frappe.utils.escape_html(row.item_name) + '</span>' : ''}</td>
+											<td class="text-right">${formatNumber(row.qty || 0)}</td>
+											<td class="text-right">${formatNumber(row.received_qty || 0)}</td>
+											<td class="text-right">${formatNumber(row.pending_qty || 0)}</td>
+											<td class="text-right">${formatCurrency(row.amount || 0)}</td>
+										</tr>
+									`).join('')}
+								</tbody>
+								<tfoot>
+									<tr>
+										<td colspan="5"><strong>${__('Total')}</strong></td>
+										<td class="text-right"><strong>${formatNumber(totalQty)}</strong></td>
+										<td class="text-right"><strong>${formatNumber(totalQty - totalPending)}</strong></td>
+										<td class="text-right"><strong>${formatNumber(totalPending)}</strong></td>
+										<td class="text-right"><strong>${formatCurrency(totalAmount)}</strong></td>
+									</tr>
+								</tfoot>
+							</table>
+						</div>
+						<p class="text-muted" style="margin-top: 8px;">${rows.length} ${__('PO line(s)')} · ${__('Demand Received = open Purchase Order qty')}</p>
+					`;
+				}
+				const d = new frappe.ui.Dialog({
+					title: __('Demand Received') + ' — ' + frappe.utils.escape_html(titleSuffix),
+					size: 'extra-large',
+					fields: [{ fieldtype: 'HTML', fieldname: 'details', options: body }],
+					primary_action_label: __('Open Purchase Order List'),
+					primary_action: function() {
+						window.open('/app/purchase-order', '_blank');
+						d.hide();
+					}
+				});
+				d.show();
+			}
+		});
+	}
+
 	function populateHeadOfficeTable(data) {
 		console.log('populateHeadOfficeTable called with data:', data);
 		console.log('populateHeadOfficeTable - Data length:', data.length);

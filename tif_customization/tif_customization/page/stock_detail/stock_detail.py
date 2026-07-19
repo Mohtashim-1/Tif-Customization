@@ -2100,6 +2100,65 @@ def get_report_item_groups(txt=None):
 
 
 @frappe.whitelist()
+def get_demand_received_details(filters=None, item_code=None):
+	"""Purchase Order lines that make up Demand Received (open/submitted POs in date range)."""
+	try:
+		if isinstance(filters, str):
+			filters = frappe.parse_json(filters) or {}
+		filters = filters or {}
+
+		from_date = filters.get("from_date")
+		to_date = filters.get("to_date")
+		if not from_date or not to_date:
+			return []
+
+		item_codes = []
+		if item_code:
+			item_codes = [item_code]
+		else:
+			item_codes = get_filtered_item_codes(filters)
+		if not item_codes:
+			return []
+
+		placeholders = ",".join(["%s"] * len(item_codes))
+		rows = frappe.db.sql(
+			f"""
+			SELECT
+				po.name AS purchase_order,
+				po.supplier,
+				po.supplier_name,
+				po.transaction_date,
+				po.status,
+				po_item.item_code,
+				po_item.item_name,
+				po_item.qty,
+				po_item.received_qty,
+				(po_item.qty - IFNULL(po_item.received_qty, 0)) AS pending_qty,
+				po_item.rate,
+				po_item.amount,
+				po_item.warehouse
+			FROM `tabPurchase Order Item` po_item
+			JOIN `tabPurchase Order` po ON po.name = po_item.parent
+			WHERE po_item.item_code IN ({placeholders})
+			AND po.transaction_date BETWEEN %s AND %s
+			AND po.docstatus = 1
+			AND po.status NOT IN ('Closed', 'Cancelled', 'Completed', 'Delivered')
+			ORDER BY po.transaction_date DESC, po.name DESC, po_item.idx ASC
+			LIMIT 500
+			""",
+			tuple(list(item_codes) + [from_date, to_date]),
+			as_dict=True,
+		)
+		return rows or []
+	except Exception as e:
+		frappe.log_error(
+			f"Error getting demand received details: {str(e)}",
+			"Demand Received Details Error",
+		)
+		return []
+
+
+@frappe.whitelist()
 def get_items(item_group=None, txt=None):
     """Get list of items for filter dropdown (only specific items - all are item codes)
     
