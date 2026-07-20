@@ -109,38 +109,6 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 									<div class="tif-card__value">—</div>
 									<div class="tif-card__hint">Center + S.EDU</div>
 								</div>
-								<div class="tif-card tif-card--clickable" data-card="emp_full_time_permanent" title="Click for detail">
-									<div class="tif-card__label">Full Time Permanent</div>
-									<div class="tif-card__value">—</div>
-									<div class="tif-card__hint">Active employees</div>
-								</div>
-								<div class="tif-card tif-card--clickable" data-card="emp_part_time_permanent" title="Click for detail">
-									<div class="tif-card__label">Part Time Permanent</div>
-									<div class="tif-card__value">—</div>
-									<div class="tif-card__hint">Active employees</div>
-								</div>
-
-
-								<div class="tif-card tif-card--clickable" data-card="emp_contract_fixed_salary" title="Click for detail">
-									<div class="tif-card__label">Contract Base (Fixed Salary)</div>
-									<div class="tif-card__value">—</div>
-									<div class="tif-card__hint">Active employees</div>
-								</div>
-								<div class="tif-card tif-card--clickable" data-card="emp_contract_as_per_need" title="Click for detail">
-									<div class="tif-card__label">Contract Base (As Per Need)</div>
-									<div class="tif-card__value">—</div>
-									<div class="tif-card__hint">Contract / consultant staff</div>
-								</div>
-								<div class="tif-card tif-card--clickable" data-card="emp_full_time_probation" title="Click for detail">
-									<div class="tif-card__label">Full Time Probation</div>
-									<div class="tif-card__value">—</div>
-									<div class="tif-card__hint">Active employees</div>
-								</div>
-								<div class="tif-card tif-card--clickable" data-card="emp_part_time_probation" title="Click for detail">
-									<div class="tif-card__label">Part Time Probation</div>
-									<div class="tif-card__value">—</div>
-									<div class="tif-card__hint">Active employees</div>
-								</div>
 								<div class="tif-card tif-card--clickable" data-card="new_hires_this_month" title="Click for detail">
 									<div class="tif-card__label">New hires (This Month)</div>
 									<div class="tif-card__value">—</div>
@@ -165,6 +133,16 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 									<div class="tif-card__label">Left Employees (This Year)</div>
 									<div class="tif-card__value">—</div>
 									<div class="tif-card__hint">Payroll year (26 Jun – 25 Jun)</div>
+								</div>
+								<div class="tif-card tif-card--clickable" data-card="top_3_late_comers_last_year" title="Click for employee names">
+									<div class="tif-card__label">Top 3 Late Comers (Last Year)</div>
+									<div class="tif-card__value">—</div>
+									<div class="tif-card__hint">Full time · previous payroll year</div>
+								</div>
+								<div class="tif-card" data-card="top_punctual_last_year">
+									<div class="tif-card__label">Top Punctual (Last Year)</div>
+									<div class="tif-card__value">—</div>
+									<div class="tif-card__hint">Full time with 0 lates · previous payroll year</div>
 								</div>
 								<div class="tif-card tif-card--clickable" data-card="eobi_added" title="Click for detail">
 									<div class="tif-card__label">EOBI Enrolled</div>
@@ -205,10 +183,45 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 									<div class="tif-card__value">—</div>
 									<div class="tif-card__hint">Full time · current payroll month</div>
 								</div>
-								<div class="tif-card tif-card--clickable" data-card="top_3_punctual_employees" title="Click for employee names">
-									<div class="tif-card__label">Top 3 Punctual Employees</div>
+								<div class="tif-card" data-card="top_3_punctual_employees">
+									<div class="tif-card__label">Top Punctual</div>
 									<div class="tif-card__value">—</div>
-									<div class="tif-card__hint">Full time · current payroll month</div>
+									<div class="tif-card__hint">Full time with 0 lates</div>
+								</div>
+								<div class="tif-card tif-card--clickable" data-card="emp_full_time_permanent" title="Click for detail">
+									<div class="tif-card__label">Full Time Permanent</div>
+									<div class="tif-card__value">—</div>
+									<div class="tif-card__hint">Active employees</div>
+								</div>
+								<div class="tif-card tif-card--clickable" data-card="emp_part_time_permanent" title="Click for detail">
+									<div class="tif-card__label">Part Time Permanent</div>
+									<div class="tif-card__value">—</div>
+									<div class="tif-card__hint">Active employees</div>
+								</div>
+								<div class="tif-card tif-card--clickable" data-card="emp_contract_fixed_salary" title="Click for detail">
+									<div class="tif-card__label">Contract Base (Fixed Salary)</div>
+									<div class="tif-card__value">—</div>
+									<div class="tif-card__hint">Active employees</div>
+								</div>
+								<div class="tif-card tif-card--clickable" data-card="emp_contract_as_per_need" title="Click for detail">
+									<div class="tif-card__label">Contract Base (As Per Need)</div>
+									<div class="tif-card__value">—</div>
+									<div class="tif-card__hint">Contract / consultant staff</div>
+								</div>
+								<div class="tif-card tif-card--clickable" data-card="emp_full_time_probation" title="Click for detail">
+									<div class="tif-card__label">Full Time Probation</div>
+									<div class="tif-card__value">—</div>
+									<div class="tif-card__hint">Active employees</div>
+								</div>
+								<div class="tif-card tif-card--clickable" data-card="emp_part_time_probation" title="Click for detail">
+									<div class="tif-card__label">Part Time Probation</div>
+									<div class="tif-card__value">—</div>
+									<div class="tif-card__hint">Active employees</div>
+								</div>
+								<div class="tif-card tif-card--clickable" data-card="emp_types_total" title="Click for detail">
+									<div class="tif-card__label">Total</div>
+									<div class="tif-card__value">—</div>
+									<div class="tif-card__hint">All employment types</div>
 								</div>
 							</div>
 							
@@ -358,6 +371,7 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 					.tif-card[data-card="emp_contract_as_per_need"]{--tif-card-accent:#7c3aed;--tif-card-accent-text:#6d28d9;--tif-card-muted:#4c1d95;background:linear-gradient(135deg,#f5f3ff 0%,#ede9fe 100%);border-color:#ddd6fe}
 					.tif-card[data-card="emp_full_time_probation"],
 					.tif-card[data-card="emp_part_time_probation"]{--tif-card-accent:#0891b2;--tif-card-accent-text:#0e7490;--tif-card-muted:#164e63;background:linear-gradient(135deg,#ecfeff 0%,#cffafe 100%);border-color:#a5f3fc}
+					.tif-card[data-card="emp_types_total"]{--tif-card-accent:#0f766e;--tif-card-accent-text:#115e59;--tif-card-muted:#134e4a;background:linear-gradient(135deg,#f0fdfa 0%,#ccfbf1 100%);border-color:#99f6e4}
 					.tif-card[data-card="new_hires_this_month"],
 					.tif-card[data-card="new_hires_this_year"]{--tif-card-accent:#059669;--tif-card-accent-text:#047857;--tif-card-muted:#064e3b;background:linear-gradient(135deg,#ecfdf5 0%,#d1fae5 100%);border-color:#a7f3d0}
 					.tif-card[data-card="left_employees_this_month"],
@@ -370,8 +384,10 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 					.tif-card[data-card="upcoming_confirmation"]{--tif-card-accent:#0d9488;--tif-card-accent-text:#0f766e;--tif-card-muted:#134e4a;background:linear-gradient(135deg,#f0fdfa 0%,#ccfbf1 100%);border-color:#99f6e4}
 					.tif-card[data-card="total_male"],
 					.tif-card[data-card="total_female"]{--tif-card-accent:#64748b;--tif-card-accent-text:#475569;--tif-card-muted:#334155;background:linear-gradient(135deg,#f8fafc 0%,#e2e8f0 100%);border-color:#cbd5e1}
-					.tif-card[data-card="top_3_late_comers"]{--tif-card-accent:#dc2626;--tif-card-accent-text:#b91c1c;--tif-card-muted:#7f1d1d;background:linear-gradient(135deg,#fef2f2 0%,#fee2e2 100%);border-color:#fecaca}
-					.tif-card[data-card="top_3_punctual_employees"]{--tif-card-accent:#059669;--tif-card-accent-text:#047857;--tif-card-muted:#064e3b;background:linear-gradient(135deg,#ecfdf5 0%,#d1fae5 100%);border-color:#a7f3d0}
+					.tif-card[data-card="top_3_late_comers"],
+					.tif-card[data-card="top_3_late_comers_last_year"]{--tif-card-accent:#dc2626;--tif-card-accent-text:#b91c1c;--tif-card-muted:#7f1d1d;background:linear-gradient(135deg,#fef2f2 0%,#fee2e2 100%);border-color:#fecaca}
+					.tif-card[data-card="top_3_punctual_employees"],
+					.tif-card[data-card="top_punctual_last_year"]{--tif-card-accent:#059669;--tif-card-accent-text:#047857;--tif-card-muted:#064e3b;background:linear-gradient(135deg,#ecfdf5 0%,#d1fae5 100%);border-color:#a7f3d0}
 					.tif-attdash__grid{display:grid;grid-template-columns:repeat(2,minmax(300px,1fr));gap:12px}
 					.tif-panel{border:1px solid var(--border-color);border-radius:10px;background:var(--card-bg);padding:12px;box-shadow:0 1px 2px rgba(15,23,42,.06)}
 					.tif-panel__title{font-size:13px;font-weight:600;margin-bottom:8px}
@@ -705,6 +721,7 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 				this.set_card("emp_part_time_probation", data.emp_part_time_probation);
 				this.set_card("emp_contract_as_per_need", data.emp_contract_as_per_need);
 				this.set_card("emp_contract_fixed_salary", data.emp_contract_fixed_salary);
+				this.set_card("emp_types_total", data.emp_types_total);
 				this.set_card("new_hires_this_month", data.new_hires_this_month);
 				this.set_card("new_hires_this_year", data.new_hires_this_year);
 				this.set_card("attrition_this_month", data.attrition_this_month);
@@ -733,15 +750,47 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 				this.set_card("upcoming_confirmation", data.upcoming_confirmation_count);
 				this.set_card("total_male", data.total_male);
 				this.set_card("total_female", data.total_female);
-				this.set_card("top_3_late_comers", data.top_3_late_comers_count);
-				this.set_card("top_3_punctual_employees", data.top_3_punctual_employees_count);
+
+				const lateList = data.top_3_late_comers || [];
+				this.set_card("top_3_late_comers", lateList.length || data.top_3_late_comers_count || 0);
 				this.set_card_hint(
 					"top_3_late_comers",
-					payrollMonthLabel ? `Full time · ${payrollMonthLabel}` : "Full time · current payroll month",
+					payrollMonthLabel
+						? `Full time · ${payrollMonthLabel}`
+						: "Full time · current payroll month",
 				);
+
+				const punctualCount = Number(
+					data.top_punctual_zero_lates_count ?? data.top_3_punctual_employees_count ?? 0,
+				);
+				this.set_card("top_3_punctual_employees", punctualCount);
 				this.set_card_hint(
 					"top_3_punctual_employees",
-					payrollMonthLabel ? `Full time · ${payrollMonthLabel}` : "Full time · current payroll month",
+					payrollMonthLabel
+						? `Full time with 0 lates · ${payrollMonthLabel}`
+						: "Full time with 0 lates · current payroll month",
+				);
+
+				const lateYearList = data.top_3_late_comers_last_year || [];
+				const payrollYearPrevLabel = data.payroll_year_prev_label || "";
+				this.set_card(
+					"top_3_late_comers_last_year",
+					lateYearList.length || data.top_3_late_comers_last_year_count || 0,
+				);
+				this.set_card_hint(
+					"top_3_late_comers_last_year",
+					payrollYearPrevLabel
+						? `Full time · ${payrollYearPrevLabel}`
+						: "Full time · previous payroll year",
+				);
+
+				const punctualYearCount = Number(data.top_punctual_last_year_count || 0);
+				this.set_card("top_punctual_last_year", punctualYearCount);
+				this.set_card_hint(
+					"top_punctual_last_year",
+					payrollYearPrevLabel
+						? `Full time with 0 lates · ${payrollYearPrevLabel}`
+						: "Full time with 0 lates · previous payroll year",
 				);
 
 				this.set_card("new_hires", data.new_hires);

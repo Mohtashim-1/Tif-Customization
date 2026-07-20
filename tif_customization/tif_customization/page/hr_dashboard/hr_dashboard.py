@@ -5,7 +5,7 @@ import json
 import re
 
 import frappe
-from frappe.utils import add_days, add_months, cint, flt, formatdate, get_first_day, get_last_day, getdate, nowdate
+from frappe.utils import add_days, add_months, add_years, cint, flt, formatdate, get_first_day, get_last_day, getdate, nowdate
 
 
 EA_DOCTYPE = "Employee Attendance"
@@ -77,11 +77,26 @@ def get_dashboard_data(filters=None):
 	data["top_3_late_comers"] = _ea_top_fulltime_employees(
 		payroll_month_keys, company, branch, department, employee, order_field="total_lates", limit=3, ascending=False
 	)
-	data["top_3_punctual_employees"] = _ea_top_fulltime_employees(
-		payroll_month_keys, company, branch, department, employee, order_field="total_lates", limit=3, ascending=True
-	)
 	data["top_3_late_comers_count"] = len(data["top_3_late_comers"])
-	data["top_3_punctual_employees_count"] = len(data["top_3_punctual_employees"])
+	# Top Punctual = full-time employees with zero lates in the payroll month
+	data["top_punctual_zero_lates_count"] = _count_fulltime_zero_lates(
+		payroll_month_keys, company, branch, department, employee
+	)
+	data["top_3_punctual_employees"] = []
+	data["top_3_punctual_employees_count"] = data["top_punctual_zero_lates_count"]
+
+	# Last payroll year (previous fiscal year vs Left Employees This Year)
+	prev_year_start, prev_year_end = _get_previous_payroll_fiscal_year_bounds(today)
+	prev_year_keys = _months_in_range(prev_year_start, prev_year_end)
+	data["payroll_year_prev_label"] = _payroll_period_label(prev_year_start, prev_year_end)
+	data["top_3_late_comers_last_year"] = _ea_top_fulltime_employees(
+		prev_year_keys, company, branch, department, employee, order_field="total_lates", limit=3, ascending=False
+	)
+	data["top_3_late_comers_last_year_count"] = len(data["top_3_late_comers_last_year"])
+	data["top_punctual_last_year_count"] = _count_fulltime_zero_lates(
+		prev_year_keys, company, branch, department, employee
+	)
+
 	data["top_by_absents"] = _ea_top_employees(month_keys, company, branch, department, employee, order_field="total_absents", limit=12)
 
 	data["leave_trend"] = _leave_trend(from_date, to_date, company=company, branch=branch, department=department, employee=employee)
@@ -194,6 +209,12 @@ def get_card_drilldown(card_key=None, filters=None):
 		"emp_contract_fixed_salary": lambda: _drill_active_employment_types(
 			company, branch, department, EMPLOYMENT_CARD_TYPES["emp_contract_fixed_salary"]
 		),
+		"emp_types_total": lambda: _drill_active_employment_types(
+			company,
+			branch,
+			department,
+			[et for types in EMPLOYMENT_CARD_TYPES.values() for et in types],
+		),
 		"new_hires_this_month": lambda: _drill_new_hires(month_start, month_end, company, branch, department),
 		"new_hires_this_year": lambda: _drill_new_hires(year_start, today, company, branch, department),
 		"left_employees_this_month": lambda: _drill_payload(
@@ -225,8 +246,8 @@ def get_card_drilldown(card_key=None, filters=None):
 		"top_3_late_comers": lambda: _drill_top_fulltime_attendance(
 			company, branch, department, ascending=False, limit=3
 		),
-		"top_3_punctual_employees": lambda: _drill_top_fulltime_attendance(
-			company, branch, department, ascending=True, limit=3
+		"top_3_late_comers_last_year": lambda: _drill_top_fulltime_attendance_last_year(
+			company, branch, department, limit=3
 		),
 	}
 
@@ -269,6 +290,11 @@ def _empty_payload(from_date, to_date, company, branch, department="", employee=
 		"top_3_punctual_employees": [],
 		"top_3_late_comers_count": 0,
 		"top_3_punctual_employees_count": 0,
+		"top_punctual_zero_lates_count": 0,
+		"top_3_late_comers_last_year": [],
+		"top_3_late_comers_last_year_count": 0,
+		"top_punctual_last_year_count": 0,
+		"payroll_year_prev_label": "",
 		"payroll_month_label": "",
 		"payroll_year_label": "",
 		"top_by_absents": [],
@@ -320,6 +346,7 @@ def _empty_payload(from_date, to_date, company, branch, department="", employee=
 		"emp_part_time_probation": 0,
 		"emp_contract_as_per_need": 0,
 		"emp_contract_fixed_salary": 0,
+		"emp_types_total": 0,
 		"eobi_added_count": 0,
 		"eobi_added_employees": [],
 		"pak_qatar_enrolled_count": 0,
@@ -432,6 +459,12 @@ def _get_payroll_fiscal_year_bounds(reference_date=None):
 	year_end = dt_date(reference_date.year, 6, period_to)
 	year_start = dt_date(reference_date.year - 1, 6, period_from)
 	return year_start, year_end
+
+
+def _get_previous_payroll_fiscal_year_bounds(reference_date=None):
+	"""Previous payroll year relative to the current payroll fiscal year."""
+	year_start, year_end = _get_payroll_fiscal_year_bounds(reference_date)
+	return add_years(year_start, -1), add_years(year_end, -1)
 
 
 def _ea_where_months(month_keys):
@@ -791,6 +824,40 @@ def _ea_top_fulltime_employees(
 			}
 		)
 	return out
+
+
+def _count_fulltime_zero_lates(month_keys, company, branch, department, employee):
+	"""Count active full-time employees with zero total lates in the payroll month."""
+	if not month_keys or not _has_field(EA_DOCTYPE, "total_lates") or not _has_field("Employee", "employment_type"):
+		return 0
+
+	join_sql, where_sql, params = _ea_join_and_where(company, branch, department, employee, month_keys)
+	if "LEFT JOIN `tabEmployee` e" not in join_sql:
+		join_sql = f"{join_sql} LEFT JOIN `tabEmployee` e ON e.name = a.employee "
+
+	where_sql = (	
+		f"{where_sql} AND COALESCE(e.status, '') = 'Active' "
+		"AND e.employment_type IN %(employment_types)s"
+	)
+	params["employment_types"] = FULL_TIME_EMPLOYMENT_TYPES
+	num = _num_sql("a", "total_lates")
+	label_sql = "COALESCE(NULLIF(TRIM(a.employee_name), ''), a.employee, 'Unknown')"
+	employee_sql = "COALESCE(NULLIF(TRIM(a.employee), ''), '')" if _has_field(EA_DOCTYPE, "employee") else "''"
+
+	row = frappe.db.sql(
+		f"""
+		SELECT COUNT(*) AS c FROM (
+			SELECT {employee_sql} AS employee_id, {label_sql} AS employee_label
+			FROM {EA_TABLE} a {join_sql}
+			WHERE {where_sql}
+			GROUP BY employee_id, employee_label
+			HAVING SUM({num}) <= 0
+		) t
+		""",
+		params,
+		as_dict=True,
+	)
+	return cint(row[0].c) if row else 0
 
 
 def _ea_top_employees(
@@ -1760,6 +1827,7 @@ def _workforce_card_counts(company, branch, department):
 	out = {}
 	for key, types in EMPLOYMENT_CARD_TYPES.items():
 		out[key] = _count_active_employment_types(company, branch, department, types)
+	out["emp_types_total"] = sum(cint(out.get(key)) for key in EMPLOYMENT_CARD_TYPES)
 	return out
 
 
@@ -2173,6 +2241,25 @@ def _drill_top_fulltime_attendance(company, branch, department, ascending=False,
 	)
 	return _drill_payload(
 		f"{title} — {formatdate(period_start, 'dd MMM yyyy')} to {formatdate(period_end, 'dd MMM yyyy')}",
+		rows,
+	)
+
+
+def _drill_top_fulltime_attendance_last_year(company, branch, department, limit=3):
+	prev_start, prev_end = _get_previous_payroll_fiscal_year_bounds()
+	month_keys = _months_in_range(prev_start, prev_end)
+	rows = _ea_top_fulltime_employees(
+		month_keys,
+		company,
+		branch,
+		department,
+		"",
+		order_field="total_lates",
+		limit=limit,
+		ascending=False,
+	)
+	return _drill_payload(
+		f"Top 3 Late Comers (Last Year) — {formatdate(prev_start, 'dd MMM yyyy')} to {formatdate(prev_end, 'dd MMM yyyy')}",
 		rows,
 	)
 
