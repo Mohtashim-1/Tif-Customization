@@ -2447,7 +2447,7 @@ def _beneficiary_has_table():
 	return frappe.db.table_exists("Healthcare Beneficiary") and _has_field("Employee", "beneficiary")
 
 
-def _beneficiary_select_fields():
+def _beneficiary_select_fields(include_common_relation_reference=True):
 	"""Optional columns on Healthcare Beneficiary (alias b)."""
 	fields = [
 		"b.name1 AS relative_name",
@@ -2462,8 +2462,16 @@ def _beneficiary_select_fields():
 	elif _has_field("Healthcare Beneficiary", "replation"):
 		fields.append("b.replation AS relation")
 	if _has_field("Healthcare Beneficiary", "custom_cnic"):
-		fields.append("b.custom_cnic AS relative_cnic")
-	if _has_field("Healthcare Beneficiary", "custom_common_relation_reference"):
+		# Treat placeholder dashes as empty so drill-down does not show bare "-"
+		fields.append(
+			"""CASE
+				WHEN NULLIF(REPLACE(REPLACE(TRIM(b.custom_cnic), '-', ''), ' ', ''), '') IS NULL THEN NULL
+				ELSE TRIM(b.custom_cnic)
+			END AS relative_cnic"""
+		)
+	if include_common_relation_reference and _has_field(
+		"Healthcare Beneficiary", "custom_common_relation_reference"
+	):
 		fields.append("b.custom_common_relation_reference AS common_relation_reference")
 	return ", ".join(fields)
 
@@ -2573,13 +2581,15 @@ def _fetch_common_relation_rows(company, branch, department, limit=500):
 	key_b = _beneficiary_key_sql()
 	key_b2 = key_b.replace("b.", "b2.")
 	lim = cint(limit)
+	# Show the matched key in Common Relation Reference (field, else CNIC, else name)
+	# so the column is never blank when a match exists.
 	return (
 		frappe.db.sql(
 			f"""
 			SELECT
-				shared.relation_key,
 				shared.employee_count,
-				{_beneficiary_select_fields()}
+				shared.relation_key AS common_relation_reference,
+				{_beneficiary_select_fields(include_common_relation_reference=False)}
 			FROM `tabHealthcare Beneficiary` b
 			INNER JOIN `tabEmployee` e ON e.name = b.parent
 			INNER JOIN (
