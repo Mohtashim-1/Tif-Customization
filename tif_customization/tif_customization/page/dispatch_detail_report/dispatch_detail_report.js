@@ -151,9 +151,19 @@ if (typeof window.DispatchDetailReport === "undefined") {
 		this.page.main.find("#ddr-reset").on("click", () => this.reset_filters());
 		this.page.main.find("#ddr-export").on("click", () => this.export_csv());
 		this.page.main.on("click", ".ddr-toggle", (e) => {
+			e.preventDefault();
 			const dn = $(e.currentTarget).data("dn");
-			this.page.main.find(`#ddr-detail-${CSS.escape(dn)}`).toggle();
-			$(e.currentTarget).find("i").toggleClass("fa-chevron-right fa-chevron-down");
+			const $detail = this.page.main.find(`#ddr-detail-${CSS.escape(dn)}`);
+			$detail.toggle();
+			const open = $detail.is(":visible");
+			this.page.main
+				.find(`.ddr-toggle[data-dn="${CSS.escape(dn)}"] i`)
+				.toggleClass("fa-chevron-right", !open)
+				.toggleClass("fa-chevron-down", open);
+			if (open && $(e.currentTarget).hasClass("ddr-courier-link")) {
+				const $box = $detail.find(".ddr-courier-box")[0];
+				if ($box) $box.scrollIntoView({ behavior: "smooth", block: "nearest" });
+			}
 		});
 	}
 
@@ -244,7 +254,12 @@ if (typeof window.DispatchDetailReport === "undefined") {
 		$tbody.empty();
 		rows.forEach((row) => {
 			const dn = row.delivery_note_no;
-			const dn_link = `<a href="/app/delivery-note/${encodeURIComponent(dn)}">${frappe.utils.escape_html(dn)}</a>`;
+			const returnBadge = row.is_return
+				? ` <span class="label label-warning" title="${__("Return against")} ${frappe.utils.escape_html(row.return_against || "")}">${__("Return")}</span>`
+				: "";
+			const dn_link = `<a href="/app/delivery-note/${encodeURIComponent(dn)}">${frappe.utils.escape_html(dn)}</a>${returnBadge}`;
+			const qtyDisplay =
+				flt(row.total_books) !== 0 ? row.total_books : row.total_qty;
 
 			$tbody.append(`
 				<tr class="ddr-main-row">
@@ -256,8 +271,14 @@ if (typeof window.DispatchDetailReport === "undefined") {
 					<td style="font-size:12px;">${frappe.utils.escape_html(row.warehouses_label || "")}</td>
 					<td>${frappe.utils.escape_html(row.delivery_mode || "")}</td>
 					<td style="font-size:12px;">${frappe.utils.escape_html([row.courier, row.courier_service].filter(Boolean).join(" / "))}</td>
-					<td class="text-right">${this.fmt_num(row.total_books)}</td>
-					<td class="text-right">${this.fmt_currency(row.courier_payable)}</td>
+					<td class="text-right">${this.fmt_num(qtyDisplay)}</td>
+					<td class="text-right">
+						${
+							flt(row.courier_payable) > 0
+								? `<a href="#" class="ddr-toggle ddr-courier-link" data-dn="${frappe.utils.escape_html(dn)}" title="${__("Click for courier charge details")}">${this.fmt_currency(row.courier_payable)}</a>`
+								: this.fmt_currency(row.courier_payable)
+						}
+					</td>
 					<td class="text-right"><strong>${this.fmt_currency(row.books_cost)}</strong></td>
 				</tr>
 				<tr id="ddr-detail-${frappe.utils.escape_html(dn)}" style="display:none;">
@@ -271,13 +292,18 @@ if (typeof window.DispatchDetailReport === "undefined") {
 
 	render_item_drilldown(row) {
 		const items = row.items || [];
-		if (!items.length) {
-			return `<div style="padding:12px;" class="text-muted">${__("No book lines")}</div>`;
-		}
+		const hasCourierCharges =
+			flt(row.courier_payable) > 0 ||
+			flt(row.delivery_rate) > 0 ||
+			flt(row.transport_charges) > 0 ||
+			flt(row.jv_courier_amount) > 0 ||
+			(row.courier_jv_entries || []).length > 0 ||
+			["Courier", "Transport"].includes(row.delivery_mode || "");
 
-		const item_rows = items
-			.map(
-				(it) => `
+		const item_rows = items.length
+			? items
+					.map(
+						(it) => `
 			<tr>
 				<td>${frappe.utils.escape_html(it.item_code || "")}</td>
 				<td>${frappe.utils.escape_html(it.item_name || "")}</td>
@@ -288,22 +314,23 @@ if (typeof window.DispatchDetailReport === "undefined") {
 				<td class="text-right">${this.fmt_currency(it.unit_cost)}</td>
 				<td class="text-right">${this.fmt_currency(it.book_cost)}</td>
 			</tr>`
-			)
-			.join("");
+					)
+					.join("")
+			: `<tr><td colspan="8" class="text-muted text-center">${__("No book lines")}</td></tr>`;
 
 		const meta = [
 			row.city && `${__("City")}: ${row.city}`,
 			row.area && `${__("Area")}: ${row.area}`,
 			row.province && `${__("Province")}: ${row.province}`,
-			row.courier_mode_of_payment && `${__("Courier Payment")}: ${row.courier_mode_of_payment}`,
-			row.courier_expense_source === "jv" && `${__("Courier expense")}: ${__("Journal Entry")}`,
 		]
 			.filter(Boolean)
 			.join(" · ");
 
 		return `
 			<div style="padding:12px 16px;">
-				<div style="font-size:12px;color:#555;margin-bottom:8px;">${frappe.utils.escape_html(meta)}</div>
+				${meta ? `<div style="font-size:12px;color:#555;margin-bottom:10px;">${frappe.utils.escape_html(meta)}</div>` : ""}
+				${hasCourierCharges ? this.render_courier_charges_detail(row) : ""}
+				<div style="font-size:12px;font-weight:600;margin:4px 0 8px;color:#334155;">${__("Books / Items")}</div>
 				<table class="table table-condensed table-bordered" style="margin:0;background:#fff;">
 					<thead>
 						<tr style="background:#eef2f6;">
@@ -319,6 +346,79 @@ if (typeof window.DispatchDetailReport === "undefined") {
 					</thead>
 					<tbody>${item_rows}</tbody>
 				</table>
+			</div>`;
+	}
+
+	render_courier_charges_detail(row) {
+		const jvRows = row.courier_jv_entries || [];
+		const sourceLabel =
+			row.courier_expense_source === "jv"
+				? __("Journal Entry (actual)")
+				: row.courier_expense_source === "transport"
+					? __("Transport Charges")
+					: __("Delivery Rate on DN");
+
+		const jvTable = jvRows.length
+			? `
+			<table class="table table-condensed table-bordered" style="margin:8px 0 0;background:#fff;font-size:12px;">
+				<thead>
+					<tr style="background:#fee2e2;">
+						<th>${__("Journal Entry")}</th>
+						<th>${__("Date")}</th>
+						<th>${__("Account")}</th>
+						<th class="text-right">${__("Amount")}</th>
+					</tr>
+				</thead>
+				<tbody>
+					${jvRows
+						.map(
+							(jv) => `
+					<tr>
+						<td><a href="/app/journal-entry/${encodeURIComponent(jv.journal_entry)}">${frappe.utils.escape_html(jv.journal_entry)}</a></td>
+						<td>${jv.posting_date ? frappe.datetime.str_to_user(jv.posting_date) : "—"}</td>
+						<td>${frappe.utils.escape_html(jv.account || "")}</td>
+						<td class="text-right">${this.fmt_currency(jv.amount)}</td>
+					</tr>`
+						)
+						.join("")}
+				</tbody>
+			</table>`
+			: `<div style="font-size:12px;color:#64748b;margin-top:6px;">${
+					flt(row.courier_payable) > 0
+						? __("No Journal Entry posted yet — using Delivery Rate / Transport Charges.")
+						: __("No courier charges posted for this Delivery Note.")
+				}</div>`;
+
+		return `
+			<div class="ddr-courier-box" style="margin-bottom:14px;padding:12px;border:1px solid #fecaca;border-radius:8px;background:#fff7f7;">
+				<div style="display:flex;flex-wrap:wrap;gap:8px 18px;align-items:baseline;margin-bottom:6px;">
+					<div style="font-size:13px;font-weight:700;color:#b91c1c;">${__("Courier Charges")}</div>
+					<div style="font-size:12px;color:#7f1d1d;">
+						${__("Payable")}: <strong>${this.fmt_currency(row.courier_payable)}</strong>
+						· ${__("Source")}: ${frappe.utils.escape_html(sourceLabel)}
+					</div>
+				</div>
+				<table class="table table-condensed" style="margin:0;background:transparent;font-size:12px;">
+					<tbody>
+						<tr>
+							<td style="border:0;padding:2px 8px 2px 0;width:160px;color:#64748b;">${__("Courier")}</td>
+							<td style="border:0;padding:2px 0;">${frappe.utils.escape_html([row.courier, row.courier_service].filter(Boolean).join(" / ") || "—")}</td>
+							<td style="border:0;padding:2px 8px 2px 16px;width:160px;color:#64748b;">${__("Payment Mode")}</td>
+							<td style="border:0;padding:2px 0;">${frappe.utils.escape_html(row.courier_mode_of_payment || "—")}</td>
+						</tr>
+						<tr>
+							<td style="border:0;padding:2px 8px 2px 0;color:#64748b;">${__("Delivery Rate (DN)")}</td>
+							<td style="border:0;padding:2px 0;">${this.fmt_currency(row.delivery_rate)}</td>
+							<td style="border:0;padding:2px 8px 2px 16px;color:#64748b;">${__("Transport Charges")}</td>
+							<td style="border:0;padding:2px 0;">${this.fmt_currency(row.transport_charges)}</td>
+						</tr>
+						<tr>
+							<td style="border:0;padding:2px 8px 2px 0;color:#64748b;">${__("JV Courier Amount")}</td>
+							<td style="border:0;padding:2px 0;" colspan="3"><strong>${this.fmt_currency(row.jv_courier_amount)}</strong></td>
+						</tr>
+					</tbody>
+				</table>
+				${jvTable}
 			</div>`;
 	}
 

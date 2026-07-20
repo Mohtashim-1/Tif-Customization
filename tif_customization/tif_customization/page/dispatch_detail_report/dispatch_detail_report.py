@@ -2,11 +2,10 @@ import json
 
 import frappe
 from frappe import _
-from frappe.utils import add_days, flt, getdate, today
+from frappe.utils import add_days, cint, flt, getdate, today
 
 from tif_customization.tif_customization.utils.supply_chain_books import (
-	sql_book_item_filter,
-	with_book_item_params,
+	is_supply_chain_book_item,
 )
 
 
@@ -21,17 +20,10 @@ def get_dispatch_detail_data(filters=None):
 		from_date = getdate(filters.get("from_date") or add_days(today(), -30))
 		to_date = getdate(filters.get("to_date") or today())
 
-		params = with_book_item_params({"from_date": from_date, "to_date": to_date})
+		params = {"from_date": from_date, "to_date": to_date}
 		where = [
 			"dn.docstatus = 1",
-			"IFNULL(dn.is_return, 0) = 0",
 			"dn.posting_date BETWEEN %(from_date)s AND %(to_date)s",
-			# Only DNs that dispatch Supply Chain books (exclude Certificate / General Items)
-			f"""EXISTS (
-				SELECT 1 FROM `tabDelivery Note Item` dni_b
-				WHERE dni_b.parent = dn.name
-				{sql_book_item_filter("dni_b.item_code")}
-			)""",
 		]
 
 		if filters.get("customer"):
@@ -48,10 +40,9 @@ def get_dispatch_detail_data(filters=None):
 
 		if filters.get("warehouse"):
 			where.append(
-				f"""EXISTS (
+				"""EXISTS (
 					SELECT 1 FROM `tabDelivery Note Item` dni_w
 					WHERE dni_w.parent = dn.name AND dni_w.warehouse = %(warehouse)s
-					{sql_book_item_filter("dni_w.item_code")}
 				)"""
 			)
 			params["warehouse"] = filters["warehouse"]
@@ -77,6 +68,8 @@ def get_dispatch_detail_data(filters=None):
 				dn.custom_delivery_rate,
 				dn.custom_courier_mode_of_payment,
 				dn.custom_city,
+				IFNULL(dn.is_return, 0) AS is_return,
+				dn.return_against,
 				COALESCE(addr.custom_area, dn.custom_area, '') AS area,
 				COALESCE(addr.city, dn.custom_city, '') AS city,
 				COALESCE(addr.state, '') AS province,
@@ -111,6 +104,7 @@ def get_dispatch_detail_data(filters=None):
 		dn_names = [r.delivery_note_no for r in rows]
 		items_by_dn = _get_items_by_delivery_note(dn_names)
 		jv_courier_by_dn = _get_jv_courier_expense_by_dn(dn_names)
+		jv_details_by_dn = _get_jv_courier_details_by_dn(dn_names)
 
 		result_rows = []
 		for row in rows:
@@ -120,9 +114,11 @@ def get_dispatch_detail_data(filters=None):
 
 			jv_amount = jv_courier_by_dn.get(dn_name)
 			courier_payable = _courier_payable(row, jv_amount)
-			total_books = sum(flt(i.get("qty", 0)) for i in items)
+			total_books = sum(flt(i.get("qty", 0)) for i in items if i.get("is_book"))
+			total_qty = sum(flt(i.get("qty", 0)) for i in items)
 			total_cartons = sum(flt(i.get("custom_cartons", 0)) for i in items)
 			books_cost = sum(flt(i.get("book_cost", 0)) for i in items)
+			jv_details = jv_details_by_dn.get(dn_name, [])
 
 			result_rows.append(
 				{
@@ -143,11 +139,20 @@ def get_dispatch_detail_data(filters=None):
 					"courier": row.custom_courier or "",
 					"courier_service": row.custom_courier_service or "",
 					"courier_mode_of_payment": row.custom_courier_mode_of_payment or "",
+					"delivery_rate": flt(row.custom_delivery_rate),
+					"transport_charges": flt(row.transport_charges),
+					"jv_courier_amount": flt(jv_amount) if jv_amount is not None else 0.0,
+					"courier_jv_entries": jv_details,
 					"courier_payable": courier_payable,
-					"courier_expense_source": "jv" if jv_amount else "delivery_rate",
+					"courier_expense_source": "jv"
+					if jv_amount is not None and flt(jv_amount) > 0
+					else ("delivery_rate" if (row.custom_delivery_mode or "") == "Courier" else "transport"),
 					"books_cost": books_cost,
 					"total_books": total_books,
+					"total_qty": total_qty,
 					"total_cartons": total_cartons,
+					"is_return": cint(row.is_return),
+					"return_against": row.return_against or "",
 					"items": items,
 				}
 			)
@@ -190,7 +195,7 @@ def _get_items_by_delivery_note(dn_names):
 		return items_by_dn
 
 	items = frappe.db.sql(
-		f"""
+		"""
 		SELECT
 			dni.parent,
 			dni.item_code,
@@ -209,18 +214,17 @@ def _get_items_by_delivery_note(dn_names):
 		FROM `tabDelivery Note Item` dni
 		LEFT JOIN `tabItem` it ON it.name = dni.item_code
 		WHERE dni.parent IN %(dn_names)s
-		{sql_book_item_filter("dni.item_code")}
 		ORDER BY dni.parent, dni.idx
 		""",
-		with_book_item_params({"dn_names": tuple(dn_names)}),
+		{"dn_names": tuple(dn_names)},
 		as_dict=True,
 	)
 
 	for item in items:
 		parent = item.parent
-		book_type = _book_type(item.item_name, item.item_code)
 		qty = flt(item.qty)
 		unit_cost = flt(item.unit_cost)
+		is_book = is_supply_chain_book_item(item.item_code)
 		items_by_dn.setdefault(parent, []).append(
 			{
 				"item_code": item.item_code,
@@ -229,9 +233,11 @@ def _get_items_by_delivery_note(dn_names):
 				"stock_uom": item.stock_uom,
 				"warehouse": item.warehouse or "",
 				"unit_cost": unit_cost,
-				"book_cost": qty * unit_cost,
+				"book_cost": qty * unit_cost if is_book else 0.0,
+				"line_cost": qty * unit_cost,
 				"custom_cartons": flt(item.custom_cartons),
-				"book_type": book_type,
+				"book_type": _book_type(item.item_name, item.item_code) if is_book else "Other",
+				"is_book": is_book,
 			}
 		)
 	return items_by_dn
@@ -261,6 +267,47 @@ def _get_jv_courier_expense_by_dn(dn_names):
 		as_dict=True,
 	)
 	return {row.dn_name: flt(row.amount) for row in rows}
+
+
+def _get_jv_courier_details_by_dn(dn_names):
+	"""Per-DN Journal Entry lines for courier charges (for expand detail)."""
+	if not dn_names:
+		return {}
+
+	rows = frappe.db.sql(
+		"""
+		SELECT
+			je.cheque_no AS dn_name,
+			je.name AS journal_entry,
+			je.posting_date,
+			jea.account,
+			COALESCE(jea.debit - jea.credit, 0) AS amount
+		FROM `tabJournal Entry Account` jea
+		INNER JOIN `tabJournal Entry` je ON je.name = jea.parent AND je.docstatus = 1
+		WHERE je.cheque_no IN %(dn_names)s
+		AND (jea.account LIKE %(courier_ac)s OR jea.account LIKE %(courier_exp_ac)s)
+		AND COALESCE(jea.debit - jea.credit, 0) != 0
+		ORDER BY je.posting_date, je.name
+		""",
+		{
+			"dn_names": tuple(dn_names),
+			"courier_ac": "%Courier%",
+			"courier_exp_ac": "%Courier Expense%",
+		},
+		as_dict=True,
+	)
+
+	out = {}
+	for row in rows or []:
+		out.setdefault(row.dn_name, []).append(
+			{
+				"journal_entry": row.journal_entry,
+				"posting_date": row.posting_date,
+				"account": row.account or "",
+				"amount": flt(row.amount),
+			}
+		)
+	return out
 
 
 def _courier_payable(row, jv_amount=None):
@@ -302,9 +349,13 @@ def _empty_summary():
 
 
 def _build_summary(rows):
+	outbound = [r for r in rows if not cint(r.get("is_return"))]
+	returns = [r for r in rows if cint(r.get("is_return"))]
 	return {
 		"total_delivery_notes": len(rows),
-		"total_books": flt(sum(r["total_books"] for r in rows)),
+		"total_books": flt(sum(r["total_books"] for r in outbound)),
 		"total_courier_payable": flt(sum(r["courier_payable"] for r in rows)),
-		"total_books_cost": flt(sum(r["books_cost"] for r in rows)),
+		"total_books_cost": flt(sum(r["books_cost"] for r in outbound)),
+		"return_delivery_notes": len(returns),
 	}
+
