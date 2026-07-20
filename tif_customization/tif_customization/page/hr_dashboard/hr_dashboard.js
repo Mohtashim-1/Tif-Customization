@@ -1125,7 +1125,7 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 					const chart = this.ensure_chart("wf_des", "#tif-dash-wf-desig", {
 						chart: this._chartAnim({
 							type: "bar",
-							height: Math.max(360, labels.length * 30),
+							height: Math.max(420, labels.length * 28),
 							toolbar: { show: false },
 						}),
 						theme: { mode },
@@ -1134,11 +1134,34 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 						noData: { text: "No designation data" },
 						plotOptions: { bar: { horizontal: true, borderRadius: 4, barHeight: "70%" } },
 						xaxis: this._xaxisCategoriesNoTrim(labels),
+						yaxis: {
+							labels: {
+								maxWidth: 280,
+								style: { fontSize: "11px" },
+							},
+						},
 						series: [{ name: "Employees", data: values }],
-						dataLabels: { enabled: false },
+						dataLabels: {
+							enabled: true,
+							formatter: (val) => (Number.isFinite(val) ? String(Math.round(val)) : ""),
+							style: { fontSize: "11px", fontWeight: 600 },
+						},
 					});
 					if (chart) {
-						chart.updateOptions({ xaxis: this._xaxisCategoriesNoTrim(labels) }, false, true);
+						chart.updateOptions(
+							{
+								chart: { height: Math.max(420, labels.length * 28) },
+								xaxis: this._xaxisCategoriesNoTrim(labels),
+								yaxis: {
+									labels: {
+										maxWidth: 280,
+										style: { fontSize: "11px" },
+									},
+								},
+							},
+							false,
+							true,
+						);
 						chart.updateSeries([{ name: "Employees", data: values }], true);
 					}
 				}

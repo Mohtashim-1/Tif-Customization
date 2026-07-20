@@ -120,7 +120,9 @@ def get_dashboard_data(filters=None):
 	data["total_female"] = _count_active_by_gender("Female", company, branch, department)
 	data["headcount_by_grade"] = _headcount_by_grade(company, branch, department, limit=20)
 	data["headcount_by_employee_branch"] = _active_employee_group_count("branch", company, branch, department, limit=15)
-	data["headcount_by_designation"] = _active_employee_group_count("designation", company, branch, department, limit=20)
+	data["headcount_by_designation"] = _active_employee_group_count(
+		"designation", company, branch, department, limit=500
+	)
 	data["headcount_by_department"] = _active_employee_group_count("department", company, branch, department, limit=25)
 	data["headcount_by_department_employment_type"] = _headcount_stacked_by_employment_type(
 		"department", company, branch, department, limit=25
