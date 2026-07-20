@@ -109,85 +109,6 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 									<div class="tif-card__value">—</div>
 									<div class="tif-card__hint">Center + S.EDU</div>
 								</div>
-								<div class="tif-card tif-card--clickable" data-card="new_hires_this_month" title="Click for detail">
-									<div class="tif-card__label">New hires (This Month)</div>
-									<div class="tif-card__value">—</div>
-									<div class="tif-card__hint">Joining this month</div>
-								</div>
-								<div class="tif-card tif-card--clickable" data-card="new_hires_this_year" title="Click for detail">
-									<div class="tif-card__label">New hires (This Year)</div>
-									<div class="tif-card__value">—</div>
-									<div class="tif-card__hint">Joining this year</div>
-								</div>
-								<div class="tif-card tif-card--clickable" data-card="attrition_this_month" title="Click for detail">
-									<div class="tif-card__label">Attrition (This Month)</div>
-									<div class="tif-card__value">—</div>
-									<div class="tif-card__hint">Payroll month (26–25)</div>
-								</div>
-								<div class="tif-card tif-card--clickable" data-card="left_employees_this_month" title="Click for detail">
-									<div class="tif-card__label">Left Employees (This Month)</div>
-									<div class="tif-card__value">—</div>
-									<div class="tif-card__hint">Payroll month (26–25)</div>
-								</div>
-								<div class="tif-card tif-card--clickable" data-card="left_employees_this_year" title="Click for detail">
-									<div class="tif-card__label">Left Employees (This Year)</div>
-									<div class="tif-card__value">—</div>
-									<div class="tif-card__hint">Payroll year (26 Jun – 25 Jun)</div>
-								</div>
-								<div class="tif-card tif-card--clickable" data-card="top_3_late_comers_last_year" title="Click for employee names">
-									<div class="tif-card__label">Top 3 Late Comers (Last Year)</div>
-									<div class="tif-card__value">—</div>
-									<div class="tif-card__hint">Full time · previous payroll year</div>
-								</div>
-								<div class="tif-card" data-card="top_punctual_last_year">
-									<div class="tif-card__label">Top Punctual (Last Year)</div>
-									<div class="tif-card__value">—</div>
-									<div class="tif-card__hint">Full time with 0 lates · previous payroll year</div>
-								</div>
-								<div class="tif-card tif-card--clickable" data-card="eobi_added" title="Click for detail">
-									<div class="tif-card__label">EOBI Enrolled</div>
-									<div class="tif-card__value">—</div>
-									<div class="tif-card__hint">Active employees with EOBI</div>
-								</div>
-								<div class="tif-card tif-card--clickable" data-card="pak_qatar_enrolled" title="Click for detail">
-									<div class="tif-card__label">Pak Qatar (Enrolled Health Card, Paycon, GLT)</div>
-									<div class="tif-card__value">—</div>
-								</div>
-								<div class="tif-card tif-card--clickable" data-card="cnic_expired_count" title="Click for detail">
-									<div class="tif-card__label">CNIC Expired</div>
-									<div class="tif-card__value">—</div>
-									<div class="tif-card__hint">Active; expiry before today</div>
-								</div>
-								<div class="tif-card tif-card--clickable" data-card="cnic_upcoming_count" title="Click for detail">
-									<div class="tif-card__label">Upcoming CNIC Expiry</div>
-									<div class="tif-card__value">—</div>
-									<div class="tif-card__hint">Active; expiring soon</div>
-								</div>
-								<div class="tif-card tif-card--clickable" data-card="upcoming_confirmation" title="Click for detail">
-									<div class="tif-card__label">Upcoming Confirmation</div>
-									<div class="tif-card__value">—</div>
-									<div class="tif-card__hint">Next 60 days</div>
-								</div>
-								<div class="tif-card tif-card--clickable" data-card="total_male" title="Click for detail">
-									<div class="tif-card__label">Total Male</div>
-									<div class="tif-card__value">—</div>
-									<div class="tif-card__hint">Active employees</div>
-								</div>
-								<div class="tif-card tif-card--clickable" data-card="total_female" title="Click for detail">
-									<div class="tif-card__label">Total Female</div>
-									<div class="tif-card__value">—</div>
-									<div class="tif-card__hint">Active employees</div>
-								</div>
-								<div class="tif-card tif-card--clickable" data-card="top_3_late_comers" title="Click for employee names">
-									<div class="tif-card__label">Top 3 Late Comers</div>
-									<div class="tif-card__value">—</div>
-									<div class="tif-card__hint">Full time · current payroll month</div>
-								</div>
-								<div class="tif-card" data-card="top_3_punctual_employees">
-									<div class="tif-card__label">Top Punctual</div>
-									<div class="tif-card__value">—</div>
-									<div class="tif-card__hint">Full time with 0 lates</div>
-								</div>
 								<div class="tif-card tif-card--clickable" data-card="emp_full_time_permanent" title="Click for detail">
 									<div class="tif-card__label">Full Time Permanent</div>
 									<div class="tif-card__value">—</div>
@@ -269,6 +190,88 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 										<div class="tif-card__value">—</div>
 										<div class="tif-card__hint">All active female</div>
 									</div>
+								</div>
+							</div>
+
+							<div class="tif-attdash__cards">
+								<div class="tif-card tif-card--clickable" data-card="new_hires_this_month" title="Click for detail">
+									<div class="tif-card__label">New hires (This Month)</div>
+									<div class="tif-card__value">—</div>
+									<div class="tif-card__hint">Joining this month</div>
+								</div>
+								<div class="tif-card tif-card--clickable" data-card="new_hires_this_year" title="Click for detail">
+									<div class="tif-card__label">New hires (This Year)</div>
+									<div class="tif-card__value">—</div>
+									<div class="tif-card__hint">Joining this year</div>
+								</div>
+								<div class="tif-card tif-card--clickable" data-card="attrition_this_month" title="Click for detail">
+									<div class="tif-card__label">Attrition (This Month)</div>
+									<div class="tif-card__value">—</div>
+									<div class="tif-card__hint">Payroll month (26–25)</div>
+								</div>
+								<div class="tif-card tif-card--clickable" data-card="left_employees_this_month" title="Click for detail">
+									<div class="tif-card__label">Left Employees (This Month)</div>
+									<div class="tif-card__value">—</div>
+									<div class="tif-card__hint">Payroll month (26–25)</div>
+								</div>
+								<div class="tif-card tif-card--clickable" data-card="left_employees_this_year" title="Click for detail">
+									<div class="tif-card__label">Left Employees (This Year)</div>
+									<div class="tif-card__value">—</div>
+									<div class="tif-card__hint">Payroll year (26 Jun – 25 Jun)</div>
+								</div>
+								<div class="tif-card" data-card="top_punctual_last_year">
+									<div class="tif-card__label">Top Punctual (Last Year)</div>
+									<div class="tif-card__value">—</div>
+									<div class="tif-card__hint">Full time with 0 lates · previous payroll year</div>
+								</div>
+								<div class="tif-card tif-card--clickable" data-card="top_3_late_comers_last_year" title="Click for employee names">
+									<div class="tif-card__label">Top 3 Late Comers (Last Year)</div>
+									<div class="tif-card__value">—</div>
+									<div class="tif-card__hint">Full time · previous payroll year</div>
+								</div>
+								<div class="tif-card tif-card--clickable" data-card="eobi_added" title="Click for detail">
+									<div class="tif-card__label">EOBI Enrolled</div>
+									<div class="tif-card__value">—</div>
+									<div class="tif-card__hint">Active employees with EOBI</div>
+								</div>
+								<div class="tif-card tif-card--clickable" data-card="pak_qatar_enrolled" title="Click for detail">
+									<div class="tif-card__label">Pak Qatar (Enrolled Health Card, Paycon, GLT)</div>
+									<div class="tif-card__value">—</div>
+								</div>
+								<div class="tif-card tif-card--clickable" data-card="cnic_expired_count" title="Click for detail">
+									<div class="tif-card__label">CNIC Expired</div>
+									<div class="tif-card__value">—</div>
+									<div class="tif-card__hint">Active; expiry before today</div>
+								</div>
+								<div class="tif-card tif-card--clickable" data-card="cnic_upcoming_count" title="Click for detail">
+									<div class="tif-card__label">Upcoming CNIC Expiry</div>
+									<div class="tif-card__value">—</div>
+									<div class="tif-card__hint">Active; expiring soon</div>
+								</div>
+								<div class="tif-card tif-card--clickable" data-card="upcoming_confirmation" title="Click for detail">
+									<div class="tif-card__label">Upcoming Confirmation</div>
+									<div class="tif-card__value">—</div>
+									<div class="tif-card__hint">Next 60 days</div>
+								</div>
+								<div class="tif-card tif-card--clickable" data-card="total_male" title="Click for detail">
+									<div class="tif-card__label">Total Male</div>
+									<div class="tif-card__value">—</div>
+									<div class="tif-card__hint">Active employees</div>
+								</div>
+								<div class="tif-card tif-card--clickable" data-card="total_female" title="Click for detail">
+									<div class="tif-card__label">Total Female</div>
+									<div class="tif-card__value">—</div>
+									<div class="tif-card__hint">Active employees</div>
+								</div>
+								<div class="tif-card tif-card--clickable" data-card="top_3_late_comers" title="Click for employee names">
+									<div class="tif-card__label">Top 3 Late Comers</div>
+									<div class="tif-card__value">—</div>
+									<div class="tif-card__hint">Full time · current payroll month</div>
+								</div>
+								<div class="tif-card" data-card="top_3_punctual_employees">
+									<div class="tif-card__label">Top Punctual</div>
+									<div class="tif-card__value">—</div>
+									<div class="tif-card__hint">Full time with 0 lates</div>
 								</div>
 							</div>
 							
@@ -425,12 +428,18 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 					.tif-card[data-card="emp_types_total"]{--tif-card-accent:#0f766e;--tif-card-accent-text:#115e59;--tif-card-muted:#134e4a;background:linear-gradient(135deg,#f0fdfa 0%,#ccfbf1 100%);border-color:#99f6e4}
 					.tif-card[data-card="full_time_male"],
 					.tif-card[data-card="part_time_male"],
-					.tif-card[data-card="contract_staff_male"],
-					.tif-card[data-card="overall_male_staff"]{--tif-card-accent:#2563eb;--tif-card-accent-text:#1d4ed8;--tif-card-muted:#1e3a8a;background:linear-gradient(135deg,#eff6ff 0%,#dbeafe 100%);border-color:#bfdbfe}
+					.tif-card[data-card="contract_staff_male"]{--tif-card-accent:#2563eb;--tif-card-accent-text:#1d4ed8;--tif-card-muted:#1e3a8a;background:linear-gradient(135deg,#eff6ff 0%,#dbeafe 100%);border-color:#bfdbfe}
 					.tif-card[data-card="full_time_female"],
 					.tif-card[data-card="part_time_female"],
-					.tif-card[data-card="contract_staff_female"],
-					.tif-card[data-card="overall_female_staff"]{--tif-card-accent:#db2777;--tif-card-accent-text:#be185d;--tif-card-muted:#831843;background:linear-gradient(135deg,#fdf2f8 0%,#fce7f3 100%);border-color:#fbcfe8}
+					.tif-card[data-card="contract_staff_female"]{--tif-card-accent:#db2777;--tif-card-accent-text:#be185d;--tif-card-muted:#831843;background:linear-gradient(135deg,#fdf2f8 0%,#fce7f3 100%);border-color:#fbcfe8}
+					.tif-card[data-card="overall_male_staff"]{--tif-card-accent:#1e3a8a;--tif-card-accent-text:#ffffff;--tif-card-muted:#bfdbfe;background:linear-gradient(135deg,#1d4ed8 0%,#1e3a8a 100%);border-color:#1e40af;box-shadow:0 6px 16px rgba(30,64,175,.22)}
+					.tif-card[data-card="overall_female_staff"]{--tif-card-accent:#9d174d;--tif-card-accent-text:#ffffff;--tif-card-muted:#fbcfe8;background:linear-gradient(135deg,#db2777 0%,#9d174d 100%);border-color:#be185d;box-shadow:0 6px 16px rgba(190,24,93,.22)}
+					.tif-card[data-card="overall_male_staff"] .tif-card__label,
+					.tif-card[data-card="overall_male_staff"] .tif-card__hint,
+					.tif-card[data-card="overall_female_staff"] .tif-card__label,
+					.tif-card[data-card="overall_female_staff"] .tif-card__hint{color:var(--tif-card-muted)}
+					.tif-card[data-card="overall_male_staff"] .tif-card__value,
+					.tif-card[data-card="overall_female_staff"] .tif-card__value{color:#ffffff}
 					.tif-card[data-card="new_hires_this_month"],
 					.tif-card[data-card="new_hires_this_year"]{--tif-card-accent:#059669;--tif-card-accent-text:#047857;--tif-card-muted:#064e3b;background:linear-gradient(135deg,#ecfdf5 0%,#d1fae5 100%);border-color:#a7f3d0}
 					.tif-card[data-card="left_employees_this_month"],
