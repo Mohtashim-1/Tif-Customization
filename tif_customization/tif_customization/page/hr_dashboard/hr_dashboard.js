@@ -223,6 +223,21 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 									<div class="tif-card__value">—</div>
 									<div class="tif-card__hint">Full time with 0 lates</div>
 								</div>
+								<div class="tif-card tif-card--clickable" data-card="relative_count" title="Click for detail">
+									<div class="tif-card__label">Relative Count</div>
+									<div class="tif-card__value">—</div>
+									<div class="tif-card__hint">Health provider members (dependents)</div>
+								</div>
+								<div class="tif-card tif-card--clickable" data-card="common_relation_reference_count" title="Click for detail">
+									<div class="tif-card__label">Common Relation Reference Count</div>
+									<div class="tif-card__value">—</div>
+									<div class="tif-card__hint">Same CNIC / ref on 2+ employees</div>
+								</div>
+								<div class="tif-card tif-card--clickable" data-card="city_wise_count" title="Click for detail">
+									<div class="tif-card__label">City-wise Count</div>
+									<div class="tif-card__value">—</div>
+									<div class="tif-card__hint">Distinct branches (Employee.branch)</div>
+								</div>
 							</div>
 
 							<div class="tif-attdash__spacer" aria-hidden="true"></div>
@@ -453,6 +468,9 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 					.tif-card[data-card="top_3_late_comers_last_year"]{--tif-card-accent:#dc2626;--tif-card-accent-text:#b91c1c;--tif-card-muted:#7f1d1d;background:linear-gradient(135deg,#fef2f2 0%,#fee2e2 100%);border-color:#fecaca}
 					.tif-card[data-card="top_3_punctual_employees"],
 					.tif-card[data-card="top_punctual_last_year"]{--tif-card-accent:#059669;--tif-card-accent-text:#047857;--tif-card-muted:#064e3b;background:linear-gradient(135deg,#ecfdf5 0%,#d1fae5 100%);border-color:#a7f3d0}
+					.tif-card[data-card="relative_count"]{--tif-card-accent:#7c3aed;--tif-card-accent-text:#6d28d9;--tif-card-muted:#4c1d95;background:linear-gradient(135deg,#f5f3ff 0%,#ede9fe 100%);border-color:#ddd6fe}
+					.tif-card[data-card="common_relation_reference_count"]{--tif-card-accent:#c2410c;--tif-card-accent-text:#9a3412;--tif-card-muted:#7c2d12;background:linear-gradient(135deg,#fff7ed 0%,#ffedd5 100%);border-color:#fed7aa}
+					.tif-card[data-card="city_wise_count"]{--tif-card-accent:#0369a1;--tif-card-accent-text:#075985;--tif-card-muted:#0c4a6e;background:linear-gradient(135deg,#f0f9ff 0%,#e0f2fe 100%);border-color:#bae6fd}
 					.tif-attdash__grid{display:grid;grid-template-columns:repeat(2,minmax(300px,1fr));gap:12px}
 					.tif-panel{border:1px solid var(--border-color);border-radius:10px;background:var(--card-bg);padding:12px;box-shadow:0 1px 2px rgba(15,23,42,.06)}
 					.tif-panel__title{font-size:13px;font-weight:600;margin-bottom:8px}
@@ -823,6 +841,9 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 				this.set_card("upcoming_confirmation", data.upcoming_confirmation_count);
 				this.set_card("total_male", data.total_male);
 				this.set_card("total_female", data.total_female);
+				this.set_card("relative_count", data.relative_count);
+				this.set_card("common_relation_reference_count", data.common_relation_reference_count);
+				this.set_card("city_wise_count", data.city_wise_count);
 
 				const lateList = data.top_3_late_comers || [];
 				this.set_card("top_3_late_comers", lateList.length || data.top_3_late_comers_count || 0);
