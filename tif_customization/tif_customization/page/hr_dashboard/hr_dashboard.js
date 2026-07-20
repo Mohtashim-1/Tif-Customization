@@ -224,6 +224,53 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 									<div class="tif-card__hint">All employment types</div>
 								</div>
 							</div>
+
+							<div class="tif-attdash__spacer" aria-hidden="true"></div>
+							<div class="tif-attdash__section">
+								<div class="tif-attdash__section-title">Staff by gender</div>
+								<div class="tif-attdash__cards">
+									<div class="tif-card tif-card--clickable" data-card="full_time_male" title="Click for detail">
+										<div class="tif-card__label">Full Time Male</div>
+										<div class="tif-card__value">—</div>
+										<div class="tif-card__hint">Active employees</div>
+									</div>
+									<div class="tif-card tif-card--clickable" data-card="full_time_female" title="Click for detail">
+										<div class="tif-card__label">Full Time Female</div>
+										<div class="tif-card__value">—</div>
+										<div class="tif-card__hint">Active employees</div>
+									</div>
+									<div class="tif-card tif-card--clickable" data-card="part_time_male" title="Click for detail">
+										<div class="tif-card__label">Part Time Male</div>
+										<div class="tif-card__value">—</div>
+										<div class="tif-card__hint">Active employees</div>
+									</div>
+									<div class="tif-card tif-card--clickable" data-card="part_time_female" title="Click for detail">
+										<div class="tif-card__label">Part Time Female</div>
+										<div class="tif-card__value">—</div>
+										<div class="tif-card__hint">Active employees</div>
+									</div>
+									<div class="tif-card tif-card--clickable" data-card="contract_staff_male" title="Click for detail">
+										<div class="tif-card__label">Contract Staff Male</div>
+										<div class="tif-card__value">—</div>
+										<div class="tif-card__hint">Active employees</div>
+									</div>
+									<div class="tif-card tif-card--clickable" data-card="contract_staff_female" title="Click for detail">
+										<div class="tif-card__label">Contract Staff Female</div>
+										<div class="tif-card__value">—</div>
+										<div class="tif-card__hint">Active employees</div>
+									</div>
+									<div class="tif-card tif-card--clickable" data-card="overall_male_staff" title="Click for detail">
+										<div class="tif-card__label">Overall Male Staff</div>
+										<div class="tif-card__value">—</div>
+										<div class="tif-card__hint">All active male</div>
+									</div>
+									<div class="tif-card tif-card--clickable" data-card="overall_female_staff" title="Click for detail">
+										<div class="tif-card__label">Overall Female Staff</div>
+										<div class="tif-card__value">—</div>
+										<div class="tif-card__hint">All active female</div>
+									</div>
+								</div>
+							</div>
 							
 
 						<div class="tif-attdash__grid">
@@ -350,6 +397,10 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 				style.id = "tif-attdash-style";
 				style.textContent = `
 					.tif-attdash__cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:12px;margin:8px 0 14px}
+					.tif-attdash__spacer{height:18px;margin:6px 0 4px;border:0;border-top:1px solid var(--border-color);opacity:.85}
+					.tif-attdash__section{margin:0 0 16px}
+					.tif-attdash__section-title{font-size:14px;font-weight:650;margin:0 0 10px;color:var(--text-color)}
+					.tif-attdash__section .tif-attdash__cards{margin-top:0}
 					.tif-card{border:1px solid var(--border-color);border-radius:10px;background:var(--card-bg);padding:12px;min-width:140px}
 					.tif-card--clickable{cursor:pointer;transition:border-color .15s ease,box-shadow .15s ease,transform .15s ease}
 					.tif-card--clickable:hover{border-color:var(--primary);box-shadow:0 2px 8px rgba(37,99,235,.12)}
@@ -372,6 +423,14 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 					.tif-card[data-card="emp_full_time_probation"],
 					.tif-card[data-card="emp_part_time_probation"]{--tif-card-accent:#0891b2;--tif-card-accent-text:#0e7490;--tif-card-muted:#164e63;background:linear-gradient(135deg,#ecfeff 0%,#cffafe 100%);border-color:#a5f3fc}
 					.tif-card[data-card="emp_types_total"]{--tif-card-accent:#0f766e;--tif-card-accent-text:#115e59;--tif-card-muted:#134e4a;background:linear-gradient(135deg,#f0fdfa 0%,#ccfbf1 100%);border-color:#99f6e4}
+					.tif-card[data-card="full_time_male"],
+					.tif-card[data-card="part_time_male"],
+					.tif-card[data-card="contract_staff_male"],
+					.tif-card[data-card="overall_male_staff"]{--tif-card-accent:#2563eb;--tif-card-accent-text:#1d4ed8;--tif-card-muted:#1e3a8a;background:linear-gradient(135deg,#eff6ff 0%,#dbeafe 100%);border-color:#bfdbfe}
+					.tif-card[data-card="full_time_female"],
+					.tif-card[data-card="part_time_female"],
+					.tif-card[data-card="contract_staff_female"],
+					.tif-card[data-card="overall_female_staff"]{--tif-card-accent:#db2777;--tif-card-accent-text:#be185d;--tif-card-muted:#831843;background:linear-gradient(135deg,#fdf2f8 0%,#fce7f3 100%);border-color:#fbcfe8}
 					.tif-card[data-card="new_hires_this_month"],
 					.tif-card[data-card="new_hires_this_year"]{--tif-card-accent:#059669;--tif-card-accent-text:#047857;--tif-card-muted:#064e3b;background:linear-gradient(135deg,#ecfdf5 0%,#d1fae5 100%);border-color:#a7f3d0}
 					.tif-card[data-card="left_employees_this_month"],
@@ -722,6 +781,14 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 				this.set_card("emp_contract_as_per_need", data.emp_contract_as_per_need);
 				this.set_card("emp_contract_fixed_salary", data.emp_contract_fixed_salary);
 				this.set_card("emp_types_total", data.emp_types_total);
+				this.set_card("full_time_male", data.full_time_male);
+				this.set_card("full_time_female", data.full_time_female);
+				this.set_card("part_time_male", data.part_time_male);
+				this.set_card("part_time_female", data.part_time_female);
+				this.set_card("contract_staff_male", data.contract_staff_male);
+				this.set_card("contract_staff_female", data.contract_staff_female);
+				this.set_card("overall_male_staff", data.overall_male_staff);
+				this.set_card("overall_female_staff", data.overall_female_staff);
 				this.set_card("new_hires_this_month", data.new_hires_this_month);
 				this.set_card("new_hires_this_year", data.new_hires_this_year);
 				this.set_card("attrition_this_month", data.attrition_this_month);

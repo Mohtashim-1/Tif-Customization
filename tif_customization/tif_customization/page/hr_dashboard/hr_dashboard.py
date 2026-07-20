@@ -215,6 +215,26 @@ def get_card_drilldown(card_key=None, filters=None):
 			department,
 			[et for types in EMPLOYMENT_CARD_TYPES.values() for et in types],
 		),
+		"full_time_male": lambda: _drill_active_employment_types_by_gender(
+			company, branch, department, FULL_TIME_EMPLOYMENT_TYPES, "Male", "Full Time Male"
+		),
+		"full_time_female": lambda: _drill_active_employment_types_by_gender(
+			company, branch, department, FULL_TIME_EMPLOYMENT_TYPES, "Female", "Full Time Female"
+		),
+		"part_time_male": lambda: _drill_active_employment_types_by_gender(
+			company, branch, department, PART_TIME_EMPLOYMENT_TYPES, "Male", "Part Time Male"
+		),
+		"part_time_female": lambda: _drill_active_employment_types_by_gender(
+			company, branch, department, PART_TIME_EMPLOYMENT_TYPES, "Female", "Part Time Female"
+		),
+		"contract_staff_male": lambda: _drill_active_employment_types_by_gender(
+			company, branch, department, CONTRACT_EMPLOYMENT_TYPES, "Male", "Contract Staff Male"
+		),
+		"contract_staff_female": lambda: _drill_active_employment_types_by_gender(
+			company, branch, department, CONTRACT_EMPLOYMENT_TYPES, "Female", "Contract Staff Female"
+		),
+		"overall_male_staff": lambda: _drill_active_by_gender(company, branch, department, "Male"),
+		"overall_female_staff": lambda: _drill_active_by_gender(company, branch, department, "Female"),
 		"new_hires_this_month": lambda: _drill_new_hires(month_start, month_end, company, branch, department),
 		"new_hires_this_year": lambda: _drill_new_hires(year_start, today, company, branch, department),
 		"left_employees_this_month": lambda: _drill_payload(
@@ -347,6 +367,14 @@ def _empty_payload(from_date, to_date, company, branch, department="", employee=
 		"emp_contract_as_per_need": 0,
 		"emp_contract_fixed_salary": 0,
 		"emp_types_total": 0,
+		"full_time_male": 0,
+		"full_time_female": 0,
+		"part_time_male": 0,
+		"part_time_female": 0,
+		"contract_staff_male": 0,
+		"contract_staff_female": 0,
+		"overall_male_staff": 0,
+		"overall_female_staff": 0,
 		"eobi_added_count": 0,
 		"eobi_added_employees": [],
 		"pak_qatar_enrolled_count": 0,
@@ -379,6 +407,23 @@ EMPLOYMENT_CARD_TYPES = {
 FULL_TIME_EMPLOYMENT_TYPES = (
 	EMPLOYMENT_CARD_TYPES["emp_full_time_permanent"] + EMPLOYMENT_CARD_TYPES["emp_full_time_probation"]
 )
+
+PART_TIME_EMPLOYMENT_TYPES = (
+	EMPLOYMENT_CARD_TYPES["emp_part_time_permanent"] + EMPLOYMENT_CARD_TYPES["emp_part_time_probation"]
+)
+
+CONTRACT_EMPLOYMENT_TYPES = (
+	EMPLOYMENT_CARD_TYPES["emp_contract_fixed_salary"] + EMPLOYMENT_CARD_TYPES["emp_contract_as_per_need"]
+)
+
+GENDER_EMPLOYMENT_CARDS = {
+	"full_time_male": ("Male", FULL_TIME_EMPLOYMENT_TYPES),
+	"full_time_female": ("Female", FULL_TIME_EMPLOYMENT_TYPES),
+	"part_time_male": ("Male", PART_TIME_EMPLOYMENT_TYPES),
+	"part_time_female": ("Female", PART_TIME_EMPLOYMENT_TYPES),
+	"contract_staff_male": ("Male", CONTRACT_EMPLOYMENT_TYPES),
+	"contract_staff_female": ("Female", CONTRACT_EMPLOYMENT_TYPES),
+}
 
 
 def _has_field(doctype, fieldname):
@@ -1828,6 +1873,18 @@ def _workforce_card_counts(company, branch, department):
 	for key, types in EMPLOYMENT_CARD_TYPES.items():
 		out[key] = _count_active_employment_types(company, branch, department, types)
 	out["emp_types_total"] = sum(cint(out.get(key)) for key in EMPLOYMENT_CARD_TYPES)
+	out.update(_gender_employment_card_counts(company, branch, department))
+	return out
+
+
+def _gender_employment_card_counts(company, branch, department):
+	out = {}
+	for key, (gender, types) in GENDER_EMPLOYMENT_CARDS.items():
+		out[key] = _count_active_employment_types_by_gender(
+			company, branch, department, types, gender
+		)
+	out["overall_male_staff"] = _count_active_by_gender("Male", company, branch, department)
+	out["overall_female_staff"] = _count_active_by_gender("Female", company, branch, department)
 	return out
 
 
@@ -1844,6 +1901,33 @@ def _count_active_employment_types(company, branch, department, employment_types
 		FROM `tabEmployee` e
 		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}
 		  AND e.employment_type IN ({placeholders})
+		""",
+		params,
+		as_dict=True,
+	)
+	return cint((row or [{}])[0].get("c"))
+
+
+def _count_active_employment_types_by_gender(company, branch, department, employment_types, gender):
+	if (
+		not employment_types
+		or not gender
+		or not frappe.db.table_exists("Employee")
+		or not _has_field("Employee", "gender")
+	):
+		return 0
+	where_sql, params = _emp_filters_sql(company, branch, department)
+	placeholders = ", ".join([f"%(et{i})s" for i in range(len(employment_types))])
+	for i, value in enumerate(employment_types):
+		params[f"et{i}"] = value
+	params["gender"] = gender
+	row = frappe.db.sql(
+		f"""
+		SELECT COUNT(e.name) AS c
+		FROM `tabEmployee` e
+		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}
+		  AND e.employment_type IN ({placeholders})
+		  AND TRIM(COALESCE(e.gender, '')) = %(gender)s
 		""",
 		params,
 		as_dict=True,
@@ -1893,6 +1977,20 @@ def _drill_active_employment_types(company, branch, department, employment_types
 	)
 	label = ", ".join(employment_types[:2]) + ("…" if len(employment_types) > 2 else "")
 	return _drill_payload(f"Employees — {label}", rows)
+
+
+def _drill_active_employment_types_by_gender(
+	company, branch, department, employment_types, gender, title, limit=500
+):
+	rows = _fetch_active_employee_rows(
+		company,
+		branch,
+		department,
+		employment_types=employment_types,
+		gender=gender,
+		limit=limit,
+	)
+	return _drill_payload(title, rows)
 
 
 def _fetch_active_employee_rows(
