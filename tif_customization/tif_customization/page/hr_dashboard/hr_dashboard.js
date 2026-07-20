@@ -144,56 +144,6 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 									<div class="tif-card__value">—</div>
 									<div class="tif-card__hint">All employment types</div>
 								</div>
-							</div>
-
-							<div class="tif-attdash__spacer" aria-hidden="true"></div>
-							<div class="tif-attdash__section">
-								<div class="tif-attdash__section-title">Staff by gender</div>
-								<div class="tif-attdash__cards">
-									<div class="tif-card tif-card--clickable" data-card="full_time_male" title="Click for detail">
-										<div class="tif-card__label">Full Time Male</div>
-										<div class="tif-card__value">—</div>
-										<div class="tif-card__hint">Active employees</div>
-									</div>
-									<div class="tif-card tif-card--clickable" data-card="full_time_female" title="Click for detail">
-										<div class="tif-card__label">Full Time Female</div>
-										<div class="tif-card__value">—</div>
-										<div class="tif-card__hint">Active employees</div>
-									</div>
-									<div class="tif-card tif-card--clickable" data-card="part_time_male" title="Click for detail">
-										<div class="tif-card__label">Part Time Male</div>
-										<div class="tif-card__value">—</div>
-										<div class="tif-card__hint">Active employees</div>
-									</div>
-									<div class="tif-card tif-card--clickable" data-card="part_time_female" title="Click for detail">
-										<div class="tif-card__label">Part Time Female</div>
-										<div class="tif-card__value">—</div>
-										<div class="tif-card__hint">Active employees</div>
-									</div>
-									<div class="tif-card tif-card--clickable" data-card="contract_staff_male" title="Click for detail">
-										<div class="tif-card__label">Contract Staff Male</div>
-										<div class="tif-card__value">—</div>
-										<div class="tif-card__hint">Active employees</div>
-									</div>
-									<div class="tif-card tif-card--clickable" data-card="contract_staff_female" title="Click for detail">
-										<div class="tif-card__label">Contract Staff Female</div>
-										<div class="tif-card__value">—</div>
-										<div class="tif-card__hint">Active employees</div>
-									</div>
-									<div class="tif-card tif-card--clickable" data-card="overall_male_staff" title="Click for detail">
-										<div class="tif-card__label">Overall Male Staff</div>
-										<div class="tif-card__value">—</div>
-										<div class="tif-card__hint">All active male</div>
-									</div>
-									<div class="tif-card tif-card--clickable" data-card="overall_female_staff" title="Click for detail">
-										<div class="tif-card__label">Overall Female Staff</div>
-										<div class="tif-card__value">—</div>
-										<div class="tif-card__hint">All active female</div>
-									</div>
-								</div>
-							</div>
-
-							<div class="tif-attdash__cards">
 								<div class="tif-card tif-card--clickable" data-card="new_hires_this_month" title="Click for detail">
 									<div class="tif-card__label">New hires (This Month)</div>
 									<div class="tif-card__value">—</div>
@@ -272,6 +222,53 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 									<div class="tif-card__label">Top Punctual</div>
 									<div class="tif-card__value">—</div>
 									<div class="tif-card__hint">Full time with 0 lates</div>
+								</div>
+							</div>
+
+							<div class="tif-attdash__spacer" aria-hidden="true"></div>
+							<div class="tif-attdash__section">
+								<div class="tif-attdash__section-title">Staff by gender</div>
+								<div class="tif-attdash__cards">
+									<div class="tif-card tif-card--clickable" data-card="full_time_male" title="Click for detail">
+										<div class="tif-card__label">Full Time Male</div>
+										<div class="tif-card__value">—</div>
+										<div class="tif-card__hint">Active employees</div>
+									</div>
+									<div class="tif-card tif-card--clickable" data-card="full_time_female" title="Click for detail">
+										<div class="tif-card__label">Full Time Female</div>
+										<div class="tif-card__value">—</div>
+										<div class="tif-card__hint">Active employees</div>
+									</div>
+									<div class="tif-card tif-card--clickable" data-card="part_time_male" title="Click for detail">
+										<div class="tif-card__label">Part Time Male</div>
+										<div class="tif-card__value">—</div>
+										<div class="tif-card__hint">Active employees</div>
+									</div>
+									<div class="tif-card tif-card--clickable" data-card="part_time_female" title="Click for detail">
+										<div class="tif-card__label">Part Time Female</div>
+										<div class="tif-card__value">—</div>
+										<div class="tif-card__hint">Active employees</div>
+									</div>
+									<div class="tif-card tif-card--clickable" data-card="contract_staff_male" title="Click for detail">
+										<div class="tif-card__label">Contract Staff Male</div>
+										<div class="tif-card__value">—</div>
+										<div class="tif-card__hint">Active employees</div>
+									</div>
+									<div class="tif-card tif-card--clickable" data-card="contract_staff_female" title="Click for detail">
+										<div class="tif-card__label">Contract Staff Female</div>
+										<div class="tif-card__value">—</div>
+										<div class="tif-card__hint">Active employees</div>
+									</div>
+									<div class="tif-card tif-card--clickable" data-card="overall_male_staff" title="Click for detail">
+										<div class="tif-card__label">Overall Male Staff</div>
+										<div class="tif-card__value">—</div>
+										<div class="tif-card__hint">All active male</div>
+									</div>
+									<div class="tif-card tif-card--clickable" data-card="overall_female_staff" title="Click for detail">
+										<div class="tif-card__label">Overall Female Staff</div>
+										<div class="tif-card__value">—</div>
+										<div class="tif-card__hint">All active female</div>
+									</div>
 								</div>
 							</div>
 							
