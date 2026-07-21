@@ -1,8 +1,17 @@
+import calendar
 import json
 
 import frappe
 from frappe import _
 from frappe.utils import add_days, cint, flt, getdate, today
+
+
+_MONTH_NUMBERS = {name.lower(): num for num, name in enumerate(calendar.month_name) if name}
+
+
+def _month_number(name):
+	"""Month name (e.g. 'July') -> 1..12; 0 when unknown."""
+	return _MONTH_NUMBERS.get(str(name or "").strip().lower(), 0)
 
 
 @frappe.whitelist()
@@ -167,24 +176,44 @@ def _minutes_label(minutes):
 
 
 def _build_monthly_history(late_days):
-	"""Group late days by calendar month for employee history view."""
+	"""
+	Group late days by PAYROLL month (26th–25th), not calendar month.
+
+	Uses the attendance record's own month/year (ea.month / ea.year) — the same value
+	shown in the Attendance Sheet name — so a late on e.g. 27-Jun is counted under the
+	July payroll month. Falls back to the calendar month only if the record has no
+	month/year stored.
+	"""
 	months = {}
 	for day in late_days or []:
-		dt = getdate(day.get("date"))
-		if not dt:
-			continue
-		key = dt.strftime("%Y-%m")
+		year = str(day.get("year") or "").strip()
+		month_name = str(day.get("month") or "").strip()
+		mnum = _month_number(month_name)
+		if year and mnum:
+			key = f"{year}-{mnum:02d}"
+			label = f"{month_name} {year}"
+		else:
+			dt = getdate(day.get("date"))
+			if not dt:
+				continue
+			key = dt.strftime("%Y-%m")
+			label = dt.strftime("%B %Y")
+			year = str(dt.year)
+			month_name = dt.strftime("%B")
 		if key not in months:
 			months[key] = {
 				"month_key": key,
-				"month_label": dt.strftime("%B %Y"),
-				"year": dt.year,
-				"month": dt.strftime("%B"),
+				"month_label": label,
+				"year": year,
+				"month": month_name,
 				"late_count": 0,
 				"days": [],
 			}
 		months[key]["late_count"] += 1
 		months[key]["days"].append(day)
+
+	for month in months.values():
+		month["days"].sort(key=lambda d: str(d.get("date") or ""))
 
 	return sorted(months.values(), key=lambda row: row["month_key"])
 
