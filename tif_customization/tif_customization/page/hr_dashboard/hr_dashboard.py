@@ -65,7 +65,6 @@ def get_dashboard_data(filters=None):
 	)
 	data["punctuality_incident_mix"] = _punctuality_incident_mix(totals)
 	data["top_by_lates"] = _ea_top_employees(month_keys, company, branch, department, employee, order_field="total_lates", limit=12)
-	payroll_month_keys = _current_payroll_ea_month_keys(today)
 	period_start, period_end, period_year, period_month = _get_payroll_period_bounds(today)
 	data["payroll_month_label"] = f"{formatdate(period_start, 'dd MMM yyyy')} – {formatdate(period_end, 'dd MMM yyyy')}"
 	data["payroll_month_period"] = {
@@ -74,27 +73,31 @@ def get_dashboard_data(filters=None):
 		"month": period_month,
 		"year": period_year,
 	}
+	# Punctuality "last month" = most recent COMPLETED payroll month (the one before the in-progress period)
+	lm_start, lm_end, lm_year, lm_month = _get_payroll_period_bounds(add_days(period_start, -1))
+	punctuality_month_keys = [(lm_year, lm_month)]
+	data["punctuality_last_month_label"] = _payroll_period_label(lm_start, lm_end)
 	data["top_3_late_comers"] = _ea_top_fulltime_employees(
-		payroll_month_keys, company, branch, department, employee, order_field="total_lates", limit=3, ascending=False
+		punctuality_month_keys, company, branch, department, employee, order_field="total_lates", limit=3, ascending=False
 	)
 	data["top_3_late_comers_count"] = len(data["top_3_late_comers"])
-	# Top Punctual = full-time employees with zero lates in the payroll month
+	# Top Punctual = full-time employees with zero lates in that completed payroll month
 	data["top_punctual_zero_lates_count"] = _count_fulltime_zero_lates(
-		payroll_month_keys, company, branch, department, employee
+		punctuality_month_keys, company, branch, department, employee
 	)
 	data["top_3_punctual_employees"] = []
 	data["top_3_punctual_employees_count"] = data["top_punctual_zero_lates_count"]
 
-	# Last payroll year (previous fiscal year vs Left Employees This Year)
-	prev_year_start, prev_year_end = _get_previous_payroll_fiscal_year_bounds(today)
-	prev_year_keys = _months_in_range(prev_year_start, prev_year_end)
-	data["payroll_year_prev_label"] = _payroll_period_label(prev_year_start, prev_year_end)
+	# Last Year = the payroll fiscal year that just ended (26 Jun 2025 – 25 Jun 2026)
+	fy_start, fy_end = _get_payroll_fiscal_year_bounds(today)
+	fy_keys = _months_in_range(fy_start, fy_end)
+	data["payroll_year_prev_label"] = _payroll_period_label(fy_start, fy_end)
 	data["top_3_late_comers_last_year"] = _ea_top_fulltime_employees(
-		prev_year_keys, company, branch, department, employee, order_field="total_lates", limit=3, ascending=False
+		fy_keys, company, branch, department, employee, order_field="total_lates", limit=3, ascending=False
 	)
 	data["top_3_late_comers_last_year_count"] = len(data["top_3_late_comers_last_year"])
 	data["top_punctual_last_year_count"] = _count_fulltime_zero_lates(
-		prev_year_keys, company, branch, department, employee
+		fy_keys, company, branch, department, employee
 	)
 
 	data["top_by_absents"] = _ea_top_employees(month_keys, company, branch, department, employee, order_field="total_absents", limit=12)
@@ -2382,8 +2385,9 @@ def _drill_pending_leaves(from_date, to_date, company, branch, department, emplo
 
 
 def _drill_top_fulltime_attendance(company, branch, department, ascending=False, limit=3):
-	period_start, period_end, _, _ = _get_payroll_period_bounds()
-	month_keys = _current_payroll_ea_month_keys()
+	period_start, _, _, _ = _get_payroll_period_bounds()
+	lm_start, lm_end, lm_year, lm_month = _get_payroll_period_bounds(add_days(period_start, -1))
+	month_keys = [(lm_year, lm_month)]
 	rows = _ea_top_fulltime_employees(
 		month_keys,
 		company,
@@ -2400,13 +2404,13 @@ def _drill_top_fulltime_attendance(company, branch, department, ascending=False,
 		else "Top 3 Late Comers (Full Time)"
 	)
 	return _drill_payload(
-		f"{title} — {formatdate(period_start, 'dd MMM yyyy')} to {formatdate(period_end, 'dd MMM yyyy')}",
+		f"{title} — {formatdate(lm_start, 'dd MMM yyyy')} to {formatdate(lm_end, 'dd MMM yyyy')}",
 		rows,
 	)
 
 
 def _drill_top_fulltime_attendance_last_year(company, branch, department, limit=3):
-	prev_start, prev_end = _get_previous_payroll_fiscal_year_bounds()
+	prev_start, prev_end = _get_payroll_fiscal_year_bounds()
 	month_keys = _months_in_range(prev_start, prev_end)
 	rows = _ea_top_fulltime_employees(
 		month_keys,

@@ -169,15 +169,25 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 									<div class="tif-card__value">—</div>
 									<div class="tif-card__hint">Payroll year (26 Jun – 25 Jun)</div>
 								</div>
-								<div class="tif-card" data-card="top_punctual_last_year">
-									<div class="tif-card__label">Top Punctual (Last Year)</div>
+								<div class="tif-card tif-card--clickable" data-card="top_3_late_comers" title="Click for employee names">
+									<div class="tif-card__label">Top 3 Late Comers (Last Month)</div>
 									<div class="tif-card__value">—</div>
-									<div class="tif-card__hint">Full time with 0 lates · previous payroll year</div>
+									<div class="tif-card__hint">Full time · last completed payroll month</div>
+								</div>
+								<div class="tif-card" data-card="top_3_punctual_employees">
+									<div class="tif-card__label">Top Punctual (Last Month)</div>
+									<div class="tif-card__value">—</div>
+									<div class="tif-card__hint">Full time with 0 lates · last completed payroll month</div>
 								</div>
 								<div class="tif-card tif-card--clickable" data-card="top_3_late_comers_last_year" title="Click for employee names">
 									<div class="tif-card__label">Top 3 Late Comers (Last Year)</div>
 									<div class="tif-card__value">—</div>
-									<div class="tif-card__hint">Full time · previous payroll year</div>
+									<div class="tif-card__hint">Full time · last payroll year</div>
+								</div>
+								<div class="tif-card" data-card="top_punctual_last_year">
+									<div class="tif-card__label">Top Punctual (Last Year)</div>
+									<div class="tif-card__value">—</div>
+									<div class="tif-card__hint">Full time with 0 lates · last payroll year</div>
 								</div>
 								<div class="tif-card tif-card--clickable" data-card="eobi_added" title="Click for detail">
 									<div class="tif-card__label">EOBI Enrolled</div>
@@ -212,16 +222,6 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 									<div class="tif-card__label">Total Female</div>
 									<div class="tif-card__value">—</div>
 									<div class="tif-card__hint">Active employees</div>
-								</div>
-								<div class="tif-card tif-card--clickable" data-card="top_3_late_comers" title="Click for employee names">
-									<div class="tif-card__label">Top 3 Late Comers</div>
-									<div class="tif-card__value">—</div>
-									<div class="tif-card__hint">Full time · current payroll month</div>
-								</div>
-								<div class="tif-card" data-card="top_3_punctual_employees">
-									<div class="tif-card__label">Top Punctual</div>
-									<div class="tif-card__value">—</div>
-									<div class="tif-card__hint">Full time with 0 lates</div>
 								</div>
 							<div class="tif-card tif-card--clickable" data-card="referred_employee_count" title="Click for detail">
 								<div class="tif-card__label">Referred Employees</div>
@@ -845,13 +845,14 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 				this.set_card("beneficiary_people_count", data.beneficiary_people_count);
 				this.set_card("city_wise_count", data.city_wise_count);
 
+				const punctualityMonthLabel = data.punctuality_last_month_label || "";
 				const lateList = data.top_3_late_comers || [];
 				this.set_card("top_3_late_comers", lateList.length || data.top_3_late_comers_count || 0);
 				this.set_card_hint(
 					"top_3_late_comers",
-					payrollMonthLabel
-						? `Full time · ${payrollMonthLabel}`
-						: "Full time · current payroll month",
+					punctualityMonthLabel
+						? `Full time · ${punctualityMonthLabel}`
+						: "Full time · last completed payroll month",
 				);
 
 				const punctualCount = Number(
@@ -860,9 +861,9 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 				this.set_card("top_3_punctual_employees", punctualCount);
 				this.set_card_hint(
 					"top_3_punctual_employees",
-					payrollMonthLabel
-						? `Full time with 0 lates · ${payrollMonthLabel}`
-						: "Full time with 0 lates · current payroll month",
+					punctualityMonthLabel
+						? `Full time with 0 lates · ${punctualityMonthLabel}`
+						: "Full time with 0 lates · last completed payroll month",
 				);
 
 				const lateYearList = data.top_3_late_comers_last_year || [];
@@ -875,7 +876,7 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 					"top_3_late_comers_last_year",
 					payrollYearPrevLabel
 						? `Full time · ${payrollYearPrevLabel}`
-						: "Full time · previous payroll year",
+						: "Full time · last payroll year",
 				);
 
 				const punctualYearCount = Number(data.top_punctual_last_year_count || 0);
@@ -884,7 +885,7 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 					"top_punctual_last_year",
 					payrollYearPrevLabel
 						? `Full time with 0 lates · ${payrollYearPrevLabel}`
-						: "Full time with 0 lates · previous payroll year",
+						: "Full time with 0 lates · last payroll year",
 				);
 
 				this.set_card("new_hires", data.new_hires);
