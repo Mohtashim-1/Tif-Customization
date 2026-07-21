@@ -109,15 +109,25 @@ if (typeof window.CourierDashboard === 'undefined') {
 		this.from_date_control.set_value(me.filters.from_date);
 		this.to_date_control.set_value(me.filters.to_date);
 		
-		// Setup event listeners
-		$('#apply-filters').on('click', () => me.apply_filters());
-		$('#reset-filters').on('click', () => me.reset_filters());
-		$('#export-excel').on('click', () => me.export_to_excel());
-		$('#print-report').on('click', () => me.print_report());
+		// Setup event listeners (scoped to this page to avoid clashing with other instances)
+		let $main = me.page.main;
+		$main.find('#apply-filters').on('click', () => me.apply_filters());
+		$main.find('#reset-filters').on('click', () => me.reset_filters());
+		$main.find('#export-excel').on('click', () => me.export_to_excel());
+		$main.find('#print-report').on('click', () => me.print_report());
+		
+		// Auto-reload when the dates or customer change (not only on "Apply Filters")
+		let auto_reload = frappe.utils.debounce(() => {
+			if (me._suspend_auto) return;
+			me.apply_filters();
+		}, 400);
+		if (me.from_date_control.$input) me.from_date_control.$input.on('change', auto_reload);
+		if (me.to_date_control.$input) me.to_date_control.$input.on('change', auto_reload);
+		$main.find('#customer-filter').on('change', auto_reload);
 		
 		// View type buttons
-		$('.btn-group button[data-view]').on('click', function() {
-			$('.btn-group button').removeClass('active btn-primary').addClass('btn-default');
+		$main.find('.btn-group button[data-view]').on('click', function() {
+			$main.find('.btn-group button').removeClass('active btn-primary').addClass('btn-default');
 			$(this).removeClass('btn-default').addClass('active btn-primary');
 			me.filters.view_type = $(this).data('view');
 			me.update_transaction_table();
@@ -355,7 +365,7 @@ if (typeof window.CourierDashboard === 'undefined') {
 			method: 'tif_customization.tif_customization.page.courier_report.courier_report.get_customers',
 			callback: function(r) {
 				if (r.message) {
-					let select = $('#customer-filter');
+					let select = me.page.main.find('#customer-filter');
 					r.message.forEach(customer => {
 						select.append(`<option value="${customer.name}">${customer.customer_name || customer.name}</option>`);
 					});
@@ -369,7 +379,7 @@ if (typeof window.CourierDashboard === 'undefined') {
 		
 		me.filters.from_date = me.from_date_control.get_value();
 		me.filters.to_date = me.to_date_control.get_value();
-		me.filters.customer = $('#customer-filter').val() || '';
+		me.filters.customer = me.page.main.find('#customer-filter').val() || '';
 		
 		me.load_data();
 	}
@@ -384,16 +394,44 @@ if (typeof window.CourierDashboard === 'undefined') {
 			view_type: 'all'
 		};
 		
+		// Suspend auto-reload while we programmatically reset the controls,
+		// so we don't fire duplicate loads (debounce window is 400ms).
+		me._suspend_auto = true;
 		me.from_date_control.set_value(me.filters.from_date);
 		me.to_date_control.set_value(me.filters.to_date);
-		$('#customer-filter').val('');
-		$('.btn-group button[data-view="all"]').click();
+		me.page.main.find('#customer-filter').val('');
+		me.page.main.find('.btn-group button[data-view="all"]').click();
+		setTimeout(() => { me._suspend_auto = false; }, 600);
 		
 		me.load_data();
 	}
 	
+	show_loading(show) {
+		let me = this;
+		let $main = me.page.main;
+		let $overlay = $main.find('.courier-loading-overlay');
+		if (show) {
+			if (!$overlay.length) {
+				if ($main.css('position') === 'static') { $main.css('position', 'relative'); }
+				$overlay = $(`
+					<div class="courier-loading-overlay" style="position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,0.72);display:flex;align-items:center;justify-content:center;z-index:1000;border-radius:5px;">
+						<div style="text-align:center;color:#555;">
+							<i class="fa fa-spinner fa-spin fa-2x" style="color:#0F62FE;"></i>
+							<div style="margin-top:10px;font-size:13px;">Loading courier data…</div>
+						</div>
+					</div>
+				`);
+				$main.append($overlay);
+			}
+			$overlay.show();
+		} else if ($overlay.length) {
+			$overlay.hide();
+		}
+	}
+	
 	load_data() {
 		let me = this;
+		me.show_loading(true);
 		
 		frappe.call({
 			method: 'tif_customization.tif_customization.page.courier_report.courier_report.get_courier_report_data',
@@ -415,7 +453,7 @@ if (typeof window.CourierDashboard === 'undefined') {
 					});
 				}
 			}
-		});
+		}).always(() => me.show_loading(false));
 	}
 	
 	render_kpis() {
