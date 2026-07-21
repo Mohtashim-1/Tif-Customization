@@ -587,6 +587,11 @@ def _ea_join_and_where(company, branch, department, employee, month_keys):
 		conditions.append("(a.`employee` = %(employee)s)")
 		params["employee"] = employee
 
+	if _has_field(EA_DOCTYPE, "employee"):
+		sedu_cond = _sedu_exclude_by_employee_sql(params, "a.`employee`")
+		if sedu_cond:
+			conditions.append(sedu_cond)
+
 	return join_sql, " AND ".join(conditions), params
 
 
@@ -982,6 +987,10 @@ def _leave_join_conditions(company=None, branch=None, department=None, employee=
 	if employee and _has_field("Leave Application", "employee"):
 		conditions.append("la.employee = %(employee)s")
 		params["employee"] = employee
+	if _has_field("Leave Application", "employee"):
+		sedu_cond = _sedu_exclude_by_employee_sql(params, "la.employee")
+		if sedu_cond:
+			conditions.append(sedu_cond)
 	return join_employee, conditions, params
 
 
@@ -1164,6 +1173,7 @@ def _count_active_region_keyword(company, branch, department, keyword):
 		return 0
 	kw = f"%{(keyword or '').strip().lower()}%"
 	where_sql, params = _emp_filters_sql(company, branch, department)
+	sedu_sql, params = _special_education_dept_clause(params, mode="exclude")
 	params["kw"] = kw
 
 	joins = []
@@ -1200,7 +1210,7 @@ def _count_active_region_keyword(company, branch, department, keyword):
 		SELECT COUNT(e.name) AS c
 		FROM `tabEmployee` e
 		{from_join}
-		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}
+		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}{sedu_sql}
 		  AND {match_sql}
 		""",
 		params,
@@ -1216,12 +1226,13 @@ def _cnic_expired_stats_and_rows(company, branch, department, limit=25):
 		return out
 	today = getdate(nowdate())
 	where_sql, params = _emp_filters_sql(company, branch, department)
+	sedu_sql, params = _special_education_dept_clause(params, mode="exclude")
 	params["today"] = str(today)
 	count_row = frappe.db.sql(
 		f"""
 		SELECT COUNT(*) AS c
 		FROM `tabEmployee` e
-		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}
+		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}{sedu_sql}
 		  AND e.cnic_expiry IS NOT NULL
 		  AND e.cnic_expiry < %(today)s
 		""",
@@ -1238,7 +1249,7 @@ def _cnic_expired_stats_and_rows(company, branch, department, limit=25):
 			COALESCE(NULLIF(TRIM(e.department), ''), '—') AS department,
 			e.cnic_expiry AS cnic_expiry
 		FROM `tabEmployee` e
-		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}
+		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}{sedu_sql}
 		  AND e.cnic_expiry IS NOT NULL
 		  AND e.cnic_expiry < %(today)s
 		ORDER BY e.cnic_expiry ASC
@@ -1285,11 +1296,12 @@ def _count_total_left_employees(company, branch, department):
 	if not frappe.db.table_exists("Employee"):
 		return 0
 	where_sql, params = _emp_filters_sql(company, branch, department)
+	sedu_sql, params = _special_education_dept_clause(params, mode="exclude")
 	row = frappe.db.sql(
 		f"""
 		SELECT COUNT(e.name) AS c
 		FROM `tabEmployee` e
-		WHERE COALESCE(e.status, '') = 'Left' AND {where_sql}
+		WHERE COALESCE(e.status, '') = 'Left' AND {where_sql}{sedu_sql}
 		""",
 		params,
 		as_dict=True,
@@ -1305,13 +1317,14 @@ def _cnic_upcoming_stats_and_rows(company, branch, department, today=None, days=
 	today = getdate(today or nowdate())
 	until = add_days(today, cint(days or 30))
 	where_sql, params = _emp_filters_sql(company, branch, department)
+	sedu_sql, params = _special_education_dept_clause(params, mode="exclude")
 	params.update({"today": str(today), "until": str(until)})
 
 	count_row = frappe.db.sql(
 		f"""
 		SELECT COUNT(*) AS c
 		FROM `tabEmployee` e
-		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}
+		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}{sedu_sql}
 		  AND e.cnic_expiry IS NOT NULL
 		  AND e.cnic_expiry BETWEEN %(today)s AND %(until)s
 		""",
@@ -1329,7 +1342,7 @@ def _cnic_upcoming_stats_and_rows(company, branch, department, today=None, days=
 			COALESCE(NULLIF(TRIM(e.department), ''), '—') AS department,
 			e.cnic_expiry AS cnic_expiry
 		FROM `tabEmployee` e
-		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}
+		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}{sedu_sql}
 		  AND e.cnic_expiry IS NOT NULL
 		  AND e.cnic_expiry BETWEEN %(today)s AND %(until)s
 		ORDER BY e.cnic_expiry ASC
@@ -1363,6 +1376,26 @@ def _special_education_dept_clause(params, mode="exclude"):
 	if mode == "include":
 		return f" AND e.department IN ({in_list})", params
 	return f" AND COALESCE(e.department, '') NOT IN ({in_list})", params
+
+
+def _sedu_exclude_by_employee_sql(params, emp_col):
+	"""
+	Condition (no leading AND) excluding rows whose employee belongs to a
+	Special Education department. Keyed on `emp_col` (e.g. a.employee / la.employee)
+	so it works even when the query doesn't join `tabEmployee`.
+	"""
+	if not _has_field("Employee", "department") or not SPECIAL_EDUCATION_DEPARTMENTS:
+		return ""
+	placeholders = []
+	for i, name in enumerate(SPECIAL_EDUCATION_DEPARTMENTS):
+		key = f"sedu_emp_{i}"
+		params[key] = name
+		placeholders.append(f"%({key})s")
+	in_list = ", ".join(placeholders)
+	return (
+		f"COALESCE({emp_col}, '') NOT IN "
+		f"(SELECT emp.name FROM `tabEmployee` emp WHERE emp.department IN ({in_list}))"
+	)
 
 
 def _count_active_employees(company, branch, department):
@@ -1407,6 +1440,7 @@ def _count_active_by_gender(gender, company, branch, department):
 	if not frappe.db.table_exists("Employee") or not _has_field("Employee", "gender"):
 		return 0
 	where_sql, params = _emp_filters_sql(company, branch, department)
+	sedu_sql, params = _special_education_dept_clause(params, mode="exclude")
 	params["gender"] = gender
 	row = frappe.db.sql(
 		f"""
@@ -1414,7 +1448,7 @@ def _count_active_by_gender(gender, company, branch, department):
 		FROM `tabEmployee` e
 		WHERE COALESCE(e.status, '') = 'Active'
 		  AND TRIM(COALESCE(e.gender, '')) = %(gender)s
-		  AND {where_sql}
+		  AND {where_sql}{sedu_sql}
 		""",
 		params,
 		as_dict=True,
@@ -1428,12 +1462,13 @@ def _count_new_hires(from_date, to_date, company, branch, department):
 	if not _has_field("Employee", "date_of_joining"):
 		return 0
 	where_sql, params = _emp_filters_sql(company, branch, department)
+	sedu_sql, params = _special_education_dept_clause(params, mode="exclude")
 	params.update({"from_date": str(from_date), "to_date": str(to_date)})
 	row = frappe.db.sql(
 		f"""
 		SELECT COUNT(e.name) AS c
 		FROM `tabEmployee` e
-		WHERE {where_sql}
+		WHERE {where_sql}{sedu_sql}
 		  AND e.date_of_joining BETWEEN %(from_date)s AND %(to_date)s
 		""",
 		params,
@@ -1446,6 +1481,7 @@ def _count_left_employees(from_date, to_date, company, branch, department):
 	if not frappe.db.table_exists("Employee"):
 		return 0
 	where_sql, params = _emp_filters_sql(company, branch, department)
+	sedu_sql, params = _special_education_dept_clause(params, mode="exclude")
 	params.update({"from_date": str(from_date), "to_date": str(to_date)})
 
 	date_field = None
@@ -1471,7 +1507,7 @@ def _count_left_employees(from_date, to_date, company, branch, department):
 			f"""
 			SELECT COUNT(e.name) AS c
 			FROM `tabEmployee` e
-			WHERE {where_sql}
+			WHERE {where_sql}{sedu_sql}
 			  AND e.`{date_field}` BETWEEN %(from_date)s AND %(to_date)s
 			""",
 			params,
@@ -1483,7 +1519,7 @@ def _count_left_employees(from_date, to_date, company, branch, department):
 		f"""
 		SELECT COUNT(e.name) AS c
 		FROM `tabEmployee` e
-		WHERE {where_sql}
+		WHERE {where_sql}{sedu_sql}
 		  AND COALESCE(e.status, '') = 'Left'
 		  AND e.modified BETWEEN %(from_date)s AND %(to_date)s
 		""",
@@ -1577,6 +1613,7 @@ def _active_employee_group_count(fieldname, company, branch, department, limit=1
 	if not frappe.db.table_exists("Employee") or not _has_field("Employee", fieldname):
 		return {"labels": [], "values": []}
 	where_sql, params = _emp_filters_sql(company, branch, department)
+	sedu_sql, params = _special_education_dept_clause(params, mode="exclude")
 	# Grade / grades: sort by roman numeral (ii, iii, vii-a, …) not headcount.
 	if fieldname in ("grade", "grades"):
 		rows = frappe.db.sql(
@@ -1584,7 +1621,7 @@ def _active_employee_group_count(fieldname, company, branch, department, limit=1
 			SELECT COALESCE(NULLIF(TRIM(e.`{fieldname}`), ''), 'Not set') AS label,
 				COUNT(e.name) AS c
 			FROM `tabEmployee` e
-			WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}
+			WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}{sedu_sql}
 			GROUP BY label
 			LIMIT 500
 			""",
@@ -1600,7 +1637,7 @@ def _active_employee_group_count(fieldname, company, branch, department, limit=1
 		SELECT COALESCE(NULLIF(TRIM(e.`{fieldname}`), ''), 'Not set') AS label,
 			COUNT(e.name) AS c
 		FROM `tabEmployee` e
-		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}
+		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}{sedu_sql}
 		GROUP BY label
 		ORDER BY c DESC
 		LIMIT {cint(limit)}
@@ -1626,6 +1663,7 @@ def _headcount_stacked_by_employment_type(fieldname, company, branch, department
 		return {"labels": [], "series": []}
 
 	where_sql, params = _emp_filters_sql(company, branch, department)
+	sedu_sql, params = _special_education_dept_clause(params, mode="exclude")
 	rows = frappe.db.sql(
 		f"""
 		SELECT
@@ -1633,7 +1671,7 @@ def _headcount_stacked_by_employment_type(fieldname, company, branch, department
 			COALESCE(NULLIF(TRIM(e.employment_type), ''), 'Not set') AS employment_type,
 			COUNT(e.name) AS c
 		FROM `tabEmployee` e
-		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}
+		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}{sedu_sql}
 		GROUP BY group_label, employment_type
 		""",
 		params,
@@ -1696,12 +1734,13 @@ def _active_employee_city_count(company, branch, department, limit=15):
 	if not city_expr:
 		return {"labels": [], "values": []}
 	where_sql, params = _emp_filters_sql(company, branch, department)
+	sedu_sql, params = _special_education_dept_clause(params, mode="exclude")
 	rows = frappe.db.sql(
 		f"""
 		SELECT COALESCE({city_expr}, 'Not set') AS label, COUNT(e.name) AS c
 		FROM `tabEmployee` e
 		{join_sql}
-		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}
+		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}{sedu_sql}
 		GROUP BY label
 		ORDER BY c DESC
 		LIMIT {cint(limit)}
@@ -1721,6 +1760,7 @@ def _active_employee_city_branch_table(company, branch, department, limit=25):
 		return []
 
 	where_sql, params = _emp_filters_sql(company, branch, department)
+	sedu_sql, params = _special_education_dept_clause(params, mode="exclude")
 	branch_expr = "NULLIF(TRIM(e.branch), '')" if _has_field("Employee", "branch") else "NULL"
 	rows = frappe.db.sql(
 		f"""
@@ -1730,7 +1770,7 @@ def _active_employee_city_branch_table(company, branch, department, limit=25):
 			COUNT(e.name) AS c
 		FROM `tabEmployee` e
 		{join_sql}
-		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}
+		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}{sedu_sql}
 		GROUP BY city, branch
 		ORDER BY c DESC
 		LIMIT {cint(limit)}
@@ -1758,6 +1798,8 @@ def _probation_stats_and_rows(company, branch, department, today=None, limit=25)
 		return out
 
 	where_sql, params = _emp_filters_sql(company, branch, department)
+	sedu_sql, params = _special_education_dept_clause(params, mode="exclude")
+	where_sql = where_sql + sedu_sql
 	today = getdate(today or nowdate())
 	params["today"] = str(today)
 
@@ -1904,6 +1946,7 @@ def _count_active_employment_types(company, branch, department, employment_types
 	if not employment_types or not frappe.db.table_exists("Employee"):
 		return 0
 	where_sql, params = _emp_filters_sql(company, branch, department)
+	sedu_sql, params = _special_education_dept_clause(params, mode="exclude")
 	placeholders = ", ".join([f"%(et{i})s" for i in range(len(employment_types))])
 	for i, value in enumerate(employment_types):
 		params[f"et{i}"] = value
@@ -1911,7 +1954,7 @@ def _count_active_employment_types(company, branch, department, employment_types
 		f"""
 		SELECT COUNT(e.name) AS c
 		FROM `tabEmployee` e
-		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}
+		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}{sedu_sql}
 		  AND e.employment_type IN ({placeholders})
 		""",
 		params,
@@ -1929,6 +1972,7 @@ def _count_active_employment_types_by_gender(company, branch, department, employ
 	):
 		return 0
 	where_sql, params = _emp_filters_sql(company, branch, department)
+	sedu_sql, params = _special_education_dept_clause(params, mode="exclude")
 	placeholders = ", ".join([f"%(et{i})s" for i in range(len(employment_types))])
 	for i, value in enumerate(employment_types):
 		params[f"et{i}"] = value
@@ -1937,7 +1981,7 @@ def _count_active_employment_types_by_gender(company, branch, department, employ
 		f"""
 		SELECT COUNT(e.name) AS c
 		FROM `tabEmployee` e
-		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}
+		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}{sedu_sql}
 		  AND e.employment_type IN ({placeholders})
 		  AND TRIM(COALESCE(e.gender, '')) = %(gender)s
 		""",
@@ -2012,7 +2056,7 @@ def _fetch_active_employee_rows(
 	employment_types=None,
 	gender=None,
 	limit=500,
-	special_education_mode=None,
+	special_education_mode="exclude",
 ):
 	if not frappe.db.table_exists("Employee"):
 		return []
@@ -2053,13 +2097,14 @@ def _fetch_hire_rows(from_date, to_date, company, branch, department, limit=500)
 	if not frappe.db.table_exists("Employee") or not _has_field("Employee", "date_of_joining"):
 		return []
 	where_sql, params = _emp_filters_sql(company, branch, department)
+	sedu_sql, params = _special_education_dept_clause(params, mode="exclude")
 	params.update({"from_date": str(from_date), "to_date": str(to_date)})
 	lim = cint(limit)
 	return frappe.db.sql(
 		f"""
 		SELECT {_employee_row_select_extra()}
 		FROM `tabEmployee` e
-		WHERE {where_sql}
+		WHERE {where_sql}{sedu_sql}
 		  AND e.date_of_joining BETWEEN %(from_date)s AND %(to_date)s
 		ORDER BY e.date_of_joining DESC, e.employee_name ASC
 		LIMIT {lim}
@@ -2078,6 +2123,8 @@ def _fetch_left_rows(from_date, to_date, company, branch, department, limit=500)
 	if not frappe.db.table_exists("Employee"):
 		return []
 	where_sql, params = _emp_filters_sql(company, branch, department)
+	sedu_sql, params = _special_education_dept_clause(params, mode="exclude")
+	where_sql = where_sql + sedu_sql
 	params.update({"from_date": str(from_date), "to_date": str(to_date)})
 
 	date_field = None
@@ -2129,12 +2176,13 @@ def _eobi_added_stats(company, branch, department, limit=500):
 
 def _fetch_eobi_added_rows(company, branch, department, limit=500):
 	where_sql, params = _emp_filters_sql(company, branch, department)
+	sedu_sql, params = _special_education_dept_clause(params, mode="exclude")
 	lim = cint(limit)
 	return frappe.db.sql(
 		f"""
 		SELECT {_employee_row_select_extra()}, e.eobi AS eobi
 		FROM `tabEmployee` e
-		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}
+		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}{sedu_sql}
 		  AND UPPER(COALESCE(NULLIF(TRIM(e.eobi), ''), '')) NOT IN ('', '-', 'N/A', 'NA', 'NONE', 'NIL', 'NO')
 		ORDER BY e.employee_name ASC
 		LIMIT {lim}
@@ -2172,6 +2220,7 @@ def _pak_qatar_match_sql():
 
 def _fetch_pak_qatar_rows(company, branch, department, limit=500):
 	where_sql, params = _emp_filters_sql(company, branch, department)
+	sedu_sql, params = _special_education_dept_clause(params, mode="exclude")
 	match_sql = _pak_qatar_match_sql()
 	extra = []
 	if _has_field("Employee", "health_insurance_provider"):
@@ -2184,7 +2233,7 @@ def _fetch_pak_qatar_rows(company, branch, department, limit=500):
 		f"""
 		SELECT {_employee_row_select_extra()}{extra_sql}
 		FROM `tabEmployee` e
-		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}
+		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}{sedu_sql}
 		  AND {match_sql}
 		ORDER BY e.employee_name ASC
 		LIMIT {lim}
@@ -2213,13 +2262,14 @@ def _fetch_upcoming_confirmation_rows(company, branch, department, today=None, d
 	today = getdate(today or nowdate())
 	until = add_days(today, cint(days or 60))
 	where_sql, params = _emp_filters_sql(company, branch, department)
+	sedu_sql, params = _special_education_dept_clause(params, mode="exclude")
 	params.update({"today": str(today), "until": str(until)})
 	lim = cint(limit)
 	return frappe.db.sql(
 		f"""
 		SELECT {_employee_row_select_extra()}, e.scheduled_confirmation_date AS scheduled_confirmation_date
 		FROM `tabEmployee` e
-		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}
+		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}{sedu_sql}
 		  AND e.scheduled_confirmation_date IS NOT NULL
 		  AND e.scheduled_confirmation_date BETWEEN %(today)s AND %(until)s
 		ORDER BY e.scheduled_confirmation_date ASC, e.employee_name ASC
@@ -2498,6 +2548,7 @@ def _fetch_relative_rows(company, branch, department, limit=500):
 	if not _beneficiary_has_table():
 		return []
 	where_sql, params = _emp_filters_sql(company, branch, department)
+	sedu_sql, params = _special_education_dept_clause(params, mode="exclude")
 	lim = cint(limit)
 	return (
 		frappe.db.sql(
@@ -2508,7 +2559,7 @@ def _fetch_relative_rows(company, branch, department, limit=500):
 			WHERE b.parenttype = 'Employee'
 			  AND b.parentfield = 'beneficiary'
 			  AND COALESCE(e.status, '') = 'Active'
-			  AND {where_sql}
+			  AND {where_sql}{sedu_sql}
 			  AND COALESCE(NULLIF(TRIM(b.name1), ''), '') != ''
 			ORDER BY e.employee_name ASC, b.idx ASC
 			LIMIT {lim}
@@ -2529,6 +2580,7 @@ def _relative_and_relation_stats(company, branch, department, limit=500):
 		return out
 
 	where_sql, params = _emp_filters_sql(company, branch, department)
+	sedu_sql, params = _special_education_dept_clause(params, mode="exclude")
 	row = frappe.db.sql(
 		f"""
 		SELECT COUNT(b.name) AS c
@@ -2537,7 +2589,7 @@ def _relative_and_relation_stats(company, branch, department, limit=500):
 		WHERE b.parenttype = 'Employee'
 		  AND b.parentfield = 'beneficiary'
 		  AND COALESCE(e.status, '') = 'Active'
-		  AND {where_sql}
+		  AND {where_sql}{sedu_sql}
 		  AND COALESCE(NULLIF(TRIM(b.name1), ''), '') != ''
 		""",
 		params,
@@ -2555,7 +2607,7 @@ def _relative_and_relation_stats(company, branch, department, limit=500):
 			WHERE b.parenttype = 'Employee'
 			  AND b.parentfield = 'beneficiary'
 			  AND COALESCE(e.status, '') = 'Active'
-			  AND {where_sql}
+			  AND {where_sql}{sedu_sql}
 			  AND {key_sql} IS NOT NULL
 			GROUP BY {key_sql}
 			HAVING COUNT(DISTINCT e.name) >= 2
@@ -2577,7 +2629,9 @@ def _fetch_common_relation_rows(company, branch, department, limit=500):
 	if not _beneficiary_has_table():
 		return []
 	where_sql, params = _emp_filters_sql(company, branch, department)
+	sedu_sql, params = _special_education_dept_clause(params, mode="exclude")
 	where_e2 = where_sql.replace("e.", "e2.")
+	sedu_e2 = sedu_sql.replace("e.", "e2.")
 	key_b = _beneficiary_key_sql()
 	key_b2 = key_b.replace("b.", "b2.")
 	lim = cint(limit)
@@ -2599,7 +2653,7 @@ def _fetch_common_relation_rows(company, branch, department, limit=500):
 				WHERE b2.parenttype = 'Employee'
 				  AND b2.parentfield = 'beneficiary'
 				  AND COALESCE(e2.status, '') = 'Active'
-				  AND {where_e2}
+				  AND {where_e2}{sedu_e2}
 				  AND {key_b2} IS NOT NULL
 				GROUP BY {key_b2}
 				HAVING COUNT(DISTINCT e2.name) >= 2
@@ -2607,7 +2661,7 @@ def _fetch_common_relation_rows(company, branch, department, limit=500):
 			WHERE b.parenttype = 'Employee'
 			  AND b.parentfield = 'beneficiary'
 			  AND COALESCE(e.status, '') = 'Active'
-			  AND {where_sql}
+			  AND {where_sql}{sedu_sql}
 			ORDER BY shared.employee_count DESC, shared.relation_key ASC, e.employee_name ASC
 			LIMIT {lim}
 			""",
@@ -2628,12 +2682,13 @@ def _count_distinct_branches(company, branch, department):
 	if not frappe.db.table_exists("Employee") or not _has_field("Employee", "branch"):
 		return 0
 	where_sql, params = _emp_filters_sql(company, branch, department)
+	sedu_sql, params = _special_education_dept_clause(params, mode="exclude")
 	row = frappe.db.sql(
 		f"""
 		SELECT COUNT(DISTINCT NULLIF(TRIM(e.branch), '')) AS c
 		FROM `tabEmployee` e
 		WHERE COALESCE(e.status, '') = 'Active'
-		  AND {where_sql}
+		  AND {where_sql}{sedu_sql}
 		  AND NULLIF(TRIM(e.branch), '') IS NOT NULL
 		""",
 		params,
@@ -2647,6 +2702,7 @@ def _fetch_city_wise_rows(company, branch, department, limit=500):
 	if not frappe.db.table_exists("Employee") or not _has_field("Employee", "branch"):
 		return []
 	where_sql, params = _emp_filters_sql(company, branch, department)
+	sedu_sql, params = _special_education_dept_clause(params, mode="exclude")
 	lim = cint(limit)
 	return (
 		frappe.db.sql(
@@ -2656,7 +2712,7 @@ def _fetch_city_wise_rows(company, branch, department, limit=500):
 				COUNT(e.name) AS employee_count
 			FROM `tabEmployee` e
 			WHERE COALESCE(e.status, '') = 'Active'
-			  AND {where_sql}
+			  AND {where_sql}{sedu_sql}
 			  AND NULLIF(TRIM(e.branch), '') IS NOT NULL
 			GROUP BY COALESCE(NULLIF(TRIM(e.branch), ''), '—')
 			ORDER BY employee_count DESC, branch_name ASC
