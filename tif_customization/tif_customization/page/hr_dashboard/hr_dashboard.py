@@ -273,8 +273,8 @@ def get_card_drilldown(card_key=None, filters=None):
 		"top_3_late_comers_last_year": lambda: _drill_top_fulltime_attendance_last_year(
 			company, branch, department, limit=3
 		),
-		"relative_count": lambda: _drill_relative_count(company, branch, department),
-		"common_relation_reference_count": lambda: _drill_common_relation_reference(
+		"referred_employee_count": lambda: _drill_referred_employees(company, branch, department),
+		"beneficiary_people_count": lambda: _drill_beneficiary_people(
 			company, branch, department
 		),
 		"city_wise_count": lambda: _drill_city_wise_count(company, branch, department),
@@ -390,8 +390,8 @@ def _empty_payload(from_date, to_date, company, branch, department="", employee=
 		"upcoming_confirmation_count": 0,
 		"total_male": 0,
 		"total_female": 0,
-		"relative_count": 0,
-		"common_relation_reference_count": 0,
+		"referred_employee_count": 0,
+		"beneficiary_people_count": 0,
 		"city_wise_count": 0,
 	}
 
@@ -2462,6 +2462,8 @@ def _columns_from_rows(rows):
 		"total_leave_days": "Leave Days",
 		"value": "Σ Lates",
 		"relative_name": "Relative Name",
+		"referred_by": "Referred By",
+		"referred_by_id": "Referred By (ID)",
 		"relation": "Relation",
 		"relative_cnic": "Relative CNIC",
 		"common_relation_reference": "Common Relation Reference",
@@ -2544,7 +2546,94 @@ def _beneficiary_key_sql():
 	return "COALESCE(" + ", ".join(parts) + ")"
 
 
-def _fetch_relative_rows(company, branch, department, limit=500):
+def _count_referred_employees(company, branch, department):
+	"""Active employees who joined on a reference (Employee.custom_reference_employee set)."""
+	if not frappe.db.table_exists("Employee") or not _has_field("Employee", "custom_reference_employee"):
+		return 0
+	where_sql, params = _emp_filters_sql(company, branch, department)
+	sedu_sql, params = _special_education_dept_clause(params, mode="exclude")
+	row = frappe.db.sql(
+		f"""
+		SELECT COUNT(e.name) AS c
+		FROM `tabEmployee` e
+		WHERE COALESCE(e.status, '') = 'Active'
+		  AND {where_sql}{sedu_sql}
+		  AND COALESCE(NULLIF(TRIM(e.custom_reference_employee), ''), '') != ''
+		""",
+		params,
+		as_dict=True,
+	)
+	return cint((row or [{}])[0].get("c"))
+
+
+def _fetch_referred_employee_rows(company, branch, department, limit=500):
+	"""Active employees who came on a reference, with the referring employee."""
+	if not frappe.db.table_exists("Employee") or not _has_field("Employee", "custom_reference_employee"):
+		return []
+	where_sql, params = _emp_filters_sql(company, branch, department)
+	sedu_sql, params = _special_education_dept_clause(params, mode="exclude")
+	lim = cint(limit)
+	return (
+		frappe.db.sql(
+			f"""
+			SELECT
+				e.employee_name AS employee_name,
+				e.name AS employee_id,
+				COALESCE(NULLIF(TRIM(e.department), ''), '—') AS department,
+				COALESCE(NULLIF(TRIM(ref.employee_name), ''), e.custom_reference_employee, '—') AS referred_by,
+				e.custom_reference_employee AS referred_by_id
+			FROM `tabEmployee` e
+			LEFT JOIN `tabEmployee` ref ON ref.name = e.custom_reference_employee
+			WHERE COALESCE(e.status, '') = 'Active'
+			  AND {where_sql}{sedu_sql}
+			  AND COALESCE(NULLIF(TRIM(e.custom_reference_employee), ''), '') != ''
+			ORDER BY referred_by ASC, e.employee_name ASC
+			LIMIT {lim}
+			""",
+			params,
+			as_dict=True,
+		)
+		or []
+	)
+
+
+def _relative_and_relation_stats(company, branch, department, limit=500):
+	return {
+		"referred_employee_count": _count_referred_employees(company, branch, department),
+		"beneficiary_people_count": _count_beneficiary_people(company, branch, department),
+	}
+
+
+def _drill_referred_employees(company, branch, department, limit=500):
+	rows = _fetch_referred_employee_rows(company, branch, department, limit=limit)
+	return _drill_payload("Referred Employees (came on reference)", rows)
+
+
+def _count_beneficiary_people(company, branch, department):
+	"""Count Healthcare Beneficiary members (dependents) on active employees (Employee.beneficiary)."""
+	if not _beneficiary_has_table():
+		return 0
+	where_sql, params = _emp_filters_sql(company, branch, department)
+	sedu_sql, params = _special_education_dept_clause(params, mode="exclude")
+	row = frappe.db.sql(
+		f"""
+		SELECT COUNT(b.name) AS c
+		FROM `tabHealthcare Beneficiary` b
+		INNER JOIN `tabEmployee` e ON e.name = b.parent
+		WHERE b.parenttype = 'Employee'
+		  AND b.parentfield = 'beneficiary'
+		  AND COALESCE(e.status, '') = 'Active'
+		  AND {where_sql}{sedu_sql}
+		  AND COALESCE(NULLIF(TRIM(b.name1), ''), '') != ''
+		""",
+		params,
+		as_dict=True,
+	)
+	return cint((row or [{}])[0].get("c"))
+
+
+def _fetch_beneficiary_people_rows(company, branch, department, limit=500):
+	"""Beneficiary members (dependents) with their linked active employee."""
 	if not _beneficiary_has_table():
 		return []
 	where_sql, params = _emp_filters_sql(company, branch, department)
@@ -2553,7 +2642,7 @@ def _fetch_relative_rows(company, branch, department, limit=500):
 	return (
 		frappe.db.sql(
 			f"""
-			SELECT {_beneficiary_select_fields()}
+			SELECT {_beneficiary_select_fields(include_common_relation_reference=False)}
 			FROM `tabHealthcare Beneficiary` b
 			INNER JOIN `tabEmployee` e ON e.name = b.parent
 			WHERE b.parenttype = 'Employee'
@@ -2571,110 +2660,9 @@ def _fetch_relative_rows(company, branch, department, limit=500):
 	)
 
 
-def _relative_and_relation_stats(company, branch, department, limit=500):
-	out = {
-		"relative_count": 0,
-		"common_relation_reference_count": 0,
-	}
-	if not _beneficiary_has_table():
-		return out
-
-	where_sql, params = _emp_filters_sql(company, branch, department)
-	sedu_sql, params = _special_education_dept_clause(params, mode="exclude")
-	row = frappe.db.sql(
-		f"""
-		SELECT COUNT(b.name) AS c
-		FROM `tabHealthcare Beneficiary` b
-		INNER JOIN `tabEmployee` e ON e.name = b.parent
-		WHERE b.parenttype = 'Employee'
-		  AND b.parentfield = 'beneficiary'
-		  AND COALESCE(e.status, '') = 'Active'
-		  AND {where_sql}{sedu_sql}
-		  AND COALESCE(NULLIF(TRIM(b.name1), ''), '') != ''
-		""",
-		params,
-		as_dict=True,
-	)
-	out["relative_count"] = cint((row or [{}])[0].get("c"))
-
-	key_sql = _beneficiary_key_sql()
-	shared = frappe.db.sql(
-		f"""
-		SELECT COUNT(*) AS c FROM (
-			SELECT {key_sql} AS relation_key
-			FROM `tabHealthcare Beneficiary` b
-			INNER JOIN `tabEmployee` e ON e.name = b.parent
-			WHERE b.parenttype = 'Employee'
-			  AND b.parentfield = 'beneficiary'
-			  AND COALESCE(e.status, '') = 'Active'
-			  AND {where_sql}{sedu_sql}
-			  AND {key_sql} IS NOT NULL
-			GROUP BY {key_sql}
-			HAVING COUNT(DISTINCT e.name) >= 2
-		) t
-		""",
-		params,
-		as_dict=True,
-	)
-	out["common_relation_reference_count"] = cint((shared or [{}])[0].get("c"))
-	return out
-
-
-def _drill_relative_count(company, branch, department, limit=500):
-	rows = _fetch_relative_rows(company, branch, department, limit=limit)
-	return _drill_payload("Relative Count", rows)
-
-
-def _fetch_common_relation_rows(company, branch, department, limit=500):
-	if not _beneficiary_has_table():
-		return []
-	where_sql, params = _emp_filters_sql(company, branch, department)
-	sedu_sql, params = _special_education_dept_clause(params, mode="exclude")
-	where_e2 = where_sql.replace("e.", "e2.")
-	sedu_e2 = sedu_sql.replace("e.", "e2.")
-	key_b = _beneficiary_key_sql()
-	key_b2 = key_b.replace("b.", "b2.")
-	lim = cint(limit)
-	# Show the matched key in Common Relation Reference (field, else CNIC, else name)
-	# so the column is never blank when a match exists.
-	return (
-		frappe.db.sql(
-			f"""
-			SELECT
-				shared.employee_count,
-				shared.relation_key AS common_relation_reference,
-				{_beneficiary_select_fields(include_common_relation_reference=False)}
-			FROM `tabHealthcare Beneficiary` b
-			INNER JOIN `tabEmployee` e ON e.name = b.parent
-			INNER JOIN (
-				SELECT {key_b2} AS relation_key, COUNT(DISTINCT e2.name) AS employee_count
-				FROM `tabHealthcare Beneficiary` b2
-				INNER JOIN `tabEmployee` e2 ON e2.name = b2.parent
-				WHERE b2.parenttype = 'Employee'
-				  AND b2.parentfield = 'beneficiary'
-				  AND COALESCE(e2.status, '') = 'Active'
-				  AND {where_e2}{sedu_e2}
-				  AND {key_b2} IS NOT NULL
-				GROUP BY {key_b2}
-				HAVING COUNT(DISTINCT e2.name) >= 2
-			) shared ON shared.relation_key = {key_b}
-			WHERE b.parenttype = 'Employee'
-			  AND b.parentfield = 'beneficiary'
-			  AND COALESCE(e.status, '') = 'Active'
-			  AND {where_sql}{sedu_sql}
-			ORDER BY shared.employee_count DESC, shared.relation_key ASC, e.employee_name ASC
-			LIMIT {lim}
-			""",
-			params,
-			as_dict=True,
-		)
-		or []
-	)
-
-
-def _drill_common_relation_reference(company, branch, department, limit=500):
-	rows = _fetch_common_relation_rows(company, branch, department, limit=limit)
-	return _drill_payload("Common Relation Reference Count", rows)
+def _drill_beneficiary_people(company, branch, department, limit=500):
+	rows = _fetch_beneficiary_people_rows(company, branch, department, limit=limit)
+	return _drill_payload("Beneficiary People (health provider members)", rows)
 
 
 def _count_distinct_branches(company, branch, department):
