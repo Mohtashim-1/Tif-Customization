@@ -51,13 +51,13 @@ if (typeof window.DispatchReport === 'undefined') {
 						<div class="col-md-3">
 							<div class="form-group">
 								<label>From Date</label>
-								<input type="date" id="from-date" class="form-control" value="${me.filters.from_date}">
+								<div id="from-date-control"></div>
 							</div>
 						</div>
 						<div class="col-md-3">
 							<div class="form-group">
 								<label>To Date</label>
-								<input type="date" id="to-date" class="form-control" value="${me.filters.to_date}">
+								<div id="to-date-control"></div>
 							</div>
 						</div>
 						<div class="col-md-3">
@@ -184,6 +184,32 @@ if (typeof window.DispatchReport === 'undefined') {
 		`;
 		
 		$(me.page.body).html(html);
+		let $body = $(me.page.body);
+		
+		// Debounced auto-reload used by all filter controls
+		me._auto_reload = frappe.utils.debounce(() => {
+			if (me._suspend_auto) return;
+			me.apply_filters();
+		}, 400);
+		
+		// Proper Frappe Date pickers (replace old native <input type="date">)
+		me.from_date_control = frappe.ui.form.make_control({
+			parent: $body.find('#from-date-control')[0],
+			df: { fieldtype: 'Date', fieldname: 'from_date', label: '', placeholder: 'From Date' },
+			render_input: true,
+		});
+		me.to_date_control = frappe.ui.form.make_control({
+			parent: $body.find('#to-date-control')[0],
+			df: { fieldtype: 'Date', fieldname: 'to_date', label: '', placeholder: 'To Date' },
+			render_input: true,
+		});
+		me.from_date_control.set_value(me.filters.from_date);
+		me.to_date_control.set_value(me.filters.to_date);
+		if (me.from_date_control.$input) me.from_date_control.$input.on('change', me._auto_reload);
+		if (me.to_date_control.$input) me.to_date_control.$input.on('change', me._auto_reload);
+		
+		// Auto-reload when the dropdown filters change too
+		$body.on('change', '#country-filter, #city-filter, #province-filter, #area-filter, #book-type-filter', me._auto_reload);
 		
 		// Setup customer autocomplete after a short delay
 		setTimeout(() => {
@@ -208,6 +234,7 @@ if (typeof window.DispatchReport === 'undefined') {
 					if (control && control.$input) {
 						me.customer_control = control;
 						control.$input.attr('id', 'customer-filter');
+						control.$input.on('change awesomplete-selectcomplete', me._auto_reload);
 					}
 				} catch (e) {
 					console.error('Error setting up customer field:', e);
@@ -236,6 +263,7 @@ if (typeof window.DispatchReport === 'undefined') {
 					if (control && control.$input) {
 						me.book_control = control;
 						control.$input.attr('id', 'book-filter');
+						control.$input.on('change awesomplete-selectcomplete', me._auto_reload);
 					}
 				} catch (e) {
 					console.error('Error setting up book/item field:', e);
@@ -243,20 +271,20 @@ if (typeof window.DispatchReport === 'undefined') {
 			}
 		}, 300);
 		
-		// Event handlers
-		$('#apply-filters').on('click', function() {
+		// Event handlers (scoped to this page's body)
+		$body.find('#apply-filters').on('click', function() {
 			me.apply_filters();
 		});
 		
-		$('#reset-filters').on('click', function() {
+		$body.find('#reset-filters').on('click', function() {
 			me.reset_filters();
 		});
 		
-		$('#export-excel').on('click', function() {
+		$body.find('#export-excel').on('click', function() {
 			me.export_to_excel();
 		});
 		
-		$('#print-report').on('click', function() {
+		$body.find('#print-report').on('click', function() {
 			me.print_report();
 		});
 		
@@ -319,9 +347,9 @@ if (typeof window.DispatchReport === 'undefined') {
 		applyButton.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Searching...');
 		me.showLoader();
 		
-		// Get filter values
-		let fromDate = $('#from-date').val();
-		let toDate = $('#to-date').val();
+		// Get filter values from the Frappe Date controls
+		let fromDate = me.from_date_control ? me.from_date_control.get_value() : $('#from-date').val();
+		let toDate = me.to_date_control ? me.to_date_control.get_value() : $('#to-date').val();
 		
 		// Set dates, use defaults if empty
 		me.filters.from_date = fromDate || frappe.datetime.add_days(frappe.datetime.get_today(), -30);
@@ -372,9 +400,15 @@ if (typeof window.DispatchReport === 'undefined') {
 			book_type: ''
 		};
 		
-		// Reset form fields
-		$('#from-date').val(me.filters.from_date);
-		$('#to-date').val(me.filters.to_date);
+		// Suspend auto-reload while programmatically resetting controls (debounce window 400ms)
+		me._suspend_auto = true;
+		setTimeout(() => { me._suspend_auto = false; }, 600);
+		
+		// Reset date pickers
+		if (me.from_date_control) me.from_date_control.set_value(me.filters.from_date);
+		else $('#from-date').val(me.filters.from_date);
+		if (me.to_date_control) me.to_date_control.set_value(me.filters.to_date);
+		else $('#to-date').val(me.filters.to_date);
 		
 		// Reset link fields - use control if available
 		if (me.customer_control && typeof me.customer_control.set_value === 'function') {
@@ -412,6 +446,7 @@ if (typeof window.DispatchReport === 'undefined') {
 	load_data() {
 		let me = this;
 		
+		me.showLoader();
 		$('#dispatch-tbody').html('<tr><td colspan="12" class="text-center">Loading data...</td></tr>');
 		
 		frappe.call({
