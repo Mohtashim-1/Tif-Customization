@@ -167,8 +167,9 @@ def get_dashboard_data(filters=None):
 	data.update(_eobi_added_stats(company, branch, department, limit=500))
 	data.update(_pak_qatar_enrolled_stats(company, branch, department, limit=500))
 	data.update(_upcoming_confirmation_stats(company, branch, department, today=today, days=60, limit=500))
-	data.update(_relative_and_relation_stats(company, branch, department, limit=500))
-	data["city_wise_count"] = _count_distinct_branches(company, branch, department)
+	# Temporarily hidden KPIs: Referred Employees / Beneficiary People / City-wise Count
+	# data.update(_relative_and_relation_stats(company, branch, department, limit=500))
+	# data["city_wise_count"] = _count_distinct_branches(company, branch, department)
 
 	return data
 
@@ -2468,6 +2469,7 @@ def _columns_from_rows(rows):
 		"relative_name": "Relative Name",
 		"referred_by": "Referred By",
 		"referred_by_id": "Referred By (ID)",
+		"reference_relation": "Reference Relation",
 		"relation": "Relation",
 		"relative_cnic": "Relative CNIC",
 		"common_relation_reference": "Common Relation Reference",
@@ -2577,6 +2579,11 @@ def _fetch_referred_employee_rows(company, branch, department, limit=500):
 	where_sql, params = _emp_filters_sql(company, branch, department)
 	sedu_sql, params = _special_education_dept_clause(params, mode="exclude")
 	lim = cint(limit)
+	relation_sql = (
+		"COALESCE(NULLIF(TRIM(e.custom_reference_relation), ''), '—') AS reference_relation"
+		if _has_field("Employee", "custom_reference_relation")
+		else "'—' AS reference_relation"
+	)
 	return (
 		frappe.db.sql(
 			f"""
@@ -2585,7 +2592,8 @@ def _fetch_referred_employee_rows(company, branch, department, limit=500):
 				e.name AS employee_id,
 				COALESCE(NULLIF(TRIM(e.department), ''), '—') AS department,
 				COALESCE(NULLIF(TRIM(ref.employee_name), ''), e.custom_reference_employee, '—') AS referred_by,
-				e.custom_reference_employee AS referred_by_id
+				e.custom_reference_employee AS referred_by_id,
+				{relation_sql}
 			FROM `tabEmployee` e
 			LEFT JOIN `tabEmployee` ref ON ref.name = e.custom_reference_employee
 			WHERE COALESCE(e.status, '') = 'Active'

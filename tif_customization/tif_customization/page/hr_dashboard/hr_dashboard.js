@@ -223,6 +223,7 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 									<div class="tif-card__value">—</div>
 									<div class="tif-card__hint">Active employees</div>
 								</div>
+							<!-- Temporarily hidden KPIs
 							<div class="tif-card tif-card--clickable" data-card="referred_employee_count" title="Click for detail">
 								<div class="tif-card__label">Referred Employees</div>
 								<div class="tif-card__value">—</div>
@@ -238,6 +239,7 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 									<div class="tif-card__value">—</div>
 									<div class="tif-card__hint">Distinct branches (Employee.branch)</div>
 								</div>
+							-->
 							</div>
 
 							<div class="tif-attdash__spacer" aria-hidden="true"></div>
@@ -841,9 +843,10 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 				this.set_card("upcoming_confirmation", data.upcoming_confirmation_count);
 				this.set_card("total_male", data.total_male);
 				this.set_card("total_female", data.total_female);
-				this.set_card("referred_employee_count", data.referred_employee_count);
-				this.set_card("beneficiary_people_count", data.beneficiary_people_count);
-				this.set_card("city_wise_count", data.city_wise_count);
+				// Temporarily hidden KPIs
+				// this.set_card("referred_employee_count", data.referred_employee_count);
+				// this.set_card("beneficiary_people_count", data.beneficiary_people_count);
+				// this.set_card("city_wise_count", data.city_wise_count);
 
 				const punctualityMonthLabel = data.punctuality_last_month_label || "";
 				const lateList = data.top_3_late_comers || [];
