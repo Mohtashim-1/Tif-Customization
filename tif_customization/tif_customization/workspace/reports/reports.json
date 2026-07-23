@@ -76,7 +76,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Dispatch Detail Report (UAT)",
+   "label": "Dispatch Detail Report",
    "link_count": 0,
    "link_to": "dispatch-detail-report",
    "link_type": "Page",
@@ -114,7 +114,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Book Purchase & Printing Dashboard (UAT)",
+   "label": "Book Purchase & Printing Dashboard",
    "link_count": 0,
    "link_to": "book-purchase-printing-dashboard",
    "link_type": "Page",
@@ -489,7 +489,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-07-13 14:37:17.887833",
+ "modified": "2026-07-22 15:22:33.211320",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Reports",
