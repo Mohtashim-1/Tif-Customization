@@ -651,7 +651,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-07-21 14:34:28.750499",
+ "modified": "2026-07-24 15:22:35.631440",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Forms",
@@ -672,6 +672,9 @@
   },
   {
    "role": "HR User"
+  },
+  {
+   "role": "HOD"
   }
  ],
  "sequence_id": 53.0,

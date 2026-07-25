@@ -300,7 +300,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Expense Report and Dashboard (UAT) 29-Jun-26",
+   "label": "Expense Report and Dashboard ",
    "link_count": 0,
    "link_to": "procurement-expense",
    "link_type": "Page",
@@ -340,7 +340,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Donation Analytics (UAT) 29-Jun-26",
+   "label": "Donation Analytics ",
    "link_count": 0,
    "link_to": "donation-analytics",
    "link_type": "Page",
@@ -360,7 +360,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Reconciliation with Bank Statements Summary (UAT) 29-06-2026",
+   "label": "Reconciliation with Bank Statements Summary ",
    "link_count": 0,
    "link_to": "reconcillation-with-",
    "link_type": "Page",
@@ -400,7 +400,7 @@
   {
    "hidden": 0,
    "is_query_report": 1,
-   "label": "Donor Ledger (UAT)",
+   "label": "Donor Ledger",
    "link_count": 0,
    "link_to": "Donor Ledger Statement",
    "link_type": "Report",
@@ -411,7 +411,7 @@
   {
    "hidden": 0,
    "is_query_report": 1,
-   "label": "Cash Book (UAT)",
+   "label": "Cash Book",
    "link_count": 0,
    "link_to": "Cash Book",
    "link_type": "Report",
@@ -422,7 +422,7 @@
   {
    "hidden": 0,
    "is_query_report": 1,
-   "label": "Bank Book (UAT)",
+   "label": "Bank Book",
    "link_count": 0,
    "link_to": "Bank Book",
    "link_type": "Report",
@@ -489,7 +489,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-07-22 15:22:33.211320",
+ "modified": "2026-07-24 15:22:14.101723",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Reports",
@@ -516,6 +516,9 @@
   },
   {
    "role": "Trustee"
+  },
+  {
+   "role": "HOD"
   }
  ],
  "sequence_id": 52.0,

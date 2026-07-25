@@ -243,8 +243,16 @@ def download_reconciliation_excel(filters=None):
 
 
 def _build_bank_series(bank_account, gl_account, company, from_date, to_date, months, month_keys):
-	erp = _gl_monthly_totals(gl_account, company, from_date, to_date, month_keys)
+
+	# Full GL keeps opening/ending cash position correct.
+	erp_full = _gl_monthly_totals(gl_account, company, from_date, to_date, month_keys)
 	erp_initial = _gl_balance_before(gl_account, company, from_date)
+
+	# Donation / expense rows exclude internal bank transfers so they are not
+	# counted as income on the receiving bank and expense on the sending bank.
+	erp = _exclude_internal_transfers_from_monthly(
+		erp_full, gl_account, company, from_date, to_date, month_keys
+	)
 
 	donations = {}
 	expenses = {}
@@ -253,8 +261,8 @@ def _build_bank_series(bank_account, gl_account, company, from_date, to_date, mo
 		donations[key] = flt((erp.get("debits") or {}).get(key))
 		expenses[key] = flt((erp.get("credits") or {}).get(key))
 
-	total_in = sum(flt(erp.get("debits", {}).get(k)) for k in month_keys)
-	total_out = sum(flt(erp.get("credits", {}).get(k)) for k in month_keys)
+	total_in = sum(flt(erp_full.get("debits", {}).get(k)) for k in month_keys)
+	total_out = sum(flt(erp_full.get("credits", {}).get(k)) for k in month_keys)
 	erp_ending = flt(erp_initial) + total_in - total_out
 
 	return {
@@ -421,4 +429,94 @@ def _gl_monthly_totals(gl_account, company, from_date, to_date, month_keys):
 		if key in debits:
 			debits[key] = flt(row.get("total_debit"))
 			credits[key] = flt(row.get("total_credit"))
+	return {"debits": debits, "credits": credits}
+
+
+def _exclude_internal_transfers_from_monthly(erp_full, gl_account, company, from_date, to_date, month_keys):
+	"""Subtract internal bank-to-bank movements from donation/expense activity."""
+	transfers = _internal_transfer_monthly_totals(gl_account, company, from_date, to_date, month_keys)
+	debits = _empty_month_map(month_keys)
+	credits = _empty_month_map(month_keys)
+	for key in month_keys:
+		debits[key] = max(flt(erp_full["debits"].get(key)) - flt(transfers["debits"].get(key)), 0)
+		credits[key] = max(flt(erp_full["credits"].get(key)) - flt(transfers["credits"].get(key)), 0)
+	return {"debits": debits, "credits": credits}
+
+
+def _internal_transfer_monthly_totals(gl_account, company, from_date, to_date, month_keys):
+	"""Monthly debit/credit on this bank from Internal Transfer PE and bank-to-bank JE."""
+	debits = _empty_month_map(month_keys)
+	credits = _empty_month_map(month_keys)
+	params = {
+		"account": gl_account,
+		"company": company,
+		"from_date": from_date,
+		"to_date": to_date,
+	}
+
+	pe_rows = frappe.db.sql(
+		"""
+		SELECT
+			DATE_FORMAT(gle.posting_date, '%%Y-%%m') AS month_key,
+			COALESCE(SUM(gle.debit), 0) AS total_debit,
+			COALESCE(SUM(gle.credit), 0) AS total_credit
+		FROM `tabGL Entry` gle
+		INNER JOIN `tabPayment Entry` pe
+			ON pe.name = gle.voucher_no AND pe.docstatus = 1
+		WHERE gle.account = %(account)s
+		  AND gle.company = %(company)s
+		  AND gle.voucher_type = 'Payment Entry'
+		  AND gle.posting_date BETWEEN %(from_date)s AND %(to_date)s
+		  AND IFNULL(gle.is_cancelled, 0) = 0
+		  AND pe.payment_type = 'Internal Transfer'
+		GROUP BY month_key
+		""",
+		params,
+		as_dict=True,
+	)
+	for row in pe_rows:
+		key = row.get("month_key")
+		if key in debits:
+			debits[key] += flt(row.get("total_debit"))
+			credits[key] += flt(row.get("total_credit"))
+
+	je_rows = frappe.db.sql(
+		"""
+		SELECT
+			DATE_FORMAT(gle.posting_date, '%%Y-%%m') AS month_key,
+			COALESCE(SUM(gle.debit), 0) AS total_debit,
+			COALESCE(SUM(gle.credit), 0) AS total_credit
+		FROM `tabGL Entry` gle
+		WHERE gle.account = %(account)s
+		  AND gle.company = %(company)s
+		  AND gle.voucher_type = 'Journal Entry'
+		  AND gle.posting_date BETWEEN %(from_date)s AND %(to_date)s
+		  AND IFNULL(gle.is_cancelled, 0) = 0
+		  AND (gle.debit > 0 OR gle.credit > 0)
+		  AND EXISTS (
+			SELECT 1
+			FROM `tabGL Entry` contra
+			INNER JOIN `tabAccount` acc ON acc.name = contra.account
+			WHERE contra.voucher_type = gle.voucher_type
+			  AND contra.voucher_no = gle.voucher_no
+			  AND contra.company = gle.company
+			  AND IFNULL(contra.is_cancelled, 0) = 0
+			  AND contra.account != gle.account
+			  AND acc.account_type = 'Bank'
+			  AND (
+				(gle.debit > 0 AND contra.credit > 0)
+				OR (gle.credit > 0 AND contra.debit > 0)
+			  )
+		  )
+		GROUP BY month_key
+		""",
+		params,
+		as_dict=True,
+	)
+	for row in je_rows:
+		key = row.get("month_key")
+		if key in debits:
+			debits[key] += flt(row.get("total_debit"))
+			credits[key] += flt(row.get("total_credit"))
+
 	return {"debits": debits, "credits": credits}

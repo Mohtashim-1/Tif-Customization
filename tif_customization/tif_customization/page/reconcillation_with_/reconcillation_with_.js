@@ -539,6 +539,11 @@ class ReconciliationWithBankPage {
 					</tbody>
 				</table>
 			</div>
+			<p class="text-muted small mt-2 mb-0">
+				${__(
+					"Internal bank transfers (Payment Entry Internal Transfer and bank-to-bank Journal Entries) are excluded from Donation and Expense so they are not counted twice across banks. Opening and ending balances still include all GL movements."
+				)}
+			</p>
 		`);
 	}
 }
