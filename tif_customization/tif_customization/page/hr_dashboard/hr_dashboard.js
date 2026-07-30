@@ -197,6 +197,7 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 								<div class="tif-card tif-card--clickable" data-card="pak_qatar_enrolled" title="Click for detail">
 									<div class="tif-card__label">Pak Qatar (Enrolled Health Card, Paycon, GLT)</div>
 									<div class="tif-card__value">—</div>
+									<div class="tif-card__hint">All departments incl. Special Education</div>
 								</div>
 								<div class="tif-card tif-card--clickable" data-card="cnic_expired_count" title="Click for detail">
 									<div class="tif-card__label">CNIC Expired</div>

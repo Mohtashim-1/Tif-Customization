@@ -6,9 +6,12 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "type",
   "training_date",
   "training_time",
+  "month",
   "training_type",
+  "workshop_topic",
   "mode_of_training",
   "participants_category",
   "school_name",
@@ -19,9 +22,20 @@
   "city",
   "area",
   "trainer_name",
-  "program"
+  "program",
+  "workshop_for"
  ],
  "fields": [
+  {
+   "default": "Training",
+   "fieldname": "type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Type",
+   "options": "Training\nWorkshop",
+   "reqd": 1
+  },
   {
    "default": "Today",
    "fieldname": "training_date",
@@ -38,11 +52,26 @@
    "label": "UP Coming Training Time"
   },
   {
+   "depends_on": "eval:doc.type == 'Workshop'",
+   "fieldname": "month",
+   "fieldtype": "Data",
+   "label": "Month",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.type == 'Training'",
    "fieldname": "training_type",
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "UP Coming Training Type",
    "options": "Training Type"
+  },
+  {
+   "depends_on": "eval:doc.type == 'Workshop'",
+   "fieldname": "workshop_topic",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "UP Coming workshop Topic"
   },
   {
    "fieldname": "mode_of_training",
@@ -55,7 +84,7 @@
    "fieldname": "participants_category",
    "fieldtype": "Select",
    "label": "Participants Category",
-   "options": "\nSchool Kids\nTrainees"
+   "options": "\nSchool Kids\nTrainees\nTeachers"
   },
   {
    "fieldname": "school_name",
@@ -73,7 +102,7 @@
    "fieldname": "department_training",
    "fieldtype": "Select",
    "label": "Department Training",
-   "options": "TPS\nCEE\nQPS\nTIF"
+   "options": "TPS\nCEE\nQPS\nTIF\nT. Training"
   },
   {
    "fieldname": "city",
@@ -93,6 +122,7 @@
    "label": "Name of Trainer"
   },
   {
+   "depends_on": "eval:doc.type == 'Training'",
    "fieldname": "program",
    "fieldtype": "Link",
    "label": "Program",
@@ -103,10 +133,17 @@
    "fieldtype": "Column Break"
   },
   {
+   "depends_on": "eval:doc.type == 'Training'",
    "fieldname": "tag_school",
    "fieldtype": "Link",
    "label": "Tag School",
    "options": "School"
+  },
+  {
+   "depends_on": "eval:doc.type == 'Workshop'",
+   "fieldname": "workshop_for",
+   "fieldtype": "Data",
+   "label": "Workshop For"
   }
  ],
  "index_web_pages_for_search": 1,

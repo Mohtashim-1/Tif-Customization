@@ -2228,8 +2228,9 @@ def _pak_qatar_match_sql():
 
 
 def _fetch_pak_qatar_rows(company, branch, department, limit=500):
+	# Unlike the headcount cards, enrolment is tracked org-wide: Special Education
+	# staff hold the same policies and must not be filtered out here.
 	where_sql, params = _emp_filters_sql(company, branch, department)
-	sedu_sql, params = _special_education_dept_clause(params, mode="exclude")
 	match_sql = _pak_qatar_match_sql()
 	extra = []
 	if _has_field("Employee", "health_insurance_provider"):
@@ -2242,7 +2243,7 @@ def _fetch_pak_qatar_rows(company, branch, department, limit=500):
 		f"""
 		SELECT {_employee_row_select_extra()}{extra_sql}
 		FROM `tabEmployee` e
-		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}{sedu_sql}
+		WHERE COALESCE(e.status, '') = 'Active' AND {where_sql}
 		  AND {match_sql}
 		ORDER BY e.employee_name ASC
 		LIMIT {lim}

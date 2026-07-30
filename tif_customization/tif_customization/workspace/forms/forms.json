@@ -15,6 +15,24 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "Training",
+   "link_count": 0,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Upcoming Training",
+   "link_count": 0,
+   "link_to": "Upcoming Training",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "Procurement",
    "link_count": 7,
    "onboard": 0,
@@ -651,7 +669,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-07-24 15:22:35.631440",
+ "modified": "2026-07-30 12:17:21.922465",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Forms",
