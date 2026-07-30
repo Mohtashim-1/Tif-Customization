@@ -17,6 +17,12 @@ const TIF_MONTH_NAMES = [
 ];
 
 frappe.ui.form.on("Upcoming Training", {
+	refresh(frm) {
+		frm.add_custom_button(__("Training & Workshop Report"), () => {
+			frappe.set_route("upcoming-training-report");
+		});
+	},
+
 	training_date(frm) {
 		set_month_from_date(frm);
 	},
