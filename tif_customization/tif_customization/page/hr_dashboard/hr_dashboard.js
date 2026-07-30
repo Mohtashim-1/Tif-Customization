@@ -184,10 +184,10 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 									<div class="tif-card__value">—</div>
 									<div class="tif-card__hint">Full time · last payroll year</div>
 								</div>
-								<div class="tif-card" data-card="top_punctual_last_year">
-									<div class="tif-card__label">Top Punctual (Last Year)</div>
+								<div class="tif-card tif-card--clickable" data-card="top_punctual_last_year" title="Click for employee names">
+									<div class="tif-card__label">Top 3 Punctual (Last Year)</div>
 									<div class="tif-card__value">—</div>
-									<div class="tif-card__hint">Full time with 0 lates · last payroll year</div>
+									<div class="tif-card__hint">Full time · least lates · last payroll year</div>
 								</div>
 								<div class="tif-card tif-card--clickable" data-card="eobi_added" title="Click for detail">
 									<div class="tif-card__label">EOBI Enrolled</div>
@@ -882,13 +882,15 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 						: "Full time · last payroll year",
 				);
 
-				const punctualYearCount = Number(data.top_punctual_last_year_count || 0);
+				const punctualYearList = data.top_3_punctual_last_year || [];
+				const punctualYearCount =
+					punctualYearList.length || Number(data.top_punctual_last_year_count || 0);
 				this.set_card("top_punctual_last_year", punctualYearCount);
 				this.set_card_hint(
 					"top_punctual_last_year",
 					payrollYearPrevLabel
-						? `Full time with 0 lates · ${payrollYearPrevLabel}`
-						: "Full time with 0 lates · last payroll year",
+						? `Full time · least lates · ${payrollYearPrevLabel}`
+						: "Full time · least lates · last payroll year",
 				);
 
 				this.set_card("new_hires", data.new_hires);

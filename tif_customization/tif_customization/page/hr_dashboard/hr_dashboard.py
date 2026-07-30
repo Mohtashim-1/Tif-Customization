@@ -96,9 +96,10 @@ def get_dashboard_data(filters=None):
 		fy_keys, company, branch, department, employee, order_field="total_lates", limit=3, ascending=False
 	)
 	data["top_3_late_comers_last_year_count"] = len(data["top_3_late_comers_last_year"])
-	data["top_punctual_last_year_count"] = _count_fulltime_zero_lates(
-		fy_keys, company, branch, department, employee
+	data["top_3_punctual_last_year"] = _ea_top_fulltime_employees(
+		fy_keys, company, branch, department, employee, order_field="total_lates", limit=3, ascending=True
 	)
+	data["top_punctual_last_year_count"] = len(data["top_3_punctual_last_year"])
 
 	data["top_by_absents"] = _ea_top_employees(month_keys, company, branch, department, employee, order_field="total_absents", limit=12)
 
@@ -277,6 +278,9 @@ def get_card_drilldown(card_key=None, filters=None):
 		"top_3_late_comers_last_year": lambda: _drill_top_fulltime_attendance_last_year(
 			company, branch, department, limit=3
 		),
+		"top_punctual_last_year": lambda: _drill_top_fulltime_punctual_last_year(
+			company, branch, department, limit=3
+		),
 		"referred_employee_count": lambda: _drill_referred_employees(company, branch, department),
 		"beneficiary_people_count": lambda: _drill_beneficiary_people(
 			company, branch, department
@@ -326,6 +330,7 @@ def _empty_payload(from_date, to_date, company, branch, department="", employee=
 		"top_punctual_zero_lates_count": 0,
 		"top_3_late_comers_last_year": [],
 		"top_3_late_comers_last_year_count": 0,
+		"top_3_punctual_last_year": [],
 		"top_punctual_last_year_count": 0,
 		"payroll_year_prev_label": "",
 		"payroll_month_label": "",
@@ -2425,6 +2430,25 @@ def _drill_top_fulltime_attendance_last_year(company, branch, department, limit=
 	)
 	return _drill_payload(
 		f"Top 3 Late Comers (Last Year) — {formatdate(prev_start, 'dd MMM yyyy')} to {formatdate(prev_end, 'dd MMM yyyy')}",
+		rows,
+	)
+
+
+def _drill_top_fulltime_punctual_last_year(company, branch, department, limit=3):
+	prev_start, prev_end = _get_payroll_fiscal_year_bounds()
+	month_keys = _months_in_range(prev_start, prev_end)
+	rows = _ea_top_fulltime_employees(
+		month_keys,
+		company,
+		branch,
+		department,
+		"",
+		order_field="total_lates",
+		limit=limit,
+		ascending=True,
+	)
+	return _drill_payload(
+		f"Top 3 Punctual (Last Year) — {formatdate(prev_start, 'dd MMM yyyy')} to {formatdate(prev_end, 'dd MMM yyyy')}",
 		rows,
 	)
 
