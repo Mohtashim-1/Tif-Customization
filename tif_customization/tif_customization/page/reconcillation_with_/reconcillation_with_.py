@@ -443,6 +443,36 @@ def _exclude_internal_transfers_from_monthly(erp_full, gl_account, company, from
 	return {"debits": debits, "credits": credits}
 
 
+def _get_bank_to_bank_je_vouchers(company, from_date, to_date):
+	"""JE vouchers that both debit and credit Bank accounts (cached per request)."""
+	cache_key = (str(company), str(from_date), str(to_date))
+	cache = getattr(frappe.local, "_recon_bank_to_bank_je_vouchers", None)
+	if cache is None:
+		cache = {}
+		frappe.local._recon_bank_to_bank_je_vouchers = cache
+	if cache_key in cache:
+		return cache[cache_key]
+
+	rows = frappe.db.sql(
+		"""
+		SELECT gle.voucher_no
+		FROM `tabGL Entry` gle
+		INNER JOIN `tabAccount` acc
+			ON acc.name = gle.account AND acc.account_type = 'Bank'
+		WHERE gle.company = %(company)s
+		  AND gle.voucher_type = 'Journal Entry'
+		  AND gle.posting_date BETWEEN %(from_date)s AND %(to_date)s
+		  AND IFNULL(gle.is_cancelled, 0) = 0
+		GROUP BY gle.voucher_no
+		HAVING SUM(gle.debit > 0) > 0 AND SUM(gle.credit > 0) > 0
+		""",
+		{"company": company, "from_date": from_date, "to_date": to_date},
+	)
+	vouchers = tuple(row[0] for row in rows if row[0])
+	cache[cache_key] = vouchers
+	return vouchers
+
+
 def _internal_transfer_monthly_totals(gl_account, company, from_date, to_date, month_keys):
 	"""Monthly debit/credit on this bank from Internal Transfer PE and bank-to-bank JE."""
 	debits = _empty_month_map(month_keys)
@@ -480,43 +510,31 @@ def _internal_transfer_monthly_totals(gl_account, company, from_date, to_date, m
 			debits[key] += flt(row.get("total_debit"))
 			credits[key] += flt(row.get("total_credit"))
 
-	je_rows = frappe.db.sql(
-		"""
-		SELECT
-			DATE_FORMAT(gle.posting_date, '%%Y-%%m') AS month_key,
-			COALESCE(SUM(gle.debit), 0) AS total_debit,
-			COALESCE(SUM(gle.credit), 0) AS total_credit
-		FROM `tabGL Entry` gle
-		WHERE gle.account = %(account)s
-		  AND gle.company = %(company)s
-		  AND gle.voucher_type = 'Journal Entry'
-		  AND gle.posting_date BETWEEN %(from_date)s AND %(to_date)s
-		  AND IFNULL(gle.is_cancelled, 0) = 0
-		  AND (gle.debit > 0 OR gle.credit > 0)
-		  AND EXISTS (
-			SELECT 1
-			FROM `tabGL Entry` contra
-			INNER JOIN `tabAccount` acc ON acc.name = contra.account
-			WHERE contra.voucher_type = gle.voucher_type
-			  AND contra.voucher_no = gle.voucher_no
-			  AND contra.company = gle.company
-			  AND IFNULL(contra.is_cancelled, 0) = 0
-			  AND contra.account != gle.account
-			  AND acc.account_type = 'Bank'
-			  AND (
-				(gle.debit > 0 AND contra.credit > 0)
-				OR (gle.credit > 0 AND contra.debit > 0)
-			  )
-		  )
-		GROUP BY month_key
-		""",
-		params,
-		as_dict=True,
-	)
-	for row in je_rows:
-		key = row.get("month_key")
-		if key in debits:
-			debits[key] += flt(row.get("total_debit"))
-			credits[key] += flt(row.get("total_credit"))
+	transfer_jes = _get_bank_to_bank_je_vouchers(company, from_date, to_date)
+	if transfer_jes:
+		params["vouchers"] = transfer_jes
+		je_rows = frappe.db.sql(
+			"""
+			SELECT
+				DATE_FORMAT(posting_date, '%%Y-%%m') AS month_key,
+				COALESCE(SUM(debit), 0) AS total_debit,
+				COALESCE(SUM(credit), 0) AS total_credit
+			FROM `tabGL Entry`
+			WHERE account = %(account)s
+			  AND company = %(company)s
+			  AND voucher_type = 'Journal Entry'
+			  AND voucher_no IN %(vouchers)s
+			  AND posting_date BETWEEN %(from_date)s AND %(to_date)s
+			  AND IFNULL(is_cancelled, 0) = 0
+			GROUP BY month_key
+			""",
+			params,
+			as_dict=True,
+		)
+		for row in je_rows:
+			key = row.get("month_key")
+			if key in debits:
+				debits[key] += flt(row.get("total_debit"))
+				credits[key] += flt(row.get("total_credit"))
 
 	return {"debits": debits, "credits": credits}
