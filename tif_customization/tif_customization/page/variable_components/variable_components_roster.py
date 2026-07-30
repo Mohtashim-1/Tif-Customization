@@ -4,7 +4,7 @@ import calendar
 
 import frappe
 from frappe import _
-from frappe.utils import add_months, cint, flt, formatdate, getdate
+from frappe.utils import add_days, add_months, cint, flt, formatdate, getdate
 
 _PAYROLL_MONTHS = [
 	"January",
@@ -210,18 +210,99 @@ def set_roster_excluded(company, start_date, end_date, employees, excluded=1):
 
 
 def _uncovered_half_day_deduction(doc):
+	"""0.5 per half-day not covered by an approved half-day leave on that date."""
 	try:
-		from hr_vfg.hr_vfg.hr_ventureforce_global.report.monthly_attendance_summary.monthly_attendance_summary import (
+		from hr_vfg.hr_ventureforce_global.report.monthly_attendance_summary.monthly_attendance_summary import (
 			_uncovered_half_day_deduction as _ded,
 		)
 
 		return _ded(doc)
 	except Exception:
+		# Same rule as monthly_attendance_summary when that module is unavailable
 		deduction = 0.0
 		for row in doc.table1 or []:
-			if row.half_day:
-				deduction += 0.5
+			if not row.half_day:
+				continue
+			row_date = getdate(row.date)
+			covered = frappe.db.exists(
+				"Leave Application",
+				{
+					"employee": doc.employee,
+					"from_date": ("<=", row_date),
+					"to_date": (">=", row_date),
+					"status": "Approved",
+					"docstatus": 1,
+					"half_day": 1,
+					"half_day_date": row_date,
+				},
+			)
+			if covered:
+				continue
+			deduction += 0.5
 		return deduction
+
+
+def _approved_leave_by_employee(employee_names, end_date):
+	"""Approved leave applications overlapping the payroll period, grouped by employee."""
+	if not employee_names:
+		return {}
+
+	end = getdate(end_date)
+	apps = frappe.get_all(
+		"Leave Application",
+		filters={
+			"employee": ("in", list(employee_names)),
+			"status": "Approved",
+			"docstatus": 1,
+			"from_date": ("<=", end),
+			"to_date": (">=", add_days(end, -60)),
+		},
+		fields=["employee", "from_date", "to_date", "half_day", "half_day_date"],
+	)
+	out = {}
+	for app in apps:
+		out.setdefault(app.employee, []).append(app)
+	return out
+
+
+def _leave_on_date(leave_apps, row_date):
+	"""Approved leave covering row_date, preferring a half-day match on that exact date."""
+	match = None
+	for app in leave_apps:
+		if not (getdate(app.from_date) <= row_date <= getdate(app.to_date)):
+			continue
+		is_half = bool(cint(app.half_day)) and app.half_day_date and getdate(app.half_day_date) == row_date
+		if is_half:
+			return {"half_day_on_date": True}
+		match = {"half_day_on_date": False}
+	return match
+
+
+def _unsynced_leave_credit(doc, leave_apps):
+	"""Days wrongly charged for approved leave the attendance sheet has not picked up.
+
+	Employee Attendance clears absent / half-day flags for approved leave on save, so a
+	sheet last saved before the leave was approved keeps charging those days as absent.
+	"""
+	if not leave_apps:
+		return 0.0
+
+	credit = 0.0
+	for row in doc.table1 or []:
+		if cint(getattr(row, "mark_leave", 0)):
+			continue
+		if not (cint(row.absent) or cint(row.half_day)):
+			continue
+		leave = _leave_on_date(leave_apps, getdate(row.date))
+		if not leave:
+			continue
+		if cint(row.half_day):
+			# a genuine half-day leave is already excluded from the half-day deduction
+			if not leave["half_day_on_date"]:
+				credit += 0.5
+		else:
+			credit += 1.0
+	return credit
 
 
 def attendance_by_employee(employees, end_date):
@@ -230,9 +311,11 @@ def attendance_by_employee(employees, end_date):
 		return {}
 
 	month_str, year = month_year_from_period_end(end_date)
+	employee_names = [emp.name if hasattr(emp, "name") else emp for emp in employees]
+	leave_map = _approved_leave_by_employee(employee_names, end_date)
+
 	out = {}
-	for emp in employees:
-		emp_name = emp.name if hasattr(emp, "name") else emp
+	for emp_name in employee_names:
 		ea_name = frappe.db.get_value(
 			"Employee Attendance",
 			{"employee": emp_name, "month": month_str, "year": year},
@@ -247,6 +330,8 @@ def attendance_by_employee(employees, end_date):
 				"present_days": 0,
 				"deduction_days": 0,
 				"total_absents": 0,
+				"leave_days": 0,
+				"unsynced_leave_days": 0,
 				"attendance_month": month_str,
 				"attendance_year": year,
 			}
@@ -254,9 +339,11 @@ def attendance_by_employee(employees, end_date):
 
 		doc = frappe.get_doc("Employee Attendance", ea_name)
 		half_day_deduction = _uncovered_half_day_deduction(doc)
-		deduction_days = flt(doc.total_absents) + half_day_deduction + flt(doc.lates_for_absent)
+		charged_days = flt(doc.total_absents) + half_day_deduction + flt(doc.lates_for_absent)
+		unsynced_leave_days = _unsynced_leave_credit(doc, leave_map.get(emp_name) or [])
+		deduction_days = max(0.0, charged_days - unsynced_leave_days)
 		month_days = flt(doc.month_days)
-		payable_days = max(0.0, month_days - flt(deduction_days))
+		payable_days = max(0.0, month_days - deduction_days)
 
 		out[emp_name] = {
 			"has_attendance": 1,
@@ -268,6 +355,8 @@ def attendance_by_employee(employees, end_date):
 			"total_absents": flt(doc.total_absents),
 			"half_day_deduction": half_day_deduction,
 			"lates_for_absent": flt(doc.lates_for_absent),
+			"leave_days": flt(doc.total_leaves) + unsynced_leave_days,
+			"unsynced_leave_days": unsynced_leave_days,
 			"total_working_days": flt(doc.total_working_days) or month_days,
 			"attendance_month": month_str,
 			"attendance_year": year,

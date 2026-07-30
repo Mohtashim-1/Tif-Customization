@@ -800,11 +800,22 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 								let days_title = "";
 								if (att.has_attendance && flt(att.month_days)) {
 									display = `${flt(att.payable_days)}/${flt(att.month_days)}`;
-									days_title = __("Payable {0} / month {1} (absents+late: {2})", [
-										flt(att.payable_days),
-										flt(att.month_days),
-										flt(att.deduction_days),
-									]);
+									days_title = __(
+										"Payable {0} / month {1} (present: {2}, paid leave: {3}, absents+late: {4})",
+										[
+											flt(att.payable_days),
+											flt(att.month_days),
+											flt(att.present_days),
+											flt(att.leave_days),
+											flt(att.deduction_days),
+										]
+									);
+									if (flt(att.unsynced_leave_days)) {
+										days_title += __(
+											" — includes {0} leave day(s) approved after the attendance sheet was last saved",
+											[flt(att.unsynced_leave_days)]
+										);
+									}
 								}
 								const ea = att.employee_attendance;
 								const ea_link = ea
