@@ -23,6 +23,13 @@ frappe.tif_customization.UpcomingTrainingReport = class UpcomingTrainingReport {
 	}
 
 	make_filters() {
+		this.type = this.make_filter_control({
+			label: __("Type"),
+			fieldtype: "Select",
+			fieldname: "type",
+			options: "\nTraining\nWorkshop",
+			change: () => this.load_data(),
+		});
 		this.from_date = this.make_filter_control({
 			label: __("From Date"),
 			fieldtype: "Date",
@@ -35,23 +42,24 @@ frappe.tif_customization.UpcomingTrainingReport = class UpcomingTrainingReport {
 			fieldname: "to_date",
 			change: () => this.load_data(),
 		});
-		this.training_type = this.make_filter_control({
-			label: __("Training Type"),
+		this.topic = this.make_filter_control({
+			label: __("Training Type / Workshop Topic"),
 			fieldtype: "Data",
-			fieldname: "training_type",
+			fieldname: "topic",
 			change: () => this.load_data(),
 		});
 		this.mode_of_training = this.make_filter_control({
 			label: __("Mode of Training"),
 			fieldtype: "Select",
 			fieldname: "mode_of_training",
-			options: "\nOnline\nOnsite",
+			options: "\nIn-person\nOnline\nOnsite",
 			change: () => this.load_data(),
 		});
 		this.participants_category = this.make_filter_control({
 			label: __("Participants Category"),
-			fieldtype: "Data",
+			fieldtype: "Select",
 			fieldname: "participants_category",
+			options: "\nSchool Kids\nTrainees\nTeachers",
 			change: () => this.load_data(),
 		});
 		this.school_name = this.make_filter_control({
@@ -74,9 +82,15 @@ frappe.tif_customization.UpcomingTrainingReport = class UpcomingTrainingReport {
 			.on("click", () => this.clear_filters());
 
 		this.page.set_primary_action(__("Refresh"), () => this.load_data(), "refresh");
-		this.page.add_inner_button(__("New Training"), () => frappe.new_doc("Upcoming Training"));
+		this.page.add_inner_button(__("New Training"), () => this.new_record("Training"));
+		this.page.add_inner_button(__("New Workshop"), () => this.new_record("Workshop"));
 		this.page.add_action_item(__("Clear Filters"), () => this.clear_filters());
 		this.page.add_action_item(__("Export CSV"), () => this.export_csv());
+	}
+
+	new_record(type) {
+		frappe.route_options = { type };
+		frappe.new_doc("Upcoming Training");
 	}
 
 	make_filter_control(df) {
@@ -133,7 +147,7 @@ frappe.tif_customization.UpcomingTrainingReport = class UpcomingTrainingReport {
 					<table class="table table-bordered" style="margin-bottom: 0; white-space: nowrap;">
 						<thead><tr>${this.columns().map((column) => `<th>${column.label}</th>`).join("")}</tr></thead>
 						<tbody id="upcoming-training-tbody">
-							<tr><td colspan="12" class="text-center text-muted">${__("Loading...")}</td></tr>
+							<tr><td colspan="${this.columns().length}" class="text-center text-muted">${__("Loading...")}</td></tr>
 						</tbody>
 					</table>
 				</div>
@@ -143,9 +157,16 @@ frappe.tif_customization.UpcomingTrainingReport = class UpcomingTrainingReport {
 
 	columns() {
 		return [
-			{ fieldname: "training_date", label: __("UP Coming Training Date") },
-			{ fieldname: "training_time", label: __("UP Coming Training Time") },
-			{ fieldname: "training_type", label: __("UP Coming Training Type") },
+			{ fieldname: "training_date", label: __("Date") },
+			{ fieldname: "training_time", label: __("Time") },
+			{ fieldname: "type", label: __("Type") },
+			{ fieldname: "month", label: __("Month") },
+			{
+				fieldname: "topic",
+				label: __("Training Type / Workshop Topic"),
+				// Training and Workshop store this in different fields; show whichever the row uses.
+				value: (row) => row.training_type || row.workshop_topic,
+			},
 			{ fieldname: "mode_of_training", label: __("Mode of Training") },
 			{ fieldname: "participants_category", label: __("Participants Category") },
 			{ fieldname: "school_name", label: __("School Name") },
@@ -155,14 +176,20 @@ frappe.tif_customization.UpcomingTrainingReport = class UpcomingTrainingReport {
 			{ fieldname: "area", label: __("Area") },
 			{ fieldname: "trainer_name", label: __("Name of Trainer") },
 			{ fieldname: "program", label: __("Program") },
+			{ fieldname: "workshop_for", label: __("Workshop For") },
 		];
+	}
+
+	cell_value(row, column) {
+		return column.value ? column.value(row) : row[column.fieldname];
 	}
 
 	get_filters() {
 		return {
+			type: this.type.get_value(),
 			from_date: this.from_date.get_value(),
 			to_date: this.to_date.get_value(),
-			training_type: this.training_type.get_value(),
+			topic: this.topic.get_value(),
 			mode_of_training: this.mode_of_training.get_value(),
 			participants_category: this.participants_category.get_value(),
 			school_name: this.school_name.get_value(),
@@ -172,9 +199,10 @@ frappe.tif_customization.UpcomingTrainingReport = class UpcomingTrainingReport {
 
 	clear_filters() {
 		[
+			this.type,
 			this.from_date,
 			this.to_date,
-			this.training_type,
+			this.topic,
 			this.mode_of_training,
 			this.participants_category,
 			this.school_name,
@@ -185,7 +213,8 @@ frappe.tif_customization.UpcomingTrainingReport = class UpcomingTrainingReport {
 
 	load_data() {
 		const tbody = $(this.page.body).find("#upcoming-training-tbody");
-		tbody.html(`<tr><td colspan="12" class="text-center text-muted">${__("Loading...")}</td></tr>`);
+		const span = this.columns().length;
+		tbody.html(`<tr><td colspan="${span}" class="text-center text-muted">${__("Loading...")}</td></tr>`);
 
 		frappe.call({
 			method:
@@ -198,7 +227,7 @@ frappe.tif_customization.UpcomingTrainingReport = class UpcomingTrainingReport {
 				this.render_rows();
 			},
 			error: () => {
-				tbody.html(`<tr><td colspan="12" class="text-center text-danger">${__("Unable to load report")}</td></tr>`);
+				tbody.html(`<tr><td colspan="${span}" class="text-center text-danger">${__("Unable to load report")}</td></tr>`);
 			},
 		});
 	}
@@ -210,8 +239,10 @@ frappe.tif_customization.UpcomingTrainingReport = class UpcomingTrainingReport {
 		const in_person = summary.in_person ?? row_summary.in_person;
 		const areas = summary.areas ?? row_summary.areas;
 		const cards = [
-			[__("Total Trainings"), summary.total || 0, "#2563eb"],
-			[__("Training Today"), summary.today || 0, "#7c3aed"],
+			[__("Total Records"), summary.total || 0, "#2563eb"],
+			[__("Scheduled Today"), summary.today || 0, "#7c3aed"],
+			[__("Trainings"), summary.trainings || 0, "#0891b2"],
+			[__("Workshops"), summary.workshops || 0, "#c026d3"],
 			[__("Total Onsite"), onsite || 0, "#059669"],
 			[__("Total Online"), online || 0, "#0284c7"],
 			[__("Total In-person"), in_person || 0, "#ea580c"],
@@ -255,17 +286,22 @@ frappe.tif_customization.UpcomingTrainingReport = class UpcomingTrainingReport {
 
 	render_rows() {
 		const tbody = $(this.page.body).find("#upcoming-training-tbody");
+		const columns = this.columns();
 		if (!this.rows.length) {
-			tbody.html(`<tr><td colspan="12" class="text-center text-muted">${__("No upcoming trainings found")}</td></tr>`);
+			tbody.html(
+				`<tr><td colspan="${columns.length}" class="text-center text-muted">${__(
+					"No upcoming trainings or workshops found"
+				)}</td></tr>`
+			);
 			return;
 		}
 
 		tbody.html(
 			this.rows
 				.map((row) => {
-					const cells = this.columns().map((column, index) => {
-						const value = this.escape(row[column.fieldname]) || "-";
-						if (index === 0) {
+					const cells = columns.map((column) => {
+						const value = this.escape(this.cell_value(row, column)) || "-";
+						if (column.fieldname === "training_date") {
 							return `<td><a href="${frappe.utils.get_form_link("Upcoming Training", row.name)}">${value}</a></td>`;
 						}
 						return `<td>${value}</td>`;
@@ -284,7 +320,7 @@ frappe.tif_customization.UpcomingTrainingReport = class UpcomingTrainingReport {
 		const columns = this.columns();
 		const data = [
 			columns.map((column) => column.label),
-			...this.rows.map((row) => columns.map((column) => row[column.fieldname] || "")),
+			...this.rows.map((row) => columns.map((column) => this.cell_value(row, column) || "")),
 		];
 		frappe.tools.downloadify(data, null, __("Upcoming Training Report"));
 	}

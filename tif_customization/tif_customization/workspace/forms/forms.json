@@ -1,6 +1,6 @@
 {
  "charts": [],
- "content": "[{\"id\":\"bLuNAJb1LT\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Forms</span>\",\"col\":12}},{\"id\":\"5AVCMvPyX1\",\"type\":\"card\",\"data\":{\"card_name\":\"HR\",\"col\":4}},{\"id\":\"JJ32ceNrP1\",\"type\":\"card\",\"data\":{\"card_name\":\"Accounts\",\"col\":4}},{\"id\":\"cdlcgYF-Db\",\"type\":\"card\",\"data\":{\"card_name\":\"Supply Chain\",\"col\":4}},{\"id\":\"5I4bAP4ldw\",\"type\":\"card\",\"data\":{\"card_name\":\"Procurement\",\"col\":4}},{\"id\":\"L_gfyWitLd\",\"type\":\"card\",\"data\":{\"card_name\":\"QPS\",\"col\":4}},{\"id\":\"dYv1cJfg8p\",\"type\":\"card\",\"data\":{\"card_name\":\"Common\",\"col\":4}}]",
+ "content": "[{\"id\":\"bLuNAJb1LT\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Forms</span>\",\"col\":12}},{\"id\":\"5AVCMvPyX1\",\"type\":\"card\",\"data\":{\"card_name\":\"HR\",\"col\":4}},{\"id\":\"JJ32ceNrP1\",\"type\":\"card\",\"data\":{\"card_name\":\"Accounts\",\"col\":4}},{\"id\":\"cdlcgYF-Db\",\"type\":\"card\",\"data\":{\"card_name\":\"Supply Chain\",\"col\":4}},{\"id\":\"5I4bAP4ldw\",\"type\":\"card\",\"data\":{\"card_name\":\"Procurement\",\"col\":4}},{\"id\":\"L_gfyWitLd\",\"type\":\"card\",\"data\":{\"card_name\":\"QPS\",\"col\":4}},{\"id\":\"dYv1cJfg8p\",\"type\":\"card\",\"data\":{\"card_name\":\"Common\",\"col\":4}},{\"id\":\"tifTrainCard1\",\"type\":\"card\",\"data\":{\"card_name\":\"Training\",\"col\":4}}]",
  "creation": "2026-06-18 16:14:41.634498",
  "custom_blocks": [],
  "docstatus": 0,
@@ -16,7 +16,7 @@
    "hidden": 0,
    "is_query_report": 0,
    "label": "Training",
-   "link_count": 0,
+   "link_count": 1,
    "onboard": 0,
    "type": "Card Break"
   },
@@ -669,7 +669,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-07-30 12:17:21.922465",
+ "modified": "2026-07-30 12:22:42.436094",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Forms",
