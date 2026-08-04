@@ -204,6 +204,17 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 				opacity: 0.85;
 				color: black;
 			}
+			.stock-item-card .stock-item-name {
+				margin: 0 0 8px 0;
+				font-size: 12px;
+				color: black;
+				opacity: 0.9;
+				line-height: 1.35;
+				min-height: 1.35em;
+				overflow: visible;
+				white-space: normal;
+				word-break: break-word;
+			}
 			.kpi-dept-row {
 				display: flex;
 				flex-wrap: wrap;
@@ -1837,19 +1848,20 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 						}
 						
 						const colorGradient = colorGradients[index % colorGradients.length];
-						const itemCode = (item.item_code || '-').substring(0, 30);
+						const itemCode = frappe.utils.escape_html(item.item_code || '-');
 						const rawItemName = item.item_name || '';
-						const itemName = (
-							rawItemName && rawItemName !== item.item_code
-								? rawItemName
-								: ''
-						).substring(0, 30);
-						
+						const itemName = frappe.utils.escape_html(
+							rawItemName && rawItemName !== item.item_code ? rawItemName : ''
+						);
+						const nameTitle = itemName
+							? ` title="${frappe.utils.escape_html(rawItemName)}"`
+							: '';
+
 						return `
 							<div class="col-md-2" style="margin-bottom: 10px;">
-								<div class="kpi-card" style="background: ${colorGradient}; color: black; padding: 12px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); min-height: 100px;">
-									<h6 style="margin: 0 0 5px 0; font-size: 12px; color: black; opacity: 0.95; font-weight: bold; line-height: 1.2;">${itemCode}</h6>
-									<p style="margin: 0 0 8px 0; font-size: 12px; color: black; opacity: 0.9; line-height: 1.1; height: 20px; overflow: hidden;">${itemName || '&nbsp;'}</p>
+								<div class="kpi-card stock-item-card" style="background: ${colorGradient}; color: black; padding: 12px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); min-height: 118px;">
+									<h6 style="margin: 0 0 5px 0; font-size: 12px; color: black; opacity: 0.95; font-weight: bold; line-height: 1.2; word-break: break-word;">${itemCode}</h6>
+									<p class="stock-item-name"${nameTitle}>${itemName || '&nbsp;'}</p>
 									<h2 style="margin: 0; font-size: 22px; font-weight: bold; text-align: center;">${formatNumber(balance)}</h2>
 									<p style="margin: 5px 0 0 0; font-size: 12px;color: black; opacity: 0.85; text-align: center;">Available Stock</p>
 								</div>
@@ -1858,18 +1870,18 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 					}).join('')}
 					${panjPara2630 ? `
 						<div class="col-md-2" style="margin-bottom: 10px;">
-							<div class="kpi-card" style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); color: black; padding: 12px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); min-height: 100px;">
-								<h6 style="margin: 0 0 5px 0; font-size: 12px; color: black; opacity: 0.95; font-weight: bold; line-height: 1.2;">${(panjPara2630.item_code || 'Panj Para 26-30').substring(0, 30)}</h6>
-								<p style="margin: 0 0 8px 0; font-size: 12px; color: black; opacity: 0.9; line-height: 1.1; height: 20px; overflow: hidden;">Panj Para 26-30</p>
+							<div class="kpi-card stock-item-card" style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); color: black; padding: 12px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); min-height: 118px;">
+								<h6 style="margin: 0 0 5px 0; font-size: 12px; color: black; opacity: 0.95; font-weight: bold; line-height: 1.2; word-break: break-word;">${frappe.utils.escape_html(panjPara2630.item_code || 'Panj Para 26-30')}</h6>
+								<p class="stock-item-name">Panj Para 26-30</p>
 								<h2 style="margin: 0; font-size: 22px; font-weight: bold; text-align: center;">${formatNumber(panjPara2630.available_stock || 0)}</h2>
 								<p style="margin: 5px 0 0 0; font-size: 12px;color: black; opacity: 0.85; text-align: center;">Available Stock</p>
 							</div>
 						</div>
 					` : `
 						<div class="col-md-2" style="margin-bottom: 10px;">
-							<div class="kpi-card" style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); color: black; padding: 12px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); min-height: 100px;">
+							<div class="kpi-card stock-item-card" style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); color: black; padding: 12px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); min-height: 118px;">
 								<h6 style="margin: 0 0 5px 0; font-size: 12px; color: black; opacity: 0.95; font-weight: bold; line-height: 1.2;">Panj Para 26-30</h6>
-								<p style="margin: 0 0 8px 0; font-size: 12px; color: black; opacity: 0.9; line-height: 1.1; height: 20px; overflow: hidden;">&nbsp;</p>
+								<p class="stock-item-name">&nbsp;</p>
 								<h2 style="margin: 0; font-size: 22px; font-weight: bold; text-align: center;">${formatNumber(0)}</h2>
 								<p style="margin: 5px 0 0 0; font-size: 12px;color: black; opacity: 0.85; text-align: center;">Available Stock</p>
 							</div>
@@ -1877,18 +1889,18 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 					`}
 					${panjPara15 ? `
 						<div class="col-md-2" style="margin-bottom: 10px;">
-							<div class="kpi-card" style="background: linear-gradient(135deg, #4ecdc4 0%, #44a08d 100%); color: black; padding: 12px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); min-height: 100px;">
-								<h6 style="margin: 0 0 5px 0; font-size: 12px; color: black; opacity: 0.95; font-weight: bold; line-height: 1.2;">${(panjPara15.item_code || 'Panj Para 1-5').substring(0, 30)}</h6>
-								<p style="margin: 0 0 8px 0; font-size: 12px; color: black; opacity: 0.9; line-height: 1.1; height: 20px; overflow: hidden;">Panj Para 1-5</p>
+							<div class="kpi-card stock-item-card" style="background: linear-gradient(135deg, #4ecdc4 0%, #44a08d 100%); color: black; padding: 12px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); min-height: 118px;">
+								<h6 style="margin: 0 0 5px 0; font-size: 12px; color: black; opacity: 0.95; font-weight: bold; line-height: 1.2; word-break: break-word;">${frappe.utils.escape_html(panjPara15.item_code || 'Panj Para 1-5')}</h6>
+								<p class="stock-item-name">Panj Para 1-5</p>
 								<h2 style="margin: 0; font-size: 22px; font-weight: bold; text-align: center;">${formatNumber(panjPara15.available_stock || 0)}</h2>
 								<p style="margin: 5px 0 0 0; font-size: 12px;color: black; opacity: 0.85; text-align: center;">Available Stock</p>
 							</div>
 						</div>
 					` : `
 						<div class="col-md-2" style="margin-bottom: 10px;">
-							<div class="kpi-card" style="background: linear-gradient(135deg, #4ecdc4 0%, #44a08d 100%); color: black; padding: 12px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); min-height: 100px;">
+							<div class="kpi-card stock-item-card" style="background: linear-gradient(135deg, #4ecdc4 0%, #44a08d 100%); color: black; padding: 12px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); min-height: 118px;">
 								<h6 style="margin: 0 0 5px 0; font-size: 12px; color: black; opacity: 0.95; font-weight: bold; line-height: 1.2;">Panj Para 1-5</h6>
-								<p style="margin: 0 0 8px 0; font-size: 12px; color: black; opacity: 0.9; line-height: 1.1; height: 20px; overflow: hidden;">&nbsp;</p>
+								<p class="stock-item-name">&nbsp;</p>
 								<h2 style="margin: 0; font-size: 22px; font-weight: bold; text-align: center;">${formatNumber(0)}</h2>
 								<p style="margin: 5px 0 0 0; font-size: 12px;color: black; opacity: 0.85; text-align: center;">Available Stock</p>
 							</div>
