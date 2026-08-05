@@ -532,6 +532,13 @@ class SmesActivityForm {
 				)
 				.join("");
 			control = `<select data-field="${name}">${options}</select>`;
+		} else if (type === "link") {
+			control = `
+				<div class="smes-frappe-ctl"
+					data-frappe-field="${frappe.utils.escape_html(name)}"
+					data-frappe-type="Link"
+					data-frappe-options="${frappe.utils.escape_html(opts.options || "")}"
+					data-frappe-reqd="${opts.reqd ? 1 : 0}"></div>`;
 		} else if (type === "textarea") {
 			control = `<textarea data-field="${name}">${frappe.utils.escape_html(this.val(name))}</textarea>`;
 		} else if (type === "radio") {
@@ -581,9 +588,12 @@ class SmesActivityForm {
 			const $el = $(el);
 			const fieldname = $el.data("frappe-field");
 			const fieldtype = $el.data("frappe-type");
+			const link_options = $el.data("frappe-options") || "";
 			const $fallback = $el.siblings(".smes-native-fallback");
+			const is_link = fieldtype === "Link";
 
-			if (is_mobile) {
+			// Date/Time: native inputs on mobile. Link: always use searchable Frappe control.
+			if (is_mobile && !is_link) {
 				$el.addClass("smes-hidden");
 				$fallback.removeClass("smes-hidden");
 				const $input = $fallback.find("[data-field]");
@@ -599,27 +609,55 @@ class SmesActivityForm {
 			$el.removeClass("smes-hidden").empty();
 
 			try {
+				const df = {
+					fieldtype,
+					fieldname,
+					label: "",
+					reqd: cint($el.data("frappe-reqd")),
+				};
+				if (is_link) {
+					df.options = link_options;
+					if (fieldname === "area") {
+						df.get_query = () => {
+							const filters = {};
+							if (this.data.city) {
+								filters.city = this.data.city;
+							}
+							return { filters };
+						};
+					}
+				}
 				const control = frappe.ui.form.make_control({
 					parent: $el,
-					df: {
-						fieldtype,
-						fieldname,
-						label: "",
-						reqd: 0,
-					},
+					df,
 					render_input: true,
 				});
+				control.refresh();
 				let value = this.data[fieldname] || "";
 				if (fieldtype === "Time") value = this.normalize_time_for_frappe(value);
-				control.set_value(value);
+				if (value) control.set_value(value);
 
 				const sync = () => {
 					let val = control.get_value();
 					if (fieldtype === "Time") val = this.normalize_time_for_frappe(val);
+					const prev = this.data[fieldname];
 					this.data[fieldname] = val || "";
+					if (fieldname === "city" && prev !== this.data.city && !this._remounting_links) {
+						// City changed → clear area and remount so Area query filters by new city
+						this.data.area = "";
+						this._remounting_links = true;
+						try {
+							this.collect();
+							this.render_step();
+							this.bind_uploads();
+						} finally {
+							this._remounting_links = false;
+						}
+					}
 				};
 				if (control.$input) {
 					control.$input.on("change blur", sync);
+					control.$input.on("awesomplete-selectcomplete", sync);
 				}
 				this.controls[fieldname] = control;
 			} catch (err) {
@@ -719,9 +757,6 @@ class SmesActivityForm {
 	}
 
 	html_general() {
-		const areas = (this.meta.areas || [])
-			.filter((a) => !this.data.city || !a.city || a.city === this.data.city)
-			.map((a) => a.name);
 		const staff_names = this.meta.staff_names || [];
 		return `
 			<h3>${__("General Information")}</h3>
@@ -740,10 +775,13 @@ class SmesActivityForm {
 				${this.field("ending_time", __("Ending Time"), "time")}
 			</div>
 			<div class="smes-row-2">
-				${this.field("city", __("City"), "select", { reqd: 1, options: this.meta.cities || [] })}
-				${this.field("area", __("Area"), "select", {
+				${this.field("city", __("City"), "link", { reqd: 1, options: "City" })}
+				${this.field("area", __("Area"), "link", {
 					reqd: 1,
-					options: areas.length ? areas : (this.meta.areas || []).map((a) => a.name),
+					options: "Area",
+					hint: this.data.city
+						? __("Type to search areas in {0}", [this.data.city])
+						: __("Select City first, then type to search Area"),
 				})}
 			</div>
 			${this.field("province", __("Province"), "radio", { reqd: 1, options: this.meta.provinces || [] })}
