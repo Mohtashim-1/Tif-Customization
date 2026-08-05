@@ -101,10 +101,10 @@ class FieldStaffReportPage {
 				options: "\nMarketing\nM&E\nTraining"
 			}),
 			user: this.make_filter({
-				label: __("User"),
+				label: __("Field Staff"),
 				fieldname: "user",
-				fieldtype: "Link",
-				options: "User"
+				fieldtype: "Select",
+				options: "\n",
 			}),
 			province: this.make_filter({
 				label: __("Province"),
@@ -114,6 +114,24 @@ class FieldStaffReportPage {
 					"\nPunjab\nSindh\nKhyber Pakhtunkhwa\nBalochistan\nAzad Jammu & Kashmir\nGilgit-Baltistan\nIslamabad Capital Territory"
 			})
 		};
+		this.load_team_filter_options();
+	}
+
+	async load_team_filter_options() {
+		try {
+			const r = await frappe.call({
+				method: "tif_customization.tif_customization.field_visit_permissions.get_my_field_team",
+			});
+			const team = r.message?.team || [];
+			const opts = [""].concat(
+				team.map((t) => t.employee_name || t.user_id || t.employee).filter(Boolean)
+			);
+			const unique = [...new Set(opts)];
+			this.filters.user.df.options = unique.join("\n");
+			this.filters.user.refresh();
+		} catch (e) {
+			console.warn("Could not load field team filter", e);
+		}
 	}
 
 	bind_actions() {

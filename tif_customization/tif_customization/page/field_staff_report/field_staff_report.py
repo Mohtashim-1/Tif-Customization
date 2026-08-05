@@ -31,6 +31,15 @@ def get_report_data(filters=None):
 	conditions = ["fv.docstatus < 2"]
 	params = {}
 
+	# Field leads only see their own + direct reports' visits
+	from tif_customization.tif_customization.field_visit_permissions import (
+		apply_team_scope_to_conditions,
+		can_view_all_field_visits,
+		get_team_match_values,
+	)
+
+	apply_team_scope_to_conditions(conditions, params, alias="fv")
+
 	visit_date_expr = """
 		CASE
 			WHEN fv.type = 'Marketing' THEN COALESCE(fv.visit_date, DATE(fv.timestamp), DATE(fv.modified))
@@ -50,6 +59,9 @@ def get_report_data(filters=None):
 		conditions.append("fv.type = %(visit_type)s")
 		params["visit_type"] = visit_type
 	if user:
+		# Non-view-all users may only filter within their team
+		if not can_view_all_field_visits() and user not in get_team_match_values():
+			frappe.throw(_("You can only view reports for your field staff."))
 		conditions.append(
 			"""(
 				CASE

@@ -18,9 +18,27 @@ def get_report_data(filters=None):
 		user = (filters.get("user") or "").strip() or None
 		section = (filters.get("section") or "").strip() or None
 
-		marketing = _get_marketing_visits(from_date, to_date, user=user, section=section)
-		me_visits = _get_me_visits(from_date, to_date, user=user, section=section)
-		training = _get_training_sessions(from_date, to_date, user=user, section=section)
+		from tif_customization.tif_customization.field_visit_permissions import (
+			can_view_all_field_visits,
+			get_team_match_values,
+		)
+
+		# Field leads: only their team. If a specific user filter is set, must be in team.
+		team_values = None
+		if not can_view_all_field_visits():
+			team_values = get_team_match_values()
+			if user and user not in team_values:
+				frappe.throw(_("You can only view reports for your field staff."))
+
+		marketing = _get_marketing_visits(
+			from_date, to_date, user=user, section=section, team_values=team_values
+		)
+		me_visits = _get_me_visits(
+			from_date, to_date, user=user, section=section, team_values=team_values
+		)
+		training = _get_training_sessions(
+			from_date, to_date, user=user, section=section, team_values=team_values
+		)
 		submission_ratio = _get_submission_ratio(
 			marketing=marketing,
 			me_visits=me_visits,
@@ -134,7 +152,7 @@ def _get_eligible_submission_users(user=None, section=None):
 	return section_users
 
 
-def _section_user_filters(user=None, section=None):
+def _section_user_filters(user=None, section=None, team_values=None):
 	conditions = []
 	params = {}
 	if user:
@@ -146,6 +164,16 @@ def _section_user_filters(user=None, section=None):
 			)"""
 		)
 		params["user"] = user
+	elif team_values:
+		conditions.append(
+			"""(
+				TRIM({user_expr}) IN %(team_values)s
+				OR u.name IN %(team_values)s
+				OR LOWER(TRIM(u.full_name)) IN %(team_values_lower)s
+			)"""
+		)
+		params["team_values"] = tuple(team_values)
+		params["team_values_lower"] = tuple(v.lower() for v in team_values)
 	if section:
 		conditions.append("COALESCE(e.department, 'Unassigned') = %(section)s")
 		params["section"] = section
@@ -195,9 +223,11 @@ def _employee_join(user_expr):
 	"""
 
 
-def _get_marketing_visits(from_date, to_date, user=None, section=None):
+def _get_marketing_visits(from_date, to_date, user=None, section=None, team_values=None):
 	user_expr = "COALESCE(NULLIF(TRIM(fv.visit_by), ''), fv.owner)"
-	extra_conditions, extra_params = _section_user_filters(user=user, section=section)
+	extra_conditions, extra_params = _section_user_filters(
+		user=user, section=section, team_values=team_values
+	)
 	extra_sql = ""
 	if extra_conditions:
 		extra_sql = " AND " + " AND ".join(c.replace("{user_expr}", user_expr) for c in extra_conditions)
@@ -250,9 +280,11 @@ def _get_marketing_visits(from_date, to_date, user=None, section=None):
 	return {"rows": result_rows, "totals": totals}
 
 
-def _get_me_visits(from_date, to_date, user=None, section=None):
+def _get_me_visits(from_date, to_date, user=None, section=None, team_values=None):
 	user_expr = "COALESCE(NULLIF(TRIM(fv.me_visit_by), ''), fv.owner)"
-	extra_conditions, extra_params = _section_user_filters(user=user, section=section)
+	extra_conditions, extra_params = _section_user_filters(
+		user=user, section=section, team_values=team_values
+	)
 	extra_sql = ""
 	if extra_conditions:
 		extra_sql = " AND " + " AND ".join(c.replace("{user_expr}", user_expr) for c in extra_conditions)
@@ -301,9 +333,11 @@ def _get_me_visits(from_date, to_date, user=None, section=None):
 	return {"rows": result_rows, "totals": totals}
 
 
-def _get_training_sessions(from_date, to_date, user=None, section=None):
+def _get_training_sessions(from_date, to_date, user=None, section=None, team_values=None):
 	user_expr = "COALESCE(NULLIF(TRIM(fv.training_entry_filled_by), ''), fv.owner)"
-	extra_conditions, extra_params = _section_user_filters(user=user, section=section)
+	extra_conditions, extra_params = _section_user_filters(
+		user=user, section=section, team_values=team_values
+	)
 	extra_sql = ""
 	if extra_conditions:
 		extra_sql = " AND " + " AND ".join(c.replace("{user_expr}", user_expr) for c in extra_conditions)
