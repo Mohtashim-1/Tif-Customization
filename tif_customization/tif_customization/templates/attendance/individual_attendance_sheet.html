@@ -168,64 +168,60 @@ table tr { overflow:hidden; height:14px; white-space:nowrap; }
 
     {% for row in doc.table1 %}
 
-      {% set narration = "" %}
-      {% set has_in = row.check_in_1 and row.check_in_1 not in ["00:00", "00:00:00"] %}
-      {% set has_out = row.check_out_1 and row.check_out_1 not in ["00:00", "00:00:00"] %}
-      {% set has_early = row.early_going_hours and row.early_going_hours not in ["00:00", "00:00:00"] %}
+      {% set row_ns = namespace(narration="") %}
+      {% set has_in = row.check_in_1 and row.check_in_1 not in ["00:00", "00:00:00", "", None] %}
+      {% set has_out = row.check_out_1 and row.check_out_1 not in ["00:00", "00:00:00", "", None] %}
+      {% set has_early_flag = row.early == 1 or row.early == "1" or row.early is true %}
+      {% set has_early_hrs = row.early_going_hours and row.early_going_hours not in ["00:00", "00:00:00", "", None] %}
+      {% set has_late = row.late == 1 or row.late == "1" or row.late is true %}
+      {% set has_half = row.half_day == 1 or row.half_day == "1" or row.half_day is true %}
+      {% set has_leave_mark = row.mark_leave == 1 or row.mark_leave == "1" or row.mark_leave is true %}
       {% set row_key = frappe.utils.getdate(row.date).strftime("%Y-%m-%d") %}
+      {% set parts = [] %}
 
-      {# 1) Public Holiday — check holiday_map first (from Holiday List), then fallback to row.public_holiday field #}
+      {# Off-day statuses (exclusive) #}
       {% if row_key in holiday_map %}
-        {% set narration = "Public Holiday - " ~ holiday_map[row_key] %}
+        {% set row_ns.narration = "Public Holiday - " ~ holiday_map[row_key] %}
       {% elif row.public_holiday %}
-        {% set narration = "Public Holiday" %}
+        {% set row_ns.narration = "Public Holiday" %}
+      {% elif row.day == "Sunday" %}
+        {% set row_ns.narration = "Weekend" %}
+      {% elif row.weekly_off %}
+        {% set row_ns.narration = "Weekly Off" %}
+      {% elif row.absent == 1 or row.absent == "1" or row.absent is true %}
+        {% set row_ns.narration = "Absent" %}
+      {% else %}
+        {# Combine attendance flags so Late + Half Day + Leave all show #}
+        {% if has_leave_mark or row_key in leave_map %}
+          {% if row_key in leave_map %}
+            {% set _ = parts.append("Leave - " ~ leave_map[row_key]) %}
+          {% elif row.type %}
+            {% set _ = parts.append("Leave - " ~ row.type) %}
+          {% else %}
+            {% set _ = parts.append("Leave") %}
+          {% endif %}
+        {% endif %}
+        {% if has_half %}
+          {% if not (row_key in leave_map and leave_map[row_key] is string and "Half Day" in leave_map[row_key]) %}
+            {% set _ = parts.append("Half Day") %}
+          {% endif %}
+        {% endif %}
+        {% if has_late %}
+          {% set _ = parts.append("Late Present") %}
+        {% endif %}
+        {% if has_early_flag or (has_in and has_out and has_early_hrs) %}
+          {% set _ = parts.append("Early Out") %}
+        {% endif %}
+        {% if parts %}
+          {% set row_ns.narration = " / ".join(parts) %}
+        {% elif has_in or has_out %}
+          {% set row_ns.narration = "Present" %}
+        {% else %}
+          {% set row_ns.narration = "Absent" %}
+        {% endif %}
       {% endif %}
 
-      {# 2) Weekend (Sunday) — only if not already a holiday #}
-      {% if narration == "" and row.day == "Sunday" %}
-        {% set narration = "Weekend" %}
-      {% endif %}
-
-      {# 3) Weekly Off (non-Sunday off days like Saturday) — only if not already marked #}
-      {% if narration == "" and row.weekly_off %}
-        {% set narration = "Weekly Off" %}
-      {% endif %}
-
-      {# 4) Leave (Approved) #}
-      {% if narration == "" and row_key in leave_map %}
-        {% set narration = "Leave - " ~ leave_map[row_key] %}
-      {% endif %}
-
-      {# 5) Half Day #}
-      {% if narration == "" and row.half_day %}
-        {% set narration = "Half Day" %}
-      {% endif %}
-
-      {# 6) Late Present #}
-      {% if narration == "" and (row.late == 1 or row.late == "1") %}
-        {% set narration = "Late Present" %}
-      {% endif %}
-
-      {# 7) Early Out #}
-      {% if narration == "" and has_in and has_out and has_early %}
-        {% set narration = "Early Out" %}
-      {% endif %}
-
-      {# 8) Present #}
-      {% if narration == "" and has_in and has_out %}
-        {% set narration = "Present" %}
-      {% endif %}
-
-
-      {# 8) Present #}
-      {% if narration == "" and has_in or has_out %}
-        {% set narration = "Present" %}
-      {% endif %}
-
-      {# 9) Absent #}
-      {% if narration == "" %}
-        {% set narration = "Absent" %}
-      {% endif %}
+      {% set narration = row_ns.narration %}
 
       <tr>
         <td>{{ frappe.format_date(row.date, "dd-MM-yyyy") }}</td>

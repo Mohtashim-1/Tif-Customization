@@ -62,6 +62,9 @@ def get_individual_attendance_sheet_html(employee: str, from_date: str, to_date:
 			c.half_day,
 			c.absent,
 			c.late,
+			c.early,
+			c.mark_leave,
+			c.type,
 			c.per_day_hour,
 			c.early_overtime,
 			c.approved_ot1

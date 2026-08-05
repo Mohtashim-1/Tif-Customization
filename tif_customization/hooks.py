@@ -64,6 +64,8 @@ page_js = {
 	"courier-report" : "tif_customization/page/courier_report/courier_report.js",
 	"dispatch-report" : "tif_customization/page/dispatch_report/dispatch_report.js",
 	"dispatch-detail-report" : "tif_customization/page/dispatch_detail_report/dispatch_detail_report.js",
+	"school-wise-book-dispatched" : "tif_customization/page/school_wise_book_dispatched/school_wise_book_dispatched.js",
+	"school-wise-demand-report" : "tif_customization/page/school_wise_demand_report/school_wise_demand_report.js",
 	"late-coming-report" : "tif_customization/page/late_coming_report/late_coming_report.js",
 	"book-purchase-printing-dashboard" : "tif_customization/page/book_purchase_printing_dashboard/book_purchase_printing_dashboard.js",
 	"procurement-expense" : "tif_customization/page/procurement_expense/procurement_expense.js",

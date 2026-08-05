@@ -46,7 +46,7 @@ def validate_sat_attendance(doc, method):
 			row.mark_leave = 1
 			row.absent = 0
 			if is_half_day_leave:
-				# Worked half can still be late and/or early going
+				# Worked half can still be late; early going only if within exit grace (~after 4 PM)
 				row.half_day = 1
 				if not row.check_in_1:
 					row.late = 0
