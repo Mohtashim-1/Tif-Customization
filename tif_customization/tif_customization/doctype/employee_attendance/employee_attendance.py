@@ -1,25 +1,38 @@
 import frappe
-from frappe.utils import getdate
+from frappe.utils import cint, getdate
 
 
-def _has_approved_leave(employee, row_date):
-	return frappe.db.exists(
+def _is_half_day_leave_on_date(employee, row_date):
+	"""Approved half-day leave covering this exact date."""
+	row_date = getdate(row_date)
+	apps = frappe.get_all(
 		"Leave Application",
-		{
+		filters={
 			"employee": employee,
 			"from_date": ("<=", row_date),
 			"to_date": (">=", row_date),
 			"status": "Approved",
 			"docstatus": 1,
 		},
+		fields=["half_day", "half_day_date"],
+		limit=1,
 	)
+	if not apps:
+		return False, False
+
+	la = apps[0]
+	is_half = bool(
+		cint(la.half_day) and la.half_day_date and getdate(la.half_day_date) == row_date
+	)
+	return True, is_half
 
 
 @frappe.whitelist()
 def validate_sat_attendance(doc, method):
 	"""
 	Saturday half-day rules for permanent staff.
-	Leave days use mark_leave only — never the Half Day checkbox.
+	Full-day leave: mark_leave only (no late/early/half_day).
+	Half-day leave with punches: keep half_day + late from main recalculate.
 	Does not overwrite totals (main validate is authoritative).
 	"""
 	employment = (doc.employment_type or "").replace(" ", "")
@@ -28,12 +41,20 @@ def validate_sat_attendance(doc, method):
 
 	for row in doc.table1:
 		row_date = getdate(row.date)
-		if _has_approved_leave(doc.employee, row_date):
+		has_leave, is_half_day_leave = _is_half_day_leave_on_date(doc.employee, row_date)
+		if has_leave:
 			row.mark_leave = 1
 			row.absent = 0
-			row.half_day = 0
-			row.late = 0
-			row.early = 0
+			if is_half_day_leave:
+				# Worked half can still be late and/or early going
+				row.half_day = 1
+				if not row.check_in_1:
+					row.late = 0
+					row.early = 0
+			else:
+				row.half_day = 0
+				row.late = 0
+				row.early = 0
 			continue
 
 		if row.weekly_off:
@@ -61,3 +82,9 @@ def validate_sat_attendance(doc, method):
 			row.sat_halfday = 0
 			row.half_day = 1
 			row.absent = 0
+
+	# Keep parent totals in sync with any flag changes above
+	doc.total_lates = sum(1 for row in doc.table1 if cint(row.late))
+	doc.total_early_goings = sum(1 for row in doc.table1 if cint(row.early))
+	doc.total_half_days = sum(cint(row.half_day) for row in doc.table1)
+	doc.total_absents = sum(1 for row in doc.table1 if cint(row.absent))

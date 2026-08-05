@@ -157,6 +157,15 @@ def build_conditions(filters: Dict, month_keys: List[Tuple[str, str]]) -> Tuple[
 	if filters.get("only_active") and has_field("status", "Employee"):
 		conditions.append("COALESCE(e.`status`, '') = 'Active'")
 
+	# School Marketing Executives are excluded from this early-going report
+	if has_field("designation", "Employee"):
+		conditions.append(
+			"LOWER(TRIM(COALESCE(e.`designation`, ''))) NOT IN %(excluded_designations)s"
+		)
+		params["excluded_designations"] = (
+			"school marketing executive",
+		)
+
 	return " AND ".join(conditions), params
 
 

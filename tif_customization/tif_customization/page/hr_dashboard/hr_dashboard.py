@@ -2142,11 +2142,15 @@ def _fetch_left_rows(from_date, to_date, company, branch, department, limit=500)
 			date_field = candidate
 			break
 
+	reason_select = ""
+	if _has_field("Employee", "reason_for_leaving"):
+		reason_select = ", e.reason_for_leaving AS reason_for_leaving"
+
 	lim = cint(limit)
 	if date_field:
 		rows = frappe.db.sql(
 			f"""
-			SELECT {_employee_row_select_extra()}, e.`{date_field}` AS exit_date, e.status AS status
+			SELECT {_employee_row_select_extra()}, e.`{date_field}` AS exit_date, e.status AS status{reason_select}
 			FROM `tabEmployee` e
 			WHERE {where_sql}
 			  AND e.`{date_field}` BETWEEN %(from_date)s AND %(to_date)s
@@ -2159,7 +2163,7 @@ def _fetch_left_rows(from_date, to_date, company, branch, department, limit=500)
 	else:
 		rows = frappe.db.sql(
 			f"""
-			SELECT {_employee_row_select_extra()}, e.modified AS exit_date, e.status AS status
+			SELECT {_employee_row_select_extra()}, e.modified AS exit_date, e.status AS status{reason_select}
 			FROM `tabEmployee` e
 			WHERE {where_sql}
 			  AND COALESCE(e.status, '') = 'Left'
@@ -2476,6 +2480,7 @@ def _columns_from_rows(rows):
 		"branch": "Branch",
 		"exit_date": "Exit Date",
 		"status": "Status",
+		"reason_for_leaving": "Reason for Leaving",
 		"cnic_expiry": "CNIC Expiry",
 		"scheduled_confirmation_date": "Confirmation Date",
 		"eobi": "EOBI",

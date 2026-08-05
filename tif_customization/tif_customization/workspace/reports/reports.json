@@ -292,7 +292,7 @@
   {
    "hidden": 0,
    "is_query_report": 1,
-   "label": "Early Report",
+   "label": "Early Going Report",
    "link_count": 0,
    "link_to": "TIF Staff Early Going",
    "link_type": "Report",
@@ -499,7 +499,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-07-30 11:27:41.851311",
+ "modified": "2026-08-04 15:02:02.893584",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Reports",
