@@ -30,18 +30,25 @@ frappe.tif_customization.SchoolWiseDemandReport = class SchoolWiseDemandReport {
 		$(this.page.body).html(`
 			<div style="padding:16px;">
 				<style>
+					.swdr-kpis{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:16px;align-items:stretch}
+					.swdr-kpi-col{flex:1 1 150px;min-width:140px;max-width:100%;display:flex}
 					.swdr-kpi{
 						position:relative;overflow:hidden;
-						padding:14px 16px;border-radius:10px;min-height:92px;
+						padding:14px 16px;border-radius:10px;
 						border:1px solid var(--border-color,#e5e7eb);
+						width:100%;
+						min-height:108px;
+						height:100%;
+						display:flex;flex-direction:column;justify-content:space-between;
+						box-sizing:border-box;
 					}
 					.swdr-kpi::before{
 						content:"";position:absolute;inset:0 0 auto 0;height:4px;
 						background:var(--swdr-accent, transparent);
 					}
-					.swdr-kpi .label{font-size:12px;margin-bottom:6px;color:var(--swdr-muted, var(--text-muted,#6b7280))}
+					.swdr-kpi .label{font-size:12px;margin:0 0 6px;line-height:1.3;color:var(--swdr-muted, var(--text-muted,#6b7280))}
 					.swdr-kpi .value{font-size:22px;font-weight:700;line-height:1.2;color:var(--swdr-value, var(--text-color,#111827))}
-					.swdr-kpi .hint{font-size:11px;margin-top:6px;color:var(--swdr-muted, var(--text-muted,#6b7280))}
+					.swdr-kpi .hint{font-size:11px;margin-top:auto;padding-top:6px;line-height:1.3;color:var(--swdr-muted, var(--text-muted,#6b7280))}
 					.swdr-kpi--schools{--swdr-accent:#1e40af;--swdr-value:#fff;--swdr-muted:#dbeafe;background:linear-gradient(135deg,#1d4ed8 0%,#1e3a8a 100%);border-color:#1e40af;box-shadow:0 6px 16px rgba(30,64,175,.18)}
 					.swdr-kpi--orders{--swdr-accent:#0f766e;--swdr-value:#fff;--swdr-muted:#ccfbf1;background:linear-gradient(135deg,#0d9488 0%,#115e59 100%);border-color:#0f766e;box-shadow:0 6px 16px rgba(15,118,110,.18)}
 					.swdr-kpi--pending{--swdr-accent:#ea580c;--swdr-value:#c2410c;--swdr-muted:#7c2d12;background:linear-gradient(135deg,#fff7ed 0%,#ffedd5 100%);border-color:#fed7aa}
@@ -63,7 +70,7 @@ frappe.tif_customization.SchoolWiseDemandReport = class SchoolWiseDemandReport {
 					Pending qty = Ordered − Delivered. Use School Name to filter by customer / school.
 				</p>
 				<div id="swdr-filters" class="row" style="margin-bottom:12px;"></div>
-				<div id="swdr-kpis" class="row" style="margin-bottom:16px;"></div>
+				<div id="swdr-kpis" class="swdr-kpis"></div>
 				<div id="swdr-table" class="swdr-table-wrap"></div>
 			</div>
 		`);
@@ -199,7 +206,7 @@ frappe.tif_customization.SchoolWiseDemandReport = class SchoolWiseDemandReport {
 				cards
 					.map(
 						(c) => `
-					<div class="col-md-2 col-sm-4" style="margin-bottom:10px;">
+					<div class="swdr-kpi-col">
 						<div class="swdr-kpi ${c.cls}">
 							<div class="label">${frappe.utils.escape_html(c.label)}</div>
 							<div class="value">${frappe.format(c.value, { fieldtype: "Float", precision: 0 })}</div>

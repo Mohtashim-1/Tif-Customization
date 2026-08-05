@@ -203,7 +203,7 @@ frappe.tif_customization.SchoolWiseBookDispatched = class SchoolWiseBookDispatch
 				cards
 					.map(
 						(c) => `
-					<div class="col-md-2 col-sm-4" style="margin-bottom:10px;">
+					<div class="swbd-kpi-col">
 						<div class="swbd-kpi ${c.cls}">
 							<div class="label">${frappe.utils.escape_html(c.label)}</div>
 							<div class="value">${frappe.format(c.value, { fieldtype: "Float", precision: 0 })}</div>
