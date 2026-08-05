@@ -1,0 +1,323 @@
+frappe.pages["sme-summary-report"].on_page_load = function (wrapper) {
+	const page = frappe.ui.make_app_page({
+		parent: wrapper,
+		title: __("SME Summary Report"),
+		single_column: true,
+	});
+	new frappe.tif_customization.SMESummaryReport(page).make();
+};
+
+frappe.tif_customization = frappe.tif_customization || {};
+
+frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
+	constructor(page) {
+		this.page = page;
+		this.data = null;
+	}
+
+	make() {
+		this.make_layout();
+		this.make_filters();
+		this.page.set_primary_action(__("Refresh"), () => this.load_data(), "refresh");
+		this.page.add_action_item(__("Export CSV"), () => this.export_csv());
+		this.page.add_action_item(__("Print"), () => window.print());
+		this.load_data();
+	}
+
+	make_layout() {
+		$(this.page.body).html(`
+			<div class="sme-sum" style="padding:16px;">
+				<style>
+					.sme-sum-note{font-size:12px;color:var(--text-muted,#6b7280);margin:0 0 12px}
+					.sme-sum-table-wrap{overflow:auto;border:1px solid var(--border-color,#e5e7eb);border-radius:8px;background:#fff}
+					.sme-sum-table{width:100%;border-collapse:collapse;font-size:12px;min-width:1100px}
+					.sme-sum-table th,.sme-sum-table td{padding:7px 8px;border:1px solid var(--border-color,#e5e7eb);vertical-align:middle}
+					.sme-sum-table thead th{background:#f3f4f6;text-align:center;font-weight:600;white-space:nowrap}
+					.sme-sum-table .group{background:#e5e7eb}
+					.sme-sum-table .left{text-align:left}
+					.sme-sum-table .num{text-align:right;font-variant-numeric:tabular-nums}
+					.sme-sum-table tfoot th{background:#f9fafb;font-weight:700}
+					.sme-sum-table .score-col{background:#ecfdf5;font-weight:700}
+					.sme-sum-title{text-align:center;font-size:18px;font-weight:700;margin:8px 0 14px}
+					.sme-sum-meta{text-align:center;font-size:12px;color:#6b7280;margin-bottom:12px}
+					@media print{
+						.page-head,.layout-side-section,.sme-sum-filters{display:none!important}
+						.sme-sum-table{font-size:10px}
+					}
+				</style>
+				<p class="sme-sum-note">
+					${__(
+						"Period summary for School Marketing Executives. Grand Total = Followup + New + Meetings + M&E. Score uses SME Target Base KPI points (UAT)."
+					)}
+				</p>
+				<div id="sme-sum-filters" class="sme-sum-filters row" style="margin-bottom:12px;"></div>
+				<div id="sme-sum-body"></div>
+			</div>
+		`);
+	}
+
+	make_filters() {
+		const today = frappe.datetime.get_today();
+		const month_start = frappe.datetime.month_start();
+
+		this.from_date = this.make_filter({
+			label: __("From Date"),
+			fieldtype: "Date",
+			fieldname: "from_date",
+			default: month_start,
+		});
+		this.to_date = this.make_filter({
+			label: __("To Date"),
+			fieldtype: "Date",
+			fieldname: "to_date",
+			default: today,
+		});
+		this.working_days = this.make_filter({
+			label: __("Working Days"),
+			fieldtype: "Int",
+			fieldname: "working_days",
+			description: __("Leave blank to use weekdays in range"),
+		});
+		this.region = this.make_filter({
+			label: __("Score Region"),
+			fieldtype: "Select",
+			fieldname: "region",
+			options: [
+				"",
+				"karachi",
+				"punjab",
+				"urban",
+				"rural",
+			].join("\n"),
+			default: "karachi",
+		});
+		// Friendly labels via change after render
+		setTimeout(() => {
+			const $sel = $(this.region.$input);
+			$sel.find('option[value="karachi"]').text(__("Karachi"));
+			$sel.find('option[value="punjab"]').text(__("Punjab"));
+			$sel.find('option[value="urban"]').text(__("Other Province Urban"));
+			$sel.find('option[value="rural"]').text(__("Other Province Rural"));
+		}, 0);
+
+		this.employee = this.make_filter({
+			label: __("SME"),
+			fieldtype: "Link",
+			fieldname: "employee",
+			options: "Employee",
+			get_query: () => ({
+				filters: {
+					status: "Active",
+					designation: "School Marketing Executive",
+				},
+			}),
+		});
+	}
+
+	make_filter(df) {
+		const wrap = $('<div class="col-md-2" style="margin-bottom:8px;"></div>');
+		$("#sme-sum-filters").append(wrap);
+		return frappe.ui.form.make_control({
+			parent: wrap,
+			df: Object.assign({ change: () => this.schedule_load() }, df),
+			render_input: true,
+		});
+	}
+
+	schedule_load() {
+		clearTimeout(this._timer);
+		this._timer = setTimeout(() => this.load_data(), 350);
+	}
+
+	get_filters() {
+		return {
+			from_date: this.from_date.get_value(),
+			to_date: this.to_date.get_value(),
+			working_days: this.working_days.get_value() || "",
+			region: this.region.get_value() || "karachi",
+			employee: this.employee.get_value() || "",
+		};
+	}
+
+	load_data() {
+		const filters = this.get_filters();
+		if (!filters.from_date || !filters.to_date) {
+			frappe.msgprint(__("Please select From Date and To Date."));
+			return;
+		}
+		$("#sme-sum-body").html(`<p class="text-muted">${__("Loading...")}</p>`);
+		frappe.call({
+			method:
+				"tif_customization.tif_customization.page.sme_summary_report.sme_summary_report.get_report_data",
+			args: { filters },
+			callback: (r) => {
+				if (!r.message) {
+					$("#sme-sum-body").html(`<p class="text-danger">${__("Failed to load.")}</p>`);
+					return;
+				}
+				this.data = r.message;
+				this.render(r.message);
+			},
+			error: () => {
+				$("#sme-sum-body").html(`<p class="text-danger">${__("Failed to load.")}</p>`);
+			},
+		});
+	}
+
+	fmt(n) {
+		return frappe.format(n || 0, { fieldtype: "Int" });
+	}
+
+	fmt_cur(n) {
+		return frappe.format(n || 0, { fieldtype: "Currency" });
+	}
+
+	fmt_score(n) {
+		return frappe.format(flt(n || 0), { fieldtype: "Float", precision: 2 });
+	}
+
+	render(data) {
+		const fromLabel = frappe.datetime.str_to_user(data.from_date);
+		const toLabel = frappe.datetime.str_to_user(data.to_date);
+		const rows = data.rows || [];
+		const t = data.totals || {};
+
+		const body = rows.length
+			? rows
+					.map(
+						(r) => `
+				<tr>
+					<td class="left">${frappe.utils.escape_html(r.label || "")}</td>
+					<td class="num">${this.fmt(r.followup)}</td>
+					<td class="num">${this.fmt(r.new)}</td>
+					<td class="num">${this.fmt(r.meetings)}</td>
+					<td class="num">${this.fmt(r.active)}</td>
+					<td class="num">${this.fmt(r.inactive)}</td>
+					<td class="num">${this.fmt(r.schools)}</td>
+					<td class="num">${this.fmt(r.participants)}</td>
+					<td class="num">${this.fmt(r.grand_total)}</td>
+					<td class="num">${this.fmt_cur(r.expenses)}</td>
+					<td class="num">${this.fmt(r.visited_days)}</td>
+					<td class="num">${this.fmt(r.difference)}</td>
+					<td class="num score-col" title="${__("KPI %")}: ${this.fmt_score(r.score_pct)}%">
+						${this.fmt_score(r.score)}
+					</td>
+				</tr>`
+					)
+					.join("")
+			: `<tr><td colspan="13" class="text-center text-muted">${__("No SMEs found")}</td></tr>`;
+
+		$("#sme-sum-body").html(`
+			<div class="sme-sum-title">${__("Summary")} (${fromLabel} ${__("to")} ${toLabel})</div>
+			<div class="sme-sum-meta">
+				${__("Working Days")}: <strong>${data.working_days}</strong>
+				&nbsp;|&nbsp;
+				${__("Score Region")}: <strong>${frappe.utils.escape_html(data.region_label || "")}</strong>
+				&nbsp;|&nbsp;
+				${__("Expected Points")}: <strong>${this.fmt_score(data.expected_points)}</strong>
+			</div>
+			<div class="sme-sum-table-wrap">
+				<table class="sme-sum-table">
+					<thead>
+						<tr>
+							<th rowspan="2" class="left">${__("Name")}</th>
+							<th colspan="2" class="group">${__("Marketing Visits")}</th>
+							<th colspan="1" class="group">${__("Meetings")}</th>
+							<th colspan="2" class="group">${__("M&E Visits")}</th>
+							<th colspan="2" class="group">${__("Training Sessions")}</th>
+							<th colspan="4" class="group">${__("Total")}</th>
+							<th rowspan="2" class="score-col">${__("Score")} (UAT)</th>
+						</tr>
+						<tr>
+							<th>${__("Followup & Other Visits")}</th>
+							<th>${__("New")}</th>
+							<th>${__("Meetings")}</th>
+							<th>${__("Active")}</th>
+							<th>${__("Inactive")}</th>
+							<th>${__("No. of Schools Attended")}</th>
+							<th>${__("No. of participants")}</th>
+							<th>${__("Grand Total from ERP")}</th>
+							<th>${__("Expenses")}</th>
+							<th>${__("Visited Days")}</th>
+							<th>${__("Difference")}</th>
+						</tr>
+					</thead>
+					<tbody>${body}</tbody>
+					<tfoot>
+						<tr>
+							<th class="left">${__("Grand Total")}</th>
+							<th class="num">${this.fmt(t.followup)}</th>
+							<th class="num">${this.fmt(t.new)}</th>
+							<th class="num">${this.fmt(t.meetings)}</th>
+							<th class="num">${this.fmt(t.active)}</th>
+							<th class="num">${this.fmt(t.inactive)}</th>
+							<th class="num">${this.fmt(t.schools)}</th>
+							<th class="num">${this.fmt(t.participants)}</th>
+							<th class="num">${this.fmt(t.grand_total)}</th>
+							<th class="num">${this.fmt_cur(t.expenses)}</th>
+							<th class="num">${this.fmt(t.visited_days)}</th>
+							<th class="num">${this.fmt(t.difference)}</th>
+							<th class="num score-col">${this.fmt_score(t.score)}</th>
+						</tr>
+					</tfoot>
+				</table>
+			</div>
+		`);
+	}
+
+	export_csv() {
+		if (!this.data || !(this.data.rows || []).length) {
+			frappe.msgprint(__("No data to export."));
+			return;
+		}
+		const headers = [
+			"Name",
+			"Followup & Other Visits",
+			"New",
+			"Meetings",
+			"Active",
+			"Inactive",
+			"Schools Attended",
+			"Participants",
+			"Grand Total from ERP",
+			"Expenses",
+			"Visited Days",
+			"Difference",
+			"Score",
+			"Score %",
+		];
+		const lines = [headers.join(",")];
+		(this.data.rows || []).forEach((r) => {
+			lines.push(
+				[
+					`"${(r.label || "").replace(/"/g, '""')}"`,
+					r.followup || 0,
+					r.new || 0,
+					r.meetings || 0,
+					r.active || 0,
+					r.inactive || 0,
+					r.schools || 0,
+					r.participants || 0,
+					r.grand_total || 0,
+					r.expenses || 0,
+					r.visited_days || 0,
+					r.difference || 0,
+					r.score || 0,
+					r.score_pct || 0,
+				].join(",")
+			);
+		});
+		const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement("a");
+		a.href = url;
+		a.download = `sme-summary-${this.data.from_date}-${this.data.to_date}.csv`;
+		a.click();
+		URL.revokeObjectURL(url);
+	}
+};
+
+function flt(v) {
+	const n = parseFloat(v);
+	return isNaN(n) ? 0 : n;
+}

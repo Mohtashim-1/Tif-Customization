@@ -1,21 +1,27 @@
 {
- "quick_lists": [],
- "modified_by": "Administrator",
+ "charts": [],
+ "content": "[{\"id\":\"oABt4p_ANs\",\"type\":\"custom_block\",\"data\":{\"custom_block_name\":\"Reports Menu\",\"col\":12}}]",
+ "creation": "2026-08-05 12:56:51.290778",
  "custom_blocks": [
   {
    "custom_block_name": "Reports Menu",
    "label": "Reports Menu"
   }
  ],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "for_user": "",
  "hide_custom": 0,
+ "idx": 0,
+ "indicator_color": "green",
+ "is_hidden": 0,
+ "label": "Reports",
  "links": [
   {
    "hidden": 0,
    "is_query_report": 0,
    "label": "Program",
    "link_count": 0,
-   "link_to": null,
-   "link_type": null,
    "onboard": 0,
    "type": "Card Break"
   },
@@ -44,8 +50,6 @@
    "is_query_report": 0,
    "label": "Supply Chain",
    "link_count": 6,
-   "link_to": null,
-   "link_type": null,
    "onboard": 0,
    "type": "Card Break"
   },
@@ -114,8 +118,6 @@
    "is_query_report": 0,
    "label": "Procurement",
    "link_count": 2,
-   "link_to": null,
-   "link_type": null,
    "onboard": 0,
    "type": "Card Break"
   },
@@ -144,8 +146,6 @@
    "is_query_report": 0,
    "label": "HR",
    "link_count": 11,
-   "link_to": null,
-   "link_type": null,
    "onboard": 0,
    "type": "Card Break"
   },
@@ -324,8 +324,6 @@
    "is_query_report": 0,
    "label": "Accounts",
    "link_count": 19,
-   "link_to": null,
-   "link_type": null,
    "onboard": 0,
    "type": "Card Break"
   },
@@ -437,6 +435,7 @@
    "link_to": "Donor Ledger Statement",
    "link_type": "Report",
    "onboard": 0,
+   "report_ref_doctype": "Donor",
    "type": "Link"
   },
   {
@@ -447,6 +446,7 @@
    "link_to": "Cash Book",
    "link_type": "Report",
    "onboard": 0,
+   "report_ref_doctype": "GL Entry",
    "type": "Link"
   },
   {
@@ -457,15 +457,14 @@
    "link_to": "Bank Book",
    "link_type": "Report",
    "onboard": 0,
+   "report_ref_doctype": "GL Entry",
    "type": "Link"
   },
   {
    "hidden": 0,
    "is_query_report": 0,
    "label": "SME",
-   "link_count": 10,
-   "link_to": null,
-   "link_type": null,
+   "link_count": 11,
    "onboard": 0,
    "type": "Card Break"
   },
@@ -502,6 +501,16 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "SME Summary Report (UAT)",
+   "link_count": 0,
+   "link_to": "sme-summary-report",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "Supervisor Target Base KPI (UAT)",
    "link_count": 0,
    "link_to": "supervisor-target-ba",
@@ -520,124 +529,39 @@
    "type": "Link"
   }
  ],
- "title": "Reports",
- "indicator_color": "green",
- "idx": 0,
- "sequence_id": 52.0,
- "content": "[{\"id\":\"oABt4p_ANs\",\"type\":\"custom_block\",\"data\":{\"custom_block_name\":\"Reports Menu\",\"col\":12}}]",
- "modified": "2026-08-05 13:02:37.714379",
+ "modified": "2026-08-06 00:19:24.828420",
+ "modified_by": "Administrator",
  "module": "Tif Customization",
- "label": "Reports",
- "creation": "2026-08-05 12:56:51.290778",
- "docstatus": 0,
+ "name": "Reports",
  "number_cards": [],
- "charts": [],
- "public": 1,
  "owner": "Administrator",
- "is_hidden": 0,
+ "parent_page": "",
+ "public": 1,
+ "quick_lists": [],
  "roles": [
   {
-   "name": "ft1iimpumk",
-   "owner": "Administrator",
-   "creation": "2026-08-05 12:56:51.290778",
-   "modified": "2026-08-05 13:02:37.714379",
-   "modified_by": "Administrator",
-   "docstatus": 0,
-   "idx": 1,
-   "role": "HR Manager",
-   "parent": "Reports",
-   "parentfield": "roles",
-   "parenttype": "Workspace",
-   "doctype": "Has Role"
+   "role": "HR Manager"
   },
   {
-   "name": "ft1doraa6d",
-   "owner": "Administrator",
-   "creation": "2026-08-05 12:56:51.290778",
-   "modified": "2026-08-05 13:02:37.714379",
-   "modified_by": "Administrator",
-   "docstatus": 0,
-   "idx": 2,
-   "role": "Purchase Manager",
-   "parent": "Reports",
-   "parentfield": "roles",
-   "parenttype": "Workspace",
-   "doctype": "Has Role"
+   "role": "Purchase Manager"
   },
   {
-   "name": "ft14m5dksb",
-   "owner": "Administrator",
-   "creation": "2026-08-05 12:56:51.290778",
-   "modified": "2026-08-05 13:02:37.714379",
-   "modified_by": "Administrator",
-   "docstatus": 0,
-   "idx": 3,
-   "role": "System Manager",
-   "parent": "Reports",
-   "parentfield": "roles",
-   "parenttype": "Workspace",
-   "doctype": "Has Role"
+   "role": "System Manager"
   },
   {
-   "name": "ft1d1spnf8",
-   "owner": "Administrator",
-   "creation": "2026-08-05 12:56:51.290778",
-   "modified": "2026-08-05 13:02:37.714379",
-   "modified_by": "Administrator",
-   "docstatus": 0,
-   "idx": 4,
-   "role": "Simple User",
-   "parent": "Reports",
-   "parentfield": "roles",
-   "parenttype": "Workspace",
-   "doctype": "Has Role"
+   "role": "Simple User"
   },
   {
-   "name": "ft1g6fuovt",
-   "owner": "Administrator",
-   "creation": "2026-08-05 12:56:51.290778",
-   "modified": "2026-08-05 13:02:37.714379",
-   "modified_by": "Administrator",
-   "docstatus": 0,
-   "idx": 5,
-   "role": "Sales User - Tif",
-   "parent": "Reports",
-   "parentfield": "roles",
-   "parenttype": "Workspace",
-   "doctype": "Has Role"
+   "role": "Sales User - Tif"
   },
   {
-   "name": "ft1mvvl645",
-   "owner": "Administrator",
-   "creation": "2026-08-05 12:56:51.290778",
-   "modified": "2026-08-05 13:02:37.714379",
-   "modified_by": "Administrator",
-   "docstatus": 0,
-   "idx": 6,
-   "role": "Trustee",
-   "parent": "Reports",
-   "parentfield": "roles",
-   "parenttype": "Workspace",
-   "doctype": "Has Role"
+   "role": "Trustee"
   },
   {
-   "name": "ft1isqf4oo",
-   "owner": "Administrator",
-   "creation": "2026-08-05 12:56:51.290778",
-   "modified": "2026-08-05 13:02:37.714379",
-   "modified_by": "Administrator",
-   "docstatus": 0,
-   "idx": 7,
-   "role": "HOD",
-   "parent": "Reports",
-   "parentfield": "roles",
-   "parenttype": "Workspace",
-   "doctype": "Has Role"
+   "role": "HOD"
   }
  ],
- "name": "Reports",
- "doctype": "Workspace",
+ "sequence_id": 52.0,
  "shortcuts": [],
- "for_user": "",
- "parent_page": ""
+ "title": "Reports"
 }
