@@ -42,18 +42,19 @@ def get_report_data(filters=None):
 
 	visit_date_expr = """
 		CASE
-			WHEN fv.type = 'Marketing' THEN COALESCE(fv.visit_date, DATE(fv.timestamp), DATE(fv.modified))
-			WHEN fv.type = 'M&E' THEN COALESCE(fv.me_visit_date, fv.me_starting_date, DATE(fv.me_timestamp), DATE(fv.modified))
-			WHEN fv.type = 'Training' THEN COALESCE(fv.training_date, DATE(fv.training_timestamp), DATE(fv.modified))
-			ELSE DATE(fv.modified)
+			WHEN fv.type = 'Marketing' THEN COALESCE(fv.visit_date, DATE(fv.timestamp))
+			WHEN fv.type = 'M&E' THEN COALESCE(fv.me_visit_date, fv.me_starting_date, DATE(fv.me_timestamp))
+			WHEN fv.type = 'Training' THEN COALESCE(fv.training_date, DATE(fv.training_timestamp))
+			WHEN fv.type = 'Meeting' THEN COALESCE(fv.mt_meeting_date, DATE(fv.mt_timestamp))
+			ELSE COALESCE(fv.visit_date, fv.me_visit_date, fv.training_date, fv.mt_meeting_date)
 		END
 	"""
 
 	if from_date:
-		conditions.append(f"{visit_date_expr} >= %(from_date)s")
+		conditions.append(f"{visit_date_expr} IS NOT NULL AND {visit_date_expr} >= %(from_date)s")
 		params["from_date"] = from_date
 	if to_date:
-		conditions.append(f"{visit_date_expr} <= %(to_date)s")
+		conditions.append(f"{visit_date_expr} IS NOT NULL AND {visit_date_expr} <= %(to_date)s")
 		params["to_date"] = to_date
 	if visit_type:
 		conditions.append("fv.type = %(visit_type)s")

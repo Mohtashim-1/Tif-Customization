@@ -67,6 +67,11 @@ def get_report_data(filters=None):
 		if filters.get(fieldname) and fieldname in fields:
 			db_filters[fieldname] = filters.get(fieldname)
 
+	# school_name is free-text Data (not a School Link), so use contains match.
+	school_name = (filters.get("school_name") or "").strip()
+	if school_name and "school_name" in fields:
+		db_filters["school_name"] = ["like", f"%{school_name}%"]
+
 	# Topic searches both halves: Training stores it in training_type, Workshop in workshop_topic.
 	or_filters = []
 	topic = (filters.get("topic") or filters.get("training_type") or "").strip()
@@ -99,17 +104,58 @@ def get_report_data(filters=None):
 def build_summary(rows):
 	"""Built from the raw rows, before dates are turned into display strings."""
 	today = getdate(nowdate())
+
+	# City is often blank on the form; fall back to Area.city so the Cities card is accurate.
+	area_names = {
+		(row.area or "").strip()
+		for row in rows
+		if (row.area or "").strip() and not (row.city or "").strip()
+	}
+	area_city_map = {}
+	if area_names:
+		for area in frappe.get_all(
+			"Area",
+			filters={"name": ["in", list(area_names)]},
+			fields=["name", "city"],
+		):
+			if area.city:
+				area_city_map[area.name] = area.city
+
+	cities = set()
+	areas = set()
+	schools = set()
+	for row in rows:
+		city = (row.city or "").strip() or (area_city_map.get((row.area or "").strip()) or "").strip()
+		if city:
+			cities.add(city.lower())
+		area = _norm(row.area)
+		if area:
+			areas.add(area)
+		school = (row.school_name or "").strip()
+		if school:
+			schools.add(school.lower())
+
 	return {
 		"total": len(rows),
+		"upcoming": sum(
+			1
+			for row in rows
+			if row.training_date and getdate(row.training_date) >= today
+		),
+		"completed": sum(
+			1
+			for row in rows
+			if row.training_date and getdate(row.training_date) < today
+		),
 		"today": sum(getdate(row.training_date) == today for row in rows if row.training_date),
 		"trainings": sum(_norm(row.get("type")) == "training" for row in rows),
 		"workshops": sum(_norm(row.get("type")) == "workshop" for row in rows),
-		"schools": len({row.school_name for row in rows if row.school_name}),
-		"cities": len({row.city for row in rows if row.city}),
+		"schools": len(schools),
+		"cities": len(cities),
 		"onsite": sum(_norm(row.mode_of_training) == "onsite" for row in rows),
 		"online": sum(_norm(row.mode_of_training) == "online" for row in rows),
 		"in_person": sum(_norm(row.mode_of_training) in ("in-person", "in person") for row in rows),
-		"areas": len({_norm(row.area) for row in rows if _norm(row.area)}),
+		"areas": len(areas),
 	}
 
 

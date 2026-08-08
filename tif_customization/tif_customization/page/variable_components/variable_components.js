@@ -18,6 +18,8 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 			this._remove_selected = new Set();
 			this._payment_dirty = false;
 			this._bank_options = [];
+			this.apex_loaded = false;
+			this.charts = {};
 		}
 
 		make() {
@@ -101,6 +103,11 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 							<span><i class="swatch-tax"></i> ${__("Tax (defaults from Employee Income Tax, editable)")}</span>
 							<span><i class="swatch-dirty"></i> ${__("Edited (not saved)")}</span>
 							<span><i class="swatch-payroll"></i> ${__("Included in payroll run")}</span>
+						</div>
+						<div class="vc-dept-chart-panel">
+							<div class="vc-dept-chart-panel__title">${__("Department (active count by employment type)")}</div>
+							<p class="vc-dept-chart-panel__hint">${__("Each bar shows total active employees per department, split by employment type.")}</p>
+							<div id="vc-dept-employment-chart"></div>
 						</div>
 						<div class="vc-payroll-register-summary-wrap">
 							<div class="vc-payroll-register-summary"></div>
@@ -441,8 +448,157 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 						this.update_roster_panel();
 						this.update_period_status_badge();
 						this.update_save_state();
+						this.load_dept_employment_chart();
 					},
 				});
+			}
+
+			load_apexcharts() {
+				if (this.apex_loaded || window.ApexCharts) {
+					this.apex_loaded = true;
+					return Promise.resolve();
+				}
+				return new Promise((resolve, reject) => {
+					const existing = document.querySelector('script[data-tif-apexcharts="1"]');
+					if (existing) {
+						existing.addEventListener("load", () => resolve());
+						existing.addEventListener("error", () => reject());
+						return;
+					}
+					const script = document.createElement("script");
+					script.dataset.tifApexcharts = "1";
+					script.src = "https://cdn.jsdelivr.net/npm/apexcharts@3.49.1";
+					script.onload = () => {
+						this.apex_loaded = true;
+						resolve();
+					};
+					script.onerror = () => reject(new Error("Failed to load ApexCharts"));
+					document.head.appendChild(script);
+				});
+			}
+
+			_vc_stacked_employment_colors(seriesCount) {
+				const base = [
+					"#4f46e5",
+					"#ea580c",
+					"#059669",
+					"#e11d48",
+					"#7c3aed",
+					"#0891b2",
+					"#ca8a04",
+					"#db2777",
+					"#65a30d",
+					"#0d9488",
+					"#9333ea",
+					"#b45309",
+					"#be185d",
+					"#1e40af",
+				];
+				const colors = [...base];
+				while (colors.length < seriesCount) {
+					colors.push(base[colors.length % base.length]);
+				}
+				return colors.slice(0, seriesCount);
+			}
+
+			_vc_ensure_chart(key, selector, options) {
+				if (!window.ApexCharts) return null;
+				if (this.charts[key]) return this.charts[key];
+				const container = this.page.main.find(selector)[0];
+				if (!container) return null;
+				const chart = new ApexCharts(container, options);
+				chart.render();
+				this.charts[key] = chart;
+				return chart;
+			}
+
+			_render_dept_employment_chart(data) {
+				const labels = data.labels || [];
+				const series = data.series || [];
+				const chartHeight = Math.max(400, labels.length * 34);
+				const colors = this._vc_stacked_employment_colors(series.length);
+				const mode = frappe.boot?.sysdefaults?.theme === "dark" ? "dark" : "light";
+				const xaxis = {
+					categories: labels,
+					labels: {
+						trim: false,
+						hideOverlappingLabels: false,
+						maxHeight: 400,
+						style: { fontSize: "11px" },
+					},
+				};
+				const chart = this._vc_ensure_chart("dept_employment", "#vc-dept-employment-chart", {
+					chart: {
+						type: "bar",
+						height: chartHeight,
+						stacked: true,
+						toolbar: { show: false },
+						animations: {
+							enabled: true,
+							easing: "easeinout",
+							speed: 700,
+							animateGradually: { enabled: true, delay: 100 },
+							dynamicAnimation: { enabled: true, speed: 400 },
+						},
+					},
+					theme: { mode },
+					colors,
+					grid: { borderColor: "#e2e8f0", strokeDashArray: 4 },
+					tooltip: { theme: mode, shared: true, intersect: false },
+					noData: { text: __("No department data") },
+					plotOptions: {
+						bar: {
+							horizontal: true,
+							borderRadius: 3,
+							barHeight: "72%",
+							dataLabels: {
+								total: { enabled: true, style: { fontSize: "11px", fontWeight: 700 } },
+							},
+						},
+					},
+					xaxis,
+					series,
+					dataLabels: {
+						enabled: true,
+						style: { fontSize: "10px", fontWeight: 600 },
+						formatter: (val) => (val > 0 ? String(Math.round(val)) : ""),
+					},
+					legend: { position: "top", fontWeight: 500, fontSize: "11px" },
+					yaxis: { labels: { maxWidth: 220 } },
+				});
+				if (chart) {
+					chart.updateOptions(
+						{
+							chart: { height: chartHeight },
+							colors,
+							xaxis,
+						},
+						false,
+						true,
+					);
+					chart.updateSeries(series, true);
+				}
+			}
+
+			load_dept_employment_chart() {
+				const company = this.$company.val() || frappe.defaults.get_user_default("Company");
+				this.load_apexcharts()
+					.then(() => {
+						frappe.call({
+							method:
+								"tif_customization.tif_customization.page.variable_components.variable_components.get_department_employment_chart",
+							args: { company },
+							callback: (r) => {
+								this._render_dept_employment_chart(r.message || { labels: [], series: [] });
+							},
+						});
+					})
+					.catch(() => {
+						const el = this.page.main.find("#vc-dept-employment-chart")[0];
+						if (el) {
+							el.innerHTML = `<div class="text-muted" style="padding:12px">${__("Chart library failed to load")}</div>`;
+						}
+					});
 			}
 
 			update_roster_panel() {

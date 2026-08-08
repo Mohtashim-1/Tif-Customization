@@ -16,11 +16,11 @@ frappe.pages['field-staff-visit-mo'].on_page_load = function(wrapper) {
 			<div class="filter-section" style="background: #f8f9fa; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
 				<div class="row">
 					<div class="col-md-2">
-						<label>${__('From Date')}</label>
+						<label>${__('Visit From Date')}</label>
 						<input type="date" id="fs-from-date" class="form-control" />
 					</div>
 					<div class="col-md-2">
-						<label>${__('To Date')}</label>
+						<label>${__('Visit To Date')}</label>
 						<input type="date" id="fs-to-date" class="form-control" />
 					</div>
 					<div class="col-md-3">
@@ -112,7 +112,7 @@ frappe.pages['field-staff-visit-mo'].on_page_load = function(wrapper) {
 	function load_report() {
 		const filters = get_filters();
 		if (!filters.from_date || !filters.to_date) {
-			frappe.msgprint(__('Please select From Date and To Date.'));
+			frappe.msgprint(__('Please select Visit From Date and Visit To Date.'));
 			return;
 		}
 

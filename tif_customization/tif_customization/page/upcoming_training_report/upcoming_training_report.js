@@ -64,9 +64,8 @@ frappe.tif_customization.UpcomingTrainingReport = class UpcomingTrainingReport {
 		});
 		this.school_name = this.make_filter_control({
 			label: __("School Name"),
-			fieldtype: "Link",
+			fieldtype: "Data",
 			fieldname: "school_name",
-			options: "School",
 			change: () => this.load_data(),
 		});
 		this.city = this.make_filter_control({
@@ -233,20 +232,17 @@ frappe.tif_customization.UpcomingTrainingReport = class UpcomingTrainingReport {
 	}
 
 	render_summary(summary) {
-		const row_summary = this.get_row_summary();
-		const onsite = summary.onsite ?? row_summary.onsite;
-		const online = summary.online ?? row_summary.online;
-		const in_person = summary.in_person ?? row_summary.in_person;
-		const areas = summary.areas ?? row_summary.areas;
 		const cards = [
 			[__("Total Records"), summary.total || 0, "#2563eb"],
+			[__("Upcoming"), summary.upcoming || 0, "#059669"],
+			[__("Completed"), summary.completed || 0, "#64748b"],
 			[__("Scheduled Today"), summary.today || 0, "#7c3aed"],
 			[__("Trainings"), summary.trainings || 0, "#0891b2"],
 			[__("Workshops"), summary.workshops || 0, "#c026d3"],
-			[__("Total Onsite"), onsite || 0, "#059669"],
-			[__("Total Online"), online || 0, "#0284c7"],
-			[__("Total In-person"), in_person || 0, "#ea580c"],
-			[__("Total Area"), areas || 0, "#be123c"],
+			[__("Onsite"), summary.onsite || 0, "#059669"],
+			[__("Online"), summary.online || 0, "#0284c7"],
+			[__("In-person"), summary.in_person || 0, "#ea580c"],
+			[__("Areas"), summary.areas || 0, "#be123c"],
 			[__("Schools"), summary.schools || 0, "#4f46e5"],
 			[__("Cities"), summary.cities || 0, "#0f766e"],
 		];
@@ -265,23 +261,6 @@ frappe.tif_customization.UpcomingTrainingReport = class UpcomingTrainingReport {
 					)
 					.join("")
 			);
-	}
-
-	get_row_summary() {
-		const areas = new Set();
-		return this.rows.reduce(
-			(summary, row) => {
-				const mode = String(row.mode_of_training || "").trim().toLowerCase();
-				if (mode === "onsite") summary.onsite += 1;
-				if (mode === "online") summary.online += 1;
-				if (mode === "in-person" || mode === "in person") summary.in_person += 1;
-				const area = String(row.area || "").trim().toLowerCase();
-				if (area) areas.add(area);
-				summary.areas = areas.size;
-				return summary;
-			},
-			{ onsite: 0, online: 0, in_person: 0, areas: 0 }
-		);
 	}
 
 	render_rows() {

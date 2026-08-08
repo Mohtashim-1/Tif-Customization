@@ -116,6 +116,17 @@ def get_period_options_for_variable(company=None):
 
 
 @frappe.whitelist()
+def get_department_employment_chart(company=None):
+	"""Active headcount by department × employment type (same as HR Dashboard)."""
+	company = company or frappe.defaults.get_global_default("company")
+	from tif_customization.tif_customization.page.hr_dashboard.hr_dashboard import (
+		_headcount_stacked_by_employment_type,
+	)
+
+	return _headcount_stacked_by_employment_type("department", company, None, None, limit=25)
+
+
+@frappe.whitelist()
 def get_tif_cycle_dates(year, month, cycle_type="tif_payroll_month"):
 	"""
 	Preview dates for 26th-cycle payroll.

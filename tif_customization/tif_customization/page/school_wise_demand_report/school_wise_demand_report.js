@@ -55,6 +55,7 @@ frappe.tif_customization.SchoolWiseDemandReport = class SchoolWiseDemandReport {
 					.swdr-kpi--mqh{--swdr-accent:#7c3aed;--swdr-value:#6d28d9;--swdr-muted:#4c1d95;background:linear-gradient(135deg,#f5f3ff 0%,#ede9fe 100%);border-color:#ddd6fe}
 					.swdr-kpi--qaida{--swdr-accent:#059669;--swdr-value:#047857;--swdr-muted:#064e3b;background:linear-gradient(135deg,#ecfdf5 0%,#d1fae5 100%);border-color:#a7f3d0}
 					.swdr-kpi--guide{--swdr-accent:#dc2626;--swdr-value:#b91c1c;--swdr-muted:#7f1d1d;background:linear-gradient(135deg,#fef2f2 0%,#fee2e2 100%);border-color:#fecaca}
+					.swdr-kpi--kpk{--swdr-accent:#b45309;--swdr-value:#92400e;--swdr-muted:#78350f;background:linear-gradient(135deg,#fffbeb 0%,#fef3c7 100%);border-color:#fcd34d}
 					.swdr-note{font-size:12px;color:var(--text-muted,#6b7280);margin:0 0 12px}
 					.swdr-table-wrap{overflow:auto;border:1px solid var(--border-color,#e5e7eb);border-radius:8px;background:#fff}
 					.swdr-table{width:100%;border-collapse:collapse;font-size:13px}
@@ -67,7 +68,9 @@ frappe.tif_customization.SchoolWiseDemandReport = class SchoolWiseDemandReport {
 				</style>
 				<p class="swdr-note">
 					Demand = open Sales Orders not fully delivered (book items only).
-					Pending qty = Ordered − Delivered. Use School Name to filter by customer / school.
+					Pending qty = Ordered − Delivered.
+					Book Type includes <strong>KPK Edition</strong> (item name/code contains KPK).
+					Sales Order No shows open SO IDs per school.
 				</p>
 				<div id="swdr-filters" class="row" style="margin-bottom:12px;"></div>
 				<div id="swdr-kpis" class="swdr-kpis"></div>
@@ -112,8 +115,21 @@ frappe.tif_customization.SchoolWiseDemandReport = class SchoolWiseDemandReport {
 		});
 		this.province = this.make_filter({
 			label: __("Province"),
-			fieldtype: "Data",
+			fieldtype: "Select",
 			fieldname: "province",
+			options: "\nSindh\nPunjab\nKPK\nBalochistan\nICT\nAJK\nGilgit Baltistan",
+		});
+		this.sales_order = this.make_filter({
+			label: __("Sales Order"),
+			fieldtype: "Link",
+			fieldname: "sales_order",
+			options: "Sales Order",
+			get_query: () => ({
+				filters: {
+					docstatus: 1,
+					status: ["not in", ["Closed", "Cancelled", "Completed"]],
+				},
+			}),
 		});
 		this.area = this.make_filter({
 			label: __("Area"),
@@ -131,7 +147,23 @@ frappe.tif_customization.SchoolWiseDemandReport = class SchoolWiseDemandReport {
 			label: __("Book Type"),
 			fieldtype: "Select",
 			fieldname: "book_type",
-			options: "\nMQH\nQaida\nGuide",
+			options: "\nMQH\nQaida\nGuide\nKPK Edition",
+		});
+		this.load_province_options();
+	}
+
+	load_province_options() {
+		frappe.call({
+			method:
+				"tif_customization.tif_customization.page.school_wise_demand_report.school_wise_demand_report.get_filter_options",
+			callback: (r) => {
+				const provinces = (r.message && r.message.provinces) || [];
+				if (!provinces.length || !this.province) return;
+				const current = this.province.get_value();
+				this.province.df.options = "\n" + provinces.join("\n");
+				this.province.refresh();
+				if (current) this.province.set_value(current);
+			},
 		});
 	}
 
@@ -171,6 +203,7 @@ frappe.tif_customization.SchoolWiseDemandReport = class SchoolWiseDemandReport {
 			school: this.school.get_value(),
 			city: this.city.get_value(),
 			province: this.province.get_value(),
+			sales_order: this.sales_order.get_value(),
 			area: this.area.get_value(),
 			school_status: this.school_status.get_value(),
 			book_type: this.book_type.get_value(),
@@ -199,6 +232,7 @@ frappe.tif_customization.SchoolWiseDemandReport = class SchoolWiseDemandReport {
 			{ label: __("MQH Pending"), value: s.mqh_pending || 0, cls: "swdr-kpi--mqh", hint: __("MQH demand") },
 			{ label: __("Qaida Pending"), value: s.qaida_pending || 0, cls: "swdr-kpi--qaida", hint: __("Qaida demand") },
 			{ label: __("Guide Pending"), value: s.guide_pending || 0, cls: "swdr-kpi--guide", hint: __("Guide demand") },
+			{ label: __("KPK Edition Pending"), value: s.kpk_pending || 0, cls: "swdr-kpi--kpk", hint: __("KPK Edition / KPK Textbook Board") },
 		];
 		$(this.page.body)
 			.find("#swdr-kpis")
@@ -221,6 +255,7 @@ frappe.tif_customization.SchoolWiseDemandReport = class SchoolWiseDemandReport {
 	columns() {
 		return [
 			{ key: "school_name", label: __("School") },
+			{ key: "sales_order_nos", label: __("Sales Order No"), so_links: true },
 			{ key: "school_status", label: __("Status") },
 			{ key: "city", label: __("City") },
 			{ key: "province", label: __("Province") },
@@ -232,6 +267,7 @@ frappe.tif_customization.SchoolWiseDemandReport = class SchoolWiseDemandReport {
 			{ key: "mqh_pending", label: __("MQH Pend"), num: true, pending: true },
 			{ key: "qaida_pending", label: __("Qaida Pend"), num: true, pending: true },
 			{ key: "guide_pending", label: __("Guide Pend"), num: true, pending: true },
+			{ key: "kpk_pending", label: __("KPK Edition Pend"), num: true, pending: true },
 			{ key: "other_pending", label: __("Other Pend"), num: true, pending: true },
 			{ key: "last_order_date", label: __("Last Order") },
 			{ key: "earliest_delivery_date", label: __("Earliest Delivery") },
@@ -259,6 +295,19 @@ frappe.tif_customization.SchoolWiseDemandReport = class SchoolWiseDemandReport {
 							const num = Number(val || 0);
 							val = frappe.format(num, { fieldtype: "Float", precision: 0 });
 							if (c.pending && num > 0) cls += " swdr-pending";
+						} else if (c.so_links && val) {
+							val = String(val)
+								.split(",")
+								.map((so) => so.trim())
+								.filter(Boolean)
+								.map(
+									(so) =>
+										`<a href="${frappe.utils.get_form_link(
+											"Sales Order",
+											so
+										)}" target="_blank">${frappe.utils.escape_html(so)}</a>`
+								)
+								.join(", ");
 						} else if ((c.key === "last_order_date" || c.key === "earliest_delivery_date") && val) {
 							val = frappe.datetime.str_to_user(val);
 						} else {

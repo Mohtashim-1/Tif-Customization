@@ -13,6 +13,7 @@ from frappe import _
 from frappe.utils import cint, flt, getdate
 
 from tif_customization.tif_customization.field_visit_permissions import (
+	_name_variants,
 	can_view_all_field_visits,
 	get_team_employee_rows,
 	get_team_match_values,
@@ -29,6 +30,9 @@ from tif_customization.tif_customization.page.smes_target_base___k.smes_target_b
 )
 
 SME_DESIGNATION = "School Marketing Executive"
+
+# Activity types that roll into the summary columns / visited days
+SUMMARY_TYPES = ("Marketing", "Meeting", "M&E", "Training")
 
 
 @frappe.whitelist()
@@ -62,12 +66,14 @@ def get_report_data(filters=None):
 		schools = cint(stats.get("schools") or 0)
 		participants = cint(stats.get("participants") or 0)
 		visited_days = cint(stats.get("visited_days") or 0)
-		# Grand Total from ERP = activity counts (excludes training schools/participants)
+		# Grand Total from ERP = sum of visit activity columns (not training schools/participants)
 		grand_total = followup + new + meetings + active + inactive
 		expense_amt = flt(expenses.get(key) or 0)
 		difference = visited_days - working_days
 
-		score, score_pct = _compute_score(staff, from_date, to_date, region, expected_points)
+		score_points, score_pct = _compute_score(
+			staff, from_date, to_date, region, expected_points, stats
+		)
 
 		row = {
 			"employee": staff.get("employee"),
@@ -85,7 +91,9 @@ def get_report_data(filters=None):
 			"expenses": expense_amt,
 			"visited_days": visited_days,
 			"difference": difference,
-			"score": score,
+			# Score column = KPI achievement % (raw points kept for export/tooltip)
+			"score": score_pct,
+			"score_points": score_points,
 			"score_pct": score_pct,
 		}
 		rows.append(row)
@@ -102,10 +110,20 @@ def get_report_data(filters=None):
 			"visited_days",
 			"difference",
 			"score",
+			"score_points",
 		):
 			totals[k] += flt(row.get(k) or 0)
 
 	rows.sort(key=lambda r: (r.get("employee_name") or "").lower())
+
+	n = len(rows) or 1
+	totals_out = {
+		k: (flt(v, 2) if k in ("expenses", "score_points") else cint(v))
+		for k, v in totals.items()
+		if k not in ("score",)
+	}
+	# Footer Score % = average achievement across SMEs (not sum)
+	totals_out["score"] = flt(totals.get("score", 0) / n, 2)
 
 	return {
 		"from_date": str(from_date),
@@ -115,7 +133,7 @@ def get_report_data(filters=None):
 		"region_label": REGION_LABELS.get(region, region),
 		"expected_points": flt(expected_points, 2),
 		"rows": rows,
-		"totals": {k: (flt(v, 2) if k in ("expenses", "score") else cint(v)) for k, v in totals.items()},
+		"totals": totals_out,
 		"regions": [{"key": rk, "label": REGION_LABELS[rk]} for rk in REGION_KEYS],
 	}
 
@@ -130,12 +148,30 @@ def _parse_filters(filters):
 
 
 def _resolve_dates(filters):
+	"""Resolve Visit From / Visit To Date (filters Field Visit by visit date)."""
 	today = getdate()
-	from_date = getdate(filters.get("from_date") or today.replace(day=1))
-	to_date = getdate(filters.get("to_date") or today)
+	# Accept either from_date/to_date or visit_from_date/visit_to_date
+	from_raw = filters.get("visit_from_date") or filters.get("from_date")
+	to_raw = filters.get("visit_to_date") or filters.get("to_date")
+	from_date = getdate(from_raw or today.replace(day=1))
+	to_date = getdate(to_raw or today)
 	if from_date > to_date:
-		frappe.throw(_("From Date cannot be after To Date."))
+		frappe.throw(_("Visit From Date cannot be after Visit To Date."))
 	return from_date, to_date
+
+
+def _visit_day_sql(alias="fv"):
+	"""Effective visit date per Field Visit type (not document creation/modified)."""
+	a = alias
+	return f"""
+		CASE
+			WHEN {a}.type = 'Marketing' THEN COALESCE({a}.visit_date, DATE({a}.timestamp))
+			WHEN {a}.type = 'M&E' THEN COALESCE({a}.me_visit_date, {a}.me_starting_date, DATE({a}.me_timestamp))
+			WHEN {a}.type = 'Training' THEN COALESCE({a}.training_date, DATE({a}.training_timestamp))
+			WHEN {a}.type = 'Meeting' THEN COALESCE({a}.mt_meeting_date, DATE({a}.mt_timestamp))
+			ELSE COALESCE({a}.visit_date, {a}.me_visit_date, {a}.training_date, {a}.mt_meeting_date)
+		END
+	"""
 
 
 def _weekday_count(from_date, to_date):
@@ -161,7 +197,6 @@ def _get_sme_staff(filters):
 
 	if not can_view_all_field_visits():
 		allowed = {e.get("name") for e in get_team_employee_rows(include_self=True)}
-		# Also allow match by user_id / name against team match values
 		team_vals = {v.lower() for v in get_team_match_values()}
 		rows = [
 			r
@@ -174,6 +209,15 @@ def _get_sme_staff(filters):
 	if employee_filter:
 		rows = [r for r in rows if r.name == employee_filter]
 
+	# Prefetch User full_name for owner matching
+	user_ids = [r.user_id for r in rows if r.user_id]
+	full_names = {}
+	if user_ids:
+		for u in frappe.get_all(
+			"User", filters={"name": ["in", user_ids]}, fields=["name", "full_name"]
+		):
+			full_names[u.name] = u.full_name
+
 	result = []
 	for r in rows:
 		result.append(
@@ -183,26 +227,23 @@ def _get_sme_staff(filters):
 				"employee_name": r.employee_name,
 				"user_id": r.user_id,
 				"department": r.department,
-				"match_values": _staff_match_values(r),
+				"match_values": _staff_match_values(r, full_names.get(r.user_id)),
 			}
 		)
 	return result
 
 
-def _staff_match_values(emp) -> set[str]:
+def _staff_match_values(emp, user_full_name=None) -> set[str]:
 	vals = set()
-	for v in (emp.name, emp.user_id, emp.employee_name):
-		if v:
-			vals.add(str(v).strip())
-			vals.add(str(v).strip().lower())
-	# short forms used on Field Visit
-	name = (emp.employee_name or "").strip()
-	if name:
-		parts = name.split()
-		if len(parts) >= 2:
-			vals.add(f"{parts[0][0]} {parts[-1]}")
-			vals.add(f"{parts[0][0]}. {parts[-1]}")
-			vals.add("".join(parts))
+	for v in (emp.name, emp.user_id, emp.employee_name, user_full_name):
+		if not v:
+			continue
+		vals.add(str(v).strip())
+		vals.add(str(v).strip().lower())
+	if emp.employee_name:
+		vals.update(_name_variants(emp.employee_name))
+	if user_full_name:
+		vals.update(_name_variants(user_full_name))
 	return {v for v in vals if v}
 
 
@@ -211,14 +252,14 @@ def _load_visit_stats(from_date, to_date, staff_rows):
 	if not staff_rows:
 		return {}
 
-	# Build reverse index: match string -> employee key
 	index = {}
 	for s in staff_rows:
 		for v in s["match_values"]:
-			index[v.lower()] = s["key"]
+			index[str(v).strip().lower()] = s["key"]
 
+	visit_day = _visit_day_sql("fv")
 	rows = frappe.db.sql(
-		"""
+		f"""
 		SELECT
 			fv.name,
 			fv.type,
@@ -232,24 +273,14 @@ def _load_visit_stats(from_date, to_date, staff_rows):
 			fv.me_activity_status,
 			COALESCE(fv.training_no_of_schools_attended, 0) AS schools,
 			COALESCE(fv.training_no_of_participants, 0) AS participants,
-			CASE
-				WHEN fv.type = 'Marketing' THEN COALESCE(fv.visit_date, DATE(fv.timestamp), DATE(fv.modified))
-				WHEN fv.type = 'M&E' THEN COALESCE(fv.me_visit_date, fv.me_starting_date, DATE(fv.me_timestamp), DATE(fv.modified))
-				WHEN fv.type = 'Training' THEN COALESCE(fv.training_date, DATE(fv.training_timestamp), DATE(fv.modified))
-				WHEN fv.type = 'Meeting' THEN COALESCE(fv.mt_meeting_date, DATE(fv.modified))
-				ELSE DATE(fv.modified)
-			END AS visit_day
+			{visit_day} AS visit_day
 		FROM `tabField Visit` fv
 		WHERE fv.docstatus < 2
-		AND CASE
-			WHEN fv.type = 'Marketing' THEN COALESCE(fv.visit_date, DATE(fv.timestamp), DATE(fv.modified))
-			WHEN fv.type = 'M&E' THEN COALESCE(fv.me_visit_date, fv.me_starting_date, DATE(fv.me_timestamp), DATE(fv.modified))
-			WHEN fv.type = 'Training' THEN COALESCE(fv.training_date, DATE(fv.training_timestamp), DATE(fv.modified))
-			WHEN fv.type = 'Meeting' THEN COALESCE(fv.mt_meeting_date, DATE(fv.modified))
-			ELSE DATE(fv.modified)
-		END BETWEEN %(from_date)s AND %(to_date)s
+		AND fv.type IN %(types)s
+		AND {visit_day} IS NOT NULL
+		AND {visit_day} BETWEEN %(from_date)s AND %(to_date)s
 		""",
-		{"from_date": from_date, "to_date": to_date},
+		{"from_date": from_date, "to_date": to_date, "types": SUMMARY_TYPES},
 		as_dict=True,
 	)
 
@@ -262,6 +293,7 @@ def _load_visit_stats(from_date, to_date, staff_rows):
 			"inactive": 0,
 			"schools": 0,
 			"participants": 0,
+			"trainings": 0,
 			"_days": set(),
 		}
 		for s in staff_rows
@@ -278,23 +310,26 @@ def _load_visit_stats(from_date, to_date, staff_rows):
 			cat = (row.get("marketing_visit_category") or "").strip()
 			if cat == "New":
 				bucket["new"] += 1
+			elif cat in ("Followup & Other Visits", "TPS Visits"):
+				bucket["followup"] += 1
+			elif not cat:
+				# Blank category is treated as Followup & Other (common on older entries)
+				bucket["followup"] += 1
 			else:
-				# Followup & Other, TPS, blank → Followup & Other Visits column
 				bucket["followup"] += 1
 		elif vtype == "Meeting":
 			bucket["meetings"] += 1
 		elif vtype == "M&E":
-			status = (row.get("me_activity_status") or "").strip().lower().replace("-", "")
+			status = _norm_me_status(row.get("me_activity_status"))
 			if status == "active":
 				bucket["active"] += 1
-			elif status in ("inactive", "in active"):
+			elif status == "inactive":
 				bucket["inactive"] += 1
-			else:
-				# unspecified M&E still counted as active for visibility
-				bucket["active"] += 1
+			# blank / unknown M&E status: do not invent Active/Inactive
 		elif vtype == "Training":
 			bucket["schools"] += cint(row.get("schools") or 0)
 			bucket["participants"] += cint(row.get("participants") or 0)
+			bucket["trainings"] += 1
 
 		if row.get("visit_day"):
 			bucket["_days"].add(str(row.visit_day))
@@ -305,18 +340,32 @@ def _load_visit_stats(from_date, to_date, staff_rows):
 	return stats
 
 
+def _norm_me_status(value) -> str:
+	"""Normalize Active / Inactive / In-Active."""
+	raw = (value or "").strip().lower().replace("-", " ").replace("_", " ")
+	raw = " ".join(raw.split())
+	if raw == "active":
+		return "active"
+	if raw in ("inactive", "in active"):
+		return "inactive"
+	return ""
+
+
 def _resolve_staff_key(row, index):
 	vtype = row.get("type") or ""
-	candidates = [row.get("owner")]
+	candidates = []
 	if vtype == "Marketing":
-		candidates.insert(0, row.get("visit_by"))
+		candidates.extend([row.get("visit_by"), row.get("owner")])
 	elif vtype == "M&E":
-		candidates.insert(0, row.get("me_visit_by"))
+		candidates.extend([row.get("me_visit_by"), row.get("owner")])
 	elif vtype == "Meeting":
-		candidates.insert(0, row.get("mt_visit_by"))
+		candidates.extend([row.get("mt_visit_by"), row.get("owner")])
 	elif vtype == "Training":
-		candidates.insert(0, row.get("training_entry_filled_by"))
-		candidates.insert(1, row.get("training_trainer_name"))
+		candidates.extend(
+			[row.get("training_entry_filled_by"), row.get("training_trainer_name"), row.get("owner")]
+		)
+	else:
+		candidates.append(row.get("owner"))
 
 	for c in candidates:
 		if not c:
@@ -341,7 +390,7 @@ def _load_expenses(from_date, to_date, staff_rows):
 				COALESCE(total_claimed_amount, grand_total, 0) AS amount
 			FROM `tabExpense Claim`
 			WHERE employee IN %(emps)s
-			AND docstatus < 2
+			AND docstatus = 1
 			AND posting_date BETWEEN %(from_date)s AND %(to_date)s
 			""",
 			{"emps": tuple(emp_ids), "from_date": from_date, "to_date": to_date},
@@ -356,14 +405,20 @@ def _load_expenses(from_date, to_date, staff_rows):
 	return result
 
 
-def _compute_score(staff, from_date, to_date, region, expected_points):
-	"""KPI score for the period (same points model as SME Target Base)."""
-	# Prefer employee name for Field Visit free-text matching; also try user_id
-	staff_token = staff.get("employee_name") or staff.get("user_id") or ""
-	actuals = _count_actuals(from_date, to_date, staff_token)
-	# If name match returned nothing and we have user_id, try owner email
-	if not any(actuals.values()) and staff.get("user_id") and staff.get("user_id") != staff_token:
-		actuals = _count_actuals(from_date, to_date, staff["user_id"])
+def _compute_score(staff, from_date, to_date, region, expected_points, stats):
+	"""KPI achievement % for the period.
+
+	Uses Target Base point weights, but workshop_registration scores by number of
+	training sessions (not sum of participants) so one large session cannot inflate
+	Score to thousands of points / >1000%.
+	"""
+	staff_token = staff.get("user_id") or staff.get("employee_name") or ""
+	actuals = _count_actuals(from_date, to_date, staff_token) if staff_token else {}
+	if not any(actuals.values()) and staff.get("employee_name") and staff.get("employee_name") != staff_token:
+		actuals = _count_actuals(from_date, to_date, staff["employee_name"])
+
+	# Correct workshop_registration: count sessions attributed to this SME, not heads
+	actuals["workshop_registration"] = cint((stats or {}).get("trainings") or 0)
 
 	score = 0.0
 	for activity in KPI_ACTIVITIES:

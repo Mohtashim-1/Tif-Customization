@@ -83,13 +83,13 @@ class FieldStaffReportPage {
 	setup_filters() {
 		this.filters = {
 			from_date: this.make_filter({
-				label: __("From Date"),
+				label: __("Visit From Date"),
 				fieldname: "from_date",
 				fieldtype: "Date",
 				default: this.get_month_start()
 			}),
 			to_date: this.make_filter({
-				label: __("To Date"),
+				label: __("Visit To Date"),
 				fieldname: "to_date",
 				fieldtype: "Date",
 				default: frappe.datetime.get_today()

@@ -182,10 +182,37 @@ frappe.pages["purchase-from-endowment-fund"].on_page_load = function (wrapper) {
 			render_kpis() {
 				const summary = this.data.summary || {};
 				const cards = [
-					{ label: __("Endowment Received"), value: this.money(summary.zakat_received), color: "#059669", icon: "↓", hint: __("Received through Rental Income / Endowment receipts") },
-					{ label: __("Used for Purchases"), value: this.money(summary.purchase_used), color: "#dc2626", icon: "↑", hint: `${this.num(summary.purchase_count)} ${__("payments")} · ${this.num(summary.invoice_count)} ${__("invoices")}` },
-					{ label: __("Remaining Endowment"), value: this.money(summary.remaining_amount), color: "#2563eb", icon: "=", hint: __("Received minus used for purchases") },
-					{ label: __("Suppliers"), value: this.num(summary.supplier_count), color: "#7c3aed", icon: "#", hint: __("Paid from Endowment-marked entries") },
+					{
+						label: __("Opening Balance"),
+						value: this.money(summary.opening_balance),
+						color: "#0f766e",
+						icon: "◎",
+						hint: __("From GL {0} as of {1}", [
+							frappe.utils.escape_html(summary.opening_account || "Endowment Fund - TIF"),
+							frappe.datetime.str_to_user(summary.opening_date || "2025-07-01"),
+						]),
+					},
+					{
+						label: __("Endowment Received"),
+						value: this.money(summary.zakat_received),
+						color: "#059669",
+						icon: "↓",
+						hint: __("GL opening + Rental Income / Endowment receipts"),
+					},
+					{
+						label: __("Used for Purchases"),
+						value: this.money(summary.purchase_used),
+						color: "#dc2626",
+						icon: "↑",
+						hint: `${this.num(summary.purchase_count)} ${__("payments")} · ${this.num(summary.invoice_count)} ${__("invoices")}`,
+					},
+					{
+						label: __("Remaining Endowment"),
+						value: this.money(summary.remaining_amount),
+						color: "#2563eb",
+						icon: "=",
+						hint: __("Opening + received − used for purchases"),
+					},
 				];
 
 				this.page.main.find("#zakat-kpis").html(
@@ -228,7 +255,9 @@ frappe.pages["purchase-from-endowment-fund"].on_page_load = function (wrapper) {
 						</div>
 						<div class="zakat-usage__foot">
 							<span>${__("Remaining")}: <strong>${this.money(remaining)}</strong></span>
-							<span>${__("Source")}: ${__("Rental Income / Endowment receipts + Endowment-marked purchase payments")}</span>
+							<span>${__("Source")}: ${__(
+								"GL Endowment Fund opening + Rental Income receipts − Endowment-marked purchase payments"
+							)}</span>
 						</div>
 					</div>
 				`);

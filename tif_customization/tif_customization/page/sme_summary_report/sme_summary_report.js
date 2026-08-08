@@ -46,9 +46,11 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 					}
 				</style>
 				<p class="sme-sum-note">
-					${__(
-						"Period summary for School Marketing Executives. Grand Total = Followup + New + Meetings + M&E. Score uses SME Target Base KPI points (UAT)."
-					)}
+					Period summary for School Marketing Executives.
+					Use <strong>Visit From / To Date</strong> to filter by the visit date on each Field Visit
+					(Marketing / M&amp;E / Meeting / Training dates — not document creation date).
+					Grand Total = Followup + New + Meetings + Active + Inactive.
+					Score % = KPI points ÷ expected points (Target Base). Workshop score uses session count, not participant heads.
 				</p>
 				<div id="sme-sum-filters" class="sme-sum-filters row" style="margin-bottom:12px;"></div>
 				<div id="sme-sum-body"></div>
@@ -61,13 +63,13 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 		const month_start = frappe.datetime.month_start();
 
 		this.from_date = this.make_filter({
-			label: __("From Date"),
+			label: __("Visit From Date"),
 			fieldtype: "Date",
 			fieldname: "from_date",
 			default: month_start,
 		});
 		this.to_date = this.make_filter({
-			label: __("To Date"),
+			label: __("Visit To Date"),
 			fieldtype: "Date",
 			fieldname: "to_date",
 			default: today,
@@ -142,7 +144,7 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 	load_data() {
 		const filters = this.get_filters();
 		if (!filters.from_date || !filters.to_date) {
-			frappe.msgprint(__("Please select From Date and To Date."));
+			frappe.msgprint(__("Please select Visit From Date and Visit To Date."));
 			return;
 		}
 		$("#sme-sum-body").html(`<p class="text-muted">${__("Loading...")}</p>`);
@@ -199,8 +201,8 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 					<td class="num">${this.fmt_cur(r.expenses)}</td>
 					<td class="num">${this.fmt(r.visited_days)}</td>
 					<td class="num">${this.fmt(r.difference)}</td>
-					<td class="num score-col" title="${__("KPI %")}: ${this.fmt_score(r.score_pct)}%">
-						${this.fmt_score(r.score)}
+					<td class="num score-col" title="${__("KPI points")}: ${this.fmt_score(r.score_points)} / ${this.fmt_score(data.expected_points)}">
+						${this.fmt_score(r.score)}%
 					</td>
 				</tr>`
 					)
@@ -208,8 +210,10 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 			: `<tr><td colspan="13" class="text-center text-muted">${__("No SMEs found")}</td></tr>`;
 
 		$("#sme-sum-body").html(`
-			<div class="sme-sum-title">${__("Summary")} (${fromLabel} ${__("to")} ${toLabel})</div>
+			<div class="sme-sum-title">${__("Summary")} (${__("Visit Date")}: ${fromLabel} ${__("to")} ${toLabel})</div>
 			<div class="sme-sum-meta">
+				${__("Visit Date")}: <strong>${fromLabel} – ${toLabel}</strong>
+				&nbsp;|&nbsp;
 				${__("Working Days")}: <strong>${data.working_days}</strong>
 				&nbsp;|&nbsp;
 				${__("Score Region")}: <strong>${frappe.utils.escape_html(data.region_label || "")}</strong>
@@ -226,7 +230,7 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 							<th colspan="2" class="group">${__("M&E Visits")}</th>
 							<th colspan="2" class="group">${__("Training Sessions")}</th>
 							<th colspan="4" class="group">${__("Total")}</th>
-							<th rowspan="2" class="score-col">${__("Score")} (UAT)</th>
+							<th rowspan="2" class="score-col">${__("Score %")} (UAT)</th>
 						</tr>
 						<tr>
 							<th>${__("Followup & Other Visits")}</th>
@@ -257,7 +261,7 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 							<th class="num">${this.fmt_cur(t.expenses)}</th>
 							<th class="num">${this.fmt(t.visited_days)}</th>
 							<th class="num">${this.fmt(t.difference)}</th>
-							<th class="num score-col">${this.fmt_score(t.score)}</th>
+							<th class="num score-col">${this.fmt_score(t.score)}%</th>
 						</tr>
 					</tfoot>
 				</table>
@@ -283,8 +287,8 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 			"Expenses",
 			"Visited Days",
 			"Difference",
-			"Score",
 			"Score %",
+			"Score Points",
 		];
 		const lines = [headers.join(",")];
 		(this.data.rows || []).forEach((r) => {
@@ -303,7 +307,7 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 					r.visited_days || 0,
 					r.difference || 0,
 					r.score || 0,
-					r.score_pct || 0,
+					r.score_points || 0,
 				].join(",")
 			);
 		});

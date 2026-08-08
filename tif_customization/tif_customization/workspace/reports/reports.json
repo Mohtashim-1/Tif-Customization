@@ -340,6 +340,16 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "Donation Slip",
+   "link_count": 0,
+   "link_to": "Donation",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "Donation Received Bank Wise",
    "link_count": 0,
    "link_to": "bank-wise-fund-distribution",
@@ -380,7 +390,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Purchase from Zakat (UAT) 29-Jun-26",
+   "label": "Expense from Zakat (UAT) 29-Jun-26",
    "link_count": 0,
    "link_to": "expense-from-zakat-a",
    "link_type": "Page",
@@ -529,7 +539,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-08-06 00:19:24.828420",
+ "modified": "2026-08-08 11:43:40.625548",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Reports",
@@ -559,6 +569,9 @@
   },
   {
    "role": "HOD"
+  },
+  {
+   "role": "Training User"
   }
  ],
  "sequence_id": 52.0,

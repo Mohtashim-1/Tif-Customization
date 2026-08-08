@@ -134,14 +134,14 @@ class SmesTargetBasePage {
 				default: "",
 			}),
 			from_date: this.make_filter({
-				label: __("From Date"),
+				label: __("Visit From Date"),
 				fieldname: "from_date",
 				fieldtype: "Date",
 				default: fromDefault,
 				reqd: 1,
 			}),
 			to_date: this.make_filter({
-				label: __("To Date"),
+				label: __("Visit To Date"),
 				fieldname: "to_date",
 				fieldtype: "Date",
 				default: today,
@@ -164,7 +164,7 @@ class SmesTargetBasePage {
 		if (!from_date || !to_date) {
 			frappe.msgprint({
 				title: __("Date range required"),
-				message: __("Please set From Date and To Date."),
+				message: __("Please set Visit From Date and Visit To Date."),
 				indicator: "orange",
 			});
 			return null;
@@ -172,7 +172,7 @@ class SmesTargetBasePage {
 		if (frappe.datetime.str_to_obj(from_date) > frappe.datetime.str_to_obj(to_date)) {
 			frappe.msgprint({
 				title: __("Invalid date range"),
-				message: __("From Date cannot be after To Date."),
+				message: __("Visit From Date cannot be after Visit To Date."),
 				indicator: "orange",
 			});
 			return null;

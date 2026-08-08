@@ -59,8 +59,14 @@ def _get_school_demand_rows(filters):
 		params["city"] = filters["city"]
 
 	if filters.get("province"):
-		where.append("(COALESCE(s.province, addr.state, '') = %(province)s)")
-		params["province"] = filters["province"]
+		where.append(
+			"(TRIM(COALESCE(s.province, addr.state, '')) = %(province)s)"
+		)
+		params["province"] = str(filters["province"]).strip()
+
+	if filters.get("sales_order"):
+		where.append("so.name = %(sales_order)s")
+		params["sales_order"] = filters["sales_order"]
 
 	if filters.get("area"):
 		where.append("(COALESCE(s.area, addr.custom_area, '') = %(area)s)")
@@ -83,6 +89,8 @@ def _get_school_demand_rows(filters):
 		where.append(
 			"(UPPER(COALESCE(soi.item_name,'')) LIKE '%%GUIDE%%' OR UPPER(COALESCE(soi.item_code,'')) LIKE '%%GUIDE%%')"
 		)
+	elif book_type == "KPK Edition":
+		where.append(_kpk_edition_sql())
 
 	where_clause = " AND ".join(where)
 	rows = frappe.db.sql(
@@ -94,9 +102,10 @@ def _get_school_demand_rows(filters):
 			COALESCE(s.status, '') AS school_status,
 			COALESCE(s.school_type, '') AS school_type,
 			COALESCE(s.city, addr.city, '') AS city,
-			COALESCE(s.province, addr.state, '') AS province,
+			TRIM(COALESCE(s.province, addr.state, '')) AS province,
 			COALESCE(s.area, addr.custom_area, '') AS area,
 			COUNT(DISTINCT so.name) AS sales_orders,
+			GROUP_CONCAT(DISTINCT so.name ORDER BY so.transaction_date DESC, so.name SEPARATOR ', ') AS sales_order_nos,
 			SUM(IFNULL(soi.qty, 0) - IFNULL(soi.delivered_qty, 0)) AS total_pending,
 			SUM(IFNULL(soi.qty, 0)) AS total_ordered,
 			SUM(IFNULL(soi.delivered_qty, 0)) AS total_delivered,
@@ -121,6 +130,12 @@ def _get_school_demand_rows(filters):
 					THEN IFNULL(soi.qty, 0) - IFNULL(soi.delivered_qty, 0) ELSE 0
 				END
 			) AS guide_pending,
+			SUM(
+				CASE
+					WHEN {_kpk_edition_case()}
+					THEN IFNULL(soi.qty, 0) - IFNULL(soi.delivered_qty, 0) ELSE 0
+				END
+			) AS kpk_pending,
 			MAX(so.transaction_date) AS last_order_date,
 			MIN(so.delivery_date) AS earliest_delivery_date
 		FROM `tabSales Order` so
@@ -138,7 +153,7 @@ def _get_school_demand_rows(filters):
 			COALESCE(s.status, ''),
 			COALESCE(s.school_type, ''),
 			COALESCE(s.city, addr.city, ''),
-			COALESCE(s.province, addr.state, ''),
+			TRIM(COALESCE(s.province, addr.state, '')),
 			COALESCE(s.area, addr.custom_area, '')
 		ORDER BY total_pending DESC, school_name ASC
 		""",
@@ -154,6 +169,7 @@ def _get_school_demand_rows(filters):
 			"mqh_pending",
 			"qaida_pending",
 			"guide_pending",
+			"kpk_pending",
 		):
 			row[key] = flt(row.get(key))
 		row["other_pending"] = max(
@@ -163,15 +179,73 @@ def _get_school_demand_rows(filters):
 				- row["mqh_pending"]
 				- row["qaida_pending"]
 				- row["guide_pending"]
+				- row["kpk_pending"]
 			),
 		)
 		row["sales_orders"] = int(row.get("sales_orders") or 0)
+		row["sales_order_nos"] = (row.get("sales_order_nos") or "").strip()
+		row["province"] = (row.get("province") or "").strip()
 		if row.get("last_order_date"):
 			row["last_order_date"] = str(getdate(row["last_order_date"]))
 		if row.get("earliest_delivery_date"):
 			row["earliest_delivery_date"] = str(getdate(row["earliest_delivery_date"]))
 
 	return rows
+
+
+def _kpk_edition_sql():
+	"""Match KPK Edition / KPK Textbook Board book lines."""
+	return (
+		"(UPPER(COALESCE(soi.item_name,'')) LIKE '%%KPK%%' "
+		"OR UPPER(COALESCE(soi.item_code,'')) LIKE '%%KPK%%')"
+	)
+
+
+def _kpk_edition_case():
+	return (
+		"UPPER(COALESCE(soi.item_name,'')) LIKE '%%KPK%%' "
+		"OR UPPER(COALESCE(soi.item_code,'')) LIKE '%%KPK%%'"
+	)
+
+
+PROVINCE_OPTIONS = (
+	"Sindh",
+	"Punjab",
+	"KPK",
+	"Balochistan",
+	"ICT",
+	"AJK",
+	"Gilgit Baltistan",
+)
+
+
+@frappe.whitelist()
+def get_filter_options():
+	"""Province list for filter (always includes KPK + values seen on open demand)."""
+	seen = set(
+		frappe.db.sql(
+			"""
+			SELECT DISTINCT TRIM(COALESCE(s.province, addr.state, '')) AS province
+			FROM `tabSales Order` so
+			LEFT JOIN `tabAddress` addr ON addr.name = so.customer_address
+			LEFT JOIN `tabSchool` s ON (
+				s.school_name = so.customer_name
+				OR s.name = so.customer
+			)
+			WHERE so.docstatus = 1
+			  AND so.status NOT IN ('Closed', 'Cancelled', 'Completed')
+			  AND IFNULL(so.per_delivered, 0) < 100
+			  AND TRIM(COALESCE(s.province, addr.state, '')) != ''
+			"""
+		)
+	)
+	provinces = []
+	for p in PROVINCE_OPTIONS:
+		provinces.append(p)
+	for p in sorted(v[0] for v in seen if v and v[0]):
+		if p not in provinces:
+			provinces.append(p)
+	return {"provinces": provinces}
 
 
 def _build_summary(rows):
@@ -182,6 +256,7 @@ def _build_summary(rows):
 		"mqh_pending": sum(flt(r.get("mqh_pending")) for r in rows),
 		"qaida_pending": sum(flt(r.get("qaida_pending")) for r in rows),
 		"guide_pending": sum(flt(r.get("guide_pending")) for r in rows),
+		"kpk_pending": sum(flt(r.get("kpk_pending")) for r in rows),
 		"total_ordered": sum(flt(r.get("total_ordered")) for r in rows),
 		"total_delivered": sum(flt(r.get("total_delivered")) for r in rows),
 	}
