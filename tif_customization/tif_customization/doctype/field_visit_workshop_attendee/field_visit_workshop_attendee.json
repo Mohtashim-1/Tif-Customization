@@ -1,7 +1,7 @@
 {
  "actions": [],
  "allow_rename": 1,
- "creation": "2026-06-10 14:00:00.000000",
+ "creation": "2026-08-10 15:00:00.000000",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
@@ -11,11 +11,7 @@
   "email",
   "school_organization",
   "training_venue",
-  "training_date",
-  "trainer_name",
-  "designation",
-  "feedback_submitted",
-  "feedback_token"
+  "training_date"
  ],
  "fields": [
   {
@@ -61,32 +57,6 @@
    "fieldtype": "Date",
    "in_list_view": 1,
    "label": "Training Date"
-  },
-  {
-   "fieldname": "trainer_name",
-   "fieldtype": "Data",
-   "label": "Name of Trainer"
-  },
-  {
-   "fieldname": "designation",
-   "fieldtype": "Data",
-   "label": "Designation"
-  },
-  {
-   "columns": 1,
-   "default": "0",
-   "fieldname": "feedback_submitted",
-   "fieldtype": "Check",
-   "in_list_view": 1,
-   "label": "Feedback Submitted",
-   "read_only": 1
-  },
-  {
-   "fieldname": "feedback_token",
-   "fieldtype": "Data",
-   "hidden": 1,
-   "label": "Feedback Token",
-   "read_only": 1
   }
  ],
  "grid_page_length": 50,
@@ -96,7 +66,7 @@
  "modified": "2026-08-10 16:00:00.000000",
  "modified_by": "Administrator",
  "module": "Tif Customization",
- "name": "Training Attendee",
+ "name": "Field Visit Workshop Attendee",
  "owner": "Administrator",
  "permissions": [],
  "row_format": "Dynamic",

@@ -219,6 +219,13 @@ function apply_field_visit_logic(frm) {
 		"cc_participants_category",
 	];
 
+	const enrolment_fields = ["section_break_enrolment", "enrolment_participants"];
+
+	const workshop_attendance_fields = [
+		"section_break_workshop_attendance",
+		"workshop_attendees",
+	];
+
 	const all_type_fields = [
 		...marketing_fields,
 		...school_fields,
@@ -229,6 +236,8 @@ function apply_field_visit_logic(frm) {
 		...meeting_fields,
 		...academic_fields,
 		...cocurricular_fields,
+		...enrolment_fields,
+		...workshop_attendance_fields,
 	];
 
 	// Hide all type-specific fields first
@@ -284,12 +293,20 @@ function apply_field_visit_logic(frm) {
 		set_hidden(frm, cocurricular_fields, false);
 	}
 
+	if (type === "Enrolment of participants") {
+		set_hidden(frm, enrolment_fields, false);
+	}
+
+	if (type === "Attendance / Registration in One Day / Half day Workshop") {
+		set_hidden(frm, workshop_attendance_fields, false);
+	}
+
 	// School + attachments for school-visit types
 	if (SCHOOL_TYPES.includes(type)) {
 		set_hidden(frm, school_fields, false);
 		set_hidden(frm, attachment_fields, false);
 	} else if (type) {
-		// Meetings / Academic / Co-curricular still get attachments
+		// Meetings / Academic / Co-curricular / Enrolment / Workshop still get attachments
 		set_hidden(frm, attachment_fields, false);
 	}
 
@@ -459,6 +476,38 @@ function _training_feedback_defaults(frm, prev_row) {
 		training_date: (prev_row && prev_row.training_date) || frm.doc.training_date || "",
 		trainer_name:
 			(prev_row && prev_row.trainer_name) || frm.doc.training_trainer_name || "",
+	};
+}
+
+function _enrolment_row_defaults(frm, prev_row) {
+	return {
+		city: (prev_row && prev_row.city) || frm.doc.city || frm.doc.training_city || "",
+		province:
+			(prev_row && prev_row.province) || frm.doc.province || frm.doc.training_province || "",
+		enroll_in_course: (prev_row && prev_row.enroll_in_course) || "",
+		date_of_enrolment:
+			(prev_row && prev_row.date_of_enrolment) ||
+			frm.doc.visit_date ||
+			frm.doc.training_date ||
+			frappe.datetime.get_today(),
+		other_special_session_name: (prev_row && prev_row.other_special_session_name) || "",
+	};
+}
+
+function _workshop_row_defaults(frm, prev_row) {
+	return {
+		school_organization:
+			(prev_row && prev_row.school_organization) ||
+			frm.doc.school_name ||
+			frm.doc.me_school_name ||
+			"",
+		training_venue:
+			(prev_row && prev_row.training_venue) || frm.doc.training_venue_name || "",
+		training_date:
+			(prev_row && prev_row.training_date) ||
+			frm.doc.training_date ||
+			frm.doc.visit_date ||
+			frappe.datetime.get_today(),
 	};
 }
 
@@ -654,6 +703,72 @@ frappe.ui.form.on("Field Visit", {
 				__("Volunteers"),
 			);
 		}
+
+		if (frm.doc.type === "Enrolment of participants") {
+			frm.add_custom_button(
+				__("Add Multiple Teachers"),
+				() => {
+					frappe.prompt(
+						[
+							{
+								fieldname: "count",
+								fieldtype: "Int",
+								label: __("Number of teachers / participants to add"),
+								default: 5,
+								reqd: 1,
+							},
+						],
+						(values) => {
+							add_multiple_child_rows(
+								frm,
+								"enrolment_participants",
+								"Field Visit Enrolment Participant",
+								values.count,
+								(row, prev) => {
+									Object.assign(row, _enrolment_row_defaults(frm, prev));
+								},
+							);
+						},
+						__("Add Multiple Teachers"),
+						__("Add"),
+					);
+				},
+				__("Enrolment"),
+			);
+		}
+
+		if (frm.doc.type === "Attendance / Registration in One Day / Half day Workshop") {
+			frm.add_custom_button(
+				__("Add Multiple Teachers"),
+				() => {
+					frappe.prompt(
+						[
+							{
+								fieldname: "count",
+								fieldtype: "Int",
+								label: __("Number of teachers to add"),
+								default: 5,
+								reqd: 1,
+							},
+						],
+						(values) => {
+							add_multiple_child_rows(
+								frm,
+								"workshop_attendees",
+								"Field Visit Workshop Attendee",
+								values.count,
+								(row, prev) => {
+									Object.assign(row, _workshop_row_defaults(frm, prev));
+								},
+							);
+						},
+						__("Add Multiple Teachers"),
+						__("Add"),
+					);
+				},
+				__("Workshop"),
+			);
+		}
 	},
 
 	type: apply_field_visit_logic,
@@ -686,5 +801,19 @@ frappe.ui.form.on("Field Visit", {
 		const prev = _prev_child_row(frm.doc.training_attendees, cdn);
 		Object.assign(row, _training_feedback_defaults(frm, prev));
 		frm.refresh_field("training_attendees");
+	},
+
+	enrolment_participants_add(frm, cdt, cdn) {
+		const row = locals[cdt][cdn];
+		const prev = _prev_child_row(frm.doc.enrolment_participants, cdn);
+		Object.assign(row, _enrolment_row_defaults(frm, prev));
+		frm.refresh_field("enrolment_participants");
+	},
+
+	workshop_attendees_add(frm, cdt, cdn) {
+		const row = locals[cdt][cdn];
+		const prev = _prev_child_row(frm.doc.workshop_attendees, cdn);
+		Object.assign(row, _workshop_row_defaults(frm, prev));
+		frm.refresh_field("workshop_attendees");
 	},
 });

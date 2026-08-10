@@ -15,6 +15,8 @@ class FieldVisit(Document):
 			self._validate_training_attendees()
 			self._sync_training_attendee_defaults()
 		self._validate_volunteer_enrolments()
+		self._validate_enrolment_participants()
+		self._validate_workshop_attendees()
 
 	def before_submit(self):
 		if self.type == "Training":
@@ -27,8 +29,11 @@ class FieldVisit(Document):
 	def _validate_training_attendees(self):
 		emails = set()
 		for row in self.training_attendees or []:
+			if not (row.attendee_name or "").strip():
+				frappe.throw(_("Attendee Name is required for all training attendees."))
+			# Email is optional — only check uniqueness when provided
 			if not row.email:
-				frappe.throw(_("Email is required for all training attendees."))
+				continue
 			email = row.email.strip().lower()
 			if email in emails:
 				frappe.throw(_("Duplicate attendee email: {0}").format(row.email))
@@ -37,6 +42,8 @@ class FieldVisit(Document):
 	def _sync_training_attendee_defaults(self):
 		"""Fill attendee row training details from header when blank."""
 		for row in self.training_attendees or []:
+			if not row.school_organization:
+				row.school_organization = self.school_name or self.me_school_name
 			if not row.training_venue:
 				row.training_venue = self.training_venue_name
 			if not row.training_date:
@@ -54,6 +61,38 @@ class FieldVisit(Document):
 			if key in names:
 				frappe.throw(_("Duplicate volunteer name: {0}").format(row.volunteer_name))
 			names.add(key)
+
+	def _validate_enrolment_participants(self):
+		if self.type != "Enrolment of participants":
+			return
+		for row in self.enrolment_participants or []:
+			if not (row.participant_name or "").strip():
+				frappe.throw(_("Name is required for all enrolment participant rows."))
+			if not row.enroll_in_course:
+				frappe.throw(_("Enroll in (Course Name) is required for {0}.").format(row.participant_name))
+			if (
+				row.enroll_in_course == "Other Special Session Offered by TIF"
+				and not (row.other_special_session_name or "").strip()
+			):
+				# Sheet says Not Mandatory — keep optional; no throw
+				pass
+
+	def _validate_workshop_attendees(self):
+		if self.type != "Attendance / Registration in One Day / Half day Workshop":
+			return
+		emails = set()
+		for row in self.workshop_attendees or []:
+			if not (row.attendee_name or "").strip():
+				frappe.throw(_("Attendee Name is required for all workshop attendee rows."))
+			if not row.training_venue:
+				row.training_venue = self.training_venue_name
+			if not row.training_date:
+				row.training_date = self.training_date or self.visit_date
+			if row.email:
+				email = row.email.strip().lower()
+				if email in emails:
+					frappe.throw(_("Duplicate attendee email: {0}").format(row.email))
+				emails.add(email)
 
 	def _ensure_feedback_tokens(self):
 		for row in self.training_attendees or []:
