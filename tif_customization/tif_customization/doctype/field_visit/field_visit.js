@@ -83,6 +83,8 @@ function apply_field_visit_logic(frm) {
 		"participant_contact_numbers",
 		"model_school",
 		"registered_volunteer",
+		"section_break_volunteers",
+		"volunteer_enrolments",
 	];
 
 	const attachment_fields = [
@@ -159,6 +161,7 @@ function apply_field_visit_logic(frm) {
 		"training_no_of_schools_attended",
 		"training_arrange_by",
 		"training_conducted_by",
+		"section_break_attendees",
 		"training_attendees",
 	];
 
@@ -424,6 +427,60 @@ function apply_field_visit_logic(frm) {
 	);
 }
 
+function _visit_location_defaults(frm, prev_row) {
+	const type = frm.doc.type || "";
+	if (type === "M&E") {
+		return {
+			province: (prev_row && prev_row.province) || frm.doc.me_province || "",
+			city: (prev_row && prev_row.city) || frm.doc.me_city || "",
+		};
+	}
+	if (type === "Training") {
+		return {
+			province: (prev_row && prev_row.province) || frm.doc.training_province || "",
+			city: (prev_row && prev_row.city) || frm.doc.training_city || "",
+		};
+	}
+	return {
+		province: (prev_row && prev_row.province) || frm.doc.province || "",
+		city: (prev_row && prev_row.city) || frm.doc.city || "",
+	};
+}
+
+function _training_feedback_defaults(frm, prev_row) {
+	return {
+		school_organization:
+			(prev_row && prev_row.school_organization) ||
+			frm.doc.school_name ||
+			frm.doc.me_school_name ||
+			"",
+		training_venue:
+			(prev_row && prev_row.training_venue) || frm.doc.training_venue_name || "",
+		training_date: (prev_row && prev_row.training_date) || frm.doc.training_date || "",
+		trainer_name:
+			(prev_row && prev_row.trainer_name) || frm.doc.training_trainer_name || "",
+	};
+}
+
+function _prev_child_row(rows, cdn) {
+	const list = rows || [];
+	if (list.length < 2) return null;
+	const idx = list.findIndex((r) => r.name === cdn);
+	if (idx > 0) return list[idx - 1];
+	return list[list.length - 2] || null;
+}
+
+function add_multiple_child_rows(frm, table_field, child_doctype, count, apply_defaults) {
+	const n = cint(count) || 1;
+	for (let i = 0; i < n; i += 1) {
+		const row = frappe.model.add_child(frm.doc, child_doctype, table_field);
+		if (apply_defaults) {
+			apply_defaults(row, _prev_child_row(frm.doc[table_field], row.name));
+		}
+	}
+	frm.refresh_field(table_field);
+}
+
 frappe.ui.form.on("Field Visit", {
 	refresh(frm) {
 		apply_field_visit_logic(frm);
@@ -432,14 +489,49 @@ frappe.ui.form.on("Field Visit", {
 			frappe.set_route("smes-activity-form");
 		});
 
-		if (frm.doc.type === "Training" && !frm.is_new()) {
+		if (frm.doc.type === "Training") {
 			frm.add_custom_button(
-				__("View Feedback"),
+				__("Add Multiple Attendees"),
 				() => {
-					frappe.set_route("List", "Training Attendee Feedback", { field_visit: frm.doc.name });
+					frappe.prompt(
+						[
+							{
+								fieldname: "count",
+								fieldtype: "Int",
+								label: __("Number of rows to add"),
+								default: 5,
+								reqd: 1,
+							},
+						],
+						(values) => {
+							add_multiple_child_rows(
+								frm,
+								"training_attendees",
+								"Training Attendee",
+								values.count,
+								(row, prev) => {
+									Object.assign(row, _training_feedback_defaults(frm, prev));
+								},
+							);
+						},
+						__("Add Multiple Attendees"),
+						__("Add"),
+					);
 				},
 				__("Training"),
 			);
+
+			if (!frm.is_new()) {
+				frm.add_custom_button(
+					__("View Feedback"),
+					() => {
+						frappe.set_route("List", "Training Attendee Feedback", {
+							field_visit: frm.doc.name,
+						});
+					},
+					__("Training"),
+				);
+			}
 
 			if (frm.doc.docstatus === 1) {
 				frm.add_custom_button(
@@ -526,6 +618,42 @@ frappe.ui.form.on("Field Visit", {
 				);
 			}
 		}
+
+		if (["Marketing", "M&E", "Joint Visit with SME", "Training"].includes(frm.doc.type)) {
+			frm.add_custom_button(
+				__("Add Multiple Volunteers"),
+				() => {
+					frappe.prompt(
+						[
+							{
+								fieldname: "count",
+								fieldtype: "Int",
+								label: __("Number of teachers / volunteers to add"),
+								default: 5,
+								reqd: 1,
+							},
+						],
+						(values) => {
+							add_multiple_child_rows(
+								frm,
+								"volunteer_enrolments",
+								"Field Visit Volunteer",
+								values.count,
+								(row, prev) => {
+									Object.assign(row, _visit_location_defaults(frm, prev));
+									if (!row.volunteer_form_submitted) {
+										row.volunteer_form_submitted = "No";
+									}
+								},
+							);
+						},
+						__("Add Multiple Volunteers"),
+						__("Add"),
+					);
+				},
+				__("Volunteers"),
+			);
+		}
 	},
 
 	type: apply_field_visit_logic,
@@ -542,4 +670,21 @@ frappe.ui.form.on("Field Visit", {
 	mt_meeting_type: apply_field_visit_logic,
 	ot_type_of_task: apply_field_visit_logic,
 	ot_academic_task_types: apply_field_visit_logic,
+
+	volunteer_enrolments_add(frm, cdt, cdn) {
+		const row = locals[cdt][cdn];
+		const prev = _prev_child_row(frm.doc.volunteer_enrolments, cdn);
+		Object.assign(row, _visit_location_defaults(frm, prev));
+		if (!row.volunteer_form_submitted) {
+			row.volunteer_form_submitted = "No";
+		}
+		frm.refresh_field("volunteer_enrolments");
+	},
+
+	training_attendees_add(frm, cdt, cdn) {
+		const row = locals[cdt][cdn];
+		const prev = _prev_child_row(frm.doc.training_attendees, cdn);
+		Object.assign(row, _training_feedback_defaults(frm, prev));
+		frm.refresh_field("training_attendees");
+	},
 });

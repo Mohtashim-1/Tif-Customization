@@ -116,6 +116,8 @@
   "participant_contact_numbers",
   "model_school",
   "registered_volunteer",
+  "section_break_volunteers",
+  "volunteer_enrolments",
   "section_break_attachments",
   "meeting_picture",
   "school_picture",
@@ -304,12 +306,13 @@
    "depends_on": "eval:doc.type == 'Training'",
    "fieldname": "section_break_attendees",
    "fieldtype": "Section Break",
-   "label": "Attendees"
+   "label": "Training Feedback Form"
   },
   {
    "depends_on": "eval:doc.type == 'Training'",
    "fieldname": "training_attendees",
    "fieldtype": "Table",
+   "label": "Feedback Attendees",
    "options": "Training Attendee"
   },
   {
@@ -1144,6 +1147,19 @@
    "options": "\nYes\nNo",
    "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training'], doc.type)",
    "reqd": 0
+  },
+  {
+   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training'], doc.type)",
+   "fieldname": "section_break_volunteers",
+   "fieldtype": "Section Break",
+   "label": "Enrolment of Volunteers"
+  },
+  {
+   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training'], doc.type)",
+   "fieldname": "volunteer_enrolments",
+   "fieldtype": "Table",
+   "label": "Volunteers",
+   "options": "Field Visit Volunteer"
   },
   {
    "fieldname": "section_break_attachments",

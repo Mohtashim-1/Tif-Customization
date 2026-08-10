@@ -13,6 +13,8 @@ class FieldVisit(Document):
 	def validate(self):
 		if self.type == "Training":
 			self._validate_training_attendees()
+			self._sync_training_attendee_defaults()
+		self._validate_volunteer_enrolments()
 
 	def before_submit(self):
 		if self.type == "Training":
@@ -32,6 +34,27 @@ class FieldVisit(Document):
 				frappe.throw(_("Duplicate attendee email: {0}").format(row.email))
 			emails.add(email)
 
+	def _sync_training_attendee_defaults(self):
+		"""Fill attendee row training details from header when blank."""
+		for row in self.training_attendees or []:
+			if not row.training_venue:
+				row.training_venue = self.training_venue_name
+			if not row.training_date:
+				row.training_date = self.training_date
+			if not row.trainer_name:
+				row.trainer_name = self.training_trainer_name
+
+	def _validate_volunteer_enrolments(self):
+		names = set()
+		for row in self.volunteer_enrolments or []:
+			name = (row.volunteer_name or "").strip()
+			if not name:
+				frappe.throw(_("Volunteer Name is required for all volunteer rows."))
+			key = name.lower()
+			if key in names:
+				frappe.throw(_("Duplicate volunteer name: {0}").format(row.volunteer_name))
+			names.add(key)
+
 	def _ensure_feedback_tokens(self):
 		for row in self.training_attendees or []:
 			if not row.feedback_token:
@@ -47,14 +70,17 @@ class FieldVisit(Document):
 				frappe.db.set_value("Training Attendee", row.name, "feedback_token", row.feedback_token)
 
 			link = build_feedback_link(row.feedback_token)
+			training_date = row.training_date or self.training_date or ""
+			trainer_name = row.trainer_name or self.training_trainer_name or ""
+			venue_name = row.training_venue or self.training_venue_name or ""
 			subject = _("Training Feedback Request - {0}").format(self.training_session_category or self.name)
 			message = f"""
 			Dear {row.attendee_name or 'Participant'},<br><br>
 			Thank you for attending the training session.<br><br>
 			<strong>Training Details:</strong><br>
-			- <strong>Date:</strong> {self.training_date or ''}<br>
-			- <strong>Trainer:</strong> {self.training_trainer_name or ''}<br>
-			- <strong>Venue:</strong> {self.training_venue_name or ''}<br>
+			- <strong>Date:</strong> {training_date}<br>
+			- <strong>Trainer:</strong> {trainer_name}<br>
+			- <strong>Venue:</strong> {venue_name}<br>
 			- <strong>Session:</strong> {self.training_session_category or ''}<br><br>
 			Please share your feedback using the link below:<br>
 			<a href="{link}">{link}</a><br><br>
