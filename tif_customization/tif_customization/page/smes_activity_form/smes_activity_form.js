@@ -139,6 +139,16 @@ class SmesActivityForm {
 			participant_contact_numbers: "",
 			model_school: "",
 			registered_volunteer: "",
+			// Enrolment / Workshop attendance (multi-row)
+			enrolment_participants: [],
+			workshop_attendees: [],
+			// Travel
+			travel_mode: "",
+			travel_from: "",
+			travel_to: "",
+			travel_distance_km: "",
+			travel_cost: "",
+			travel_remarks: "",
 			// Attachments
 			meeting_picture: "",
 			school_picture: "",
@@ -354,6 +364,10 @@ class SmesActivityForm {
 
 	activity_kind() {
 		const t = this.data.activity_type || "";
+		if (t.includes("Enrolment of Participants") || t.includes("Enrolment of participants")) {
+			return "enrolment";
+		}
+		if (t.includes("Attendance / Registration")) return "workshop_attendance";
 		if (t.includes("Marketing")) return "marketing";
 		if (t.includes("M&E")) return "me";
 		if (t.includes("Joint Visit")) return "joint";
@@ -367,6 +381,10 @@ class SmesActivityForm {
 	is_school_visit() {
 		const k = this.activity_kind();
 		return ["marketing", "me", "joint", "training"].includes(k);
+	}
+
+	is_enrolment_or_workshop() {
+		return ["enrolment", "workshop_attendance"].includes(this.activity_kind());
 	}
 
 	is_affiliated_yes(value) {
@@ -384,6 +402,8 @@ class SmesActivityForm {
 			meeting: __("Meetings"),
 			academic: __("Academic / Other"),
 			cocurricular: __("Co-curricular"),
+			enrolment: __("Enrolment of Participants"),
+			workshop_attendance: __("Attendance / Registration"),
 		};
 		if (kind) {
 			steps.push({ key: kind, label: labels[kind] });
@@ -392,6 +412,10 @@ class SmesActivityForm {
 			steps.push({ key: "school", label: __("School Detail") });
 		}
 		steps.push({ key: "attachments", label: __("Attachments") });
+		if (this.is_enrolment_or_workshop()) {
+			steps.push({ key: "travel", label: __("Travel") });
+			steps.push({ key: "preview", label: __("Preview") });
+		}
 		this.steps = steps;
 		if (this.step >= this.steps.length) this.step = Math.max(0, this.steps.length - 1);
 	}
@@ -699,8 +723,12 @@ class SmesActivityForm {
 			meeting: () => this.html_meeting(),
 			academic: () => this.html_academic(),
 			cocurricular: () => this.html_cocurricular(),
+			enrolment: () => this.html_enrolment(),
+			workshop_attendance: () => this.html_workshop_attendance(),
 			school: () => this.html_school(),
 			attachments: () => this.html_attachments(),
+			travel: () => this.html_travel(),
+			preview: () => this.html_preview(),
 		};
 		$body.html((html_map[key] || (() => ""))());
 
@@ -754,6 +782,7 @@ class SmesActivityForm {
 		});
 		this.mount_frappe_controls();
 		this.bind_uploads();
+		this.bind_multi_row_actions();
 	}
 
 	html_general() {
@@ -1172,6 +1201,371 @@ class SmesActivityForm {
 		`;
 	}
 
+	ensure_enrolment_rows() {
+		if (!Array.isArray(this.data.enrolment_participants) || !this.data.enrolment_participants.length) {
+			this.data.enrolment_participants = [this.blank_enrolment_row()];
+		}
+	}
+
+	ensure_workshop_rows() {
+		if (!Array.isArray(this.data.workshop_attendees) || !this.data.workshop_attendees.length) {
+			this.data.workshop_attendees = [this.blank_workshop_row()];
+		}
+	}
+
+	blank_enrolment_row(prev) {
+		return {
+			participant_name: "",
+			contact_number: "",
+			city: (prev && prev.city) || this.data.city || "",
+			province:
+				(prev && prev.province) ||
+				this.map_province_label(this.data.province) ||
+				"",
+			enroll_in_course: (prev && prev.enroll_in_course) || "",
+			date_of_enrolment: (prev && prev.date_of_enrolment) || this.data.visit_date || "",
+			other_special_session_name: (prev && prev.other_special_session_name) || "",
+		};
+	}
+
+	blank_workshop_row(prev) {
+		return {
+			attendee_name: "",
+			contact_number: "",
+			email: "",
+			school_organization: (prev && prev.school_organization) || "",
+			training_venue: (prev && prev.training_venue) || "",
+			training_date: (prev && prev.training_date) || this.data.visit_date || "",
+		};
+	}
+
+	map_province_label(portal_province) {
+		const map = {
+			Sindh: "Sindh",
+			Punjab: "Punjab",
+			KPK: "Khyber Pakhtunkhwa",
+			Balochistan: "Balochistan",
+			AJK: "Azad Jammu & Kashmir",
+			"Gilgit-Baltistan": "Gilgit-Baltistan",
+			ICT: "Islamabad Capital Territory",
+		};
+		return map[portal_province] || portal_province || "";
+	}
+
+	html_enrolment() {
+		this.ensure_enrolment_rows();
+		const courses = this.meta.enrolment_courses || [];
+		const provinces = this.meta.province_options_full || [];
+		const rows = this.data.enrolment_participants
+			.map((row, idx) => {
+				const show_other = row.enroll_in_course === "Other Special Session Offered by TIF";
+				return `
+				<div class="smes-multi-row" data-multi="enrolment" data-idx="${idx}">
+					<div class="smes-multi-row__head">
+						<strong>${__("Participant")} ${idx + 1}</strong>
+						<button type="button" class="btn btn-xs btn-default smes-remove-row" data-multi="enrolment" data-idx="${idx}">
+							${__("Remove")}
+						</button>
+					</div>
+					${this.multi_field(idx, "enrolment", "participant_name", __("Name"), "text", { reqd: 1, value: row.participant_name })}
+					<div class="smes-row-2">
+						${this.multi_field(idx, "enrolment", "contact_number", __("Contact #"), "text", { value: row.contact_number })}
+						${this.multi_field(idx, "enrolment", "city", __("City"), "text", { value: row.city })}
+					</div>
+					${this.multi_field(idx, "enrolment", "province", __("Province"), "select", {
+						value: row.province,
+						options: provinces,
+					})}
+					${this.multi_field(idx, "enrolment", "enroll_in_course", __("Enroll in (Course Name)"), "select", {
+						reqd: 1,
+						value: row.enroll_in_course,
+						options: courses,
+					})}
+					${this.multi_field(idx, "enrolment", "date_of_enrolment", __("Date of Enrolment"), "date", {
+						value: row.date_of_enrolment,
+					})}
+					${
+						show_other
+							? this.multi_field(
+									idx,
+									"enrolment",
+									"other_special_session_name",
+									__("Name of Other Special Session"),
+									"text",
+									{ value: row.other_special_session_name },
+								)
+							: ""
+					}
+				</div>`;
+			})
+			.join("");
+		return `
+			<h3>${__("Enrolment of Participants")}</h3>
+			<p class="text-muted">${__("Add one or more teachers / participants. No school or volunteer details on this type.")}</p>
+			<div class="smes-multi-list">${rows}</div>
+			<div class="smes-multi-actions">
+				<button type="button" class="btn btn-default btn-sm smes-add-row" data-multi="enrolment">${__("Add Participant")}</button>
+				<button type="button" class="btn btn-primary btn-sm smes-add-multiple" data-multi="enrolment">${__("Add Multiple Participants")}</button>
+			</div>
+		`;
+	}
+
+	html_workshop_attendance() {
+		this.ensure_workshop_rows();
+		const rows = this.data.workshop_attendees
+			.map((row, idx) => {
+				return `
+				<div class="smes-multi-row" data-multi="workshop" data-idx="${idx}">
+					<div class="smes-multi-row__head">
+						<strong>${__("Teacher / Attendee")} ${idx + 1}</strong>
+						<button type="button" class="btn btn-xs btn-default smes-remove-row" data-multi="workshop" data-idx="${idx}">
+							${__("Remove")}
+						</button>
+					</div>
+					${this.multi_field(idx, "workshop", "attendee_name", __("Attendee Name"), "text", { reqd: 1, value: row.attendee_name })}
+					<div class="smes-row-2">
+						${this.multi_field(idx, "workshop", "contact_number", __("Contact Number"), "text", { value: row.contact_number })}
+						${this.multi_field(idx, "workshop", "email", __("Email"), "email", {
+							value: row.email,
+							hint: __("Optional"),
+						})}
+					</div>
+					${this.multi_field(idx, "workshop", "school_organization", __("School / Organization"), "text", {
+						value: row.school_organization,
+						hint: __("Repeats from previous row — editable"),
+					})}
+					${this.multi_field(idx, "workshop", "training_venue", __("Training Venue"), "text", {
+						value: row.training_venue,
+						hint: __("Repeats from previous row — editable"),
+					})}
+					${this.multi_field(idx, "workshop", "training_date", __("Training Date"), "date", {
+						value: row.training_date,
+						hint: __("Repeats from previous row — editable"),
+					})}
+				</div>`;
+			})
+			.join("");
+		return `
+			<h3>${__("Attendance / Registration in One Day / Half day Workshop")}</h3>
+			<p class="text-muted">${__("Add multiple teachers. School / Venue / Date repeat on next row and stay editable.")}</p>
+			<div class="smes-multi-list">${rows}</div>
+			<div class="smes-multi-actions">
+				<button type="button" class="btn btn-default btn-sm smes-add-row" data-multi="workshop">${__("Add Teacher")}</button>
+				<button type="button" class="btn btn-primary btn-sm smes-add-multiple" data-multi="workshop">${__("Add Multiple Teachers")}</button>
+			</div>
+		`;
+	}
+
+	html_travel() {
+		return `
+			<h3>${__("Travel")}</h3>
+			${this.field("travel_mode", __("Mode of Travel"), "select", {
+				options: this.meta.travel_modes || [],
+			})}
+			<div class="smes-row-2">
+				${this.field("travel_from", __("Travel From"), "text")}
+				${this.field("travel_to", __("Travel To"), "text")}
+			</div>
+			<div class="smes-row-2">
+				${this.field("travel_distance_km", __("Distance (KM)"), "number")}
+				${this.field("travel_cost", __("Travel Cost"), "number")}
+			</div>
+			${this.field("travel_remarks", __("Travel Remarks"), "textarea")}
+		`;
+	}
+
+	html_preview() {
+		const kind = this.activity_kind();
+		const esc = frappe.utils.escape_html;
+		let rows_html = "";
+		if (kind === "enrolment") {
+			rows_html = (this.data.enrolment_participants || [])
+				.map(
+					(r, i) => `
+				<tr>
+					<td>${i + 1}</td>
+					<td>${esc(r.participant_name || "")}</td>
+					<td>${esc(r.contact_number || "")}</td>
+					<td>${esc(r.city || "")}</td>
+					<td>${esc(r.province || "")}</td>
+					<td>${esc(r.enroll_in_course || "")}</td>
+					<td>${esc(r.date_of_enrolment || "")}</td>
+					<td>${esc(r.other_special_session_name || "")}</td>
+				</tr>`,
+				)
+				.join("");
+			rows_html = `
+				<table class="table table-bordered table-sm smes-preview-table">
+					<thead>
+						<tr>
+							<th>#</th><th>${__("Name")}</th><th>${__("Contact")}</th><th>${__("City")}</th>
+							<th>${__("Province")}</th><th>${__("Course")}</th><th>${__("Date")}</th><th>${__("Other Session")}</th>
+						</tr>
+					</thead>
+					<tbody>${rows_html || `<tr><td colspan="8">${__("No participants")}</td></tr>`}</tbody>
+				</table>`;
+		} else {
+			rows_html = (this.data.workshop_attendees || [])
+				.map(
+					(r, i) => `
+				<tr>
+					<td>${i + 1}</td>
+					<td>${esc(r.attendee_name || "")}</td>
+					<td>${esc(r.contact_number || "")}</td>
+					<td>${esc(r.email || "")}</td>
+					<td>${esc(r.school_organization || "")}</td>
+					<td>${esc(r.training_venue || "")}</td>
+					<td>${esc(r.training_date || "")}</td>
+				</tr>`,
+				)
+				.join("");
+			rows_html = `
+				<table class="table table-bordered table-sm smes-preview-table">
+					<thead>
+						<tr>
+							<th>#</th><th>${__("Attendee")}</th><th>${__("Contact")}</th><th>${__("Email")}</th>
+							<th>${__("School / Org")}</th><th>${__("Venue")}</th><th>${__("Date")}</th>
+						</tr>
+					</thead>
+					<tbody>${rows_html || `<tr><td colspan="7">${__("No attendees")}</td></tr>`}</tbody>
+				</table>`;
+		}
+		return `
+			<h3>${__("Preview")}</h3>
+			<p class="text-muted">${__("Review details, then Submit.")}</p>
+			<div class="smes-preview-block">
+				<p><strong>${__("Staff")}:</strong> ${esc(this.data.visit_by || "")}</p>
+				<p><strong>${__("Date")}:</strong> ${esc(this.data.visit_date || "")}</p>
+				<p><strong>${__("Type")}:</strong> ${esc(this.data.activity_type || "")}</p>
+				<p><strong>${__("City / Area / Province")}:</strong>
+					${esc(this.data.city || "")} / ${esc(this.data.area || "")} / ${esc(this.data.province || "")}
+				</p>
+			</div>
+			${rows_html}
+			<div class="smes-preview-block">
+				<p><strong>${__("Travel")}:</strong>
+					${esc(this.data.travel_mode || "—")}
+					${this.data.travel_from || this.data.travel_to ? ` (${esc(this.data.travel_from || "")} → ${esc(this.data.travel_to || "")})` : ""}
+				</p>
+				<p><strong>${__("Distance / Cost")}:</strong>
+					${esc(String(this.data.travel_distance_km || "—"))} km /
+					${esc(String(this.data.travel_cost || "—"))}
+				</p>
+			</div>
+		`;
+	}
+
+	multi_field(idx, multi, name, label, type = "text", opts = {}) {
+		const req = opts.reqd ? `<span class="req">*</span>` : "";
+		const hint = opts.hint ? `<div class="hint">${frappe.utils.escape_html(opts.hint)}</div>` : "";
+		const val = opts.value == null ? "" : opts.value;
+		let control = "";
+		if (type === "select") {
+			const options = [`<option value="">${__("Select")}</option>`]
+				.concat(
+					(opts.options || []).map((o) => {
+						const selected = val === o ? "selected" : "";
+						return `<option value="${frappe.utils.escape_html(o)}" ${selected}>${frappe.utils.escape_html(o)}</option>`;
+					}),
+				)
+				.join("");
+			control = `<select data-multi-field="${name}" data-multi="${multi}" data-idx="${idx}">${options}</select>`;
+		} else if (type === "date") {
+			control = `<input type="date" data-multi-field="${name}" data-multi="${multi}" data-idx="${idx}" value="${frappe.utils.escape_html(val || "")}" />`;
+		} else {
+			control = `<input type="${type}" data-multi-field="${name}" data-multi="${multi}" data-idx="${idx}" value="${frappe.utils.escape_html(val || "")}" />`;
+		}
+		return `<div class="smes-field"><label>${frappe.utils.escape_html(label)}${req}</label>${control}${hint}</div>`;
+	}
+
+	collect_multi_rows() {
+		const collect = (multi, key, fields) => {
+			const map = {};
+			this.$root.find(`[data-multi="${multi}"][data-multi-field]`).each((_, el) => {
+				const $el = $(el);
+				const idx = cint($el.data("idx"));
+				const field = $el.data("multi-field");
+				if (!map[idx]) map[idx] = {};
+				map[idx][field] = $el.val();
+			});
+			const rows = Object.keys(map)
+				.sort((a, b) => cint(a) - cint(b))
+				.map((k) => map[k]);
+			if (rows.length) this.data[key] = rows;
+		};
+		collect("enrolment", "enrolment_participants");
+		collect("workshop", "workshop_attendees");
+	}
+
+	bind_multi_row_actions() {
+		this.$root.find(".smes-add-row").off("click").on("click", (e) => {
+			this.collect();
+			const multi = $(e.currentTarget).data("multi");
+			if (multi === "enrolment") {
+				this.ensure_enrolment_rows();
+				const prev = this.data.enrolment_participants[this.data.enrolment_participants.length - 1];
+				this.data.enrolment_participants.push(this.blank_enrolment_row(prev));
+			} else {
+				this.ensure_workshop_rows();
+				const prev = this.data.workshop_attendees[this.data.workshop_attendees.length - 1];
+				this.data.workshop_attendees.push(this.blank_workshop_row(prev));
+			}
+			this.render_step();
+		});
+		this.$root.find(".smes-add-multiple").off("click").on("click", (e) => {
+			const multi = $(e.currentTarget).data("multi");
+			frappe.prompt(
+				[
+					{
+						fieldname: "count",
+						fieldtype: "Int",
+						label: multi === "enrolment" ? __("Number of participants") : __("Number of teachers"),
+						default: 5,
+						reqd: 1,
+					},
+				],
+				(values) => {
+					this.collect();
+					const n = Math.max(1, cint(values.count) || 1);
+					if (multi === "enrolment") {
+						this.ensure_enrolment_rows();
+						for (let i = 0; i < n; i += 1) {
+							const prev =
+								this.data.enrolment_participants[this.data.enrolment_participants.length - 1];
+							this.data.enrolment_participants.push(this.blank_enrolment_row(prev));
+						}
+					} else {
+						this.ensure_workshop_rows();
+						for (let i = 0; i < n; i += 1) {
+							const prev = this.data.workshop_attendees[this.data.workshop_attendees.length - 1];
+							this.data.workshop_attendees.push(this.blank_workshop_row(prev));
+						}
+					}
+					this.render_step();
+				},
+				__("Add Multiple"),
+				__("Add"),
+			);
+		});
+		this.$root.find(".smes-remove-row").off("click").on("click", (e) => {
+			this.collect();
+			const multi = $(e.currentTarget).data("multi");
+			const idx = cint($(e.currentTarget).data("idx"));
+			if (multi === "enrolment") {
+				this.data.enrolment_participants.splice(idx, 1);
+				this.ensure_enrolment_rows();
+			} else {
+				this.data.workshop_attendees.splice(idx, 1);
+				this.ensure_workshop_rows();
+			}
+			this.render_step();
+		});
+		this.$root.find("[data-multi-field='enroll_in_course']").off("change.smesOther").on("change.smesOther", () => {
+			this.collect();
+			this.render_step();
+		});
+	}
+
 	bind_uploads() {
 		this.$root.find(".smes-upload").off("click").on("click", (e) => {
 			const field = $(e.currentTarget).data("field");
@@ -1219,6 +1613,7 @@ class SmesActivityForm {
 			$g.find('input[type="checkbox"]:checked').each((__, cb) => values.push($(cb).val()));
 			this.data[field] = values;
 		});
+		this.collect_multi_rows();
 	}
 
 	need(fields, msg) {
@@ -1341,6 +1736,47 @@ class SmesActivityForm {
 				],
 				__("Fill required School Detail fields"),
 			);
+		}
+		if (key === "enrolment") {
+			const rows = this.data.enrolment_participants || [];
+			if (!rows.length) {
+				frappe.show_alert({ message: __("Add at least one participant"), indicator: "orange" }, 5);
+				return false;
+			}
+			for (let i = 0; i < rows.length; i += 1) {
+				const r = rows[i];
+				if (!cstr(r.participant_name).trim() || !cstr(r.enroll_in_course).trim()) {
+					frappe.show_alert(
+						{
+							message: __("Participant {0}: Name and Course are required", [i + 1]),
+							indicator: "orange",
+						},
+						5,
+					);
+					return false;
+				}
+			}
+			return true;
+		}
+		if (key === "workshop_attendance") {
+			const rows = this.data.workshop_attendees || [];
+			if (!rows.length) {
+				frappe.show_alert({ message: __("Add at least one teacher / attendee"), indicator: "orange" }, 5);
+				return false;
+			}
+			for (let i = 0; i < rows.length; i += 1) {
+				if (!cstr(rows[i].attendee_name).trim()) {
+					frappe.show_alert(
+						{ message: __("Attendee {0}: Name is required", [i + 1]), indicator: "orange" },
+						5,
+					);
+					return false;
+				}
+			}
+			return true;
+		}
+		if (key === "travel" || key === "preview" || key === "attachments") {
+			return true;
 		}
 		return true;
 	}

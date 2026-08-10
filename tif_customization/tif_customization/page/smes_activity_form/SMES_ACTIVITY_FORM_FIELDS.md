@@ -18,12 +18,14 @@ Master control field: **Type of Activity** (`type` on Field Visit / `activity_ty
 | Trainings & Workshops / Teachers Training Meeting | `Training` | Training → School Detail → Attachments |
 | Meetings | `Meeting` | Meetings → Attachments *(skip school)* |
 | Academic / Other Official Tasks / Calls | `Academic / Other Official Tasks` | Academic → Attachments *(skip school)* |
-| Co-curricular Activity | `Co-curricular Activity` | Co-curricular → Attachments *(skip school)* |
+| Enrolment of Participants | `Enrolment of Participants` | Enrolment → Attachments → Travel → Preview *(no school / volunteers)* |
+| Attendance / Registration in One Day / Half day Workshop | `Attendance / Registration in One Day / Half day Workshop` | Attendance → Attachments → Travel → Preview *(no school / volunteers)* |
 
 ```
 General
    └─ if Marketing / M&E / Joint / Training → Activity section → School Detail → Attachments
    └─ if Meetings / Academic / Co-curricular → Activity section → Attachments
+   └─ if Enrolment / Workshop Attendance → Activity section only → Attachments → Travel → Preview
 ```
 
 ---

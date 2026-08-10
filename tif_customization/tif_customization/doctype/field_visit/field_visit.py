@@ -10,6 +10,11 @@ from tif_customization.tif_customization.api.training_feedback_portal import bui
 
 
 class FieldVisit(Document):
+	def before_validate(self):
+		# Mobile / older clients may send lowercase "participants"
+		if (self.type or "").strip() == "Enrolment of participants":
+			self.type = "Enrolment of Participants"
+
 	def validate(self):
 		if self.type == "Training":
 			self._validate_training_attendees()
@@ -63,7 +68,7 @@ class FieldVisit(Document):
 			names.add(key)
 
 	def _validate_enrolment_participants(self):
-		if self.type != "Enrolment of participants":
+		if self.type != "Enrolment of Participants":
 			return
 		for row in self.enrolment_participants or []:
 			if not (row.participant_name or "").strip():

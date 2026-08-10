@@ -219,11 +219,28 @@ function apply_field_visit_logic(frm) {
 		"cc_participants_category",
 	];
 
-	const enrolment_fields = ["section_break_enrolment", "enrolment_participants"];
+	const enrolment_fields = [
+		"section_break_enrolment",
+		"enrolment_participants",
+		"section_break_travel",
+		"travel_mode",
+		"travel_from",
+		"travel_to",
+		"travel_distance_km",
+		"travel_cost",
+		"travel_remarks",
+	];
 
 	const workshop_attendance_fields = [
 		"section_break_workshop_attendance",
 		"workshop_attendees",
+		"section_break_travel",
+		"travel_mode",
+		"travel_from",
+		"travel_to",
+		"travel_distance_km",
+		"travel_cost",
+		"travel_remarks",
 	];
 
 	const all_type_fields = [
@@ -293,7 +310,7 @@ function apply_field_visit_logic(frm) {
 		set_hidden(frm, cocurricular_fields, false);
 	}
 
-	if (type === "Enrolment of participants") {
+	if (type === "Enrolment of Participants") {
 		set_hidden(frm, enrolment_fields, false);
 	}
 
@@ -704,7 +721,7 @@ frappe.ui.form.on("Field Visit", {
 			);
 		}
 
-		if (frm.doc.type === "Enrolment of participants") {
+		if (frm.doc.type === "Enrolment of Participants") {
 			frm.add_custom_button(
 				__("Add Multiple Teachers"),
 				() => {

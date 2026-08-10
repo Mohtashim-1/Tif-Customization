@@ -202,7 +202,15 @@
   "section_break_enrolment",
   "enrolment_participants",
   "section_break_workshop_attendance",
-  "workshop_attendees"
+  "workshop_attendees",
+  "section_break_travel",
+  "travel_mode",
+  "travel_from",
+  "travel_to",
+  "column_break_travel",
+  "travel_distance_km",
+  "travel_cost",
+  "travel_remarks"
  ],
  "fields": [
   {
@@ -214,7 +222,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Type of Activity",
-   "options": "\nMarketing\nM&E\nJoint Visit with SME\nTraining\nMeeting\nAcademic / Other Official Tasks\nCo-curricular Activity\nEnrolment of participants\nAttendance / Registration in One Day / Half day Workshop\nOther",
+   "options": "\nMarketing\nM&E\nJoint Visit with SME\nTraining\nMeeting\nAcademic / Other Official Tasks\nCo-curricular Activity\nEnrolment of Participants\nAttendance / Registration in One Day / Half day Workshop\nOther",
    "reqd": 1
   },
   {
@@ -1170,25 +1178,25 @@
    "fieldname": "section_break_attachments",
    "fieldtype": "Section Break",
    "label": "Attachments",
-   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training','Meeting','Academic / Other Official Tasks','Co-curricular Activity','Enrolment of participants','Attendance / Registration in One Day / Half day Workshop','Other'], doc.type)"
+   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training','Meeting','Academic / Other Official Tasks','Co-curricular Activity','Enrolment of Participants','Attendance / Registration in One Day / Half day Workshop','Other'], doc.type)"
   },
   {
    "fieldname": "meeting_picture",
    "fieldtype": "Attach Image",
    "label": "Meeting Picture",
-   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training','Meeting','Academic / Other Official Tasks','Co-curricular Activity','Enrolment of participants','Attendance / Registration in One Day / Half day Workshop','Other'], doc.type)"
+   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training','Meeting','Academic / Other Official Tasks','Co-curricular Activity','Enrolment of Participants','Attendance / Registration in One Day / Half day Workshop','Other'], doc.type)"
   },
   {
    "fieldname": "school_picture",
    "fieldtype": "Attach Image",
    "label": "School Picture",
-   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training','Meeting','Academic / Other Official Tasks','Co-curricular Activity','Enrolment of participants','Attendance / Registration in One Day / Half day Workshop','Other'], doc.type)"
+   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training','Meeting','Academic / Other Official Tasks','Co-curricular Activity','Enrolment of Participants','Attendance / Registration in One Day / Half day Workshop','Other'], doc.type)"
   },
   {
    "fieldname": "visiting_card_attach",
    "fieldtype": "Attach",
    "label": "Visiting Card",
-   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training','Meeting','Academic / Other Official Tasks','Co-curricular Activity','Enrolment of participants','Attendance / Registration in One Day / Half day Workshop','Other'], doc.type)"
+   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training','Meeting','Academic / Other Official Tasks','Co-curricular Activity','Enrolment of Participants','Attendance / Registration in One Day / Half day Workshop','Other'], doc.type)"
   },
   {
    "fieldname": "column_break_attach",
@@ -1198,19 +1206,19 @@
    "fieldname": "attendance_sheet_attach",
    "fieldtype": "Attach",
    "label": "Attendance Sheet",
-   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training','Meeting','Academic / Other Official Tasks','Co-curricular Activity','Enrolment of participants','Attendance / Registration in One Day / Half day Workshop','Other'], doc.type)"
+   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training','Meeting','Academic / Other Official Tasks','Co-curricular Activity','Enrolment of Participants','Attendance / Registration in One Day / Half day Workshop','Other'], doc.type)"
   },
   {
    "fieldname": "training_awareness_pictures",
    "fieldtype": "Attach",
    "label": "Pictures of Training & Awareness Session",
-   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training','Meeting','Academic / Other Official Tasks','Co-curricular Activity','Enrolment of participants','Attendance / Registration in One Day / Half day Workshop','Other'], doc.type)"
+   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training','Meeting','Academic / Other Official Tasks','Co-curricular Activity','Enrolment of Participants','Attendance / Registration in One Day / Half day Workshop','Other'], doc.type)"
   },
   {
    "fieldname": "attendance_sheet_excel",
    "fieldtype": "Attach",
    "label": "MS Excel of Attendance Sheet",
-   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training','Meeting','Academic / Other Official Tasks','Co-curricular Activity','Enrolment of participants','Attendance / Registration in One Day / Half day Workshop','Other'], doc.type)"
+   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training','Meeting','Academic / Other Official Tasks','Co-curricular Activity','Enrolment of Participants','Attendance / Registration in One Day / Half day Workshop','Other'], doc.type)"
   },
   {
    "fieldname": "reason_not_agreed",
@@ -1416,13 +1424,13 @@
    "depends_on": "eval:doc.type=='Co-curricular Activity'"
   },
   {
-   "depends_on": "eval:doc.type=='Enrolment of participants'",
+   "depends_on": "eval:doc.type=='Enrolment of Participants'",
    "fieldname": "section_break_enrolment",
    "fieldtype": "Section Break",
-   "label": "Enrolment of participants"
+   "label": "Enrolment of Participants"
   },
   {
-   "depends_on": "eval:doc.type=='Enrolment of participants'",
+   "depends_on": "eval:doc.type=='Enrolment of Participants'",
    "description": "Add multiple teachers / participants. Course and date can be edited per row.",
    "fieldname": "enrolment_participants",
    "fieldtype": "Table",
@@ -1442,6 +1450,53 @@
    "fieldtype": "Table",
    "label": "Attendance Form",
    "options": "Field Visit Workshop Attendee"
+  },
+  {
+   "depends_on": "eval:in_list(['Enrolment of Participants','Attendance / Registration in One Day / Half day Workshop'], doc.type)",
+   "fieldname": "section_break_travel",
+   "fieldtype": "Section Break",
+   "label": "Travel"
+  },
+  {
+   "depends_on": "eval:in_list(['Enrolment of Participants','Attendance / Registration in One Day / Half day Workshop'], doc.type)",
+   "fieldname": "travel_mode",
+   "fieldtype": "Select",
+   "label": "Mode of Travel",
+   "options": "\nPublic Transport\nOwn Vehicle / Bike\nCompany Vehicle\nRide Hailing\nWalking\nOther"
+  },
+  {
+   "depends_on": "eval:in_list(['Enrolment of Participants','Attendance / Registration in One Day / Half day Workshop'], doc.type)",
+   "fieldname": "travel_from",
+   "fieldtype": "Data",
+   "label": "Travel From"
+  },
+  {
+   "depends_on": "eval:in_list(['Enrolment of Participants','Attendance / Registration in One Day / Half day Workshop'], doc.type)",
+   "fieldname": "travel_to",
+   "fieldtype": "Data",
+   "label": "Travel To"
+  },
+  {
+   "fieldname": "column_break_travel",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:in_list(['Enrolment of Participants','Attendance / Registration in One Day / Half day Workshop'], doc.type)",
+   "fieldname": "travel_distance_km",
+   "fieldtype": "Float",
+   "label": "Distance (KM)"
+  },
+  {
+   "depends_on": "eval:in_list(['Enrolment of Participants','Attendance / Registration in One Day / Half day Workshop'], doc.type)",
+   "fieldname": "travel_cost",
+   "fieldtype": "Currency",
+   "label": "Travel Cost"
+  },
+  {
+   "depends_on": "eval:in_list(['Enrolment of Participants','Attendance / Registration in One Day / Half day Workshop'], doc.type)",
+   "fieldname": "travel_remarks",
+   "fieldtype": "Small Text",
+   "label": "Travel Remarks"
   }
  ],
  "grid_page_length": 50,

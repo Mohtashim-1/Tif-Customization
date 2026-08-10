@@ -69,7 +69,23 @@ ACTIVITY_TYPE_MAP = {
 	"Meetings": "Meeting",
 	"Academic / Other Official Tasks / Calls": "Academic / Other Official Tasks",
 	"Co-curricular Activity": "Co-curricular Activity",
+	"Enrolment of Participants": "Enrolment of Participants",
+	"Enrolment of participants": "Enrolment of Participants",
+	"Attendance / Registration in One Day / Half day Workshop": "Attendance / Registration in One Day / Half day Workshop",
 }
+
+ENROLMENT_COURSE_OPTIONS = [
+	"TECC - Foundation",
+	"TECC - Professional",
+	"ELP - Education Leadership Program",
+	"ETQ - Effective Teaching of the Holy Quran",
+	"TTC - 90 Days Tajweed Training Course",
+	"Online Tajweed Customized Course 30/60/90 Days",
+	"Intro to Tajweed Workshop",
+	"Tajweed for Kids Workshop",
+	"V Campers - Story Telling Workshops",
+	"Other Special Session Offered by TIF",
+]
 
 FIELD_OFFICER_ROLES = (
 	"Field Staff",
@@ -207,7 +223,25 @@ def get_form_meta():
 			"December",
 		],
 		"activity_types": list(ACTIVITY_TYPE_MAP.keys()),
+		"enrolment_courses": ENROLMENT_COURSE_OPTIONS,
+		"travel_modes": [
+			"Public Transport",
+			"Own Vehicle / Bike",
+			"Company Vehicle",
+			"Ride Hailing",
+			"Walking",
+			"Other",
+		],
 		"provinces": list(PROVINCE_MAP.keys()),
+		"province_options_full": [
+			"Punjab",
+			"Sindh",
+			"Khyber Pakhtunkhwa",
+			"Balochistan",
+			"Azad Jammu & Kashmir",
+			"Gilgit-Baltistan",
+			"Islamabad Capital Territory",
+		],
 		"frequencies": [
 			"New",
 			"1st Follow up visit",
@@ -687,6 +721,12 @@ def submit_smes_activity(data):
 		arrange = _as_list(data.get("training_arrange_by"))
 		doc.training_arrange_by = "\n".join(arrange)
 		doc.training_conducted_by = data.get("training_conducted_by")
+	elif doc_type == "Enrolment of Participants":
+		_append_enrolment_rows(doc, data)
+		_apply_travel_fields(doc, data)
+	elif doc_type == "Attendance / Registration in One Day / Half day Workshop":
+		_append_workshop_rows(doc, data)
+		_apply_travel_fields(doc, data)
 
 	doc.insert(ignore_permissions=False)
 	frappe.db.commit()
@@ -696,3 +736,69 @@ def submit_smes_activity(data):
 		"url": get_url(f"/app/field-visit/{doc.name}"),
 		"message": _("Activity saved as {0}").format(doc.name),
 	}
+
+
+def _apply_travel_fields(doc, data):
+	doc.travel_mode = data.get("travel_mode")
+	doc.travel_from = data.get("travel_from")
+	doc.travel_to = data.get("travel_to")
+	doc.travel_distance_km = data.get("travel_distance_km")
+	doc.travel_cost = data.get("travel_cost")
+	doc.travel_remarks = data.get("travel_remarks")
+
+
+def _append_enrolment_rows(doc, data):
+	rows = data.get("enrolment_participants") or []
+	if isinstance(rows, str):
+		try:
+			rows = frappe.parse_json(rows) or []
+		except Exception:
+			rows = []
+	for row in rows:
+		if not isinstance(row, dict):
+			continue
+		name = cstr(row.get("participant_name") or row.get("name")).strip()
+		if not name:
+			continue
+		doc.append(
+			"enrolment_participants",
+			{
+				"participant_name": name,
+				"contact_number": cstr(row.get("contact_number") or "").strip(),
+				"city": cstr(row.get("city") or data.get("city") or "").strip(),
+				"province": PROVINCE_MAP.get(
+					cstr(row.get("province") or "").strip(),
+					cstr(row.get("province") or data.get("province") or "").strip(),
+				)
+				or province,
+				"enroll_in_course": cstr(row.get("enroll_in_course") or "").strip(),
+				"date_of_enrolment": row.get("date_of_enrolment") or data.get("visit_date"),
+				"other_special_session_name": cstr(row.get("other_special_session_name") or "").strip(),
+			},
+		)
+
+
+def _append_workshop_rows(doc, data):
+	rows = data.get("workshop_attendees") or []
+	if isinstance(rows, str):
+		try:
+			rows = frappe.parse_json(rows) or []
+		except Exception:
+			rows = []
+	for row in rows:
+		if not isinstance(row, dict):
+			continue
+		name = cstr(row.get("attendee_name") or row.get("name")).strip()
+		if not name:
+			continue
+		doc.append(
+			"workshop_attendees",
+			{
+				"attendee_name": name,
+				"contact_number": cstr(row.get("contact_number") or "").strip(),
+				"email": cstr(row.get("email") or "").strip(),
+				"school_organization": cstr(row.get("school_organization") or "").strip(),
+				"training_venue": cstr(row.get("training_venue") or "").strip(),
+				"training_date": row.get("training_date") or data.get("visit_date"),
+			},
+		)

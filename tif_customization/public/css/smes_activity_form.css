@@ -536,3 +536,44 @@
 .smes-template-link a:hover {
 	opacity: 0.9;
 }
+
+.smes-multi-list {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+	margin-bottom: 14px;
+}
+
+.smes-multi-row {
+	border: 1px solid #e5e7eb;
+	border-radius: 12px;
+	padding: 14px;
+	background: #fafafa;
+}
+
+.smes-multi-row__head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 10px;
+}
+
+.smes-multi-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-top: 4px;
+}
+
+.smes-preview-block {
+	margin: 12px 0;
+	padding: 12px 14px;
+	background: #f8fafc;
+	border-radius: 10px;
+	border: 1px solid #e2e8f0;
+}
+
+.smes-preview-table {
+	font-size: 12px;
+	margin: 12px 0;
+}
