@@ -428,6 +428,16 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "Donation Report ",
+   "link_count": 0,
+   "link_to": "donation-report",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "Expense from Zakat (UAT) 29-Jun-26",
    "link_count": 0,
    "link_to": "expense-from-zakat-a",
@@ -587,7 +597,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-08-13 02:52:13.768881",
+ "modified": "2026-08-13 02:56:17.982349",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Reports",
