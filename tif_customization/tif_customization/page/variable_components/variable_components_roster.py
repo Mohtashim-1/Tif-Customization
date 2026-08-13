@@ -442,24 +442,59 @@ def custom_period_options(company=None):
 
 
 def get_period_status(company, start_date, end_date):
-	"""Draft / finalized state for the active payroll period."""
-	if not frappe.db.exists("DocType", "Variable Components Period"):
-		return {"status": "Draft", "draft_saved_on": None, "finalized_on": None}
-	row = frappe.db.get_value(
-		"Variable Components Period",
-		{"company": company, "start_date": getdate(start_date), "end_date": getdate(end_date)},
-		["name", "status", "draft_saved_on", "finalized_on", "period_label"],
-		as_dict=True,
-	)
-	if not row:
-		return {"status": "Draft", "draft_saved_on": None, "finalized_on": None}
-	return {
-		"name": row.name,
-		"status": row.status or "Draft",
-		"draft_saved_on": row.draft_saved_on,
-		"finalized_on": row.finalized_on,
-		"period_label": row.period_label,
+	"""Draft / approval / finalized state for the active payroll period."""
+	empty = {
+		"status": "Draft",
+		"draft_saved_on": None,
+		"finalized_on": None,
+		"submitted_by": None,
+		"submitted_for_approval_on": None,
+		"approved_by": None,
+		"approved_on": None,
+		"rejection_reason": None,
+		"approval_remarks": None,
 	}
+	if not frappe.db.exists("DocType", "Variable Components Period"):
+		return empty
+
+	filters = {
+		"company": company,
+		"start_date": getdate(start_date),
+		"end_date": getdate(end_date),
+	}
+	fields = [
+		"name",
+		"status",
+		"draft_saved_on",
+		"finalized_on",
+		"period_label",
+		"submitted_by",
+		"submitted_for_approval_on",
+		"approved_by",
+		"approved_on",
+		"rejection_reason",
+		"approval_remarks",
+	]
+	try:
+		row = frappe.db.get_value(
+			"Variable Components Period",
+			filters,
+			fields,
+			as_dict=True,
+		)
+	except Exception:
+		row = frappe.db.get_value(
+			"Variable Components Period",
+			filters,
+			["name", "status", "draft_saved_on", "finalized_on", "period_label"],
+			as_dict=True,
+		)
+	if not row:
+		return empty
+	out = dict(empty)
+	out.update({k: row.get(k) for k in fields if k in row})
+	out["status"] = row.get("status") or "Draft"
+	return out
 
 
 def _get_or_create_period_doc(company, start_date, end_date):
@@ -480,18 +515,100 @@ def _get_or_create_period_doc(company, start_date, end_date):
 	return doc
 
 
+EDITABLE_PERIOD_STATUSES = frozenset({"Draft", "Rejected"})
+LOCKED_BEFORE_FINALIZE = frozenset({"Pending COO Approval", "Approved", "Finalized"})
+
+
 def mark_period_draft_saved(company, start_date, end_date):
 	doc = _get_or_create_period_doc(company, start_date, end_date)
 	if doc.status == "Finalized":
 		frappe.throw(_("This period is already finalized. Cannot save draft."))
+	if doc.status == "Pending COO Approval":
+		frappe.throw(_("This period is pending COO approval. Withdraw it before editing."))
+	if doc.status == "Approved":
+		frappe.throw(_("This period is already approved by COO. Finalize payroll or ask COO to reject for edits."))
 	doc.status = "Draft"
 	doc.draft_saved_on = frappe.utils.now_datetime()
+	doc.rejection_reason = None
+	doc.save(ignore_permissions=True)
+	return get_period_status(company, start_date, end_date)
+
+
+def mark_period_submitted_for_approval(company, start_date, end_date, user=None):
+	doc = _get_or_create_period_doc(company, start_date, end_date)
+	if doc.status == "Finalized":
+		frappe.throw(_("This period is already finalized."))
+	if doc.status == "Pending COO Approval":
+		frappe.throw(_("This period is already pending COO approval."))
+	if doc.status == "Approved":
+		frappe.throw(_("This period is already approved. Proceed to Finalize."))
+	if doc.status not in EDITABLE_PERIOD_STATUSES:
+		frappe.throw(_("Only Draft or Rejected periods can be submitted for COO approval."))
+
+	user = user or frappe.session.user
+	now = frappe.utils.now_datetime()
+	doc.status = "Pending COO Approval"
+	doc.submitted_by = user
+	doc.submitted_for_approval_on = now
+	doc.approved_by = None
+	doc.approved_on = None
+	doc.rejection_reason = None
+	doc.approval_remarks = None
+	if not doc.draft_saved_on:
+		doc.draft_saved_on = now
+	doc.save(ignore_permissions=True)
+	return get_period_status(company, start_date, end_date)
+
+
+def mark_period_approved(company, start_date, end_date, user=None, remarks=None):
+	doc = _get_or_create_period_doc(company, start_date, end_date)
+	if doc.status != "Pending COO Approval":
+		frappe.throw(_("Only periods pending COO approval can be approved."))
+	user = user or frappe.session.user
+	doc.status = "Approved"
+	doc.approved_by = user
+	doc.approved_on = frappe.utils.now_datetime()
+	doc.rejection_reason = None
+	doc.approval_remarks = (remarks or "").strip() or None
+	doc.save(ignore_permissions=True)
+	return get_period_status(company, start_date, end_date)
+
+
+def mark_period_rejected(company, start_date, end_date, reason, user=None):
+	doc = _get_or_create_period_doc(company, start_date, end_date)
+	if doc.status != "Pending COO Approval":
+		frappe.throw(_("Only periods pending COO approval can be rejected."))
+	reason = (reason or "").strip()
+	if not reason:
+		frappe.throw(_("Rejection reason is required."))
+	user = user or frappe.session.user
+	doc.status = "Rejected"
+	doc.approved_by = user
+	doc.approved_on = frappe.utils.now_datetime()
+	doc.rejection_reason = reason
+	doc.approval_remarks = None
+	doc.save(ignore_permissions=True)
+	return get_period_status(company, start_date, end_date)
+
+
+def mark_period_withdrawn(company, start_date, end_date):
+	"""HR withdraws a pending submission back to Draft."""
+	doc = _get_or_create_period_doc(company, start_date, end_date)
+	if doc.status != "Pending COO Approval":
+		frappe.throw(_("Only pending COO approval periods can be withdrawn."))
+	doc.status = "Draft"
+	doc.approved_by = None
+	doc.approved_on = None
+	doc.rejection_reason = None
+	doc.approval_remarks = None
 	doc.save(ignore_permissions=True)
 	return get_period_status(company, start_date, end_date)
 
 
 def mark_period_finalized(company, start_date, end_date):
 	doc = _get_or_create_period_doc(company, start_date, end_date)
+	if doc.status != "Approved":
+		frappe.throw(_("COO must approve this period before finalizing payroll."))
 	doc.status = "Finalized"
 	doc.finalized_on = frappe.utils.now_datetime()
 	if not doc.draft_saved_on:

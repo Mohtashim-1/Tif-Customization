@@ -4,6 +4,12 @@
 frappe.ui.form.on("Field Officer", {
 	refresh(frm) {
 		if (!frm.is_new() && frm.doc.user) {
+			frm.add_custom_button(__("Open SME KPI Sheet"), () => {
+				frappe.set_route("sme-kpi-sheet", {
+					staff: frm.doc.name1 || frm.doc.user,
+					division: frm.doc.division || "",
+				});
+			});
 			frm.add_custom_button(__("Open Target KPI Report"), () => {
 				frappe.set_route("smes-target-base---k", {
 					staff: frm.doc.name1 || frm.doc.user,

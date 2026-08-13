@@ -32,8 +32,12 @@ from tif_customization.tif_customization.page.variable_components.variable_compo
 	get_included_employee_ids,
 	get_period_status,
 	initialize_period_roster,
+	mark_period_approved,
 	mark_period_draft_saved,
 	mark_period_finalized,
+	mark_period_rejected,
+	mark_period_submitted_for_approval,
+	mark_period_withdrawn,
 	period_starting_on_26th,
 	roster_count,
 	set_roster_excluded,
@@ -55,6 +59,22 @@ ROSTER_EDIT_ALLOWED_USERS = frozenset(
 	{
 		"muhammad.yasir@tif.edu.pk",
 		"muhammad.raza@tif.edu.pk",
+	}
+)
+
+# COO approval for Variable Components before payroll finalize.
+COO_APPROVER_USERS = frozenset(
+	{
+		"shahid.khan@tif.edu.pk",
+	}
+)
+COO_APPROVER_ROLES = frozenset({"COO", "System Manager"})
+SUBMIT_FOR_APPROVAL_ROLES = frozenset(
+	{
+		"System Manager",
+		"HR Manager",
+		"HR User",
+		"Accounts Manager",
 	}
 )
 from tif_customization.tif_customization.payroll_utils import get_assignment_base_by_employee
@@ -219,6 +239,170 @@ def _assert_can_manage_roster():
 		),
 		frappe.PermissionError,
 	)
+
+
+def _user_can_approve_coo(user=None):
+	user = user or frappe.session.user
+	if user == "Administrator":
+		return True
+	if user in COO_APPROVER_USERS:
+		return True
+	roles = set(frappe.get_roles(user))
+	return bool(roles & COO_APPROVER_ROLES)
+
+
+def _user_can_submit_for_approval(user=None):
+	user = user or frappe.session.user
+	if user == "Administrator":
+		return True
+	if user in ROSTER_EDIT_ALLOWED_USERS:
+		return True
+	roles = set(frappe.get_roles(user))
+	return bool(roles & SUBMIT_FOR_APPROVAL_ROLES)
+
+
+def _assert_can_submit_for_approval():
+	if _user_can_submit_for_approval():
+		return
+	frappe.throw(
+		_("Only HR / Accounts / authorized payroll users can submit Variable Components for COO approval."),
+		frappe.PermissionError,
+	)
+
+
+def _assert_can_approve_coo():
+	if _user_can_approve_coo():
+		return
+	frappe.throw(
+		_("Only COO (Shahid Khan) or System Manager can approve or reject Variable Components."),
+		frappe.PermissionError,
+	)
+
+
+def _approval_flags(period_status=None):
+	status = (period_status or {}).get("status") or "Draft"
+	return {
+		"can_submit_for_approval": _user_can_submit_for_approval() and status in ("Draft", "Rejected"),
+		"can_withdraw_approval": _user_can_submit_for_approval() and status == "Pending COO Approval",
+		"can_approve": _user_can_approve_coo() and status == "Pending COO Approval",
+		"can_reject": _user_can_approve_coo() and status == "Pending COO Approval",
+		"can_finalize": status == "Approved",
+		"sheet_locked": status in ("Pending COO Approval", "Approved", "Finalized"),
+		"is_pending_coo": status == "Pending COO Approval",
+		"is_approved": status == "Approved",
+		"is_rejected": status == "Rejected",
+	}
+
+
+def _close_period_todos(period_name):
+	if not period_name:
+		return
+	for todo in frappe.get_all(
+		"ToDo",
+		filters={
+			"reference_type": "Variable Components Period",
+			"reference_name": period_name,
+			"status": "Open",
+		},
+		pluck="name",
+	):
+		frappe.db.set_value("ToDo", todo, "status", "Closed")
+
+
+def _notify_coo_for_approval(period_status, company, start_date, end_date):
+	period_name = period_status.get("name")
+	if not period_name:
+		return
+
+	label = period_status.get("period_label") or f"{formatdate(start_date)} – {formatdate(end_date)}"
+	description = _("Variable Components for {0} ({1}) is pending your approval.").format(
+		label, company
+	)
+	page_link = "/app/variable-components"
+
+	for user in COO_APPROVER_USERS:
+		if not frappe.db.exists("User", user) or not frappe.db.get_value("User", user, "enabled"):
+			continue
+		frappe.share.add(
+			"Variable Components Period",
+			period_name,
+			user,
+			read=1,
+			write=0,
+			share=0,
+			notify=0,
+		)
+		if frappe.get_all(
+			"ToDo",
+			filters={
+				"reference_type": "Variable Components Period",
+				"reference_name": period_name,
+				"allocated_to": user,
+				"status": "Open",
+			},
+			limit=1,
+		):
+			continue
+		from frappe.desk.form.assign_to import add as add_assignment
+
+		add_assignment(
+			{
+				"assign_to": [user],
+				"doctype": "Variable Components Period",
+				"name": period_name,
+				"description": f"{description} Open: {page_link}",
+				"priority": "High",
+			},
+			ignore_permissions=True,
+		)
+
+	try:
+		frappe.get_doc(
+			{
+				"doctype": "Notification Log",
+				"subject": _("Variable Components pending COO approval: {0}").format(label),
+				"email_content": description,
+				"for_user": next(iter(COO_APPROVER_USERS)),
+				"type": "Assignment",
+				"document_type": "Variable Components Period",
+				"document_name": period_name,
+				"from_user": frappe.session.user,
+			}
+		).insert(ignore_permissions=True)
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "Variable Components COO notify")
+
+
+def _notify_submitter_decision(period_status, approved, reason=None):
+	submitter = period_status.get("submitted_by")
+	if not submitter or submitter == frappe.session.user:
+		return
+	label = period_status.get("period_label") or period_status.get("name") or ""
+	if approved:
+		subject = _("Variable Components approved: {0}").format(label)
+		content = _("COO approved Variable Components for {0}. You can now Finalize & create salary slips.").format(
+			label
+		)
+	else:
+		subject = _("Variable Components rejected: {0}").format(label)
+		content = _("COO rejected Variable Components for {0}. Reason: {1}").format(
+			label, reason or _("No reason given")
+		)
+	try:
+		frappe.get_doc(
+			{
+				"doctype": "Notification Log",
+				"subject": subject,
+				"email_content": content,
+				"for_user": submitter,
+				"type": "Alert",
+				"document_type": "Variable Components Period",
+				"document_name": period_status.get("name"),
+				"from_user": frappe.session.user,
+			}
+		).insert(ignore_permissions=True)
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "Variable Components decision notify")
 
 
 @frappe.whitelist()
@@ -519,12 +703,14 @@ def get_variable_sheet_data(month=None, year=None, company=None, start_date=None
 		},
 		"period_status": period_status,
 		"is_finalized": period_status.get("status") == "Finalized",
+		"approval": _approval_flags(period_status),
 		"month_kpis": _payroll_register_month_kpis(company, start_date, end_date, limit=6),
 	}
 
 
 def _empty_response(month_label, start_date, end_date, company, earnings, deductions, roster_meta=None):
 	payroll_info = _get_payroll_period_info(company, start_date, end_date)
+	period_status = get_period_status(company, start_date, end_date)
 	return {
 		"title": _("THE ILM FOUNDATION - VARIABLE COMPONENTS"),
 		"subtitle": _("For the Month of {0}").format(month_label),
@@ -549,8 +735,9 @@ def _empty_response(month_label, start_date, end_date, company, earnings, deduct
 			"auto_initialized": bool((roster_meta or {}).get("auto_initialized")),
 			"can_manage": _user_can_manage_roster(),
 		},
-		"period_status": get_period_status(company, start_date, end_date),
-		"is_finalized": False,
+		"period_status": period_status,
+		"is_finalized": period_status.get("status") == "Finalized",
+		"approval": _approval_flags(period_status),
 		"month_kpis": _payroll_register_month_kpis(company, start_date, end_date, limit=6),
 	}
 
@@ -827,8 +1014,13 @@ def save_period_draft(
 	start_date, end_date = _resolve_period_dates(month, year, start_date, end_date)
 	company = company or frappe.defaults.get_global_default("company")
 	period = get_period_status(company, start_date, end_date)
-	if period.get("status") == "Finalized":
+	status = period.get("status") or "Draft"
+	if status == "Finalized":
 		frappe.throw(_("This period is already finalized. Reopen is not supported from this page."))
+	if status == "Pending COO Approval":
+		frappe.throw(_("This period is pending COO approval. Withdraw it before editing."))
+	if status == "Approved":
+		frappe.throw(_("This period is approved by COO. Finalize payroll, or ask COO to reject if edits are needed."))
 
 	if isinstance(save_additional_salary, str):
 		save_additional_salary = cint(save_additional_salary)
@@ -858,7 +1050,32 @@ def save_period_draft(
 		"payment_saved": payroll_result.get("saved", 0),
 		"variable_result": variable_result,
 		"period": period,
+		"approval": _approval_flags(period),
 	}
+
+
+def _persist_period_entries(
+	company,
+	start_date,
+	end_date,
+	payment_entries=None,
+	variable_entries=None,
+	save_additional_salary=1,
+):
+	"""Save Additional Salary + payment details without changing period approval status."""
+	payroll_result = {"saved": 0}
+	variable_result = {"created": 0, "updated": 0, "cancelled": 0, "skipped": 0, "errors": []}
+
+	if save_additional_salary and variable_entries:
+		variable_result = save_variable_components(company, getdate(end_date), variable_entries)
+
+	if payment_entries:
+		payment_entries = _sync_payment_entries_to_net(
+			company, start_date, end_date, payment_entries, variable_entries
+		)
+		payroll_result = save_payment_details(company, start_date, end_date, payment_entries)
+
+	return payroll_result, variable_result
 
 
 def _validate_payment_banks(payment_entries, employees_filter=None):
@@ -881,6 +1098,111 @@ def _validate_payment_banks(payment_entries, employees_filter=None):
 
 
 @frappe.whitelist()
+def submit_for_coo_approval(
+	month=None,
+	year=None,
+	company=None,
+	start_date=None,
+	end_date=None,
+	payment_entries=None,
+	variable_entries=None,
+):
+	"""Save current sheet and send period to COO (Shahid Khan) for approval."""
+	import json
+
+	_assert_can_submit_for_approval()
+
+	if isinstance(payment_entries, str):
+		payment_entries = json.loads(payment_entries or "[]")
+	if isinstance(variable_entries, str):
+		variable_entries = json.loads(variable_entries or "[]")
+
+	start_date, end_date = _resolve_period_dates(month, year, start_date, end_date)
+	company = company or frappe.defaults.get_global_default("company")
+
+	save_period_draft(
+		month=month,
+		year=year,
+		company=company,
+		start_date=start_date,
+		end_date=end_date,
+		save_additional_salary=1,
+		payment_entries=payment_entries,
+		variable_entries=variable_entries,
+	)
+
+	period = mark_period_submitted_for_approval(company, start_date, end_date)
+	_notify_coo_for_approval(period, company, start_date, end_date)
+
+	return {
+		"message": _("Submitted to COO (Shahid Khan) for approval."),
+		"period": period,
+		"approval": _approval_flags(period),
+	}
+
+
+@frappe.whitelist()
+def withdraw_coo_submission(month=None, year=None, company=None, start_date=None, end_date=None):
+	"""HR withdraws pending COO submission back to Draft."""
+	_assert_can_submit_for_approval()
+	start_date, end_date = _resolve_period_dates(month, year, start_date, end_date)
+	company = company or frappe.defaults.get_global_default("company")
+	period = mark_period_withdrawn(company, start_date, end_date)
+	_close_period_todos(period.get("name"))
+	return {
+		"message": _("Submission withdrawn. Period is Draft again."),
+		"period": period,
+		"approval": _approval_flags(period),
+	}
+
+
+@frappe.whitelist()
+def approve_variable_period(
+	month=None,
+	year=None,
+	company=None,
+	start_date=None,
+	end_date=None,
+	remarks=None,
+):
+	"""COO approves the period so HR can finalize payroll."""
+	_assert_can_approve_coo()
+	start_date, end_date = _resolve_period_dates(month, year, start_date, end_date)
+	company = company or frappe.defaults.get_global_default("company")
+	period = mark_period_approved(company, start_date, end_date, remarks=remarks)
+	_close_period_todos(period.get("name"))
+	_notify_submitter_decision(period, approved=True)
+	return {
+		"message": _("Period approved. HR can now Finalize & create salary slips."),
+		"period": period,
+		"approval": _approval_flags(period),
+	}
+
+
+@frappe.whitelist()
+def reject_variable_period(
+	month=None,
+	year=None,
+	company=None,
+	start_date=None,
+	end_date=None,
+	reason=None,
+):
+	"""COO rejects the period; HR can edit and resubmit."""
+	_assert_can_approve_coo()
+	start_date, end_date = _resolve_period_dates(month, year, start_date, end_date)
+	company = company or frappe.defaults.get_global_default("company")
+	period = mark_period_rejected(company, start_date, end_date, reason=reason)
+	_close_period_todos(period.get("name"))
+	_notify_submitter_decision(period, approved=False, reason=reason)
+	return {
+		"message": _("Period rejected. HR can edit and submit again."),
+		"period": period,
+		"approval": _approval_flags(period),
+	}
+
+
+@frappe.whitelist()
 def finalize_variable_period(
 	month=None,
 	year=None,
@@ -891,7 +1213,7 @@ def finalize_variable_period(
 	payment_entries=None,
 	variable_entries=None,
 ):
-	"""Save draft then create Payroll Entry + Salary Slips."""
+	"""After COO approval: save amounts then create Payroll Entry + Salary Slips."""
 	import json
 
 	if isinstance(employees, str):
@@ -906,21 +1228,21 @@ def finalize_variable_period(
 	period = get_period_status(company, start_date, end_date)
 	if period.get("status") == "Finalized":
 		frappe.throw(_("This period is already finalized. Open Payroll Entry from the list."))
+	if period.get("status") != "Approved":
+		frappe.throw(_("COO must approve this period before Finalize & create salary slips."))
 
 	if not employees:
 		frappe.throw(_("Select at least one employee for payroll."))
 
 	_validate_payment_banks(payment_entries, employees)
 
-	save_period_draft(
-		month=month,
-		year=year,
-		company=company,
-		start_date=start_date,
-		end_date=end_date,
-		save_additional_salary=1,
+	_persist_period_entries(
+		company,
+		start_date,
+		end_date,
 		payment_entries=payment_entries,
 		variable_entries=variable_entries,
+		save_additional_salary=1,
 	)
 
 	result = create_payroll_from_variable_components(
@@ -935,6 +1257,7 @@ def finalize_variable_period(
 		entries=None,
 	)
 	result["period"] = mark_period_finalized(company, start_date, end_date)
+	result["approval"] = _approval_flags(result["period"])
 	result["message"] = _("Period finalized. {0}").format(result.get("message", ""))
 	return result
 

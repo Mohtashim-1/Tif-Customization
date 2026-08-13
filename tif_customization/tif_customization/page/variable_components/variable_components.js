@@ -55,7 +55,19 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 								<button class="btn btn-primary btn-sm btn-save-draft" title="${__("Save variables, bank/mode, and payable amounts (no salary slips)")}">
 									<i class="fa fa-save"></i> ${__("Save draft")}
 								</button>
-								<button class="btn btn-success btn-sm btn-finalize" title="${__("Save everything and create Payroll Entry + Salary Slips")}">
+								<button class="btn btn-warning btn-sm btn-submit-coo" title="${__("Save and send to COO Shahid Khan for approval")}" style="display:none">
+									<i class="fa fa-paper-plane"></i> ${__("Submit for COO approval")}
+								</button>
+								<button class="btn btn-default btn-sm btn-withdraw-coo" title="${__("Withdraw submission and edit again")}" style="display:none">
+									<i class="fa fa-undo"></i> ${__("Withdraw")}
+								</button>
+								<button class="btn btn-success btn-sm btn-approve-coo" title="${__("Approve this period for payroll")}" style="display:none">
+									<i class="fa fa-thumbs-up"></i> ${__("Approve")}
+								</button>
+								<button class="btn btn-danger btn-sm btn-reject-coo" title="${__("Reject and send back to HR")}" style="display:none">
+									<i class="fa fa-thumbs-down"></i> ${__("Reject")}
+								</button>
+								<button class="btn btn-success btn-sm btn-finalize" title="${__("After COO approval: create Payroll Entry + Salary Slips")}" style="display:none">
 									<i class="fa fa-check-circle"></i> ${__("Finalize & create salary slips")}
 								</button>
 								<a class="btn btn-default btn-sm" href="/app/additional-salary">${__("Additional Salary List")}</a>
@@ -71,7 +83,8 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 									<li>${__("Review days worked / leave deductions (from Employee Attendance)")}</li>
 									<li>${__("Check Remove column for employees to take off sheet, then click Remove selected")}</li>
 									<li>${__("Payroll checkbox = include in payroll register (checked by default)")}</li>
-									<li>${__("Save draft (keeps your work) → Finalize when ready")}</li>
+									<li>${__("Save draft → Submit for COO approval (Shahid Khan)")}</li>
+									<li>${__("COO Approves → Finalize & create salary slips")}</li>
 								</ol>
 							</div>
 							<div class="vc-roster-panel__actions">
@@ -125,6 +138,10 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 				this.$company = this.page.main.find(".company-filter");
 				this.$sheet = this.page.main.find(".vc-sheet-content");
 				this.$save_draft = this.page.main.find(".btn-save-draft");
+				this.$submit_coo = this.page.main.find(".btn-submit-coo");
+				this.$withdraw_coo = this.page.main.find(".btn-withdraw-coo");
+				this.$approve_coo = this.page.main.find(".btn-approve-coo");
+				this.$reject_coo = this.page.main.find(".btn-reject-coo");
 				this.$finalize = this.page.main.find(".btn-finalize");
 				this.$dirty_hint = this.page.main.find(".vc-dirty-hint");
 				this.$period_status_badge = this.page.main.find(".vc-period-status-badge");
@@ -162,6 +179,10 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 				});
 				this.page.main.find(".btn-new-period").on("click", () => this.new_period_dialog());
 				this.$save_draft.on("click", () => this.save_draft());
+				this.$submit_coo.on("click", () => this.submit_for_coo_approval());
+				this.$withdraw_coo.on("click", () => this.withdraw_coo_submission());
+				this.$approve_coo.on("click", () => this.approve_coo_period());
+				this.$reject_coo.on("click", () => this.reject_coo_period());
 				this.$finalize.on("click", () => this.finalize_period());
 				this.page.main.find(".btn-payroll-all").on("click", () => this.set_all_payroll_checkboxes(true));
 				this.page.main.find(".btn-payroll-none").on("click", () => this.set_all_payroll_checkboxes(false));
@@ -756,34 +777,91 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 				this.update_save_state();
 			}
 
+			_approval() {
+				return (this._data && this._data.approval) || {};
+			}
+
+			_sheet_locked() {
+				const a = this._approval();
+				if (a.sheet_locked) return true;
+				return !!(this._data && this._data.is_finalized);
+			}
+
 			update_save_state() {
 				const has = this._dirty.size > 0 || this._payment_dirty;
 				const finalized = this._data && this._data.is_finalized;
-				this.$save_draft.prop("disabled", finalized || !this._data);
-				this.$finalize.prop("disabled", finalized || !this.get_selected_payroll_employees().length);
-				this.$dirty_hint.toggleClass("is-visible", has && !finalized);
+				const locked = this._sheet_locked();
+				const approval = this._approval();
+				const selected = this.get_selected_payroll_employees().length;
+
+				this.$save_draft
+					.prop("disabled", locked || !this._data)
+					.toggle(!locked && !!this._data);
+
+				this.$submit_coo
+					.toggle(!!approval.can_submit_for_approval)
+					.prop("disabled", !approval.can_submit_for_approval || !this._data);
+
+				this.$withdraw_coo
+					.toggle(!!approval.can_withdraw_approval)
+					.prop("disabled", !approval.can_withdraw_approval);
+
+				this.$approve_coo
+					.toggle(!!approval.can_approve)
+					.prop("disabled", !approval.can_approve);
+
+				this.$reject_coo
+					.toggle(!!approval.can_reject)
+					.prop("disabled", !approval.can_reject);
+
+				this.$finalize
+					.toggle(!!approval.can_finalize && !finalized)
+					.prop("disabled", !approval.can_finalize || finalized || selected === 0);
+
+				this.$dirty_hint.toggleClass("is-visible", has && !locked);
 			}
 
 			update_period_status_badge() {
 				const ps = (this._data && this._data.period_status) || {};
+				const status = ps.status || "Draft";
 				const finalized = this._data && this._data.is_finalized;
-				let text = "";
-				if (finalized) {
+				let text = status;
+				let cls = "label-default";
+
+				if (finalized || status === "Finalized") {
+					cls = "label-success";
 					text = __("Finalized");
 					if (ps.finalized_on) {
 						text += ` · ${frappe.datetime.str_to_user(ps.finalized_on)}`;
 					}
-					this.$period_status_badge
-						.html(`<span class="label label-success">${frappe.utils.escape_html(text)}</span>`)
-						.show();
+				} else if (status === "Pending COO Approval") {
+					cls = "label-info";
+					text = __("Pending COO Approval");
+					if (ps.submitted_for_approval_on) {
+						text += ` · ${frappe.datetime.str_to_user(ps.submitted_for_approval_on)}`;
+					}
+				} else if (status === "Approved") {
+					cls = "label-success";
+					text = __("COO Approved");
+					if (ps.approved_on) {
+						text += ` · ${frappe.datetime.str_to_user(ps.approved_on)}`;
+					}
+				} else if (status === "Rejected") {
+					cls = "label-danger";
+					text = __("Rejected by COO");
+					if (ps.rejection_reason) {
+						text += ` · ${ps.rejection_reason}`;
+					}
 				} else if (ps.draft_saved_on) {
+					cls = "label-warning";
 					text = __("Draft saved") + ` · ${frappe.datetime.str_to_user(ps.draft_saved_on)}`;
-					this.$period_status_badge
-						.html(`<span class="label label-warning">${frappe.utils.escape_html(text)}</span>`)
-						.show();
 				} else {
-					this.$period_status_badge.html(`<span class="label label-default">${__("Not saved")}</span>`).show();
+					text = __("Not saved");
 				}
+
+				this.$period_status_badge
+					.html(`<span class="label ${cls}">${frappe.utils.escape_html(text)}</span>`)
+					.show();
 			}
 
 			fmt(v) {
@@ -809,6 +887,7 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 				const deductions = d.deductions || [];
 				const salary_cols = d.salary_columns || [];
 				const sections = d.sections || [];
+				const locked = this._sheet_locked();
 
 				if (!earnings.length && !deductions.length) {
 					this.$sheet.html(`<div class="vc-empty">${__("No variable components configured.")}</div>`);
@@ -994,7 +1073,7 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 										data-type="earning" data-employee="${frappe.utils.escape_html(row.employee)}"
 										data-key="arrear_2" data-component="${frappe.utils.escape_html(component)}"
 										data-ads="${ads ? frappe.utils.escape_html(ads) : ""}" value="${val || ""}"
-										${d.is_finalized ? "readonly" : ""} />
+										${locked ? "readonly" : ""} />
 								</td>`;
 								return;
 							}
@@ -1063,11 +1142,11 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 									value=""
 									readonly tabindex="-1"
 									title="${__("Auto-calculated: Gross Pay minus deductions (same as Net Pay)")}"
-									${d.is_finalized ? "readonly" : ""} />
+									${locked ? "readonly" : ""} />
 							</td>
 							<td class="text-center vc-payment-cell">
 								<select class="vc-payment-mode form-control input-xs" data-employee="${frappe.utils.escape_html(row.employee)}"
-									${d.is_finalized ? "disabled" : ""}>
+									${locked ? "disabled" : ""}>
 									<option value="Cheque" ${pay_mode === "Cheque" ? "selected" : ""}>${__("Cheque")}</option>
 									<option value="Bank" ${pay_mode === "Bank" ? "selected" : ""}>${__("Bank")}</option>
 								</select>
@@ -1116,7 +1195,7 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 				tbody += "</tbody>";
 
 				const bank_datalist = this.build_bank_datalist(bank_opts);
-				const sheet_locked = d.is_finalized ? " vc-sheet-locked vc-sheet-fully-locked" : "";
+				const sheet_locked = this._sheet_locked() ? " vc-sheet-locked vc-sheet-fully-locked" : "";
 
 				this.$sheet.html(`
 					<div class="vc-head">
@@ -1241,7 +1320,7 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 			}
 
 			build_bank_field(employee, selected_bank, payment_mode) {
-				const finalized = this._data && this._data.is_finalized;
+				const locked = this._sheet_locked();
 				const is_bank = payment_mode === "Bank";
 				const val = frappe.utils.escape_html(selected_bank || "");
 				if (!is_bank) {
@@ -1251,7 +1330,7 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 				return `<input type="text" class="vc-payment-bank form-control input-xs"
 					list="vc-bank-datalist" data-employee="${frappe.utils.escape_html(employee)}"
 					value="${val}" placeholder="${__("Type or pick bank")}"
-					${finalized ? "readonly" : ""} autocomplete="off" />`;
+					${locked ? "readonly" : ""} autocomplete="off" />`;
 			}
 
 			_row_arrear_2($tr) {
@@ -1348,8 +1427,11 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 			}
 
 			save_draft() {
-				if (this._data && this._data.is_finalized) {
-					frappe.show_alert({ message: __("Period is finalized"), indicator: "orange" });
+				if (this._sheet_locked()) {
+					frappe.show_alert({
+						message: __("Period is locked (pending/approved/finalized)"),
+						indicator: "orange",
+					});
 					return;
 				}
 				const period = this.get_period_args();
@@ -1384,9 +1466,158 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 				});
 			}
 
+			submit_for_coo_approval() {
+				if (!this._approval().can_submit_for_approval) {
+					frappe.show_alert({ message: __("Cannot submit for approval"), indicator: "orange" });
+					return;
+				}
+				const period = this.get_period_args();
+				const payment_entries = this.collect_all_payment_entries();
+				const variable_entries = this.collect_all_variable_entries_for_save();
+
+				frappe.confirm(
+					__("Save this sheet and submit to COO (Shahid Khan) for approval?"),
+					() => {
+						frappe.call({
+							method: "tif_customization.tif_customization.page.variable_components.variable_components.submit_for_coo_approval",
+							args: {
+								...period,
+								payment_entries: JSON.stringify(payment_entries),
+								variable_entries: JSON.stringify(variable_entries),
+							},
+							freeze: true,
+							freeze_message: __("Submitting to COO…"),
+							timeout: 300,
+							callback: (r) => {
+								const m = r.message || {};
+								frappe.show_alert(
+									{ message: m.message || __("Submitted for COO approval"), indicator: "blue" },
+									10,
+								);
+								this._dirty.clear();
+								this._payment_dirty = false;
+								this.load_sheet();
+							},
+							error: (r) => {
+								frappe.msgprint({
+									title: __("Submit failed"),
+									message: (r && r.message) || __("Could not submit"),
+									indicator: "red",
+								});
+							},
+						});
+					},
+				);
+			}
+
+			withdraw_coo_submission() {
+				if (!this._approval().can_withdraw_approval) {
+					frappe.show_alert({ message: __("Cannot withdraw"), indicator: "orange" });
+					return;
+				}
+				frappe.confirm(__("Withdraw COO submission and return this period to Draft?"), () => {
+					frappe.call({
+						method: "tif_customization.tif_customization.page.variable_components.variable_components.withdraw_coo_submission",
+						args: this.get_period_args(),
+						freeze: true,
+						callback: (r) => {
+							frappe.show_alert({
+								message: (r.message && r.message.message) || __("Withdrawn"),
+								indicator: "orange",
+							});
+							this.load_sheet();
+						},
+					});
+				});
+			}
+
+			approve_coo_period() {
+				if (!this._approval().can_approve) {
+					frappe.show_alert({ message: __("Only COO can approve"), indicator: "orange" });
+					return;
+				}
+				const d = new frappe.ui.Dialog({
+					title: __("Approve Variable Components"),
+					fields: [
+						{
+							fieldname: "remarks",
+							fieldtype: "Small Text",
+							label: __("Remarks (optional)"),
+						},
+					],
+					primary_action_label: __("Approve"),
+					primary_action: (values) => {
+						d.hide();
+						frappe.call({
+							method: "tif_customization.tif_customization.page.variable_components.variable_components.approve_variable_period",
+							args: {
+								...this.get_period_args(),
+								remarks: values.remarks || "",
+							},
+							freeze: true,
+							freeze_message: __("Approving…"),
+							callback: (r) => {
+								frappe.show_alert({
+									message: (r.message && r.message.message) || __("Approved"),
+									indicator: "green",
+								});
+								this.load_sheet();
+							},
+						});
+					},
+				});
+				d.show();
+			}
+
+			reject_coo_period() {
+				if (!this._approval().can_reject) {
+					frappe.show_alert({ message: __("Only COO can reject"), indicator: "orange" });
+					return;
+				}
+				const d = new frappe.ui.Dialog({
+					title: __("Reject Variable Components"),
+					fields: [
+						{
+							fieldname: "reason",
+							fieldtype: "Small Text",
+							label: __("Rejection reason"),
+							reqd: 1,
+						},
+					],
+					primary_action_label: __("Reject"),
+					primary_action: (values) => {
+						d.hide();
+						frappe.call({
+							method: "tif_customization.tif_customization.page.variable_components.variable_components.reject_variable_period",
+							args: {
+								...this.get_period_args(),
+								reason: values.reason,
+							},
+							freeze: true,
+							freeze_message: __("Rejecting…"),
+							callback: (r) => {
+								frappe.show_alert({
+									message: (r.message && r.message.message) || __("Rejected"),
+									indicator: "orange",
+								});
+								this.load_sheet();
+							},
+						});
+					},
+				});
+				d.show();
+			}
+
 			finalize_period() {
 				if (this._data && this._data.is_finalized) {
 					frappe.show_alert({ message: __("Already finalized"), indicator: "orange" });
+					return;
+				}
+				if (!this._approval().can_finalize) {
+					frappe.show_alert({
+						message: __("COO must approve this period before Finalize"),
+						indicator: "orange",
+					});
 					return;
 				}
 				const employees = this.get_selected_payroll_employees();
@@ -1400,7 +1631,7 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 
 				frappe.confirm(
 					__(
-						"Finalize this period and create Payroll Entry + Salary Slips for {0} employee(s)? This cannot be undone from this page.",
+						"Finalize this COO-approved period and create Payroll Entry + Salary Slips for {0} employee(s)? This cannot be undone from this page.",
 						[employees.length],
 					),
 					() => {
@@ -1704,9 +1935,12 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 					__("{0} of {1} eligible employees selected for payroll", [selected, eligible]),
 				);
 
-				const finalized = this._data && this._data.is_finalized;
 				const pe_submitted = cint(info.payroll_entry_docstatus) === 1;
-				this.$finalize.prop("disabled", finalized || pe_submitted || selected === 0);
+				if (pe_submitted) {
+					this.$finalize.prop("disabled", true);
+				} else {
+					this.update_save_state();
+				}
 			}
 
 			collect_all_variable_entries() {
