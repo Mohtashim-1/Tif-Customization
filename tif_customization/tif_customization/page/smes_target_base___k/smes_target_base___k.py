@@ -27,18 +27,28 @@ def get_report_data(filters=None):
 		filters.get("fiscal_year_start") or _fiscal_year_start(to_date.year, to_date.month)
 	)
 	staff = (filters.get("staff") or "").strip()
+	officer_meta = _resolve_field_officer(staff)
+	# Prefer explicit region filter, else officer Type/Division from Field Officer
+	region = (filters.get("region") or "").strip().lower()
+	if region not in REGION_KEYS:
+		region = (officer_meta or {}).get("region") or ""
+	if region not in REGION_KEYS:
+		region = "karachi"
 
-	actuals = _count_actuals(from_date, to_date, staff)
+	# Expand staff match tokens (name + user email) for Field Visit ownership
+	staff_tokens = _staff_match_tokens(staff, officer_meta)
+
+	actuals = _count_actuals(from_date, to_date, staff, staff_tokens=staff_tokens)
 	activity_rows = _build_activity_rows(actuals, working_days)
 	region_totals = _build_region_totals(activity_rows, working_days)
 
 	fiscal_by_region = {
-		rk: _build_fiscal_month_scores(staff, fiscal_year_start, rk, working_days)
+		rk: _build_fiscal_month_scores(staff, fiscal_year_start, rk, working_days, staff_tokens=staff_tokens)
 		for rk in REGION_KEYS
 	}
 
-	# Increment tier reference uses Karachi column (same as spreadsheet default region).
-	karachi_percent = (region_totals.get("karachi") or {}).get("percent") or 0
+	# Increment tier uses the officer's assigned region (Excel sheet type)
+	focus_percent = (region_totals.get(region) or {}).get("percent") or 0
 
 	return {
 		"foundation_title": _("The ILM Foundation"),
@@ -51,6 +61,9 @@ def get_report_data(filters=None):
 			}
 			for rk in REGION_KEYS
 		],
+		"focus_region": region,
+		"focus_region_label": REGION_LABELS.get(region, region),
+		"officer": officer_meta,
 		"per_day_points_row": {
 			rk: REGION_SUMMARY[rk]["per_day_target_points"] for rk in REGION_KEYS
 		},
@@ -82,7 +95,7 @@ def get_report_data(filters=None):
 			},
 		],
 		"staff": staff,
-		"staff_label": _staff_label(staff),
+		"staff_label": _staff_label(staff, officer_meta),
 		"from_date": str(from_date),
 		"to_date": str(to_date),
 		"fiscal_year_start": fiscal_year_start,
@@ -90,16 +103,57 @@ def get_report_data(filters=None):
 		"working_days": working_days,
 		"fiscal_by_region": fiscal_by_region,
 		"increment_scale": INCREMENT_SCALE,
-		"increment_tier": _increment_tier(karachi_percent),
+		"increment_tier": _increment_tier(focus_percent),
 		"footnotes": [
 			_("* Model School A: Affiliated with at least one Program of 3 departments."),
 			_("** Model School B: Affiliated with at least one Program of 2 departments."),
 			_("Total expected target points depend on total number of working days."),
+			_("Officer Type / Division selects which Excel sheet targets apply (Karachi / Urban / Rural)."),
 		],
 		"reward_note": _("Highest % Achiever {0}-{1}: Cash Reward with Shield").format(
 			fiscal_year_start, fiscal_year_start + 1
 		),
 	}
+
+
+def _resolve_field_officer(staff):
+	if not staff or not frappe.db.exists("DocType", "Field Officer"):
+		return None
+	from tif_customization.tif_customization.doctype.field_officer.field_officer import get_officer_region
+
+	meta = get_officer_region(staff_name=staff)
+	if not meta or not meta.get("officer"):
+		return None
+	return meta
+
+
+def _staff_match_tokens(staff, officer_meta=None):
+	tokens = set()
+	if staff:
+		tokens.add(staff)
+	if officer_meta:
+		for key in ("name", "user", "officer"):
+			val = (officer_meta.get(key) or "").strip()
+			if val:
+				tokens.add(val)
+		# Also employee name variants via Employee link
+		if officer_meta.get("officer"):
+			emp = frappe.db.get_value("Field Officer", officer_meta["officer"], "employee")
+			if emp:
+				emp_name = frappe.db.get_value("Employee", emp, "employee_name")
+				if emp_name:
+					tokens.add(emp_name)
+	return [t for t in tokens if t]
+
+
+def _staff_label(staff, officer_meta=None):
+	if officer_meta and officer_meta.get("name"):
+		div = officer_meta.get("division") or ""
+		return f"{officer_meta['name']}" + (f" ({div})" if div else "")
+	if not staff:
+		return _("All Field Staff")
+	return staff
+
 
 
 def _build_activity_rows(actuals, working_days):
@@ -168,12 +222,46 @@ def _build_region_totals(activity_rows, working_days):
 
 @frappe.whitelist()
 def get_staff_options(txt=""):
+	"""Prefer Active Field Officers (with Type/Division + User); fall back to visit names."""
 	txt = (txt or "").strip()
 	params = {}
 	txt_filter = ""
 	if txt:
-		txt_filter = "AND staff_name LIKE %(txt)s"
+		txt_filter = "AND (fo.name1 LIKE %(txt)s OR fo.user LIKE %(txt)s OR fo.division LIKE %(txt)s)"
 		params["txt"] = f"%{txt}%"
+
+	officers = []
+	if frappe.db.exists("DocType", "Field Officer"):
+		officers = frappe.db.sql(
+			f"""
+			SELECT fo.name1 AS value, fo.user, fo.division, fo.employee
+			FROM `tabField Officer` fo
+			WHERE fo.status = 'Active'
+			  AND IFNULL(fo.name1, '') != ''
+			  {txt_filter}
+			ORDER BY fo.name1
+			LIMIT 50
+			""",
+			params,
+			as_dict=True,
+		)
+
+	if officers:
+		return [
+			{
+				"value": r.value,
+				"description": " · ".join(
+					[x for x in [r.division, r.user, r.employee] if x]
+				),
+			}
+			for r in officers
+		]
+
+	params2 = {}
+	txt_filter2 = ""
+	if txt:
+		txt_filter2 = "AND staff_name LIKE %(txt)s"
+		params2["txt"] = f"%{txt}%"
 
 	rows = frappe.db.sql(
 		f"""
@@ -189,11 +277,11 @@ def get_staff_options(txt=""):
 			SELECT NULLIF(TRIM(owner), '') FROM `tabField Visit` WHERE docstatus < 2
 		) t
 		WHERE staff_name IS NOT NULL AND staff_name != ''
-		{txt_filter}
+		{txt_filter2}
 		ORDER BY staff_name
 		LIMIT 50
 		""",
-		params,
+		params2,
 		as_dict=True,
 	)
 	return [{"value": r.staff_name, "description": r.staff_name} for r in rows if r.staff_name]
@@ -242,14 +330,10 @@ def _fiscal_year_bounds(fy_start):
 	return start, end
 
 
-def _staff_label(staff):
-	if not staff:
-		return _("All Field Staff")
-	return staff
-
-
-def _staff_filter_sql():
-	return """
+def _staff_filter_sql(staff_tokens=None):
+	"""Match visit staff fields against any of the officer name/user tokens."""
+	if not staff_tokens:
+		return """
 		AND (
 			%(staff)s IS NULL OR %(staff)s = ''
 			OR COALESCE(visit_by, '') = %(staff)s
@@ -261,6 +345,16 @@ def _staff_filter_sql():
 			OR COALESCE(me_visit_by, '') LIKE %(staff_like)s
 			OR COALESCE(training_trainer_name, '') LIKE %(staff_like)s
 			OR COALESCE(training_entry_filled_by, '') LIKE %(staff_like)s
+		)
+		"""
+	# Token list match (name + linked user)
+	return """
+		AND (
+			COALESCE(visit_by, '') IN %(staff_tokens)s
+			OR COALESCE(me_visit_by, '') IN %(staff_tokens)s
+			OR COALESCE(training_trainer_name, '') IN %(staff_tokens)s
+			OR COALESCE(training_entry_filled_by, '') IN %(staff_tokens)s
+			OR owner IN %(staff_tokens)s
 		)
 	"""
 
@@ -275,14 +369,16 @@ def _visit_date_expr(type_field):
 	return "COALESCE(modified, creation)"
 
 
-def _count_actuals(from_date, to_date, staff):
+def _count_actuals(from_date, to_date, staff, staff_tokens=None):
+	tokens = staff_tokens or ([staff] if staff else [])
 	staff_params = {
 		"from_date": from_date,
 		"to_date": to_date,
 		"staff": staff or None,
 		"staff_like": f"%{staff}%" if staff else "%",
+		"staff_tokens": tuple(tokens) if tokens else ("",),
 	}
-	staff_sql = _staff_filter_sql()
+	staff_sql = _staff_filter_sql(tokens if staff else None)
 
 	counts = {a["metric"]: 0 for a in KPI_ACTIVITIES}
 
@@ -424,7 +520,7 @@ def _scalar_count(query, params):
 	return cint(frappe.db.sql(query, params)[0][0] or 0)
 
 
-def _build_fiscal_month_scores(staff, fiscal_year_start, region, working_days):
+def _build_fiscal_month_scores(staff, fiscal_year_start, region, working_days, staff_tokens=None):
 	region_summary = REGION_SUMMARY.get(region, REGION_SUMMARY["karachi"])
 	expected = working_days * region_summary["per_day_target_points"]
 	results = []
@@ -433,7 +529,7 @@ def _build_fiscal_month_scores(staff, fiscal_year_start, region, working_days):
 		year = fiscal_year_start if month_num >= 7 else fiscal_year_start + 1
 		from_date = get_first_day(f"{year}-{month_num:02d}-01")
 		to_date = get_last_day(from_date)
-		actuals = _count_actuals(from_date, to_date, staff)
+		actuals = _count_actuals(from_date, to_date, staff, staff_tokens=staff_tokens)
 		score = 0.0
 		for activity in KPI_ACTIVITIES:
 			target_cfg = (activity.get("targets") or {}).get(region) or {}

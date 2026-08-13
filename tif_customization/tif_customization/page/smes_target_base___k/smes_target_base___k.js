@@ -39,7 +39,8 @@ class SmesTargetBasePage {
 						</div>
 					</div>
 					<div class="row sme-filter-row">
-						<div class="col-lg-4 col-md-6 mb-2" data-field="staff"></div>
+						<div class="col-lg-3 col-md-6 mb-2" data-field="staff"></div>
+						<div class="col-lg-2 col-md-4 mb-2" data-field="region"></div>
 						<div class="col-lg-2 col-md-4 mb-2" data-field="from_date"></div>
 						<div class="col-lg-2 col-md-4 mb-2" data-field="to_date"></div>
 						<div class="col-lg-2 col-md-4 mb-2" data-field="working_days"></div>
@@ -124,14 +125,29 @@ class SmesTargetBasePage {
 	setup_filters() {
 		const today = frappe.datetime.get_today();
 		const fromDefault = frappe.datetime.month_start(today);
+		const route = frappe.get_route_options() || {};
 
 		this.filters = {
 			staff: this.make_filter({
-				label: __("SME / Field Staff"),
+				label: __("SME / Field Officer"),
 				fieldname: "staff",
 				fieldtype: "Autocomplete",
 				options: [],
+				default: route.staff || "",
+			}),
+			region: this.make_filter({
+				label: __("Type / Division (KPI Sheet)"),
+				fieldname: "region",
+				fieldtype: "Select",
+				options: [
+					"",
+					"karachi",
+					"urban",
+					"rural",
+					"punjab",
+				].join("\n"),
 				default: "",
+				description: __("Auto from Field Officer when blank"),
 			}),
 			from_date: this.make_filter({
 				label: __("Visit From Date"),
@@ -155,6 +171,26 @@ class SmesTargetBasePage {
 				reqd: 1,
 			}),
 		};
+
+		// Friendly labels for region options
+		setTimeout(() => {
+			const $sel = $(this.filters.region.$input);
+			$sel.find('option[value=""]').text(__("Auto (from Field Officer)"));
+			$sel.find('option[value="karachi"]').text(__("Karachi"));
+			$sel.find('option[value="urban"]').text(__("Urban Areas"));
+			$sel.find('option[value="rural"]').text(__("Rural Areas"));
+			$sel.find('option[value="punjab"]').text(__("Punjab"));
+			if (route.division) {
+				const map = {
+					Karachi: "karachi",
+					"Urban Areas": "urban",
+					"Rural Areas": "rural",
+					Punjab: "punjab",
+				};
+				const rk = map[route.division];
+				if (rk) this.filters.region.set_value(rk);
+			}
+		}, 50);
 	}
 
 	get_filter_values() {
@@ -180,6 +216,7 @@ class SmesTargetBasePage {
 
 		return {
 			staff: (this.filters.staff.get_value() || "").trim(),
+			region: (this.filters.region.get_value() || "").trim(),
 			from_date,
 			to_date,
 			working_days: cint(this.filters.working_days.get_value()) || 21,
@@ -192,6 +229,7 @@ class SmesTargetBasePage {
 		this.body.find(".sme-reset").on("click", () => {
 			const today = frappe.datetime.get_today();
 			this.filters.staff.set_value("");
+			this.filters.region.set_value("");
 			this.filters.from_date.set_value(frappe.datetime.month_start(today));
 			this.filters.to_date.set_value(today);
 			this.filters.working_days.set_value(21);
@@ -255,10 +293,10 @@ class SmesTargetBasePage {
 			themeMap[r.key] = r.theme || "tan";
 		});
 		const regionHeader = regions
-			.map(
-				(r) =>
-					`<th colspan="3" class="${r.theme === "blue" ? "region-blue" : "region-tan"}">${frappe.utils.escape_html(r.label)}</th>`
-			)
+			.map((r) => {
+				const focus = data.focus_region === r.key ? " outline:2px solid #1b5e3b;" : "";
+				return `<th colspan="3" class="${r.theme === "blue" ? "region-blue" : "region-tan"}" style="${focus}">${frappe.utils.escape_html(r.label)}${data.focus_region === r.key ? " ★" : ""}</th>`;
+			})
 			.join("");
 
 		const subHeader = regions
@@ -339,6 +377,7 @@ class SmesTargetBasePage {
 			<p class="text-muted small mb-2">
 				${__("Period")}: ${frappe.utils.escape_html(data.from_date || "")} — ${frappe.utils.escape_html(data.to_date || "")}
 				| ${frappe.utils.escape_html(data.staff_label || "")}
+				| ${__("KPI Sheet")}: <strong>${frappe.utils.escape_html(data.focus_region_label || "")}</strong>
 				| ${__("Act = Field Visit count in selected date range")}
 			</p>
 		`;
@@ -405,9 +444,9 @@ class SmesTargetBasePage {
 				</div>
 				<div class="sme-bottom-block">
 					<strong>${__("Signatures")}</strong>
-					<div class="mt-2"><label>${__("SME Name")}</label><div class="sme-sign-box">${frappe.utils.escape_html(data.staff || "")}</div></div>
-					<div class="mt-2"><label>${__("SME Signature")}</label><div class="sme-sign-box"></div></div>
-					<div class="mt-2"><label>${__("Line Manager Signature")}</label><div class="sme-sign-box"></div></div>
+					<div class="mt-2"><label>${__("SME Name")}</label><div class="sme-sign-box">${frappe.utils.escape_html(data.staff_label || data.staff || "")}</div></div>
+					<div class="mt-2"><label>${__("Type / Division")}</label><div class="sme-sign-box">${frappe.utils.escape_html((data.officer && data.officer.division) || data.focus_region_label || "")}</div></div>
+					<a href="/app/field-officer" class="btn btn-xs btn-default mt-2 no-print">${__("Manage Field Officers")}</a>
 					<a href="/app/field-visit" class="btn btn-xs btn-default mt-2 no-print">${__("Open Field Visits")}</a>
 				</div>
 			</div>

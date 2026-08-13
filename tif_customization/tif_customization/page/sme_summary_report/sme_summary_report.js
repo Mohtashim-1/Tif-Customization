@@ -190,6 +190,7 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 						(r) => `
 				<tr>
 					<td class="left">${frappe.utils.escape_html(r.label || "")}</td>
+					<td>${frappe.utils.escape_html(r.division || r.region_label || "—")}</td>
 					<td class="num">${this.fmt(r.followup)}</td>
 					<td class="num">${this.fmt(r.new)}</td>
 					<td class="num">${this.fmt(r.meetings)}</td>
@@ -201,13 +202,13 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 					<td class="num">${this.fmt_cur(r.expenses)}</td>
 					<td class="num">${this.fmt(r.visited_days)}</td>
 					<td class="num">${this.fmt(r.difference)}</td>
-					<td class="num score-col" title="${__("KPI points")}: ${this.fmt_score(r.score_points)} / ${this.fmt_score(data.expected_points)}">
+					<td class="num score-col" title="${__("KPI points")}: ${this.fmt_score(r.score_points)}">
 						${this.fmt_score(r.score)}%
 					</td>
 				</tr>`
 					)
 					.join("")
-			: `<tr><td colspan="13" class="text-center text-muted">${__("No SMEs found")}</td></tr>`;
+			: `<tr><td colspan="14" class="text-center text-muted">${__("No SMEs found")}</td></tr>`;
 
 		$("#sme-sum-body").html(`
 			<div class="sme-sum-title">${__("Summary")} (${__("Visit Date")}: ${fromLabel} ${__("to")} ${toLabel})</div>
@@ -225,6 +226,7 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 					<thead>
 						<tr>
 							<th rowspan="2" class="left">${__("Name")}</th>
+							<th rowspan="2">${__("Type / Division")}</th>
 							<th colspan="2" class="group">${__("Marketing Visits")}</th>
 							<th colspan="1" class="group">${__("Meetings")}</th>
 							<th colspan="2" class="group">${__("M&E Visits")}</th>
@@ -250,6 +252,7 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 					<tfoot>
 						<tr>
 							<th class="left">${__("Grand Total")}</th>
+							<th></th>
 							<th class="num">${this.fmt(t.followup)}</th>
 							<th class="num">${this.fmt(t.new)}</th>
 							<th class="num">${this.fmt(t.meetings)}</th>
@@ -276,6 +279,7 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 		}
 		const headers = [
 			"Name",
+			"Type / Division",
 			"Followup & Other Visits",
 			"New",
 			"Meetings",
@@ -295,6 +299,7 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 			lines.push(
 				[
 					`"${(r.label || "").replace(/"/g, '""')}"`,
+					`"${(r.division || r.region_label || "").replace(/"/g, '""')}"`,
 					r.followup || 0,
 					r.new || 0,
 					r.meetings || 0,

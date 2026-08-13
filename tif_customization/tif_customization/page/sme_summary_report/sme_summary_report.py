@@ -51,7 +51,10 @@ def get_report_data(filters=None):
 	visit_stats = _load_visit_stats(from_date, to_date, staff_rows)
 	expenses = _load_expenses(from_date, to_date, staff_rows)
 
-	expected_points = working_days * REGION_SUMMARY[region]["per_day_target_points"]
+	expected_points_by_region = {
+		rk: working_days * REGION_SUMMARY[rk]["per_day_target_points"] for rk in REGION_KEYS
+	}
+	default_expected = expected_points_by_region.get(region) or expected_points_by_region["karachi"]
 	rows = []
 	totals = defaultdict(float)
 
@@ -71,13 +74,18 @@ def get_report_data(filters=None):
 		expense_amt = flt(expenses.get(key) or 0)
 		difference = visited_days - working_days
 
+		staff_region = _staff_region(staff) or region
+		staff_expected = expected_points_by_region.get(staff_region) or default_expected
 		score_points, score_pct = _compute_score(
-			staff, from_date, to_date, region, expected_points, stats
+			staff, from_date, to_date, staff_region, staff_expected, stats
 		)
 
 		row = {
 			"employee": staff.get("employee"),
 			"employee_name": staff.get("employee_name"),
+			"division": staff.get("division") or "",
+			"region": staff_region,
+			"region_label": REGION_LABELS.get(staff_region, staff_region),
 			"user_id": staff.get("user_id"),
 			"label": f"SME - {staff.get('employee_name') or staff.get('user_id') or staff.get('employee')}",
 			"followup": followup,
@@ -131,7 +139,7 @@ def get_report_data(filters=None):
 		"working_days": working_days,
 		"region": region,
 		"region_label": REGION_LABELS.get(region, region),
-		"expected_points": flt(expected_points, 2),
+		"expected_points": flt(default_expected, 2),
 		"rows": rows,
 		"totals": totals_out,
 		"regions": [{"key": rk, "label": REGION_LABELS[rk]} for rk in REGION_KEYS],
@@ -219,7 +227,9 @@ def _get_sme_staff(filters):
 			full_names[u.name] = u.full_name
 
 	result = []
+	officer_map = _field_officer_map([r.name for r in rows], [r.user_id for r in rows if r.user_id])
 	for r in rows:
+		fo = officer_map.get(r.name) or officer_map.get(r.user_id) or {}
 		result.append(
 			{
 				"key": r.name,
@@ -227,10 +237,53 @@ def _get_sme_staff(filters):
 				"employee_name": r.employee_name,
 				"user_id": r.user_id,
 				"department": r.department,
+				"division": fo.get("division") or "",
 				"match_values": _staff_match_values(r, full_names.get(r.user_id)),
 			}
 		)
 	return result
+
+
+def _field_officer_map(employees, user_ids):
+	"""Map employee/user → Field Officer division."""
+	out = {}
+	if not frappe.db.exists("DocType", "Field Officer"):
+		return out
+	filters = {"status": "Active"}
+	rows = frappe.get_all(
+		"Field Officer",
+		filters=filters,
+		fields=["name", "name1", "employee", "user", "division"],
+	)
+	emp_set = set(employees or [])
+	user_set = set(user_ids or [])
+	for r in rows:
+		payload = {"division": r.division, "officer": r.name, "name1": r.name1}
+		if r.employee and r.employee in emp_set:
+			out[r.employee] = payload
+		if r.user and r.user in user_set:
+			out[r.user] = payload
+	return out
+
+
+def _staff_region(staff):
+	from tif_customization.tif_customization.doctype.field_officer.field_officer import division_to_region
+
+	div = (staff or {}).get("division") or ""
+	region = division_to_region(div)
+	if region:
+		return region
+	# Fallback resolve by employee / user
+	if not frappe.db.exists("DocType", "Field Officer"):
+		return None
+	from tif_customization.tif_customization.doctype.field_officer.field_officer import get_officer_region
+
+	meta = get_officer_region(
+		employee=staff.get("employee"),
+		user=staff.get("user_id"),
+		staff_name=staff.get("employee_name"),
+	)
+	return (meta or {}).get("region")
 
 
 def _staff_match_values(emp, user_full_name=None) -> set[str]:

@@ -108,7 +108,7 @@ def get_active_field_officer_staff():
 		officers = frappe.get_all(
 			"Field Officer",
 			filters={"status": "Active"},
-			fields=["name", "name1", "employee", "user"],
+			fields=["name", "name1", "employee", "user", "division"],
 		)
 		for row in officers:
 			emp = row.employee
@@ -129,6 +129,7 @@ def get_active_field_officer_staff():
 				"employee": emp_row.name,
 				"employee_name": emp_row.employee_name or row.name1 or emp_row.name,
 				"user": user or "",
+				"division": row.division or "",
 			}
 
 	# 2) Users with field officer roles
