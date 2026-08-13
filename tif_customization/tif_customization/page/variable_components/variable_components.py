@@ -1737,6 +1737,50 @@ def _get_payroll_period_info(company, start_date, end_date):
 	return info
 
 
+def _resolve_payroll_cost_center(company):
+	"""Resolve Cost Center for Payroll Entry (required field)."""
+	cost_center = frappe.db.get_value("Company", company, "cost_center")
+	if cost_center:
+		return cost_center
+
+	cost_center = frappe.db.get_value(
+		"Payroll Entry",
+		{"company": company, "docstatus": 1, "cost_center": ["is", "set"]},
+		"cost_center",
+		order_by="creation desc",
+	)
+	if cost_center:
+		return cost_center
+
+	cost_center = frappe.db.get_value(
+		"Cost Center",
+		{
+			"company": company,
+			"is_group": 0,
+			"disabled": 0,
+			"name": ["like", "%Salary%"],
+		},
+		"name",
+	)
+	if cost_center:
+		return cost_center
+
+	cost_center = frappe.db.get_value(
+		"Cost Center",
+		{"company": company, "is_group": 0, "disabled": 0},
+		"name",
+		order_by="name asc",
+	)
+	if cost_center:
+		return cost_center
+
+	frappe.throw(
+		_(
+			"Cost Center is required for Payroll Entry. Set Default Cost Center on Company {0}, or create a Cost Center for this company."
+		).format(company)
+	)
+
+
 def _payroll_entry_defaults(company):
 	if not frappe.db.exists("DocType", "Payroll Entry"):
 		frappe.throw(_("HRMS Payroll is not installed (Payroll Entry missing)."))
@@ -1749,7 +1793,11 @@ def _payroll_entry_defaults(company):
 				company
 			)
 		)
-	return {"currency": currency, "payroll_payable_account": payroll_payable}
+	return {
+		"currency": currency,
+		"payroll_payable_account": payroll_payable,
+		"cost_center": _resolve_payroll_cost_center(company),
+	}
 
 
 def _employees_for_payroll_entry(company, start_date, end_date, employee_ids):
@@ -1854,6 +1902,8 @@ def create_payroll_from_variable_components(
 	if existing and cint(existing.docstatus) == 0:
 		pe = frappe.get_doc("Payroll Entry", existing.name)
 		pe.validate_attendance = 0
+		if not pe.cost_center:
+			pe.cost_center = defaults["cost_center"]
 	else:
 		pe = frappe.new_doc("Payroll Entry")
 		pe.company = company
@@ -1864,6 +1914,7 @@ def create_payroll_from_variable_components(
 		pe.currency = defaults["currency"]
 		pe.exchange_rate = 1
 		pe.payroll_payable_account = defaults["payroll_payable_account"]
+		pe.cost_center = defaults["cost_center"]
 		pe.salary_slip_based_on_timesheet = 0
 		pe.validate_attendance = 0
 
