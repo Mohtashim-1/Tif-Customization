@@ -94,7 +94,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Dispatch Detail Report",
+   "label": "Courier Dispatch Report",
    "link_count": 0,
    "link_to": "dispatch-detail-report",
    "link_type": "Page",
@@ -104,7 +104,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Dispatch Report",
+   "label": "School Wise Dispatched Report",
    "link_count": 0,
    "link_to": "dispatch-report",
    "link_type": "Page",
@@ -165,16 +165,6 @@
    "label": "Book Purchase & Printing Dashboard",
    "link_count": 0,
    "link_to": "book-purchase-printing-dashboard",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Vendor Consultant Ledger",
-   "link_count": 0,
-   "link_to": "vendor-consultant-ledger",
    "link_type": "Page",
    "onboard": 0,
    "type": "Link"
@@ -264,6 +254,26 @@
    "link_count": 0,
    "link_to": "salary-register",
    "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Providant Fund (UAT)",
+   "link_count": 0,
+   "link_to": "pf-dashboard",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Salary Slip (UAT)",
+   "link_count": 0,
+   "link_to": "Salary Slip",
+   "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
   },
@@ -448,6 +458,16 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "Vendor Consultant Ledger (UAT)",
+   "link_count": 0,
+   "link_to": "vendor-consultant-ledger",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "Reconciliation with Bank Statements Summary ",
    "link_count": 0,
    "link_to": "reconcillation-with-",
@@ -462,6 +482,16 @@
    "link_count": 0,
    "link_to": "program-wise-expense",
    "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Employee Tax (UAT)",
+   "link_count": 0,
+   "link_to": "Income Tax Deductions",
+   "link_type": "Report",
    "onboard": 0,
    "type": "Link"
   },
@@ -617,7 +647,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-08-13 13:47:57.390897",
+ "modified": "2026-08-17 13:20:33.682606",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Reports",

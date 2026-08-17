@@ -1452,7 +1452,8 @@ def get_pending_dispatches_count(filters=None):
             SELECT COUNT(DISTINCT so.name) as count
             FROM `tabSales Order` so
             WHERE so.docstatus = 1
-            AND so.status NOT IN ('Closed', 'Cancelled', 'Completed', 'Stopped', 'On Hold')
+            AND IFNULL(so.status, '') NOT IN ('Closed', 'Cancelled', 'Completed', 'Stopped', 'On Hold')
+            AND IFNULL(so.status, '') NOT LIKE '%%Cancel%%'
             AND (so.per_delivered < 100 OR so.per_delivered IS NULL)
             {date_filter}
         """, tuple(params) if params else (), as_dict=True)
@@ -1498,7 +1499,8 @@ def get_pending_dispatches_details(filters=None):
 			FROM `tabSales Order` so
 			LEFT JOIN `tabSales Order Item` soi ON soi.parent = so.name
 			WHERE so.docstatus = 1
-			AND so.status NOT IN ('Closed', 'Cancelled', 'Completed', 'Stopped', 'On Hold')
+			AND IFNULL(so.status, '') NOT IN ('Closed', 'Cancelled', 'Completed', 'Stopped', 'On Hold')
+			AND IFNULL(so.status, '') NOT LIKE '%%Cancel%%'
 			AND (so.per_delivered < 100 OR so.per_delivered IS NULL)
 			{date_filter}
 			GROUP BY so.name
@@ -1508,7 +1510,12 @@ def get_pending_dispatches_details(filters=None):
 			tuple(params) if params else (),
 			as_dict=True,
 		)
-		return rows or []
+		# Extra safety: never return cancelled Sales Orders to the dashboard
+		rows = [
+			r for r in (rows or [])
+			if "cancel" not in (r.get("status") or "").lower()
+		]
+		return rows
 	except Exception as e:
 		frappe.log_error(
 			f"Error getting pending dispatches details: {str(e)}",

@@ -1,7 +1,7 @@
 frappe.pages['dispatch-report'].on_page_load = function(wrapper) {
 	let page = frappe.ui.make_app_page({
 		parent: wrapper,
-		title: 'Dispatch Report',
+		title: 'School Wise Dispatch Report',
 		single_column: true
 	});
 	

@@ -69,7 +69,7 @@ frappe.tif_customization.SchoolWiseDemandReport = class SchoolWiseDemandReport {
 				<p class="swdr-note">
 					Demand = open Sales Orders not fully delivered (book items only).
 					Pending qty = Ordered − Delivered.
-					Book Type includes <strong>KPK Edition</strong> (item name/code contains KPK).
+					Book Type includes <strong>KPK Edition</strong> (KP / KPK textbooks, e.g. MQH KP Urdu Textbook).
 					Sales Order No shows open SO IDs per school.
 				</p>
 				<div id="swdr-filters" class="row" style="margin-bottom:12px;"></div>

@@ -78,9 +78,7 @@ def _get_school_demand_rows(filters):
 
 	book_type = (filters.get("book_type") or "").strip()
 	if book_type == "MQH":
-		where.append(
-			"(UPPER(COALESCE(soi.item_name,'')) LIKE '%%MQH%%' OR UPPER(COALESCE(soi.item_code,'')) LIKE '%%MQH%%')"
-		)
+		where.append(f"({_mqh_case()})")
 	elif book_type == "Qaida":
 		where.append(
 			"(UPPER(COALESCE(soi.item_name,'')) LIKE '%%QAIDA%%' OR UPPER(COALESCE(soi.item_code,'')) LIKE '%%QAIDA%%')"
@@ -111,8 +109,7 @@ def _get_school_demand_rows(filters):
 			SUM(IFNULL(soi.delivered_qty, 0)) AS total_delivered,
 			SUM(
 				CASE
-					WHEN UPPER(COALESCE(soi.item_name,'')) LIKE '%%MQH%%'
-						OR UPPER(COALESCE(soi.item_code,'')) LIKE '%%MQH%%'
+					WHEN {_mqh_case()}
 					THEN IFNULL(soi.qty, 0) - IFNULL(soi.delivered_qty, 0) ELSE 0
 				END
 			) AS mqh_pending,
@@ -195,16 +192,28 @@ def _get_school_demand_rows(filters):
 
 def _kpk_edition_sql():
 	"""Match KPK Edition / KPK Textbook Board book lines."""
-	return (
-		"(UPPER(COALESCE(soi.item_name,'')) LIKE '%%KPK%%' "
-		"OR UPPER(COALESCE(soi.item_code,'')) LIKE '%%KPK%%')"
-	)
+	return f"({_kpk_edition_case()})"
 
 
 def _kpk_edition_case():
+	# KP titles are stored as "MQH KP Urdu Textbook Class 6" with codes like MQKPUT6,
+	# so matching only on "KPK" misses every row.
 	return (
-		"UPPER(COALESCE(soi.item_name,'')) LIKE '%%KPK%%' "
-		"OR UPPER(COALESCE(soi.item_code,'')) LIKE '%%KPK%%'"
+		"UPPER(COALESCE(soi.item_code,'')) LIKE 'MQKP%%' "
+		"OR UPPER(COALESCE(soi.item_code,'')) LIKE '%%KPK%%' "
+		"OR UPPER(COALESCE(soi.item_name,'')) LIKE '%%KPK%%' "
+		"OR UPPER(COALESCE(soi.item_name,'')) LIKE '%% KP %%' "
+		"OR UPPER(COALESCE(soi.item_name,'')) LIKE '%%KHYBER%%' "
+		"OR UPPER(COALESCE(soi.item_name,'')) LIKE '%%PAKHTUN%%'"
+	)
+
+
+def _mqh_case():
+	# KP editions carry the MQH prefix too; keep them out so the two columns don't overlap.
+	return (
+		"(UPPER(COALESCE(soi.item_name,'')) LIKE '%%MQH%%' "
+		"OR UPPER(COALESCE(soi.item_code,'')) LIKE '%%MQH%%') "
+		f"AND NOT ({_kpk_edition_case()})"
 	)
 
 
