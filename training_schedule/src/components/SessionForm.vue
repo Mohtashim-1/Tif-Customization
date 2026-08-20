@@ -1,6 +1,8 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { apiGet, apiPost, METHOD } from "../lib/api";
+import DatePicker from "./DatePicker.vue";
+import TimePicker from "./TimePicker.vue";
 
 const props = defineProps({
 	open: { type: Boolean, default: false },
@@ -129,13 +131,13 @@ onMounted(load);
 						<option v-for="t in options.types" :key="t" :value="t">{{ t }}</option>
 					</select>
 				</label>
-				<label>
+				<label class="pick">
 					Date
-					<input v-model="form.training_date" type="date" required />
+					<DatePicker v-model="form.training_date" required />
 				</label>
-				<label>
+				<label class="pick">
 					Time
-					<input v-model="form.training_time" type="time" />
+					<TimePicker v-model="form.training_time" />
 				</label>
 				<label>
 					Trainer
@@ -273,6 +275,10 @@ label {
 	font-size: 12px;
 	font-weight: 600;
 	color: #374151;
+}
+.pick {
+	position: relative;
+	z-index: 2;
 }
 input,
 select {

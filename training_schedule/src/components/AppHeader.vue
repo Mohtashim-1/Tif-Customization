@@ -1,5 +1,8 @@
 <script setup>
-defineProps({
+import { onBeforeUnmount, ref, watch } from "vue";
+import { apiPost } from "../lib/api";
+
+const props = defineProps({
 	user: { type: Object, required: true },
 	title: { type: String, default: "Training Schedule" },
 	subtitle: { type: String, default: "Upcoming Training workspace" },
@@ -7,6 +10,30 @@ defineProps({
 });
 defineEmits(["notify"]);
 const search = defineModel("search", { type: String, default: "" });
+
+const menuOpen = ref(false);
+const wrap = ref(null);
+
+const profileUrl = () => `/app/user/${encodeURIComponent(props.user.id || props.user.name || "me")}`;
+
+function onDoc(e) {
+	if (wrap.value && !wrap.value.contains(e.target)) menuOpen.value = false;
+}
+
+watch(menuOpen, (v) => {
+	if (v) document.addEventListener("mousedown", onDoc);
+	else document.removeEventListener("mousedown", onDoc);
+});
+onBeforeUnmount(() => document.removeEventListener("mousedown", onDoc));
+
+async function logout() {
+	try {
+		await apiPost("logout");
+	} catch {
+		/* still leave the portal */
+	}
+	window.location.href = "/login?redirect-to=/training-schedule";
+}
 </script>
 
 <template>
@@ -24,11 +51,24 @@ const search = defineModel("search", { type: String, default: "" });
 				🔔
 				<span v-if="user.notifications" class="badge">{{ user.notifications }}</span>
 			</button>
-			<div class="profile">
-				<div class="avatar">{{ user.initials }}</div>
-				<div>
-					<div class="name">{{ user.name }}</div>
-					<div class="role">{{ user.role }}</div>
+			<div ref="wrap" class="profile-wrap">
+				<button type="button" class="profile" @click="menuOpen = !menuOpen">
+					<div class="avatar">{{ user.initials }}</div>
+					<div>
+						<div class="name">{{ user.name }}</div>
+						<div class="role">{{ user.role }}</div>
+					</div>
+					<span class="caret">▾</span>
+				</button>
+				<div v-if="menuOpen" class="menu">
+					<div class="who">
+						<strong>{{ user.name }}</strong>
+						<small>{{ user.email || user.id }}</small>
+					</div>
+					<a :href="profileUrl()">My Profile</a>
+					<a href="/app">Open Desk</a>
+					<a href="/app/upcoming-training">Upcoming Training list</a>
+					<button type="button" class="out" @click="logout">Log out</button>
 				</div>
 			</div>
 		</div>
@@ -113,6 +153,10 @@ const search = defineModel("search", { type: String, default: "" });
 	place-items: center;
 }
 
+.profile-wrap {
+	position: relative;
+}
+
 .profile {
 	display: flex;
 	align-items: center;
@@ -121,6 +165,71 @@ const search = defineModel("search", { type: String, default: "" });
 	border: 1px solid var(--line);
 	border-radius: 14px;
 	padding: 6px 12px 6px 6px;
+	font: inherit;
+}
+
+.profile:hover,
+.bell:hover {
+	border-color: #c7d2fe;
+}
+
+.caret {
+	color: #9ca3af;
+	font-size: 12px;
+}
+
+.menu {
+	position: absolute;
+	right: 0;
+	top: calc(100% + 8px);
+	width: 240px;
+	background: #fff;
+	border: 1px solid var(--line);
+	border-radius: 14px;
+	box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
+	padding: 8px;
+	z-index: 40;
+	display: flex;
+	flex-direction: column;
+}
+
+.who {
+	padding: 8px 10px 10px;
+	border-bottom: 1px solid #f3f4f6;
+	margin-bottom: 6px;
+}
+
+.who strong {
+	display: block;
+	font-size: 13px;
+}
+
+.who small {
+	color: var(--muted);
+	font-size: 12px;
+}
+
+.menu a,
+.out {
+	display: block;
+	text-align: left;
+	border: 0;
+	background: none;
+	padding: 9px 10px;
+	border-radius: 10px;
+	font: inherit;
+	font-weight: 600;
+	font-size: 13px;
+	color: #111827;
+}
+
+.menu a:hover,
+.out:hover {
+	background: #eef2ff;
+}
+
+.out {
+	color: #b91c1c;
 }
 
 .avatar {

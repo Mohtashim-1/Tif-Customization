@@ -4,11 +4,11 @@ import { apiGet, METHOD } from "./lib/api";
 import AppSidebar from "./components/AppSidebar.vue";
 import AppHeader from "./components/AppHeader.vue";
 import FilterBar from "./components/FilterBar.vue";
+import SummaryCards from "./components/SummaryCards.vue";
 import ScheduleGrid from "./components/ScheduleGrid.vue";
 import ScheduleLegend from "./components/ScheduleLegend.vue";
 import DirectoryView from "./components/DirectoryView.vue";
 import SessionForm from "./components/SessionForm.vue";
-import DashboardHome from "./components/DashboardHome.vue";
 
 const activeNav = ref("dashboard");
 const search = ref("");
@@ -53,7 +53,7 @@ const formDefaults = ref({});
 
 const pageMeta = computed(() => {
 	const map = {
-		dashboard: ["Dashboard", "Live overview of Upcoming Training"],
+		dashboard: ["Training Schedule", "Weekly planner from Upcoming Training"],
 		schedule: ["Weekly Schedule", "Click a session to edit, or an empty slot to create"],
 		trainers: ["Trainers", "People delivering Upcoming Training"],
 		programs: ["Programs", "Topics and programs from Upcoming Training"],
@@ -68,7 +68,7 @@ const pageMeta = computed(() => {
 
 const searchPlaceholder = computed(() => {
 	const map = {
-		dashboard: "Search this week…",
+		dashboard: "Search trainers, programs…",
 		schedule: "Search title, trainer, school…",
 		trainers: "Search trainers…",
 		programs: "Search programs…",
@@ -281,11 +281,7 @@ async function loadDirectory(view) {
 function onNavigate(id) {
 	activeNav.value = id;
 	search.value = "";
-	if (id === "dashboard") {
-		loadDashboard();
-		return;
-	}
-	if (id === "schedule") {
+	if (id === "dashboard" || id === "schedule") {
 		loadWeek();
 		return;
 	}
@@ -311,8 +307,7 @@ function openEdit(name) {
 function onSaved(result) {
 	formOpen.value = false;
 	showToast(result?.message || "Upcoming Training saved");
-	if (activeNav.value === "dashboard") loadDashboard();
-	else if (activeNav.value === "schedule") loadWeek();
+	if (activeNav.value === "dashboard" || activeNav.value === "schedule") loadWeek();
 	else if (activeNav.value !== "settings") loadDirectory(activeNav.value);
 }
 
@@ -354,7 +349,7 @@ function onFilterRoom() {
 }
 
 onMounted(() => {
-	loadDashboard();
+	loadWeek();
 });
 </script>
 
@@ -391,20 +386,10 @@ onMounted(() => {
 			<div v-if="error" class="ts-error">
 				<strong>Could not load Upcoming Training</strong>
 				<p>{{ error }}</p>
-				<button type="button" @click="activeNav === 'dashboard' ? loadDashboard() : loadWeek()">Retry</button>
+				<button type="button" @click="loadWeek">Retry</button>
 			</div>
 
-			<DashboardHome
-				v-else-if="activeNav === 'dashboard'"
-				:loading="dashboardLoading"
-				:payload="dashboard"
-				@add="onAddSession"
-				@edit="openEdit"
-				@open-schedule="onNavigate('schedule')"
-				@filter-trainer="onFilterTrainer"
-			/>
-
-			<template v-else-if="activeNav === 'schedule'">
+			<template v-else-if="activeNav === 'dashboard' || activeNav === 'schedule'">
 				<FilterBar
 					:week-label="weekLabel"
 					:trainers="trainers"
@@ -417,7 +402,8 @@ onMounted(() => {
 					@add="onAddSession"
 					@export="onExport"
 				/>
-				<div v-if="loading" class="ts-loading">Loading weekly calendar…</div>
+				<SummaryCards v-if="activeNav === 'dashboard'" :summary="summary" />
+				<div v-if="loading" class="ts-loading">Loading weekly planner…</div>
 				<template v-else>
 					<ScheduleGrid
 						:days="weekDays"
@@ -428,7 +414,7 @@ onMounted(() => {
 					/>
 					<ScheduleLegend />
 					<p class="ts-hint">
-						Week {{ weekLabel }} · {{ filteredSessions.length }} session(s) shown · click a card to edit
+						Week {{ weekLabel }} · {{ filteredSessions.length }} session(s) · click a card to edit, empty slot to add
 					</p>
 				</template>
 			</template>

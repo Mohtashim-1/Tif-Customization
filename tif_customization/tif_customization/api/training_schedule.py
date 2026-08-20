@@ -283,7 +283,9 @@ def _current_user_payload(sessions=None):
 	initials = "".join([p[0] for p in full_name.split()[:2] if p]).upper() or "U"
 	sessions = sessions or []
 	return {
+		"id": user,
 		"name": full_name,
+		"email": frappe.db.get_value("User", user, "email") or user,
 		"role": "Admin" if "System Manager" in frappe.get_roles() else "User",
 		"initials": initials,
 		"notifications": sum(1 for s in sessions if s.get("status") in ("upcoming", "in_progress")),
