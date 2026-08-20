@@ -3,8 +3,8 @@
  "creation": "2026-06-03 12:07:16.909838",
  "docstatus": 0,
  "doctype": "Page",
- "idx": 0,
- "modified": "2026-06-03 12:07:16.909838",
+ "idx": 2,
+ "modified": "2026-08-20 15:44:43.744471",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "smes-target-base---k",
@@ -12,13 +12,7 @@
  "page_name": "smes-target-base---k",
  "roles": [
   {
-   "role": "System Manager"
-  },
-  {
-   "role": "HR Manager"
-  },
-  {
-   "role": "HR User"
+   "role": "SME Manager"
   }
  ],
  "script": null,

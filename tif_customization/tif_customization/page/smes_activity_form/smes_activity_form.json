@@ -4,7 +4,7 @@
  "docstatus": 0,
  "doctype": "Page",
  "idx": 0,
- "modified": "2026-07-15 15:48:55.490036",
+ "modified": "2026-08-20 15:44:38.079030",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "smes-activity-form",
@@ -22,6 +22,9 @@
   },
   {
    "role": "HOD"
+  },
+  {
+   "role": "SME Manager"
   }
  ],
  "script": null,
