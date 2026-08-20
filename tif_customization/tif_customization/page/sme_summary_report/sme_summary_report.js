@@ -201,14 +201,10 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 					<td class="num">${this.fmt(r.grand_total)}</td>
 					<td class="num">${this.fmt_cur(r.expenses)}</td>
 					<td class="num">${this.fmt(r.visited_days)}</td>
-					<td class="num">${this.fmt(r.difference)}</td>
-					<td class="num score-col" title="${__("KPI points")}: ${this.fmt_score(r.score_points)}">
-						${this.fmt_score(r.score)}%
-					</td>
 				</tr>`
 					)
 					.join("")
-			: `<tr><td colspan="14" class="text-center text-muted">${__("No SMEs found")}</td></tr>`;
+			: `<tr><td colspan="12" class="text-center text-muted">${__("No SMEs found")}</td></tr>`;
 
 		$("#sme-sum-body").html(`
 			<div class="sme-sum-title">${__("Summary")} (${__("Visit Date")}: ${fromLabel} ${__("to")} ${toLabel})</div>
@@ -231,8 +227,7 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 							<th colspan="1" class="group">${__("Meetings")}</th>
 							<th colspan="2" class="group">${__("M&E Visits")}</th>
 							<th colspan="2" class="group">${__("Training Sessions")}</th>
-							<th colspan="4" class="group">${__("Total")}</th>
-							<th rowspan="2" class="score-col">${__("Score %")} (UAT)</th>
+							<th colspan="3" class="group">${__("Total")}</th>
 						</tr>
 						<tr>
 							<th>${__("Followup & Other Visits")}</th>
@@ -245,7 +240,6 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 							<th>${__("Grand Total from ERP")}</th>
 							<th>${__("Expenses")}</th>
 							<th>${__("Visited Days")}</th>
-							<th>${__("Difference")}</th>
 						</tr>
 					</thead>
 					<tbody>${body}</tbody>
@@ -263,8 +257,6 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 							<th class="num">${this.fmt(t.grand_total)}</th>
 							<th class="num">${this.fmt_cur(t.expenses)}</th>
 							<th class="num">${this.fmt(t.visited_days)}</th>
-							<th class="num">${this.fmt(t.difference)}</th>
-							<th class="num score-col">${this.fmt_score(t.score)}%</th>
 						</tr>
 					</tfoot>
 				</table>
@@ -290,9 +282,6 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 			"Grand Total from ERP",
 			"Expenses",
 			"Visited Days",
-			"Difference",
-			"Score %",
-			"Score Points",
 		];
 		const lines = [headers.join(",")];
 		(this.data.rows || []).forEach((r) => {
@@ -310,9 +299,6 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 					r.grand_total || 0,
 					r.expenses || 0,
 					r.visited_days || 0,
-					r.difference || 0,
-					r.score || 0,
-					r.score_points || 0,
 				].join(",")
 			);
 		});

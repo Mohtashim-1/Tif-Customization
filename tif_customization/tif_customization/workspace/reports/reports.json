@@ -458,7 +458,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Vendor Consultant Ledger (UAT)",
+   "label": "Vendor Ledger (UAT)",
    "link_count": 0,
    "link_to": "vendor-consultant-ledger",
    "link_type": "Page",
@@ -517,16 +517,6 @@
   },
   {
    "hidden": 0,
-   "is_query_report": 0,
-   "label": "Vendor / Consultant Ledger",
-   "link_count": 0,
-   "link_to": "vendor-consultant-ledger",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
    "is_query_report": 1,
    "label": "Donor Ledger",
    "link_count": 0,
@@ -565,16 +555,6 @@
    "link_count": 11,
    "onboard": 0,
    "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "SME Target Base KPI (UAT)",
-   "link_count": 0,
-   "link_to": "target-base-kpi",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
   },
   {
    "hidden": 0,
@@ -647,8 +627,8 @@
    "type": "Link"
   }
  ],
- "modified": "2026-08-17 13:20:33.682606",
- "modified_by": "Administrator",
+ "modified": "2026-08-19 10:35:30.490816",
+ "modified_by": "farhan.hussain@tif.edu.pk",
  "module": "Tif Customization",
  "name": "Reports",
  "number_cards": [],
