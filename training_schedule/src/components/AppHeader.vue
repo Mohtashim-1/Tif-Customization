@@ -1,22 +1,26 @@
 <script setup>
 defineProps({
 	user: { type: Object, required: true },
+	title: { type: String, default: "Training Schedule" },
+	subtitle: { type: String, default: "Upcoming Training workspace" },
+	placeholder: { type: String, default: "Search trainers, programs..." },
 });
+defineEmits(["notify"]);
 const search = defineModel("search", { type: String, default: "" });
 </script>
 
 <template>
 	<header class="header">
 		<div class="titles">
-			<h1>Training Schedule</h1>
-			<p>Manage and view all trainer schedules</p>
+			<h1>{{ title }}</h1>
+			<p>{{ subtitle }}</p>
 		</div>
 		<div class="search">
 			<span class="search-ico">⌕</span>
-			<input v-model="search" type="search" placeholder="Search trainers, programs..." />
+			<input v-model="search" type="search" :placeholder="placeholder" />
 		</div>
 		<div class="actions">
-			<button class="bell" type="button" aria-label="Notifications">
+			<button class="bell" type="button" aria-label="Notifications" @click="$emit('notify')">
 				🔔
 				<span v-if="user.notifications" class="badge">{{ user.notifications }}</span>
 			</button>

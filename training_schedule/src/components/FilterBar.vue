@@ -36,7 +36,7 @@ const status = defineModel("status", { type: String, default: "all" });
 		</div>
 
 		<div class="actions">
-			<button type="button" class="primary" @click="$emit('add')">+ Add Session</button>
+			<button type="button" class="primary" @click="$emit('add')">+ New Training</button>
 			<button type="button" class="ghost" @click="$emit('export')">⬇ Export</button>
 		</div>
 	</div>

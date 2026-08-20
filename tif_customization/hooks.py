@@ -314,6 +314,11 @@ override_whitelisted_methods = {
 # 	"tif_customization.auth.validate"
 # ]
 
+# Training Schedule Vue portal SPA routes
+website_route_rules = [
+	{"from_route": "/training-schedule/<path:app_path>", "to_route": "training-schedule"},
+]
+
 # Automatically update python controller files with type annotations for this app.
 # export_python_type_annotations = True
 

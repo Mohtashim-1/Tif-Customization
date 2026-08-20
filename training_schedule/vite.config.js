@@ -22,9 +22,9 @@ export default defineConfig({
 		rollupOptions: {
 			input: path.resolve(__dirname, "index.html"),
 			output: {
-				entryFileNames: "assets/[name]-[hash].js",
+				entryFileNames: "assets/training_schedule-[hash].js",
 				chunkFileNames: "assets/[name]-[hash].js",
-				assetFileNames: "assets/[name]-[hash][extname]",
+				assetFileNames: "assets/training_schedule-[hash][extname]",
 			},
 		},
 	},

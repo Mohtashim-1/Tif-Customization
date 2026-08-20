@@ -1,4 +1,6 @@
 <script setup>
+import { computed } from "vue";
+
 const props = defineProps({
 	active: { type: String, default: "dashboard" },
 	totalTrainers: { type: Number, default: 0 },
@@ -18,12 +20,12 @@ const nav = [
 	{ id: "settings", label: "Settings", icon: "⚙" },
 ];
 
-const cal = (() => {
-	const d = props.calendarDate || new Date("2026-05-20");
+const cal = computed(() => {
+	const d = props.calendarDate instanceof Date ? props.calendarDate : new Date();
 	const year = d.getFullYear();
 	const month = d.getMonth();
 	const first = new Date(year, month, 1);
-	const startPad = (first.getDay() + 6) % 7; // Mon-first
+	const startPad = (first.getDay() + 6) % 7;
 	const daysInMonth = new Date(year, month + 1, 0).getDate();
 	const cells = [];
 	for (let i = 0; i < startPad; i++) cells.push(null);
@@ -33,7 +35,7 @@ const cal = (() => {
 		cells,
 		today: d.getDate(),
 	};
-})();
+});
 </script>
 
 <template>
