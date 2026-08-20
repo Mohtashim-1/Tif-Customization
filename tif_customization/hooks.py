@@ -110,7 +110,8 @@ boot_session = "tif_customization.tif_customization.overrides.workspace_sidebar.
 # add methods and filters to jinja environment
 jinja = {
 	"methods": [
-		"tif_customization.tif_customization.doctype.leave_application.leave_application.get_leave_allocation_for_print"
+		"tif_customization.tif_customization.doctype.leave_application.leave_application.get_leave_allocation_for_print",
+		"tif_customization.tif_customization.utils.tif_payslip.get_payslip_display",
 	]
 }
 

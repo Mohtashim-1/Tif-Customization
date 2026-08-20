@@ -1,0 +1,206 @@
+{#- TIF Payslip — fixed layout matching Pay Slip Design PDF.
+   Maps existing Salary Slip components into design rows; does not change HR components. -#}
+{% set employee = frappe.get_doc("Employee", doc.employee) %}
+{% set ps = get_payslip_display(doc) %}
+{% set company_name = "THE ILM FOUNDATION" %}
+{% set company_address = "245/1-I, Block, Block 6 P.E.C.H.S., Karachi, 75400" %}
+{% set logo_url = "/files/TIF-Logo.png" %}
+{% if doc.company %}
+	{% set company = frappe.get_doc("Company", doc.company) %}
+	{% if company.company_name %}
+		{% set company_name = company.company_name|upper %}
+	{% endif %}
+	{% if company.company_logo %}
+		{% set logo_url = company.company_logo %}
+	{% endif %}
+{% endif %}
+
+{% macro amt(v) -%}
+	{%- if v and v|abs > 0 -%}{{ "{:,.0f}".format(v) }}{%- else -%}-{%- endif -%}
+{%- endmacro %}
+
+{% set pay_month = doc.end_date or doc.start_date or doc.posting_date %}
+{% set payment_mode = employee.salary_mode or doc.mode_of_payment or "" %}
+{% if not payment_mode and employee.bank_ac_no %}
+	{% set payment_mode = "Bank Transfer" %}
+{% elif payment_mode|lower in ["bank", "bank transfer"] %}
+	{% set payment_mode = "Bank Transfer" %}
+{% endif %}
+
+<style>
+	@page { size: A4; margin: 12mm; }
+	.tif-ps { font-family: Arial, Helvetica, sans-serif; color: #222; font-size: 11px; width: 100%; }
+	.tif-ps * { box-sizing: border-box; }
+	.tif-ps table { border-collapse: collapse; }
+	.tif-ps .hdr { width: 100%; margin-bottom: 16px; }
+	.tif-ps .hdr td { border: none !important; padding: 0 !important; vertical-align: middle; }
+	.tif-ps .hdr-left {
+		width: 68%; height: 78px; background: #30466d; color: #fff;
+		padding: 10px 14px !important;
+	}
+	.tif-ps .hdr-brand { display: table; width: 100%; }
+	.tif-ps .hdr-brand .logo-cell { display: table-cell; width: 58px; vertical-align: middle; }
+	.tif-ps .hdr-brand .text-cell { display: table-cell; vertical-align: middle; padding-left: 10px; }
+	.tif-ps .hdr-logo { max-height: 48px; max-width: 48px; }
+	.tif-ps .hdr-name { font-size: 15px; font-weight: 700; letter-spacing: 0.3px; line-height: 1.2; }
+	.tif-ps .hdr-addr { font-size: 10px; margin-top: 3px; opacity: 0.95; }
+	.tif-ps .hdr-right {
+		width: 32%; height: 78px; background: #eeeeee; text-align: center;
+		vertical-align: middle !important;
+	}
+	.tif-ps .ps-title { color: #30466d; font-size: 20px; font-weight: 700; letter-spacing: 1px; }
+	.tif-ps .ps-month { color: #30466d; font-size: 12px; font-weight: 600; margin-top: 2px; }
+	.tif-ps .sec {
+		color: #30466d; font-size: 12px; font-weight: 700; text-transform: uppercase;
+		margin: 12px 0 6px; padding-bottom: 4px; border-bottom: 2px solid #30466d;
+	}
+	.tif-ps .det { width: 100%; }
+	.tif-ps .det td { border: 1px solid #d5d5d5; padding: 7px 9px; font-size: 11px; vertical-align: middle; }
+	.tif-ps .lbl { width: 18%; background: #e9e9e9; font-weight: 700; color: #333; }
+	.tif-ps .val { width: 32%; background: #fff; }
+	.tif-ps .cols { width: 100%; margin-top: 4px; }
+	.tif-ps .cols > tbody > tr > td { border: none !important; padding: 0 !important; vertical-align: top; width: 50%; }
+	.tif-ps .cols .left { padding-right: 8px !important; }
+	.tif-ps .cols .right { padding-left: 8px !important; }
+	.tif-ps .sal { width: 100%; }
+	.tif-ps .sal th {
+		background: #30466d; color: #fff; font-size: 11px; font-weight: 700;
+		padding: 7px 10px; border: 1px solid #30466d; text-align: left;
+	}
+	.tif-ps .sal th.amt, .tif-ps .sal td.amt { text-align: right; width: 32%; }
+	.tif-ps .sal td { border: 1px solid #d5d5d5; padding: 7px 10px; height: 28px; font-size: 11px; }
+	.tif-ps .sal .tot td { background: #e9e9e9; font-weight: 700; }
+	.tif-ps .net { width: 100%; margin-top: 22px; }
+	.tif-ps .net td {
+		background: #30466d; color: #fff; padding: 12px 18px; border: none !important;
+		font-size: 16px; font-weight: 700;
+	}
+	.tif-ps .net .amt-cell { text-align: right; border-left: 1px solid rgba(255,255,255,0.55) !important; width: 42%; }
+	.tif-ps .words { margin-top: 10px; font-size: 11px; font-style: italic; color: #333; }
+	.tif-ps .words strong { font-style: normal; color: #30466d; }
+	.tif-ps .note { margin-top: 10px; font-size: 9px; font-style: italic; color: #777; }
+	.tif-ps .nobreak { page-break-inside: avoid; }
+</style>
+
+<div class="tif-ps">
+	<table class="hdr">
+		<tr>
+			<td class="hdr-left">
+				<div class="hdr-brand">
+					<div class="logo-cell">
+						<img src="{{ logo_url }}" class="hdr-logo" alt="logo">
+					</div>
+					<div class="text-cell">
+						<div class="hdr-name">{{ company_name }}</div>
+						<div class="hdr-addr">{{ company_address }}</div>
+					</div>
+				</div>
+			</td>
+			<td class="hdr-right">
+				<div class="ps-title">PAYSLIP</div>
+				<div class="ps-month">
+					{% if pay_month %}{{ frappe.utils.formatdate(pay_month, "MMMM yyyy") }}{% endif %}
+				</div>
+			</td>
+		</tr>
+	</table>
+
+	<div class="sec">Employee Details</div>
+	<table class="det">
+		<tr>
+			<td class="lbl">Employee Name</td>
+			<td class="val">{{ doc.employee_name or "" }}</td>
+			<td class="lbl">Designation</td>
+			<td class="val">{{ doc.designation or employee.designation or "" }}</td>
+		</tr>
+		<tr>
+			<td class="lbl">Employee ID</td>
+			<td class="val">{{ doc.employee or "" }}</td>
+			<td class="lbl">Department</td>
+			<td class="val">{{ doc.department or employee.department or "" }}</td>
+		</tr>
+		<tr>
+			<td class="lbl">Pay Period</td>
+			<td class="val">{% if pay_month %}{{ frappe.utils.formatdate(pay_month, "MMMM yyyy") }}{% endif %}</td>
+			<td class="lbl">Payment Date</td>
+			<td class="val">
+				{% if doc.posting_date %}{{ frappe.utils.formatdate(doc.posting_date, "dd-MMM-yyyy") }}
+				{% elif pay_month %}{{ frappe.utils.formatdate(pay_month, "MMMM yyyy") }}{% endif %}
+			</td>
+		</tr>
+		<tr>
+			<td class="lbl">Employment Type</td>
+			<td class="val">{{ employee.employment_type or "" }}</td>
+			<td class="lbl">Payment Mode</td>
+			<td class="val">{{ payment_mode }}</td>
+		</tr>
+		<tr>
+			<td class="lbl">Date of Joining</td>
+			<td class="val">{% if employee.date_of_joining %}{{ frappe.utils.formatdate(employee.date_of_joining, "dd-MMM-yyyy") }}{% endif %}</td>
+			<td class="lbl">Bank Account</td>
+			<td class="val">{{ employee.bank_ac_no or "" }}</td>
+		</tr>
+	</table>
+
+	<div class="sec" style="margin-top:16px;">Earnings &amp; Deductions</div>
+	<table class="cols nobreak">
+		<tr>
+			<td class="left">
+				<table class="sal">
+					<thead>
+						<tr>
+							<th>Earnings</th>
+							<th class="amt">Amount (PKR)</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr><td>Gross Salary</td><td class="amt">{{ amt(ps.gross_salary) }}</td></tr>
+						<tr><td>Fuel / Conveyance</td><td class="amt">{{ amt(ps.fuel_earning) }}</td></tr>
+						<tr><td>Mobile / Internet</td><td class="amt">{{ amt(ps.mobile_earning) }}</td></tr>
+						<tr><td>Overtime</td><td class="amt">{{ amt(ps.overtime_earning) }}</td></tr>
+						<tr><td>Daily Allowance</td><td class="amt">{{ amt(ps.daily_earning) }}</td></tr>
+						<tr><td>Arrears</td><td class="amt">{{ amt(ps.arrears_earning) }}</td></tr>
+						<tr class="tot"><td>Net Salary</td><td class="amt">{{ amt(ps.earnings_total) }}</td></tr>
+					</tbody>
+				</table>
+			</td>
+			<td class="right">
+				<table class="sal">
+					<thead>
+						<tr>
+							<th>Deductions</th>
+							<th class="amt">Amount (PKR)</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr><td>Income Tax</td><td class="amt">{{ amt(ps.income_tax) }}</td></tr>
+						<tr><td>EOBI / Provident Fund</td><td class="amt">{{ amt(ps.pf_eobi) }}</td></tr>
+						<tr><td>Late / Absent</td><td class="amt">{{ amt(ps.late_absent) }}</td></tr>
+						<tr><td>Loan</td><td class="amt">{{ amt(ps.loan_amt) }}</td></tr>
+						<tr><td>Advance Salary</td><td class="amt">{{ amt(ps.advance_ded) }}</td></tr>
+						<tr><td>Fuel</td><td class="amt">{{ amt(ps.fuel_ded) }}</td></tr>
+						<tr><td>Leave</td><td class="amt">{{ amt(ps.leave_ded) }}</td></tr>
+						<tr class="tot"><td>Total Deductions</td><td class="amt">{{ amt(ps.total_deductions) }}</td></tr>
+					</tbody>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+	<table class="net nobreak">
+		<tr>
+			<td>NET PAYABLE</td>
+			<td class="amt-cell">PKR {{ "{:,.0f}".format(ps.net_pay or 0) }}</td>
+		</tr>
+	</table>
+
+	<div class="words">
+		<strong>Net Pay in Words:</strong>
+		{% if doc.total_in_words %}
+			{{ doc.total_in_words }}
+		{% elif doc.net_pay %}
+			{{ frappe.utils.money_in_words(doc.net_pay, "PKR") }}
+		{% endif %}
+	</div>
+	<div class="note">This is computer generated payslip no signature and stamp required.</div>
+</div>

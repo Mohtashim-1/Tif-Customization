@@ -1,0 +1,63 @@
+:root {
+	--bg: #f3f4f8;
+	--surface: #ffffff;
+	--ink: #111827;
+	--muted: #6b7280;
+	--line: #e5e7eb;
+	--navy: #0f172a;
+	--navy-2: #1e293b;
+	--accent: #6366f1;
+	--accent-soft: #eef2ff;
+	--green: #10b981;
+	--orange: #f59e0b;
+	--purple: #8b5cf6;
+	--pink: #ec4899;
+	--yellow: #eab308;
+	--sky: #0ea5e9;
+	--radius: 14px;
+	--shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 8px 24px rgba(15, 23, 42, 0.04);
+	font-family: "DM Sans", system-ui, sans-serif;
+	color: var(--ink);
+	background: var(--bg);
+}
+
+* {
+	box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+	margin: 0;
+	min-height: 100%;
+}
+
+button,
+input,
+select {
+	font: inherit;
+}
+
+button {
+	cursor: pointer;
+}
+
+a {
+	color: inherit;
+	text-decoration: none;
+}
+
+.ts-app {
+	display: grid;
+	grid-template-columns: 260px 1fr;
+	min-height: 100vh;
+	background:
+		radial-gradient(circle at top right, rgba(99, 102, 241, 0.08), transparent 28%),
+		linear-gradient(180deg, #f8fafc 0%, var(--bg) 40%);
+}
+
+@media (max-width: 980px) {
+	.ts-app {
+		grid-template-columns: 1fr;
+	}
+}
