@@ -8,7 +8,7 @@ from datetime import time, timedelta
 
 import frappe
 from frappe import _
-from frappe.utils import add_days, getdate, nowdate
+from frappe.utils import add_days, get_first_day, get_last_day, get_quarter_ending, get_quarter_start, getdate, nowdate
 
 DOCTYPE = "Upcoming Training"
 
@@ -221,25 +221,40 @@ def _monday_of(d):
 	return add_days(d, -((d.weekday()) % 7))
 
 
+def _period_for(view, pivot):
+	pivot = getdate(pivot)
+	if view == "day":
+		return pivot, pivot
+	if view == "month":
+		return get_first_day(pivot), get_last_day(pivot)
+	if view == "quarter":
+		return get_quarter_start(pivot), get_quarter_ending(pivot)
+	start = _monday_of(pivot)
+	return start, add_days(start, 6)
+
+
 @frappe.whitelist()
-def get_schedule_data(week_start=None):
-	"""Week schedule + filters from Upcoming Training."""
+def get_schedule_data(week_start=None, view="week", anchor=None):
+	"""Schedule for day / week / month / quarter from Upcoming Training."""
 	_require_login()
 	if not frappe.has_permission(DOCTYPE, "read"):
 		frappe.throw(_("You are not permitted to view Upcoming Training."), frappe.PermissionError)
 
 	today = getdate(nowdate())
-	if week_start:
-		start = _monday_of(week_start)
-	else:
-		start = _monday_of(today)
-		has = frappe.db.exists(DOCTYPE, {"training_date": ["between", [start, add_days(start, 6)]]})
+	view = (view or "week").strip().lower()
+	if view not in ("day", "week", "month", "quarter"):
+		view = "week"
+
+	pivot = getdate(anchor or week_start or today)
+	if not anchor and not week_start:
+		start_guess, end_guess = _period_for(view, pivot)
+		has = frappe.db.exists(DOCTYPE, {"training_date": ["between", [start_guess, end_guess]]})
 		if not has:
 			latest = frappe.db.get_value(DOCTYPE, {}, "training_date", order_by="training_date desc")
 			if latest:
-				start = _monday_of(latest)
+				pivot = getdate(latest)
 
-	end = add_days(start, 6)
+	start, end = _period_for(view, pivot)
 	rows = _fetch_rows(start, end)
 	sessions = [_row_to_session(r, today) for r in rows]
 
@@ -261,6 +276,10 @@ def get_schedule_data(week_start=None):
 
 	return {
 		"user": _current_user_payload(sessions),
+		"view": view,
+		"anchor": str(pivot),
+		"period_start": str(start),
+		"period_end": str(end),
 		"week_start": str(start),
 		"week_end": str(end),
 		"today": str(today),

@@ -1,6 +1,6 @@
 <script setup>
 defineProps({
-	weekLabel: { type: String, required: true },
+	rangeLabel: { type: String, required: true },
 	trainers: { type: Array, default: () => [] },
 	programs: { type: Array, default: () => [] },
 });
@@ -8,13 +8,33 @@ defineEmits(["prev", "next", "add", "export"]);
 const trainer = defineModel("trainer", { type: String, default: "all" });
 const program = defineModel("program", { type: String, default: "all" });
 const status = defineModel("status", { type: String, default: "all" });
+const view = defineModel("view", { type: String, default: "week" });
+
+const views = [
+	{ id: "day", label: "Daily" },
+	{ id: "week", label: "Weekly" },
+	{ id: "month", label: "Monthly" },
+	{ id: "quarter", label: "Quarterly" },
+];
 </script>
 
 <template>
 	<div class="bar">
-		<div class="week">
+		<div class="views">
+			<button
+				v-for="v in views"
+				:key="v.id"
+				type="button"
+				:class="{ on: view === v.id }"
+				@click="view = v.id"
+			>
+				{{ v.label }}
+			</button>
+		</div>
+
+		<div class="range">
 			<button type="button" class="nav" @click="$emit('prev')">‹</button>
-			<span>{{ weekLabel }}</span>
+			<span>{{ rangeLabel }}</span>
 			<button type="button" class="nav" @click="$emit('next')">›</button>
 		</div>
 
@@ -56,12 +76,36 @@ const status = defineModel("status", { type: String, default: "all" });
 	box-shadow: var(--shadow);
 }
 
-.week {
+.views {
+	display: flex;
+	background: #f3f4f6;
+	border-radius: 12px;
+	padding: 4px;
+	gap: 2px;
+}
+
+.views button {
+	border: 0;
+	background: transparent;
+	border-radius: 9px;
+	padding: 8px 12px;
+	font-weight: 700;
+	font-size: 13px;
+	color: #6b7280;
+}
+
+.views button.on {
+	background: #fff;
+	color: #4f46e5;
+	box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+
+.range {
 	display: flex;
 	align-items: center;
 	gap: 10px;
 	font-weight: 600;
-	min-width: 240px;
+	min-width: 220px;
 }
 
 .nav {

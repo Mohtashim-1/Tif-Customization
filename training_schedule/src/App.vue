@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { apiGet, METHOD } from "./lib/api";
 import AppSidebar from "./components/AppSidebar.vue";
 import AppHeader from "./components/AppHeader.vue";
@@ -7,6 +7,7 @@ import FilterBar from "./components/FilterBar.vue";
 import SummaryCards from "./components/SummaryCards.vue";
 import ScheduleGrid from "./components/ScheduleGrid.vue";
 import ScheduleLegend from "./components/ScheduleLegend.vue";
+import CalendarBoard from "./components/CalendarBoard.vue";
 import DirectoryView from "./components/DirectoryView.vue";
 import SessionForm from "./components/SessionForm.vue";
 
@@ -15,6 +16,10 @@ const search = ref("");
 const trainerFilter = ref("all");
 const programFilter = ref("all");
 const statusFilter = ref("all");
+const plannerView = ref("week");
+const cursorIso = ref(null);
+const periodStart = ref("");
+const periodEnd = ref("");
 const weekOffset = ref(0);
 const weekStartIso = ref(null);
 const toast = ref("");
@@ -53,8 +58,8 @@ const formDefaults = ref({});
 
 const pageMeta = computed(() => {
 	const map = {
-		dashboard: ["Training Schedule", "Weekly planner from Upcoming Training"],
-		schedule: ["Weekly Schedule", "Click a session to edit, or an empty slot to create"],
+		dashboard: ["Training Schedule", "Daily, weekly, monthly, or quarterly planner"],
+		schedule: ["Schedule", "Switch Daily / Weekly / Monthly / Quarterly"],
 		trainers: ["Trainers", "People delivering Upcoming Training"],
 		programs: ["Programs", "Topics and programs from Upcoming Training"],
 		sessions: ["Sessions", "Create and edit Upcoming Training here"],
@@ -97,6 +102,7 @@ function iso(d) {
 }
 
 const weekStart = computed(() => {
+	if (periodStart.value) return new Date(`${periodStart.value}T00:00:00`);
 	if (weekStartIso.value) {
 		const base = new Date(`${weekStartIso.value}T00:00:00`);
 		base.setDate(base.getDate() + weekOffset.value * 7);
@@ -105,26 +111,43 @@ const weekStart = computed(() => {
 	return mondayOf(new Date());
 });
 
-const weekDays = computed(() =>
-	Array.from({ length: 7 }, (_, i) => {
+const weekDays = computed(() => {
+	if (plannerView.value === "day") {
+		return [weekStart.value];
+	}
+	return Array.from({ length: 7 }, (_, i) => {
 		const d = new Date(weekStart.value);
 		d.setDate(d.getDate() + i);
 		return d;
-	})
-);
+	});
+});
 
-const weekLabel = computed(() => {
-	const start = weekDays.value[0];
-	const end = weekDays.value[6];
+const rangeLabel = computed(() => {
+	const start = periodStart.value ? new Date(`${periodStart.value}T00:00:00`) : weekDays.value[0];
+	const end = periodEnd.value ? new Date(`${periodEnd.value}T00:00:00`) : weekDays.value[6];
+	if (plannerView.value === "day") {
+		return start.toLocaleDateString("en-US", {
+			weekday: "long",
+			month: "short",
+			day: "numeric",
+			year: "numeric",
+		});
+	}
+	if (plannerView.value === "month") {
+		return start.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+	}
+	if (plannerView.value === "quarter") {
+		const a = start.toLocaleDateString("en-US", { month: "short" });
+		const b = end.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+		return `Q${Math.floor(start.getMonth() / 3) + 1} ${a} – ${b}`;
+	}
 	const fmt = (d) => d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 	return `${fmt(start).replace(/,?\s*\d{4}$/, "")} – ${fmt(end)}`;
 });
 
 const filteredSessions = computed(() => {
 	const q = search.value.trim().toLowerCase();
-	const weekIsos = new Set(weekDays.value.map(iso));
 	return sessions.value.filter((s) => {
-		if (!weekIsos.has(s.date)) return false;
 		if (trainerFilter.value !== "all" && s.trainerId !== trainerFilter.value) return false;
 		if (programFilter.value !== "all") {
 			const prog = s.program || s.title;
@@ -146,26 +169,28 @@ function showToast(msg) {
 	}, 2400);
 }
 
-function shiftWeek(dir) {
-	weekOffset.value += dir;
-	loadWeek();
+function shiftPeriod(dir) {
+	const d = new Date(`${(cursorIso.value || periodStart.value || iso(new Date()))}T00:00:00`);
+	if (plannerView.value === "day") d.setDate(d.getDate() + dir);
+	else if (plannerView.value === "week") d.setDate(d.getDate() + dir * 7);
+	else if (plannerView.value === "month") d.setMonth(d.getMonth() + dir);
+	else d.setMonth(d.getMonth() + dir * 3);
+	cursorIso.value = iso(d);
+	loadRange();
 }
 
-async function loadWeek() {
+async function loadRange() {
 	loading.value = true;
 	error.value = "";
 	try {
-		const args = {};
-		if (weekStartIso.value) {
-			const d = new Date(`${weekStartIso.value}T00:00:00`);
-			d.setDate(d.getDate() + weekOffset.value * 7);
-			args.week_start = iso(d);
-		}
+		const args = { view: plannerView.value };
+		if (cursorIso.value) args.anchor = cursorIso.value;
 		const data = await apiGet(`${METHOD}.get_schedule_data`, args);
-		if (!weekStartIso.value && data.week_start) {
-			weekStartIso.value = data.week_start;
-			weekOffset.value = 0;
-		}
+		cursorIso.value = data.anchor || data.period_start || data.week_start;
+		periodStart.value = data.period_start || data.week_start || "";
+		periodEnd.value = data.period_end || data.week_end || "";
+		weekStartIso.value = data.week_start || periodStart.value;
+		weekOffset.value = 0;
 		sessions.value = data.sessions || [];
 		trainers.value = data.trainers || [];
 		programs.value = data.programs || [];
@@ -282,7 +307,7 @@ function onNavigate(id) {
 	activeNav.value = id;
 	search.value = "";
 	if (id === "dashboard" || id === "schedule") {
-		loadWeek();
+		loadRange();
 		return;
 	}
 	if (id === "settings") {
@@ -307,7 +332,7 @@ function openEdit(name) {
 function onSaved(result) {
 	formOpen.value = false;
 	showToast(result?.message || "Upcoming Training saved");
-	if (activeNav.value === "dashboard" || activeNav.value === "schedule") loadWeek();
+	if (activeNav.value === "dashboard" || activeNav.value === "schedule") loadRange();
 	else if (activeNav.value !== "settings") loadDirectory(activeNav.value);
 }
 
@@ -323,24 +348,30 @@ function onCreateSlot(payload) {
 }
 
 function onExport() {
-	const start = iso(weekDays.value[0]);
-	const end = iso(weekDays.value[6]);
+	const start = periodStart.value || iso(weekDays.value[0]);
+	const end = periodEnd.value || iso(weekDays.value[weekDays.value.length - 1]);
 	window.open(
 		`/api/method/${METHOD}.export_sessions_csv?from_date=${start}&to_date=${end}`,
 		"_blank"
 	);
 }
 
+function onOpenDay(dateIso) {
+	cursorIso.value = dateIso;
+	if (plannerView.value === "day") loadRange();
+	else plannerView.value = "day";
+}
+
 function onFilterTrainer(name) {
 	trainerFilter.value = name;
 	activeNav.value = "schedule";
-	loadWeek();
+	loadRange();
 }
 
 function onFilterProgram(name) {
 	programFilter.value = name;
 	activeNav.value = "schedule";
-	loadWeek();
+	loadRange();
 }
 
 function onFilterRoom() {
@@ -349,7 +380,11 @@ function onFilterRoom() {
 }
 
 onMounted(() => {
-	loadWeek();
+	loadRange();
+});
+
+watch(plannerView, () => {
+	loadRange();
 });
 </script>
 
@@ -358,7 +393,7 @@ onMounted(() => {
 		<AppSidebar
 			:active="activeNav"
 			:total-trainers="summary.total_trainers"
-			:calendar-date="weekDays[1] || new Date()"
+			:calendar-date="weekDays[0] || new Date()"
 			@navigate="onNavigate"
 		/>
 		<main class="ts-main">
@@ -386,35 +421,48 @@ onMounted(() => {
 			<div v-if="error" class="ts-error">
 				<strong>Could not load Upcoming Training</strong>
 				<p>{{ error }}</p>
-				<button type="button" @click="loadWeek">Retry</button>
+				<button type="button" @click="loadRange">Retry</button>
 			</div>
 
 			<template v-else-if="activeNav === 'dashboard' || activeNav === 'schedule'">
 				<FilterBar
-					:week-label="weekLabel"
+					:range-label="rangeLabel"
 					:trainers="trainers"
 					:programs="programs"
+					v-model:view="plannerView"
 					v-model:trainer="trainerFilter"
 					v-model:program="programFilter"
 					v-model:status="statusFilter"
-					@prev="shiftWeek(-1)"
-					@next="shiftWeek(1)"
+					@prev="shiftPeriod(-1)"
+					@next="shiftPeriod(1)"
 					@add="onAddSession"
 					@export="onExport"
 				/>
 				<SummaryCards v-if="activeNav === 'dashboard'" :summary="summary" />
-				<div v-if="loading" class="ts-loading">Loading weekly planner…</div>
+				<div v-if="loading" class="ts-loading">Loading planner…</div>
 				<template v-else>
 					<ScheduleGrid
+						v-if="plannerView === 'day' || plannerView === 'week'"
 						:days="weekDays"
 						:sessions="filteredSessions"
 						:today-iso="todayIso"
 						@open="openEdit"
 						@create="onCreateSlot"
 					/>
+					<CalendarBoard
+						v-else
+						:view="plannerView"
+						:period-start="periodStart"
+						:period-end="periodEnd"
+						:sessions="filteredSessions"
+						:today-iso="todayIso"
+						@open="openEdit"
+						@create="onCreateSlot"
+						@open-day="onOpenDay"
+					/>
 					<ScheduleLegend />
 					<p class="ts-hint">
-						Week {{ weekLabel }} · {{ filteredSessions.length }} session(s) · click a card to edit, empty slot to add
+						{{ rangeLabel }} · {{ filteredSessions.length }} session(s) · Daily / Weekly / Monthly / Quarterly
 					</p>
 				</template>
 			</template>

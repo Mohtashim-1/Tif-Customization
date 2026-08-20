@@ -55,7 +55,7 @@ function createAt(day, slot) {
 
 <template>
 	<section class="grid-wrap">
-		<table class="grid">
+		<table class="grid" :class="{ daily: days.length === 1 }">
 			<thead>
 				<tr>
 					<th class="time-col">Time</th>
@@ -125,6 +125,9 @@ function createAt(day, slot) {
 	border-collapse: separate;
 	border-spacing: 0;
 	min-width: 980px;
+}
+.grid.daily {
+	min-width: 0;
 }
 th,
 td {
