@@ -458,7 +458,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Vendor Ledger (UAT)",
+   "label": "Vendor Ledger",
    "link_count": 0,
    "link_to": "vendor-consultant-ledger",
    "link_type": "Page",
@@ -498,16 +498,6 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Monthly Wise Expense (UAT)",
-   "link_count": 0,
-   "link_to": "month-wise-expense",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
    "label": "Endowment Fund",
    "link_count": 0,
    "link_to": "purchase-from-endowment-fund",
@@ -524,28 +514,6 @@
    "link_type": "Report",
    "onboard": 0,
    "report_ref_doctype": "Donor",
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Cash Book",
-   "link_count": 0,
-   "link_to": "Cash Book",
-   "link_type": "Report",
-   "onboard": 0,
-   "report_ref_doctype": "GL Entry",
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Bank Book",
-   "link_count": 0,
-   "link_to": "Bank Book",
-   "link_type": "Report",
-   "onboard": 0,
-   "report_ref_doctype": "GL Entry",
    "type": "Link"
   },
   {
@@ -627,8 +595,8 @@
    "type": "Link"
   }
  ],
- "modified": "2026-08-19 10:35:30.490816",
- "modified_by": "farhan.hussain@tif.edu.pk",
+ "modified": "2026-08-21 16:30:39.048430",
+ "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Reports",
  "number_cards": [],
