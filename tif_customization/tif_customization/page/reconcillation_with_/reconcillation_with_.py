@@ -36,6 +36,14 @@ def get_report_data(filters=None):
 			)
 		)
 
+	_overlay_purchase_invoice_expenses(
+		banks,
+		from_date,
+		to_date,
+		month_keys,
+		include_cash=cint_all(filters.get("all_bank_accounts")),
+	)
+
 	donation_rows = []
 	expense_rows = []
 	for month in months:
@@ -259,7 +267,9 @@ def _build_bank_series(bank_account, gl_account, company, from_date, to_date, mo
 	for m in months:
 		key = m["key"]
 		donations[key] = flt((erp.get("debits") or {}).get(key))
-		expenses[key] = flt((erp.get("credits") or {}).get(key))
+		# Expense rows are filled from Purchase Invoice payments so this
+		# page matches the Expense report (procurement-expense).
+		expenses[key] = 0.0
 
 	total_in = sum(flt(erp_full.get("debits", {}).get(k)) for k in month_keys)
 	total_out = sum(flt(erp_full.get("credits", {}).get(k)) for k in month_keys)
@@ -274,6 +284,64 @@ def _build_bank_series(bank_account, gl_account, company, from_date, to_date, mo
 		"expenses": expenses,
 		"ending": erp_ending,
 	}
+
+
+def _overlay_purchase_invoice_expenses(banks, from_date, to_date, month_keys, include_cash=False):
+	"""Replace expense rows with Pay Payment Entries allocated to Purchase Invoices.
+
+	Same source as the Expense page Total Payments KPI, so both reports match.
+	Cash / petty-cash payments are added as their own column when all banks are selected.
+	"""
+	for bank in banks:
+		bank["expenses"] = {key: 0.0 for key in month_keys}
+
+	rows = frappe.db.sql(
+		"""
+		SELECT
+			pe.paid_from,
+			DATE_FORMAT(pe.posting_date, '%%Y-%%m') AS month_key,
+			COALESCE(SUM(COALESCE(per.allocated_amount, pe.paid_amount, 0)), 0) AS amount
+		FROM `tabPayment Entry` pe
+		INNER JOIN `tabPayment Entry Reference` per ON per.parent = pe.name
+		INNER JOIN `tabPurchase Invoice` pi ON pi.name = per.reference_name
+		WHERE pe.docstatus = 1
+		  AND pe.payment_type = 'Pay'
+		  AND per.reference_doctype = 'Purchase Invoice'
+		  AND pe.posting_date BETWEEN %(from_date)s AND %(to_date)s
+		GROUP BY pe.paid_from, month_key
+		""",
+		{"from_date": from_date, "to_date": to_date},
+		as_dict=True,
+	)
+
+	gl_to_bank = {bank.get("gl_account"): bank for bank in banks if bank.get("gl_account")}
+	cash = {key: 0.0 for key in month_keys}
+	has_cash = False
+
+	for row in rows:
+		key = row.get("month_key")
+		if key not in cash:
+			continue
+		amount = flt(row.get("amount"))
+		bank = gl_to_bank.get(row.get("paid_from"))
+		if bank:
+			bank["expenses"][key] = flt(bank["expenses"].get(key)) + amount
+		else:
+			cash[key] += amount
+			has_cash = True
+
+	if include_cash and has_cash:
+		banks.append(
+			{
+				"bank_account": "__cash__",
+				"label": _("Cash / Petty Cash"),
+				"gl_account": "",
+				"initial": 0.0,
+				"donations": {key: 0.0 for key in month_keys},
+				"expenses": cash,
+				"ending": 0.0,
+			}
+		)
 
 
 def _parse_filters(filters):

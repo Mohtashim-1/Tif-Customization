@@ -347,7 +347,8 @@
    "onboard": 0,
    "type": "Link"
   },
-  {
+  { 
+    
    "hidden": 0,
    "is_query_report": 1,
    "label": "Leave Application ",

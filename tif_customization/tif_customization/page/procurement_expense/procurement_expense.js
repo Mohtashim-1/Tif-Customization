@@ -828,7 +828,7 @@ if (typeof window.ProcurementExpense === 'undefined') {
 					<div class="kpi-card" style="min-height: 122px; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
 						<h5 style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.9;">Total Payments</h5>
 						<h2 style="margin: 0; font-size: clamp(18px, 2vw, 28px); font-weight: bold; white-space: nowrap;">${format_currency_value(total_payment)}</h2>
-						<p style="margin: 5px 0 0 0; font-size: 12px; opacity: 0.8;">${total_payment_count} Payments, ${total_invoice_count} Invoices</p>
+						<p style="margin: 5px 0 0 0; font-size: 12px; opacity: 0.8;">${total_payment_count} Payments, ${total_invoice_count} Invoices · same total as Bank Reconciliation Expense</p>
 					</div>
 				</div>
 				<div class="col-sm-4" style="margin-bottom: 15px;">

@@ -209,6 +209,11 @@ class ReconciliationWithBankPage {
 					font-weight: 700;
 					white-space: nowrap;
 				}
+				.recon-bank-kpi-hint {
+					margin-top: 8px;
+					font-size: 11px;
+					opacity: 0.85;
+				}
 			</style>
 		`);
 	}
@@ -400,6 +405,7 @@ class ReconciliationWithBankPage {
 				label: __("Total Expense"),
 				value: this.money(totals.total_expense),
 				gradient: "#fa709a, #fee140",
+				hint: __("Matches Expense report (PI payments)"),
 			},
 		];
 		this.body.find("#recon-bank-kpis").html(
@@ -410,6 +416,7 @@ class ReconciliationWithBankPage {
 					<div class="recon-bank-kpi" style="background: linear-gradient(135deg, ${card.gradient});">
 						<div class="recon-bank-kpi-label">${card.label}</div>
 						<div class="recon-bank-kpi-value">${card.value}</div>
+						${card.hint ? `<div class="recon-bank-kpi-hint">${card.hint}</div>` : ""}
 					</div>
 				</div>
 			`
@@ -541,7 +548,7 @@ class ReconciliationWithBankPage {
 			</div>
 			<p class="text-muted small mt-2 mb-0">
 				${__(
-					"Internal bank transfers (Payment Entry Internal Transfer and bank-to-bank Journal Entries) are excluded from Donation and Expense so they are not counted twice across banks. Opening and ending balances still include all GL movements."
+					"Total Expense matches the Expense report: Payment Entries (Pay) allocated to Purchase Invoices in this date range, including cash and cheque (gross, before withholding tax). Donations, opening, and ending balances still come from bank GL. Internal bank transfers are excluded from Donation."
 				)}
 			</p>
 		`);
