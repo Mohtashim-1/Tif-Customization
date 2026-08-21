@@ -23,7 +23,14 @@
   "area",
   "trainer_name",
   "program",
-  "workshop_for"
+  "workshop_for",
+  "zoom_section",
+  "zoom_id",
+  "column_break_zoom",
+  "zoom_link",
+  "attendance_section",
+  "attendance",
+  "attendance_count"
  ],
  "fields": [
   {
@@ -144,6 +151,47 @@
    "fieldname": "workshop_for",
    "fieldtype": "Data",
    "label": "Workshop For"
+  },
+  {
+   "fieldname": "zoom_section",
+   "fieldtype": "Section Break",
+   "label": "Zoom / Online Meeting"
+  },
+  {
+   "description": "Zoom Meeting ID tagged to this training for attendance matching",
+   "fieldname": "zoom_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Zoom ID"
+  },
+  {
+   "fieldname": "column_break_zoom",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "zoom_link",
+   "fieldtype": "Data",
+   "label": "Zoom Link",
+   "options": "URL"
+  },
+  {
+   "fieldname": "attendance_section",
+   "fieldtype": "Section Break",
+   "label": "Attendance"
+  },
+  {
+   "fieldname": "attendance",
+   "fieldtype": "Table",
+   "label": "Attendance",
+   "options": "Upcoming Training Attendance"
+  },
+  {
+   "default": "0",
+   "fieldname": "attendance_count",
+   "fieldtype": "Int",
+   "label": "Present Count",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,

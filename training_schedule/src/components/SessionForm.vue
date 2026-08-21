@@ -43,10 +43,28 @@ const form = reactive({
 	program: "",
 	workshop_for: "",
 	tag_school: "",
+	zoom_id: "",
+	zoom_link: "",
+	attendance: [],
 });
 
 const isWorkshop = computed(() => form.type === "Workshop");
 const title = computed(() => (form.name ? `Edit ${form.name}` : "New Upcoming Training"));
+const presentCount = computed(
+	() => (form.attendance || []).filter((a) => a.attendance_status === "Present").length
+);
+
+function blankAttendee() {
+	return {
+		participant_name: "",
+		email: "",
+		phone: "",
+		zoom_participant_id: "",
+		attendance_status: "Present",
+		check_in_time: "",
+		remarks: "",
+	};
+}
 
 function reset() {
 	Object.assign(form, {
@@ -67,7 +85,18 @@ function reset() {
 		program: "",
 		workshop_for: "",
 		tag_school: "",
+		zoom_id: "",
+		zoom_link: "",
+		attendance: [],
 	});
+}
+
+function addAttendee() {
+	form.attendance.push(blankAttendee());
+}
+
+function removeAttendee(idx) {
+	form.attendance.splice(idx, 1);
 }
 
 async function load() {
@@ -80,7 +109,10 @@ async function load() {
 			const doc = await apiGet(`${METHOD}.get_session`, {
 				name: props.sessionName,
 			});
-			Object.assign(form, doc);
+			Object.assign(form, {
+				...doc,
+				attendance: (doc.attendance || []).map((a) => ({ ...blankAttendee(), ...a })),
+			});
 		} else {
 			reset();
 		}
@@ -95,7 +127,11 @@ async function save() {
 	saving.value = true;
 	error.value = "";
 	try {
-		const result = await apiPost(`${METHOD}.save_session`, { values: { ...form } });
+		const payload = {
+			...form,
+			attendance: (form.attendance || []).filter((a) => (a.participant_name || "").trim()),
+		};
+		const result = await apiPost(`${METHOD}.save_session`, { values: payload });
 		emit("saved", result);
 	} catch (e) {
 		error.value = e.message || String(e);
@@ -117,7 +153,7 @@ onMounted(load);
 			<header>
 				<div>
 					<h2>{{ title }}</h2>
-					<p>Saves directly to Upcoming Training</p>
+					<p>Saves directly to Upcoming Training · Zoom ID + attendance</p>
 				</div>
 				<button type="button" class="x" @click="$emit('close')">✕</button>
 			</header>
@@ -211,6 +247,90 @@ onMounted(load);
 						<option v-for="p in options.participant_categories" :key="p" :value="p">{{ p }}</option>
 					</select>
 				</label>
+
+				<div class="full zoom-block">
+					<h3>Zoom / Online Meeting</h3>
+					<div class="zoom-grid">
+						<label>
+							Zoom ID
+							<input
+								v-model="form.zoom_id"
+								placeholder="e.g. 823 4567 8910"
+								autocomplete="off"
+							/>
+						</label>
+						<label>
+							Zoom Link
+							<input
+								v-model="form.zoom_link"
+								placeholder="https://zoom.us/j/..."
+								autocomplete="off"
+							/>
+						</label>
+					</div>
+				</div>
+
+				<div class="full attend-block">
+					<div class="attend-head">
+						<div>
+							<h3>Attendance</h3>
+							<p>
+								Tagged to this training
+								<template v-if="form.zoom_id"> · Zoom ID {{ form.zoom_id }}</template>
+								· {{ presentCount }}/{{ form.attendance.length }} present
+							</p>
+						</div>
+						<button type="button" class="ghost" @click="addAttendee">+ Add participant</button>
+					</div>
+
+					<div v-if="!form.attendance.length" class="attend-empty">
+						No attendance yet. Add participants and mark Present / Absent / Late.
+					</div>
+
+					<div v-else class="attend-table-wrap">
+						<table class="attend-table">
+							<thead>
+								<tr>
+									<th>Name</th>
+									<th>Email</th>
+									<th>Zoom Participant ID</th>
+									<th>Status</th>
+									<th>Check-in</th>
+									<th></th>
+								</tr>
+							</thead>
+							<tbody>
+								<tr v-for="(row, idx) in form.attendance" :key="idx">
+									<td>
+										<input v-model="row.participant_name" placeholder="Participant" required />
+									</td>
+									<td>
+										<input v-model="row.email" type="email" placeholder="email@" />
+									</td>
+									<td>
+										<input v-model="row.zoom_participant_id" placeholder="Zoom user id" />
+									</td>
+									<td>
+										<select v-model="row.attendance_status">
+											<option>Present</option>
+											<option>Absent</option>
+											<option>Late</option>
+										</select>
+									</td>
+									<td>
+										<input v-model="row.check_in_time" placeholder="HH:MM" />
+									</td>
+									<td>
+										<button type="button" class="linkish" @click="removeAttendee(idx)">
+											Remove
+										</button>
+									</td>
+								</tr>
+							</tbody>
+						</table>
+					</div>
+				</div>
+
 				<div class="actions">
 					<button type="button" class="ghost" @click="$emit('close')">Cancel</button>
 					<button type="submit" class="primary" :disabled="saving">
@@ -233,7 +353,7 @@ onMounted(load);
 	padding: 20px;
 }
 .sheet {
-	width: min(860px, 100%);
+	width: min(920px, 100%);
 	max-height: 92vh;
 	overflow: auto;
 	background: #fff;
@@ -289,6 +409,83 @@ select {
 	font-weight: 400;
 	background: #f9fafb;
 }
+.full {
+	grid-column: 1 / -1;
+}
+.zoom-block,
+.attend-block {
+	border: 1px solid #e5e7eb;
+	border-radius: 14px;
+	padding: 14px;
+	background: #f8fafc;
+}
+.zoom-block h3,
+.attend-block h3 {
+	margin: 0 0 4px;
+	font-size: 14px;
+}
+.zoom-block p,
+.attend-block p {
+	margin: 0;
+	color: #6b7280;
+	font-size: 12px;
+	font-weight: 400;
+}
+.zoom-grid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 12px;
+	margin-top: 10px;
+}
+.attend-head {
+	display: flex;
+	justify-content: space-between;
+	gap: 12px;
+	align-items: flex-start;
+	flex-wrap: wrap;
+	margin-bottom: 10px;
+}
+.attend-empty {
+	padding: 18px;
+	text-align: center;
+	color: #6b7280;
+	background: #fff;
+	border-radius: 10px;
+	border: 1px dashed #e5e7eb;
+}
+.attend-table-wrap {
+	overflow: auto;
+	background: #fff;
+	border-radius: 10px;
+	border: 1px solid #e5e7eb;
+}
+.attend-table {
+	width: 100%;
+	border-collapse: collapse;
+	min-width: 720px;
+}
+.attend-table th,
+.attend-table td {
+	padding: 8px;
+	border-bottom: 1px solid #f3f4f6;
+	text-align: left;
+	font-size: 12px;
+}
+.attend-table th {
+	background: #f8fafc;
+}
+.attend-table input,
+.attend-table select {
+	width: 100%;
+	padding: 8px;
+}
+.linkish {
+	border: 0;
+	background: none;
+	color: #b91c1c;
+	font-weight: 700;
+	cursor: pointer;
+}
 .actions {
 	grid-column: 1 / -1;
 	display: flex;
@@ -323,7 +520,8 @@ select {
 	padding: 12px;
 }
 @media (max-width: 700px) {
-	.grid {
+	.grid,
+	.zoom-grid {
 		grid-template-columns: 1fr;
 	}
 }

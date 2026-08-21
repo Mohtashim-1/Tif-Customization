@@ -93,6 +93,10 @@ function openSession(s) {
 								</span>
 								<span class="meta-text">
 									{{ s.trainerName }} · {{ s.time || slot.label }} · {{ s.room }}
+									<template v-if="s.zoom_id"> · Zoom {{ s.zoom_id }}</template>
+									<template v-if="s.attendance_total">
+										· {{ s.attendance_present }}/{{ s.attendance_total }} present
+									</template>
 								</span>
 							</div>
 						</article>

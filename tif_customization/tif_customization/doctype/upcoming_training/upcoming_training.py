@@ -10,6 +10,11 @@ from frappe.utils import getdate
 class UpcomingTraining(Document):
 	def validate(self):
 		self.set_month()
+		self.attendance_count = sum(
+			1
+			for row in (self.attendance or [])
+			if (row.attendance_status or "").strip() == "Present"
+		)
 
 	def set_month(self):
 		"""Month is derived, never typed, so workshop listings can never disagree with the date."""

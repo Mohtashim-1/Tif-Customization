@@ -225,6 +225,8 @@ function openRow(row) {
 						<th>Trainer</th>
 						<th>Type</th>
 						<th>Mode</th>
+						<th>Zoom ID</th>
+						<th>Attendance</th>
 						<th>Status</th>
 						<th></th>
 					</tr>
@@ -237,9 +239,13 @@ function openRow(row) {
 						<td>{{ r.trainerName }}</td>
 						<td>{{ r.type }}</td>
 						<td>{{ r.mode }}</td>
+						<td>{{ r.zoom_id || "—" }}</td>
+						<td>
+							{{ r.attendance_present || 0 }}/{{ r.attendance_total || 0 }}
+						</td>
 						<td><span class="pill" :data-status="r.status">{{ r.status }}</span></td>
 						<td>
-							<button type="button" class="linkish" @click="openRow(r)">Edit</button>
+							<button type="button" class="linkish" @click="openRow(r)">Edit / Attendance</button>
 						</td>
 					</tr>
 				</tbody>

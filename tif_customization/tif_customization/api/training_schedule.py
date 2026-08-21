@@ -8,7 +8,7 @@ from datetime import time, timedelta
 
 import frappe
 from frappe import _
-from frappe.utils import add_days, get_first_day, get_last_day, get_quarter_ending, get_quarter_start, getdate, nowdate
+from frappe.utils import add_days, cint, get_first_day, get_last_day, get_quarter_ending, get_quarter_start, getdate, nowdate
 
 DOCTYPE = "Upcoming Training"
 
@@ -30,6 +30,8 @@ FIELDS = (
 	"program",
 	"workshop_for",
 	"tag_school",
+	"zoom_id",
+	"zoom_link",
 	"modified",
 )
 
@@ -161,6 +163,8 @@ def _color_for_name(name: str) -> str:
 def _row_to_session(row, today):
 	row = frappe._dict(row)
 	trainer = (row.trainer_name or "").strip() or _("Unassigned")
+	present = cint(row.get("attendance_present") or 0)
+	total = cint(row.get("attendance_total") or 0)
 	return {
 		"id": row.name,
 		"name": row.name,
@@ -183,8 +187,39 @@ def _row_to_session(row, today):
 		"school": row.school_name or row.tag_school or "",
 		"department": row.department_training or "",
 		"participants_category": row.participants_category or "",
+		"zoom_id": row.get("zoom_id") or "",
+		"zoom_link": row.get("zoom_link") or "",
+		"attendance_present": present,
+		"attendance_total": total,
 		"url": f"/app/upcoming-training/{row.name}",
 	}
+
+
+def _attach_attendance_counts(sessions):
+	names = [s.get("name") for s in sessions if s.get("name")]
+	if not names:
+		return sessions
+	if not frappe.db.exists("DocType", "Upcoming Training Attendance"):
+		return sessions
+	rows = frappe.db.sql(
+		"""
+		SELECT parent,
+			COUNT(*) AS total,
+			SUM(CASE WHEN attendance_status = 'Present' THEN 1 ELSE 0 END) AS present
+		FROM `tabUpcoming Training Attendance`
+		WHERE parent IN %(names)s
+		GROUP BY parent
+		""",
+		{"names": names},
+		as_dict=True,
+	)
+	by_parent = {r.parent: r for r in rows}
+	for s in sessions:
+		stats = by_parent.get(s["name"])
+		if stats:
+			s["attendance_total"] = cint(stats.total)
+			s["attendance_present"] = cint(stats.present)
+	return sessions
 
 
 def _fetch_rows(from_date, to_date):
@@ -256,7 +291,7 @@ def get_schedule_data(week_start=None, view="week", anchor=None):
 
 	start, end = _period_for(view, pivot)
 	rows = _fetch_rows(start, end)
-	sessions = [_row_to_session(r, today) for r in rows]
+	sessions = _attach_attendance_counts([_row_to_session(r, today) for r in rows])
 
 	trainers_map = {}
 	programs = set()
@@ -426,8 +461,10 @@ def get_directory(view="trainers", from_date=None, to_date=None):
 		to_date = getdate(to_date)
 
 	rows = _fetch_rows(from_date, to_date)
-	sessions = [_row_to_session(r, today) for r in rows]
 	view = (view or "trainers").strip().lower()
+	sessions = [_row_to_session(r, today) for r in rows]
+	if view in ("sessions", "notifications"):
+		sessions = _attach_attendance_counts(sessions)
 
 	if view == "trainers":
 		bucket = {}
@@ -562,6 +599,22 @@ def get_session(name):
 	if not frappe.has_permission(DOCTYPE, "read"):
 		frappe.throw(_("You are not permitted to view Upcoming Training."), frappe.PermissionError)
 	doc = frappe.get_doc(DOCTYPE, name)
+	attendance = []
+	if hasattr(doc, "attendance"):
+		for row in doc.attendance or []:
+			attendance.append(
+				{
+					"name": row.name,
+					"participant_name": row.participant_name or "",
+					"email": row.email or "",
+					"phone": row.phone or "",
+					"zoom_participant_id": row.zoom_participant_id or "",
+					"attendance_status": row.attendance_status or "Present",
+					"check_in_time": _format_time(row.check_in_time),
+					"remarks": row.remarks or "",
+				}
+			)
+	present = sum(1 for a in attendance if a["attendance_status"] == "Present")
 	return {
 		"name": doc.name,
 		"type": doc.type,
@@ -580,6 +633,11 @@ def get_session(name):
 		"program": doc.program or "",
 		"workshop_for": doc.workshop_for or "",
 		"tag_school": doc.tag_school or "",
+		"zoom_id": getattr(doc, "zoom_id", None) or "",
+		"zoom_link": getattr(doc, "zoom_link", None) or "",
+		"attendance": attendance,
+		"attendance_present": present,
+		"attendance_total": len(attendance),
 	}
 
 
@@ -626,17 +684,42 @@ def save_session(values=None):
 		"program",
 		"workshop_for",
 		"tag_school",
+		"zoom_id",
+		"zoom_link",
 	):
-		if field in values:
+		if field in values and frappe.get_meta(DOCTYPE).has_field(field):
 			doc.set(field, values.get(field) or None)
+
+	if "attendance" in values and frappe.get_meta(DOCTYPE).has_field("attendance"):
+		doc.set("attendance", [])
+		for row in values.get("attendance") or []:
+			if isinstance(row, str):
+				continue
+			row = frappe._dict(row)
+			if not (row.get("participant_name") or "").strip():
+				continue
+			doc.append(
+				"attendance",
+				{
+					"participant_name": (row.participant_name or "").strip(),
+					"email": (row.email or "").strip() or None,
+					"phone": (row.phone or "").strip() or None,
+					"zoom_participant_id": (row.zoom_participant_id or "").strip() or None,
+					"attendance_status": row.attendance_status or "Present",
+					"check_in_time": row.check_in_time or None,
+					"remarks": (row.remarks or "").strip() or None,
+				},
+			)
 
 	doc.save(ignore_permissions=False)
 	frappe.db.commit()
 	today = getdate(nowdate())
+	session = _row_to_session(doc.as_dict(), today)
+	_attach_attendance_counts([session])
 	return {
 		"ok": 1,
 		"name": doc.name,
-		"session": _row_to_session(doc.as_dict(), today),
+		"session": session,
 		"message": _("Upcoming Training {0} saved.").format(doc.name),
 	}
 
