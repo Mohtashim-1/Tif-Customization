@@ -157,7 +157,7 @@ def download_reconciliation_excel(filters=None):
 	band_fill = PatternFill("solid", fgColor="B8C9E8")
 
 	banks = report.get("banks") or []
-	last_col = 2 + len(banks)
+	last_col = 3 + len(banks)
 
 	ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=last_col)
 	ws["A1"] = report.get("title")
@@ -167,7 +167,11 @@ def download_reconciliation_excel(filters=None):
 	row = 3
 	ws.cell(row=row, column=1, value="")
 	ws.cell(row=row, column=2, value="")
-	col = 3
+	total_head = ws.cell(row=row, column=3, value=_("Grand Total"))
+	total_head.font = bold
+	total_head.fill = header_fill
+	total_head.alignment = center
+	col = 4
 	for bank in banks:
 		cell = ws.cell(row=row, column=col, value=bank.get("label"))
 		cell.font = bold
@@ -176,11 +180,15 @@ def download_reconciliation_excel(filters=None):
 		col += 1
 	row += 1
 
+	def row_total(bank_values):
+		return sum(flt((bank_values or {}).get(bank["bank_account"])) for bank in banks)
+
 	def write_amount_row(label, date_label, bank_values):
 		nonlocal row
 		ws.cell(row=row, column=1, value=label)
 		ws.cell(row=row, column=2, value=date_label or "")
-		col = 3
+		ws.cell(row=row, column=3, value=row_total(bank_values))
+		col = 4
 		for bank in banks:
 			ws.cell(row=row, column=col, value=flt((bank_values or {}).get(bank["bank_account"])))
 			col += 1
@@ -190,12 +198,14 @@ def download_reconciliation_excel(filters=None):
 		nonlocal row
 		ws.cell(row=row, column=1, value=label)
 		ws.cell(row=row, column=2, value="")
-		col = 3
+		total_cell = ws.cell(row=row, column=3, value=row_total(bank_values))
+		total_cell.font = bold
+		col = 4
 		for bank in banks:
 			cell = ws.cell(row=row, column=col, value=flt((bank_values or {}).get(bank["bank_account"])))
 			cell.font = bold
 			col += 1
-		for c in range(1, 3):
+		for c in range(1, 4):
 			ws.cell(row=row, column=c).font = bold
 		row += 1
 

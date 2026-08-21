@@ -89,11 +89,28 @@ class ReconciliationWithBankPage {
 					font-size: 15px;
 					background: #f8fafc;
 				}
+				.recon-bank-table .recon-grand-head {
+					text-align: center;
+					font-weight: 700;
+					background: #0f172a;
+					color: #fff;
+					min-width: 150px;
+				}
 				.recon-bank-table .recon-bank-head {
 					text-align: center;
 					font-weight: 700;
 					background: #eef2ff;
 					min-width: 140px;
+				}
+				.recon-bank-table .recon-grand {
+					font-weight: 700;
+					background: #f8fafc;
+				}
+				.recon-summary-expense .recon-grand {
+					background: #fecaca;
+				}
+				.recon-summary .recon-grand {
+					background: #bfdbfe;
 				}
 				.recon-bank-table .recon-section {
 					background: #b8c9e8;
@@ -394,6 +411,38 @@ class ReconciliationWithBankPage {
 		return format_currency(flt(value || 0), frappe.defaults.get_default("currency"));
 	}
 
+	sumBanks(banks, bankValues) {
+		return (banks || []).reduce(
+			(sum, bank) => sum + flt((bankValues || {})[bank.bank_account]),
+			0
+		);
+	}
+
+	amountCells(banks, bankValues) {
+		const total = this.sumBanks(banks, bankValues);
+		return `
+			<td class="recon-money recon-grand">${frappe.utils.escape_html(this.money(total))}</td>
+			${(banks || [])
+				.map(
+					(bank) =>
+						`<td class="recon-money">${frappe.utils.escape_html(
+							this.money((bankValues || {})[bank.bank_account])
+						)}</td>`
+				)
+				.join("")}
+		`;
+	}
+
+	summaryRow(label, banks, bankValues, rowClass) {
+		return `
+			<tr class="${rowClass}">
+				<td>${frappe.utils.escape_html(label)}</td>
+				<td></td>
+				${this.amountCells(banks, bankValues)}
+			</tr>
+		`;
+	}
+
 	render_kpis(totals) {
 		const cards = [
 			{
@@ -425,27 +474,6 @@ class ReconciliationWithBankPage {
 		).show();
 	}
 
-	bankCells(banks, bankValues) {
-		return banks
-			.map(
-				(bank) =>
-					`<td class="recon-money">${frappe.utils.escape_html(
-						this.money((bankValues || {})[bank.bank_account])
-					)}</td>`
-			)
-			.join("");
-	}
-
-	summaryRow(label, banks, bankValues, rowClass) {
-		return `
-			<tr class="${rowClass}">
-				<td>${frappe.utils.escape_html(label)}</td>
-				<td></td>
-				${this.bankCells(banks, bankValues)}
-			</tr>
-		`;
-	}
-
 	render_report(data) {
 		const banks = data.banks || [];
 		if (!banks.length) {
@@ -456,15 +484,18 @@ class ReconciliationWithBankPage {
 			return;
 		}
 
-		this.render_kpis(data.totals || {});
-
 		const donations = data.donations || [];
 		const expenses = data.expenses || [];
 		const totals = data.totals || {};
 		const initial = data.initial_amount || {};
 		const ending = data.ending_balance || {};
 		const title = frappe.utils.escape_html(data.title || __("Reconciliation with Bank Statements Summary"));
-		const totalCols = 2 + banks.length;
+		const totalCols = 3 + banks.length;
+
+		this.render_kpis({
+			total_donation: this.sumBanks(banks, totals.donation_banks),
+			total_expense: this.sumBanks(banks, totals.expense_banks),
+		});
 
 		const bankHeaders = banks
 			.map(
@@ -485,7 +516,7 @@ class ReconciliationWithBankPage {
 					<tr>
 						${section}
 						<td>${frappe.utils.escape_html(row.month_label || "")}</td>
-						${this.bankCells(banks, row.banks)}
+						${this.amountCells(banks, row.banks)}
 					</tr>
 				`;
 			})
@@ -503,7 +534,7 @@ class ReconciliationWithBankPage {
 					<tr>
 						${section}
 						<td>${frappe.utils.escape_html(row.month_label || "")}</td>
-						${this.bankCells(banks, row.banks)}
+						${this.amountCells(banks, row.banks)}
 					</tr>
 				`;
 			})
@@ -519,6 +550,7 @@ class ReconciliationWithBankPage {
 						<tr>
 							<th></th>
 							<th></th>
+							<th class="recon-grand-head">${__("Grand Total")}</th>
 							${bankHeaders}
 						</tr>
 					</thead>
@@ -526,7 +558,7 @@ class ReconciliationWithBankPage {
 						<tr>
 							<td>${__("Initial Amount")}</td>
 							<td>${frappe.utils.escape_html(initial.date_label || "")}</td>
-							${this.bankCells(banks, initial.banks)}
+							${this.amountCells(banks, initial.banks)}
 						</tr>
 						${donationRows}
 						${this.summaryRow(__("Total Donation"), banks, totals.donation_banks, "recon-summary")}
@@ -541,7 +573,7 @@ class ReconciliationWithBankPage {
 						<tr class="recon-ending">
 							<td>${__("Ending balance {0}", [ending.date_label || ""])}</td>
 							<td></td>
-							${this.bankCells(banks, ending.banks)}
+							${this.amountCells(banks, ending.banks)}
 						</tr>
 					</tbody>
 				</table>

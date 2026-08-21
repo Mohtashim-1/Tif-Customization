@@ -413,6 +413,16 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "Salary Increments",
+   "link_count": 0,
+   "link_to": "Salary Increment",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "Leave Application",
    "link_count": 0,
    "link_to": "Leave Application",
@@ -669,7 +679,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-08-08 11:44:31.655015",
+ "modified": "2026-08-21 16:47:38.833366",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Forms",
