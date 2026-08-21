@@ -23,17 +23,17 @@ const reportKpis = computed(() =>
 const copy = {
 	trainers: {
 		title: "Trainers",
-		subtitle: "People delivering Upcoming Training sessions. Click a trainer to jump to their schedule.",
+		subtitle: "List of trainers from Upcoming Training. Open a row to see their sessions in list view.",
 		empty: "No trainers in this date range.",
 	},
 	programs: {
 		title: "Training Programs",
-		subtitle: "Programs and topics from Upcoming Training. Open a program to see matching sessions.",
+		subtitle: "Programs and topics from Upcoming Training. Open a row to see matching sessions.",
 		empty: "No programs found.",
 	},
 	sessions: {
 		title: "All Sessions",
-		subtitle: "Every Upcoming Training record. Create, edit, or open from here — this is the source of truth.",
+		subtitle: "Every Upcoming Training record in list view. Create, edit, or open from here.",
 		empty: "No sessions in the last 90 days / next 60 days.",
 	},
 	rooms: {
@@ -129,47 +129,90 @@ function openRow(row) {
 
 		<div v-else-if="!rows.length" class="empty">{{ copy[view]?.empty || "No records found." }}</div>
 
-		<div v-else-if="view === 'trainers'" class="cards">
-			<button
-				v-for="r in rows"
-				:key="r.name"
-				type="button"
-				class="person"
-				@click="$emit('filter-trainer', r.name)"
-			>
-				<span class="avatar" :style="{ background: r.color }">{{ r.initials }}</span>
-				<strong>{{ r.name }}</strong>
-				<span>{{ r.sessions }} sessions</span>
-				<small>{{ r.upcoming || 0 }} upcoming · {{ r.completed || 0 }} completed</small>
-			</button>
+		<div v-else-if="view === 'trainers'" class="table-wrap">
+			<table>
+				<thead>
+					<tr>
+						<th>Trainer</th>
+						<th>Sessions</th>
+						<th>Upcoming</th>
+						<th>Completed</th>
+						<th></th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr v-for="r in rows" :key="r.name">
+						<td>
+							<div class="person-cell">
+								<span class="avatar" :style="{ background: r.color }">{{ r.initials }}</span>
+								<strong>{{ r.name }}</strong>
+							</div>
+						</td>
+						<td>{{ r.sessions }}</td>
+						<td>{{ r.upcoming || 0 }}</td>
+						<td>{{ r.completed || 0 }}</td>
+						<td>
+							<button type="button" class="linkish" @click="$emit('filter-trainer', r.name)">
+								View sessions
+							</button>
+						</td>
+					</tr>
+				</tbody>
+			</table>
 		</div>
 
-		<div v-else-if="view === 'programs'" class="cards programs">
-			<button
-				v-for="r in rows"
-				:key="r.name"
-				type="button"
-				class="prog"
-				@click="$emit('filter-program', r.name)"
-			>
-				<strong>{{ r.name }}</strong>
-				<span>{{ r.sessions }} sessions · {{ r.trainers }} trainers</span>
-				<small>{{ r.types }}</small>
-			</button>
+		<div v-else-if="view === 'programs'" class="table-wrap">
+			<table>
+				<thead>
+					<tr>
+						<th>Program</th>
+						<th>Sessions</th>
+						<th>Trainers</th>
+						<th>Types</th>
+						<th></th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr v-for="r in rows" :key="r.name">
+						<td><strong>{{ r.name }}</strong></td>
+						<td>{{ r.sessions }}</td>
+						<td>{{ r.trainers }}</td>
+						<td>{{ r.types }}</td>
+						<td>
+							<button type="button" class="linkish" @click="$emit('filter-program', r.name)">
+								View sessions
+							</button>
+						</td>
+					</tr>
+				</tbody>
+			</table>
 		</div>
 
-		<div v-else-if="view === 'rooms'" class="cards rooms">
-			<button
-				v-for="r in rows"
-				:key="r.name"
-				type="button"
-				class="room"
-				@click="$emit('filter-room', r.name)"
-			>
-				<strong>{{ r.name }}</strong>
-				<span>{{ r.sessions }} sessions</span>
-				<small>{{ r.modes }} {{ r.cities ? "· " + r.cities : "" }}</small>
-			</button>
+		<div v-else-if="view === 'rooms'" class="table-wrap">
+			<table>
+				<thead>
+					<tr>
+						<th>Venue / Mode</th>
+						<th>Sessions</th>
+						<th>Modes</th>
+						<th>Cities</th>
+						<th></th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr v-for="r in rows" :key="r.name">
+						<td><strong>{{ r.name }}</strong></td>
+						<td>{{ r.sessions }}</td>
+						<td>{{ r.modes }}</td>
+						<td>{{ r.cities }}</td>
+						<td>
+							<button type="button" class="linkish" @click="$emit('filter-room', r.name)">
+								View sessions
+							</button>
+						</td>
+					</tr>
+				</tbody>
+			</table>
 		</div>
 
 		<div v-else class="table-wrap">
@@ -276,6 +319,19 @@ function openRow(row) {
 	color: #fff;
 	font-weight: 700;
 	margin-bottom: 8px;
+}
+.person-cell {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+.person-cell .avatar {
+	width: 32px;
+	height: 32px;
+	border-radius: 10px;
+	margin-bottom: 0;
+	font-size: 11px;
+	flex: 0 0 auto;
 }
 .table-wrap { overflow: auto; background: #fff; border-radius: 12px; }
 table { width: 100%; border-collapse: collapse; min-width: 860px; }

@@ -7,7 +7,7 @@ const props = defineProps({
 	sessions: { type: Array, default: () => [] },
 	todayIso: { type: String, default: "" },
 });
-const emit = defineEmits(["open", "create"]);
+const emit = defineEmits(["open"]);
 
 function iso(d) {
 	const y = d.getFullYear();
@@ -44,13 +44,6 @@ function statusIcon(status) {
 function openSession(s) {
 	emit("open", s.name || s.id);
 }
-
-function createAt(day, slot) {
-	emit("create", {
-		training_date: iso(day),
-		training_time: slot.start || "10:00",
-	});
-}
 </script>
 
 <template>
@@ -73,38 +66,37 @@ function createAt(day, slot) {
 					<td class="time-col">{{ slot.label }}</td>
 					<td
 						v-for="day in days"
-						:key="iso(day) + slot.id"
+						:key="iso(day) + '-' + slot.id"
+						class="day-cell"
 						:class="{ today: iso(day) === todayIso }"
 					>
-						<template v-if="sessionsAt(day, slot.id).length">
-							<article
-								v-for="s in sessionsAt(day, slot.id)"
-								:key="s.id"
-								class="session"
-								:style="{
-									'--cat': getCategory(s.category).color,
-									background: getCategory(s.category).color + '18',
-								}"
-								@click.stop="openSession(s)"
-							>
-								<div class="session-top">
-									<strong>{{ s.title }}</strong>
-									<span class="status" :data-status="s.status">{{ statusIcon(s.status) }}</span>
-								</div>
-								<div class="meta">
-									<span
-										class="avatar"
-										:style="{ background: s.trainerColor || getCategory(s.category).color }"
-									>
-										{{ s.trainerInitials || "?" }}
-									</span>
-									<span>
-										{{ s.trainerName }} · {{ s.time || slot.label }} · {{ s.room }}
-									</span>
-								</div>
-							</article>
-						</template>
-						<button v-else type="button" class="empty" @click="createAt(day, slot)">+ Add</button>
+						<article
+							v-for="s in sessionsAt(day, slot.id)"
+							:key="s.id || s.name"
+							class="session"
+							:style="{
+								'--cat': getCategory(s.category).color,
+								background: getCategory(s.category).color + '18',
+							}"
+							@click.stop="openSession(s)"
+						>
+							<div class="session-top">
+								<strong :title="s.title">{{ s.title }}</strong>
+								<span class="status" :data-status="s.status">{{ statusIcon(s.status) }}</span>
+							</div>
+							<div class="meta">
+								<span
+									class="avatar"
+									:style="{ background: s.trainerColor || getCategory(s.category).color }"
+								>
+									{{ s.trainerInitials || "?" }}
+								</span>
+								<span class="meta-text">
+									{{ s.trainerName }} · {{ s.time || slot.label }} · {{ s.room }}
+								</span>
+							</div>
+						</article>
+						<div v-if="!sessionsAt(day, slot.id).length" class="slot-empty"></div>
 					</td>
 				</tr>
 			</tbody>
@@ -122,6 +114,7 @@ function createAt(day, slot) {
 }
 .grid {
 	width: 100%;
+	table-layout: fixed;
 	border-collapse: separate;
 	border-spacing: 0;
 	min-width: 980px;
@@ -144,6 +137,9 @@ th {
 	position: sticky;
 	top: 0;
 	z-index: 1;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 th.today {
 	background: #eef2ff;
@@ -154,7 +150,8 @@ td.today {
 	background: #f8faff;
 }
 .time-col {
-	width: 130px;
+	width: 120px;
+	min-width: 120px;
 	font-weight: 600;
 	color: #4b5563;
 	background: #fafafa;
@@ -162,14 +159,19 @@ td.today {
 	left: 0;
 	z-index: 2;
 }
+.day-cell {
+	min-width: 120px;
+	width: calc((100% - 120px) / 7);
+}
 .session {
 	border-left: 4px solid var(--cat);
 	border-radius: 12px;
 	padding: 10px;
-	min-height: 64px;
+	min-height: 56px;
 	margin-bottom: 8px;
 	cursor: pointer;
 	transition: transform 0.15s ease;
+	overflow: hidden;
 }
 .session:hover {
 	transform: translateY(-1px);
@@ -183,15 +185,23 @@ td.today {
 .session-top strong {
 	font-size: 12px;
 	line-height: 1.35;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+	min-width: 0;
 }
 .status[data-status="completed"] {
 	color: #059669;
+	flex: 0 0 auto;
 }
 .status[data-status="in_progress"] {
 	color: #d97706;
+	flex: 0 0 auto;
 }
 .status[data-status="upcoming"] {
 	color: #7c3aed;
+	flex: 0 0 auto;
 }
 .meta {
 	display: flex;
@@ -199,6 +209,12 @@ td.today {
 	gap: 8px;
 	font-size: 11px;
 	color: #4b5563;
+}
+.meta-text {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 .avatar {
 	width: 22px;
@@ -212,18 +228,15 @@ td.today {
 	flex: 0 0 auto;
 }
 .empty {
-	display: block;
-	width: 100%;
-	text-align: center;
-	color: #9ca3af;
-	padding: 24px 0;
-	border: 1px dashed #e5e7eb;
-	background: transparent;
-	border-radius: 12px;
+	display: none;
 }
-.empty:hover {
-	border-color: #a5b4fc;
-	color: #4f46e5;
-	background: #eef2ff;
+.slot-empty {
+	min-height: 48px;
+	border-radius: 10px;
+	background: #fafafa;
+}
+.add-btn,
+.add-ico {
+	display: none;
 }
 </style>

@@ -5,28 +5,51 @@ from frappe.utils import flt, getdate, nowdate
 
 
 DEPARTMENTS = [
-	{"key": "cee", "label": "CEE", "keywords": ["cee"]},
-	{"key": "qps", "label": "QPS", "keywords": ["qps"]},
-	{"key": "tps", "label": "TPS", "keywords": ["tps"]},
+	{"key": "cee", "label": "CEE", "keywords": ["cee", "special education", "s.edu", "teacher training"]},
+	{"key": "qps", "label": "QPS", "keywords": ["qps", "quran program"]},
+	{"key": "tps", "label": "TPS", "keywords": ["tps", "tilawat"]},
 	{"key": "fa", "label": "F&A", "keywords": ["f&a", "finance", "accounts", "fa"]},
 	{"key": "hr", "label": "HR", "keywords": ["hr", "human resource"]},
 	{"key": "admin", "label": "Admin", "keywords": ["admin", "administration"]},
 	{"key": "it", "label": "IT", "keywords": ["it", "information technology"]},
-	{"key": "marketing", "label": "Marketing", "keywords": ["marketing"]},
-	{"key": "ceo", "label": "CEO", "keywords": ["ceo"]},
+	{"key": "marketing", "label": "Marketing", "keywords": ["marketing", "mktg"]},
+	{"key": "ceo", "label": "CEO", "keywords": ["ceo", "management"]},
 ]
+
+PROGRAM_SALARY_DEPTS = {"qps", "cee", "tps"}
+SUPPORT_SALARY_DEPTS = {"fa", "hr", "admin", "it", "marketing", "ceo"}
 
 
 REPORT_ROWS = [
 	{"row_type": "section", "label": "Salaries"},
-	{"row_type": "data", "label": "QPS Staff Salaries", "patterns": ["qps", "salary"]},
-	{"row_type": "data", "label": "CEE Staff Salaries", "patterns": ["cee", "salary"]},
-	{"row_type": "data", "label": "TPS Staff Salaries", "patterns": ["tps", "salary"]},
+	{
+		"row_type": "data",
+		"label": "QPS Staff Salaries",
+		"is_salary": 1,
+		"department_keys": ["qps"],
+		"patterns": ["salary"],
+	},
+	{
+		"row_type": "data",
+		"label": "CEE Staff Salaries",
+		"is_salary": 1,
+		"department_keys": ["cee"],
+		"patterns": ["salary"],
+	},
+	{
+		"row_type": "data",
+		"label": "TPS Staff Salaries",
+		"is_salary": 1,
+		"department_keys": ["tps"],
+		"patterns": ["salary"],
+	},
 	{
 		"row_type": "data",
 		"label": "Other Support departments",
+		"is_salary": 1,
+		"department_keys": list(SUPPORT_SALARY_DEPTS),
+		"include_unmatched": 1,
 		"patterns": ["salary"],
-		"exclude_patterns": ["qps", "cee", "tps"],
 	},
 	{"row_type": "total", "label": "Total", "section": "Salaries"},
 	{"row_type": "spacer"},
@@ -168,28 +191,66 @@ def get_report_data(from_date=None, to_date=None):
 
 
 def _fetch_gl_data(from_date, to_date):
-	return frappe.db.sql(
+	rows = frappe.db.sql(
 		"""
 		SELECT
 			LOWER(COALESCE(acc.account_name, gle.account, '')) AS account_name,
 			LOWER(COALESCE(gle.account, '')) AS account_id,
 			LOWER(COALESCE(cc.cost_center_name, gle.cost_center, '')) AS cost_center_name,
 			LOWER(COALESCE(gle.cost_center, '')) AS cost_center_id,
+			LOWER(COALESCE(parent.cost_center_name, '')) AS parent_cost_center_name,
+			LOWER(COALESCE(cc.parent_cost_center, '')) AS parent_cost_center_id,
+			LOWER(COALESCE(gparent.cost_center_name, '')) AS grandparent_cost_center_name,
+			LOWER(COALESCE(parent.parent_cost_center, '')) AS grandparent_cost_center_id,
+			gle.party_type,
+			gle.party,
 			SUM(COALESCE(gle.debit, 0) - COALESCE(gle.credit, 0)) AS amount
 		FROM `tabGL Entry` gle
 		LEFT JOIN `tabAccount` acc ON acc.name = gle.account
 		LEFT JOIN `tabCost Center` cc ON cc.name = gle.cost_center
+		LEFT JOIN `tabCost Center` parent ON parent.name = cc.parent_cost_center
+		LEFT JOIN `tabCost Center` gparent ON gparent.name = parent.parent_cost_center
 		WHERE gle.docstatus < 2
 		AND gle.posting_date BETWEEN %(from_date)s AND %(to_date)s
 		AND IFNULL(gle.is_cancelled, 0) = 0
 		-- This report is meant for expenses/capex. Exclude Income accounts so
 		-- entries like "Rental Income" don't get netted against "Office Rentals".
 		AND COALESCE(acc.root_type, '') != 'Income'
-		GROUP BY account_name, account_id, cost_center_name, cost_center_id
+		GROUP BY
+			account_name, account_id, cost_center_name, cost_center_id,
+			parent_cost_center_name, parent_cost_center_id,
+			grandparent_cost_center_name, grandparent_cost_center_id,
+			gle.party_type, gle.party
 		""",
 		{"from_date": from_date, "to_date": to_date},
 		as_dict=True,
 	)
+	_attach_employee_departments(rows)
+	return rows
+
+
+def _attach_employee_departments(rows):
+	employees = {
+		(r.get("party") or "").strip()
+		for r in rows
+		if (r.get("party_type") or "") == "Employee" and r.get("party")
+	}
+	if not employees:
+		return
+
+	dept_map = {
+		row.name: (row.department or "").lower()
+		for row in frappe.get_all(
+			"Employee",
+			filters={"name": ("in", list(employees))},
+			fields=["name", "department"],
+		)
+	}
+	for row in rows:
+		if (row.get("party_type") or "") == "Employee" and row.get("party"):
+			row["employee_department"] = dept_map.get(row.get("party"), "")
+		else:
+			row["employee_department"] = ""
 
 
 def _build_rows(entries):
@@ -234,11 +295,26 @@ def _build_rows(entries):
 def _build_data_row(config, entries):
 	patterns = [p.lower().strip() for p in (config.get("patterns") or []) if p]
 	exclude_patterns = [p.lower().strip() for p in (config.get("exclude_patterns") or []) if p]
+	is_salary = int(config.get("is_salary") or 0)
+	department_keys = set(config.get("department_keys") or [])
+	include_unmatched = int(config.get("include_unmatched") or 0)
 
 	total = 0.0
 	by_department = {d["key"]: 0.0 for d in DEPARTMENTS}
 
 	for entry in entries:
+		if is_salary:
+			if not _is_salary_account(entry):
+				continue
+			dept_key = _match_department(entry)
+			if not _salary_row_includes_department(dept_key, department_keys, include_unmatched):
+				continue
+			amount = flt(entry.get("amount"))
+			total += amount
+			if dept_key:
+				by_department[dept_key] += amount
+			continue
+
 		if not _matches_patterns(entry, patterns, exclude_patterns):
 			continue
 		amount = flt(entry.get("amount"))
@@ -255,24 +331,87 @@ def _build_data_row(config, entries):
 	}
 
 
+def _salary_row_includes_department(dept_key, department_keys, include_unmatched=0):
+	"""Decide if a salary GL amount belongs on this salary report row."""
+	if not department_keys and not include_unmatched:
+		return True
+	if dept_key and dept_key in department_keys:
+		return True
+	# Other Support: non-program salaries (support depts + unmatched cost centers)
+	if include_unmatched and dept_key not in PROGRAM_SALARY_DEPTS:
+		return True
+	return False
+
+
+def _is_salary_account(entry):
+	account_text = f"{entry.get('account_name', '')} {entry.get('account_id', '')}".lower()
+	return "salary" in account_text or "salaries" in account_text
+
+
 def _matches_patterns(entry, patterns, exclude_patterns=None):
 	if not patterns:
 		return False
 	account_text = f"{entry.get('account_name', '')} {entry.get('account_id', '')}".lower()
-	if not any(token in account_text for token in patterns):
-		return False
+	# Require ALL tokens when multiple are provided (AND), so "qps"+"salary"
+	# style configs do not match every salary account.
+	if not all(token in account_text for token in patterns):
+		# Fallback: single-token patterns still match as before
+		if len(patterns) == 1:
+			if patterns[0] not in account_text:
+				return False
+		else:
+			return False
 	exclude_patterns = exclude_patterns or []
 	if exclude_patterns and any(token in account_text for token in exclude_patterns):
 		return False
 	return True
 
 
+def _department_text(entry):
+	parts = [
+		entry.get("cost_center_name", ""),
+		entry.get("cost_center_id", ""),
+		entry.get("parent_cost_center_name", ""),
+		entry.get("parent_cost_center_id", ""),
+		entry.get("grandparent_cost_center_name", ""),
+		entry.get("grandparent_cost_center_id", ""),
+		entry.get("employee_department", ""),
+	]
+	return " ".join(cstr_lower(p) for p in parts if p)
+
+
+def cstr_lower(value):
+	return (value or "").lower()
+
+
 def _match_department(entry):
-	text = f"{entry.get('cost_center_name', '')} {entry.get('cost_center_id', '')}".lower()
+	text = _department_text(entry)
+	if not text.strip():
+		return None
+
+	# Prefer longer / more specific keywords first to avoid "it" false positives.
+	candidates = []
 	for d in DEPARTMENTS:
-		if any(k in text for k in d["keywords"]):
-			return d["key"]
-	return None
+		for keyword in d["keywords"]:
+			kw = keyword.lower().strip()
+			if not kw:
+				continue
+			if _keyword_in_text(kw, text):
+				candidates.append((len(kw), d["key"]))
+				break
+	if not candidates:
+		return None
+	candidates.sort(reverse=True)
+	return candidates[0][1]
+
+
+def _keyword_in_text(keyword, text):
+	"""Match keyword as substring, but guard short tokens like 'it' / 'fa' / 'hr'."""
+	if len(keyword) <= 2:
+		# word-ish boundary check
+		padded = f" {text.replace('-', ' ').replace('/', ' ').replace('&', ' ')} "
+		return f" {keyword} " in padded or f" {keyword} -" in f" {text} "
+	return keyword in text
 
 
 def _sum_rows(rows):
@@ -283,7 +422,7 @@ def _sum_rows(rows):
 	for row in rows:
 		total["total"] += flt(row.get("total"))
 		for d in DEPARTMENTS:
-			key = d["key"]	
+			key = d["key"]
 			total["by_department"][key] += flt((row.get("by_department") or {}).get(key))
 	return total
 
@@ -320,28 +459,57 @@ def _dept_keywords(department_key):
 	frappe.throw(f"Invalid department_key: {department_key}")
 
 
+def _entry_matches_salary_row(entry, cfg, department_key=None):
+	if not _is_salary_account(entry):
+		return False
+	dept_key = _match_department(entry)
+	allowed = set(cfg.get("department_keys") or [])
+	include_unmatched = int(cfg.get("include_unmatched") or 0)
+
+	if department_key:
+		if dept_key != department_key:
+			return False
+		return _salary_row_includes_department(dept_key, allowed, include_unmatched)
+
+	return _salary_row_includes_department(dept_key, allowed, include_unmatched)
+
+
 @frappe.whitelist()
 def get_drilldown_entries(row_index, from_date, to_date, department_key=None):
 	"""
 	Return GL Entries (voucher-wise lines) matching an expense head (row_index) within a date range.
-	Optional department_key filters by Cost Center keywords for that department.
+	Optional department_key filters by Cost Center / Employee Department for that department.
 	"""
 	cfg = _row_config_by_index(row_index)
 	if cfg.get("row_type") != "data":
 		frappe.throw("Drilldown is available only for expense head rows.")
+
+	from_date = str(getdate(from_date))
+	to_date = str(getdate(to_date))
+	department_key = (department_key or "").strip() or None
+	if department_key:
+		_dept_keywords(department_key)
+
+	# Salary rows: resolve in Python so parent cost center + employee department work.
+	if int(cfg.get("is_salary") or 0):
+		return _salary_drilldown(cfg, row_index, from_date, to_date, department_key)
 
 	patterns = [p.lower().strip() for p in (cfg.get("patterns") or []) if p]
 	exclude_patterns = [p.lower().strip() for p in (cfg.get("exclude_patterns") or []) if p]
 	if not patterns:
 		frappe.throw("No patterns configured for this row.")
 
-	dept_keywords = _dept_keywords((department_key or "").strip() or None)
-
-	from_date = str(getdate(from_date))
-	to_date = str(getdate(to_date))
+	dept_keywords = _dept_keywords(department_key) if department_key else []
 
 	account_text_expr = "LOWER(CONCAT(COALESCE(acc.account_name, ''), ' ', COALESCE(gle.account, '')))"
-	cost_center_text_expr = "LOWER(CONCAT(COALESCE(cc.cost_center_name, ''), ' ', COALESCE(gle.cost_center, '')))"
+	cost_center_text_expr = (
+		"LOWER(CONCAT("
+		"COALESCE(cc.cost_center_name, ''), ' ', COALESCE(gle.cost_center, ''), ' ', "
+		"COALESCE(parent.cost_center_name, ''), ' ', COALESCE(cc.parent_cost_center, ''), ' ', "
+		"COALESCE(gparent.cost_center_name, ''), ' ', COALESCE(parent.parent_cost_center, ''), ' ', "
+		"COALESCE(emp.department, '')"
+		"))"
+	)
 
 	params = {"from_date": from_date, "to_date": to_date}
 
@@ -350,7 +518,7 @@ def get_drilldown_entries(row_index, from_date, to_date, department_key=None):
 		key = f"p{idx}"
 		like_clauses.append(f"{account_text_expr} LIKE %({key})s")
 		params[key] = f"%{token}%"
-	where_patterns = " OR ".join(like_clauses) if like_clauses else "1=0"
+	where_patterns = " AND ".join(like_clauses) if like_clauses else "1=0"
 
 	where_exclude = ""
 	if exclude_patterns:
@@ -372,15 +540,22 @@ def get_drilldown_entries(row_index, from_date, to_date, department_key=None):
 
 	where_sql = f"( {where_patterns} ) {where_exclude} {where_dept}"
 
-	# Accurate totals even if the entries list is truncated
+	joins = """
+		FROM `tabGL Entry` gle
+		LEFT JOIN `tabAccount` acc ON acc.name = gle.account
+		LEFT JOIN `tabCost Center` cc ON cc.name = gle.cost_center
+		LEFT JOIN `tabCost Center` parent ON parent.name = cc.parent_cost_center
+		LEFT JOIN `tabCost Center` gparent ON gparent.name = parent.parent_cost_center
+		LEFT JOIN `tabEmployee` emp
+			ON gle.party_type = 'Employee' AND emp.name = gle.party
+	"""
+
 	summary = frappe.db.sql(
 		f"""
 		SELECT
 			COUNT(DISTINCT CONCAT(COALESCE(gle.voucher_type, ''), '::', COALESCE(gle.voucher_no, ''))) AS voucher_count,
 			SUM(COALESCE(gle.debit, 0) - COALESCE(gle.credit, 0)) AS total_amount
-		FROM `tabGL Entry` gle
-		LEFT JOIN `tabAccount` acc ON acc.name = gle.account
-		LEFT JOIN `tabCost Center` cc ON cc.name = gle.cost_center
+		{joins}
 		WHERE gle.docstatus < 2
 		AND IFNULL(gle.is_cancelled, 0) = 0
 		AND gle.posting_date BETWEEN %(from_date)s AND %(to_date)s
@@ -404,15 +579,15 @@ def get_drilldown_entries(row_index, from_date, to_date, department_key=None):
 			acc.account_name,
 			gle.cost_center,
 			cc.cost_center_name,
+			parent.cost_center_name AS parent_cost_center_name,
+			emp.department AS employee_department,
 			gle.party_type,
 			gle.party,
 			gle.debit,
 			gle.credit,
 			( COALESCE(gle.debit, 0) - COALESCE(gle.credit, 0) ) AS amount,
 			gle.remarks
-		FROM `tabGL Entry` gle
-		LEFT JOIN `tabAccount` acc ON acc.name = gle.account
-		LEFT JOIN `tabCost Center` cc ON cc.name = gle.cost_center
+		{joins}
 		WHERE gle.docstatus < 2
 		AND IFNULL(gle.is_cancelled, 0) = 0
 		AND gle.posting_date BETWEEN %(from_date)s AND %(to_date)s
@@ -436,6 +611,93 @@ def get_drilldown_entries(row_index, from_date, to_date, department_key=None):
 		"department_key": department_key,
 		"voucher_count": int(summary.get("voucher_count") or 0),
 		"total_amount": flt(summary.get("total_amount") or 0),
+		"truncated": truncated,
+		"entries": entries,
+	}
+
+
+def _salary_drilldown(cfg, row_index, from_date, to_date, department_key=None):
+	raw = frappe.db.sql(
+		"""
+		SELECT
+			gle.posting_date,
+			gle.voucher_type,
+			gle.voucher_no,
+			gle.account,
+			acc.account_name,
+			gle.cost_center,
+			cc.cost_center_name,
+			parent.cost_center_name AS parent_cost_center_name,
+			LOWER(COALESCE(cc.cost_center_name, gle.cost_center, '')) AS cost_center_name_l,
+			LOWER(COALESCE(gle.cost_center, '')) AS cost_center_id,
+			LOWER(COALESCE(parent.cost_center_name, '')) AS parent_cost_center_name_l,
+			LOWER(COALESCE(cc.parent_cost_center, '')) AS parent_cost_center_id,
+			LOWER(COALESCE(gparent.cost_center_name, '')) AS grandparent_cost_center_name,
+			LOWER(COALESCE(parent.parent_cost_center, '')) AS grandparent_cost_center_id,
+			gle.party_type,
+			gle.party,
+			emp.department AS employee_department,
+			gle.debit,
+			gle.credit,
+			( COALESCE(gle.debit, 0) - COALESCE(gle.credit, 0) ) AS amount,
+			gle.remarks,
+			LOWER(COALESCE(acc.account_name, gle.account, '')) AS account_name,
+			LOWER(COALESCE(gle.account, '')) AS account_id
+		FROM `tabGL Entry` gle
+		LEFT JOIN `tabAccount` acc ON acc.name = gle.account
+		LEFT JOIN `tabCost Center` cc ON cc.name = gle.cost_center
+		LEFT JOIN `tabCost Center` parent ON parent.name = cc.parent_cost_center
+		LEFT JOIN `tabCost Center` gparent ON gparent.name = parent.parent_cost_center
+		LEFT JOIN `tabEmployee` emp
+			ON gle.party_type = 'Employee' AND emp.name = gle.party
+		WHERE gle.docstatus < 2
+		AND IFNULL(gle.is_cancelled, 0) = 0
+		AND gle.posting_date BETWEEN %(from_date)s AND %(to_date)s
+		AND COALESCE(acc.root_type, '') != 'Income'
+		AND (
+			LOWER(COALESCE(acc.account_name, gle.account, '')) LIKE '%%salary%%'
+			OR LOWER(COALESCE(acc.account_name, gle.account, '')) LIKE '%%salaries%%'
+		)
+		ORDER BY gle.posting_date ASC, gle.voucher_type ASC, gle.voucher_no ASC, gle.name ASC
+		""",
+		{"from_date": from_date, "to_date": to_date},
+		as_dict=True,
+	)
+
+	matched = []
+	for row in raw:
+		entry = {
+			"account_name": row.get("account_name"),
+			"account_id": row.get("account_id"),
+			"cost_center_name": row.get("cost_center_name_l"),
+			"cost_center_id": row.get("cost_center_id"),
+			"parent_cost_center_name": row.get("parent_cost_center_name_l"),
+			"parent_cost_center_id": row.get("parent_cost_center_id"),
+			"grandparent_cost_center_name": row.get("grandparent_cost_center_name"),
+			"grandparent_cost_center_id": row.get("grandparent_cost_center_id"),
+			"employee_department": (row.get("employee_department") or "").lower(),
+			"party_type": row.get("party_type"),
+			"party": row.get("party"),
+			"amount": row.get("amount"),
+		}
+		if _entry_matches_salary_row(entry, cfg, department_key):
+			matched.append(row)
+
+	limit = 2000
+	truncated = len(matched) > limit
+	entries = matched[:limit]
+	voucher_keys = {
+		f"{e.get('voucher_type') or ''}::{e.get('voucher_no') or ''}" for e in matched
+	}
+
+	return {
+		"row_index": int(row_index),
+		"row_label": cfg.get("label"),
+		"from_date": from_date,
+		"to_date": to_date,
+		"department_key": department_key,
+		"voucher_count": len(voucher_keys),
+		"total_amount": sum(flt(e.get("amount")) for e in matched),
 		"truncated": truncated,
 		"entries": entries,
 	}

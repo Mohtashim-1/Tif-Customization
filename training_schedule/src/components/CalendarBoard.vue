@@ -9,7 +9,7 @@ const props = defineProps({
 	sessions: { type: Array, default: () => [] },
 	todayIso: { type: String, default: "" },
 });
-const emit = defineEmits(["open", "create", "open-day"]);
+const emit = defineEmits(["open", "open-day"]);
 
 function parse(isoStr) {
 	return new Date(`${isoStr}T00:00:00`);
@@ -64,10 +64,6 @@ function onDay(d) {
 	if (!d) return;
 	emit("open-day", iso(d));
 }
-
-function addOn(d) {
-	emit("create", { training_date: iso(d), training_time: "10:00" });
-}
 </script>
 
 <template>
@@ -87,7 +83,6 @@ function addOn(d) {
 					<template v-if="d">
 						<div class="cell-head">
 							<button type="button" class="num" @click="onDay(d)">{{ d.getDate() }}</button>
-							<button type="button" class="plus" title="Add training" @click="addOn(d)">+</button>
 						</div>
 						<button
 							v-for="s in (byDate[iso(d)] || []).slice(0, view === 'quarter' ? 2 : 4)"
@@ -163,18 +158,10 @@ function addOn(d) {
 	align-items: center;
 	margin-bottom: 4px;
 }
-.num,
-.plus {
+.num {
 	border: 0;
 	background: none;
 	font-weight: 700;
-}
-.plus {
-	color: #6366f1;
-	opacity: 0;
-}
-.cell:hover .plus {
-	opacity: 1;
 }
 .chip {
 	width: 100%;

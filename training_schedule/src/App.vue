@@ -363,18 +363,21 @@ function onOpenDay(dateIso) {
 }
 
 function onFilterTrainer(name) {
-	trainerFilter.value = name;
-	activeNav.value = "schedule";
-	loadRange();
+	search.value = name || "";
+	activeNav.value = "sessions";
+	loadDirectory("sessions");
+	showToast(name ? `Showing sessions for ${name}` : "Showing all sessions");
 }
 
 function onFilterProgram(name) {
-	programFilter.value = name;
-	activeNav.value = "schedule";
-	loadRange();
+	search.value = name || "";
+	activeNav.value = "sessions";
+	loadDirectory("sessions");
+	showToast(name ? `Showing sessions for ${name}` : "Showing all sessions");
 }
 
-function onFilterRoom() {
+function onFilterRoom(name) {
+	search.value = name || "";
 	activeNav.value = "sessions";
 	loadDirectory("sessions");
 }

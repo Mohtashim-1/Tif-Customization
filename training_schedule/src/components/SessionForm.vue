@@ -227,7 +227,7 @@ onMounted(load);
 	position: fixed;
 	inset: 0;
 	background: rgba(15, 23, 42, 0.45);
-	z-index: 80;
+	z-index: 200;
 	display: grid;
 	place-items: center;
 	padding: 20px;
