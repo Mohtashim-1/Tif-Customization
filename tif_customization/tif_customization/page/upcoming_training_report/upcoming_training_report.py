@@ -13,6 +13,7 @@ REPORT_FIELDS = (
 	"type",
 	"training_date",
 	"training_time",
+	"training_end_time",
 	"month",
 	"training_type",
 	"workshop_topic",
@@ -95,7 +96,9 @@ def get_report_data(filters=None):
 	for row in rows:
 		row = frappe._dict(row)
 		row.training_date = format_report_date(row.training_date)
-		row.training_time = format_report_time(row.training_time)
+		start = format_report_time(row.training_time)
+		end = format_report_time(row.get("training_end_time"))
+		row.training_time = f"{start} – {end}" if start and end else start
 		formatted_rows.append(row)
 
 	return {"rows": formatted_rows, "summary": summary}

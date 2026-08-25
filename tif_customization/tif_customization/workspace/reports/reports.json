@@ -347,8 +347,7 @@
    "onboard": 0,
    "type": "Link"
   },
-  { 
-    
+  {
    "hidden": 0,
    "is_query_report": 1,
    "label": "Leave Application ",
@@ -489,7 +488,7 @@
   {
    "hidden": 0,
    "is_query_report": 1,
-   "label": "Employee Tax (UAT)",
+   "label": "Employee Yearly Tax Certificate (UAT)",
    "link_count": 0,
    "link_to": "Income Tax Deductions",
    "link_type": "Report",
@@ -596,8 +595,8 @@
    "type": "Link"
   }
  ],
- "modified": "2026-08-21 16:30:39.048430",
- "modified_by": "Administrator",
+ "modified": "2026-08-25 09:48:25.522271",
+ "modified_by": "farhan.hussain@tif.edu.pk",
  "module": "Tif Customization",
  "name": "Reports",
  "number_cards": [],

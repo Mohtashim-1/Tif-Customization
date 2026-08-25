@@ -330,6 +330,11 @@ function openEdit(name) {
 }
 
 function onSaved(result) {
+	if (result?.silent) {
+		if (activeNav.value === "dashboard" || activeNav.value === "schedule") loadRange();
+		else if (activeNav.value !== "settings") loadDirectory(activeNav.value);
+		return;
+	}
 	formOpen.value = false;
 	showToast(result?.message || "Upcoming Training saved");
 	if (activeNav.value === "dashboard" || activeNav.value === "schedule") loadRange();
@@ -340,6 +345,7 @@ function onAddSession() {
 	openCreate({
 		training_date: todayIso.value || iso(new Date()),
 		training_time: "10:00",
+		training_end_time: "12:00",
 	});
 }
 
@@ -432,6 +438,7 @@ watch(plannerView, () => {
 					:range-label="rangeLabel"
 					:trainers="trainers"
 					:programs="programs"
+					:show-add="activeNav === 'dashboard'"
 					v-model:view="plannerView"
 					v-model:trainer="trainerFilter"
 					v-model:program="programFilter"

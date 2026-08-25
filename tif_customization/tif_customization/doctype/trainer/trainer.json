@@ -1,28 +1,30 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "field:type",
- "creation": "2026-06-26 20:26:01.421631",
+ "autoname": "field:trainer_name",
+ "creation": "2026-08-25 15:12:00.000000",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "type"
+  "trainer_name"
  ],
  "fields": [
   {
-   "fieldname": "type",
+   "fieldname": "trainer_name",
    "fieldtype": "Data",
-   "label": "Type",
+   "in_list_view": 1,
+   "label": "Trainer Name",
+   "reqd": 1,
    "unique": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-06-26 20:26:28.303324",
+ "modified": "2026-08-25 15:12:00.000000",
  "modified_by": "Administrator",
  "module": "Tif Customization",
- "name": "Training Type",
+ "name": "Trainer",
  "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [

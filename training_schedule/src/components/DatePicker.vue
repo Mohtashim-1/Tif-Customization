@@ -152,7 +152,7 @@ onBeforeUnmount(() => document.removeEventListener("mousedown", onDoc));
 	border: 1px solid #e5e7eb;
 	border-radius: 10px;
 	padding: 10px 12px;
-	background: #f9fafb;
+	background: #fff;
 	text-align: left;
 	font: inherit;
 }

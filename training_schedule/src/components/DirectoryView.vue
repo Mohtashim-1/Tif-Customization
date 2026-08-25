@@ -73,7 +73,6 @@ function openRow(row) {
 			</div>
 			<div class="actions">
 				<button type="button" class="ghost" @click="$emit('refresh')">Refresh</button>
-				<button type="button" class="primary" @click="$emit('add')">+ New Upcoming Training</button>
 			</div>
 		</div>
 
@@ -117,7 +116,7 @@ function openRow(row) {
 				</article>
 				<article>
 					<h3>Create / edit</h3>
-					<p>Use <strong>+ New Upcoming Training</strong> on any screen. Saves stay in this portal.</p>
+					<p>Use <strong>+ New Training</strong> on the Dashboard to create a session. Saves stay in this portal.</p>
 				</article>
 				<article>
 					<h3>Desk list</h3>

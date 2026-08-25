@@ -31,11 +31,11 @@ export const PROGRAMS = [
 export const ROOMS = ["Room A", "Room B", "Room C", "Room D", "Room E", "Room F", "Lab 1", "Lab 2"];
 
 export const TIME_SLOTS = [
-	{ id: "s1", label: "08:00 – 10:00", start: "08:00" },
-	{ id: "s2", label: "10:15 – 12:15", start: "10:15" },
-	{ id: "s3", label: "12:30 – 02:30", start: "12:30" },
-	{ id: "s4", label: "02:45 – 04:45", start: "14:45" },
-	{ id: "s5", label: "05:00 – 07:00", start: "17:00" },
+	{ id: "s1", label: "08:00 – 10:00", start: "08:00", end: "10:00" },
+	{ id: "s2", label: "10:15 – 12:15", start: "10:15", end: "12:15" },
+	{ id: "s3", label: "12:30 – 02:30", start: "12:30", end: "14:30" },
+	{ id: "s4", label: "02:45 – 04:45", start: "14:45", end: "16:45" },
+	{ id: "s5", label: "05:00 – 07:00", start: "17:00", end: "19:00" },
 ];
 
 /** ISO dates for week Mon–Sun */

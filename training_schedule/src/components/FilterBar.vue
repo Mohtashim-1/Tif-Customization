@@ -3,6 +3,7 @@ defineProps({
 	rangeLabel: { type: String, required: true },
 	trainers: { type: Array, default: () => [] },
 	programs: { type: Array, default: () => [] },
+	showAdd: { type: Boolean, default: false },
 });
 defineEmits(["prev", "next", "add", "export"]);
 const trainer = defineModel("trainer", { type: String, default: "all" });
@@ -56,7 +57,7 @@ const views = [
 		</div>
 
 		<div class="actions">
-			<button type="button" class="primary" @click="$emit('add')">+ New Training</button>
+			<button v-if="showAdd" type="button" class="primary" @click="$emit('add')">+ New Training</button>
 			<button type="button" class="ghost" @click="$emit('export')">⬇ Export</button>
 		</div>
 	</div>

@@ -7,9 +7,15 @@
  "field_order": [
   "participant_name",
   "email",
+  "join_time",
+  "leave_time",
+  "duration_minutes",
+  "is_guest",
+  "recording_disclaimer_response",
+  "in_waiting_room",
+  "attendance_status",
   "phone",
   "zoom_participant_id",
-  "attendance_status",
   "check_in_time",
   "remarks"
  ],
@@ -19,7 +25,7 @@
    "fieldname": "participant_name",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Participant Name",
+   "label": "Name (Original Name)",
    "reqd": 1
   },
   {
@@ -31,18 +37,44 @@
    "options": "Email"
   },
   {
-   "columns": 1,
-   "fieldname": "phone",
+   "columns": 2,
+   "fieldname": "join_time",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Phone"
+   "label": "Join Time"
+  },
+  {
+   "columns": 2,
+   "fieldname": "leave_time",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Leave Time"
   },
   {
    "columns": 1,
-   "fieldname": "zoom_participant_id",
-   "fieldtype": "Data",
+   "fieldname": "duration_minutes",
+   "fieldtype": "Int",
    "in_list_view": 1,
-   "label": "Zoom Participant ID"
+   "label": "Duration (Minutes)"
+  },
+  {
+   "columns": 1,
+   "default": "0",
+   "fieldname": "is_guest",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Guest"
+  },
+  {
+   "fieldname": "recording_disclaimer_response",
+   "fieldtype": "Data",
+   "label": "Recording Disclaimer Response"
+  },
+  {
+   "default": "0",
+   "fieldname": "in_waiting_room",
+   "fieldtype": "Check",
+   "label": "In Waiting Room"
   },
   {
    "columns": 1,
@@ -54,10 +86,18 @@
    "options": "Present\nAbsent\nLate"
   },
   {
-   "columns": 1,
+   "fieldname": "phone",
+   "fieldtype": "Data",
+   "label": "Phone"
+  },
+  {
+   "fieldname": "zoom_participant_id",
+   "fieldtype": "Data",
+   "label": "Zoom Participant ID"
+  },
+  {
    "fieldname": "check_in_time",
    "fieldtype": "Time",
-   "in_list_view": 1,
    "label": "Check-in Time"
   },
   {
@@ -68,7 +108,7 @@
  ],
  "istable": 1,
  "links": [],
- "modified": "2026-08-21 18:10:00.000000",
+ "modified": "2026-08-21 18:25:00.000000",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Upcoming Training Attendance",

@@ -56,7 +56,7 @@ async function logout() {
 					<div class="avatar">{{ user.initials }}</div>
 					<div>
 						<div class="name">{{ user.name }}</div>
-						<div class="role">{{ user.role }}</div>
+						<div class="role">{{ user.designation || user.role }}</div>
 					</div>
 					<span class="caret">▾</span>
 				</button>
