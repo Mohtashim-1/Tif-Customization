@@ -181,8 +181,49 @@ frappe.pages["program-wise-expense"].on_page_load = function (wrapper) {
 					.join("");
 
 				const baseRows = quarters[0].rows || [];
+				const rowHasAmount = (rowIndex) =>
+					quarters.some((quarter) => Math.abs(Number(((quarter.rows || [])[rowIndex] || {}).total) || 0) >= 0.005);
+
+				const visibleFlags = baseRows.map((row, rowIndex) => {
+					if (row.row_type === "data" || row.row_type === "total" || row.row_type === "grand_total") {
+						return rowHasAmount(rowIndex);
+					}
+					return true;
+				});
+
+				baseRows.forEach((row, rowIndex) => {
+					if (row.row_type !== "section") return;
+					let hasVisibleData = false;
+					for (let i = rowIndex + 1; i < baseRows.length; i++) {
+						const next = baseRows[i];
+						if (next.row_type === "section" || next.row_type === "grand_total") break;
+						if (next.row_type === "data" && visibleFlags[i]) {
+							hasVisibleData = true;
+							break;
+						}
+					}
+					visibleFlags[rowIndex] = hasVisibleData;
+					for (let i = rowIndex + 1; i < baseRows.length; i++) {
+						if (baseRows[i].row_type === "total") {
+							visibleFlags[i] = hasVisibleData && rowHasAmount(i);
+							break;
+						}
+						if (baseRows[i].row_type === "section" || baseRows[i].row_type === "grand_total") break;
+					}
+				});
+
+				baseRows.forEach((row, rowIndex) => {
+					if (row.row_type !== "spacer") return;
+					const prevVisible = visibleFlags.slice(0, rowIndex).some(Boolean);
+					const nextVisible = visibleFlags.slice(rowIndex + 1).some(Boolean);
+					visibleFlags[rowIndex] = prevVisible && nextVisible;
+				});
+
 				let bodyHtml = "";
 				baseRows.forEach((baseRow, rowIndex) => {
+					if (!visibleFlags[rowIndex]) {
+						return;
+					}
 					if (baseRow.row_type === "spacer") {
 						bodyHtml += `<tr class="spacer-row"><td colspan="${totalColumns}"></td></tr>`;
 						return;
@@ -254,6 +295,9 @@ frappe.pages["program-wise-expense"].on_page_load = function (wrapper) {
 			}
 
 			format_amount(value) {
+				if (Math.abs(value || 0) < 0.005) {
+					return "";
+				}
 				return format_currency(value || 0, frappe.defaults.get_default("currency"));
 			}
 

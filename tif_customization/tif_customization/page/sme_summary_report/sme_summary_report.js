@@ -1,10 +1,12 @@
 frappe.pages["sme-summary-report"].on_page_load = function (wrapper) {
-	const page = frappe.ui.make_app_page({
-		parent: wrapper,
-		title: __("SME Summary Report"),
-		single_column: true,
+	frappe.require("/assets/tif_customization/js/field_visit_drilldown.js", () => {
+		const page = frappe.ui.make_app_page({
+			parent: wrapper,
+			title: __("SME Summary Report"),
+			single_column: true,
+		});
+		new frappe.tif_customization.SMESummaryReport(page).make();
 	});
-	new frappe.tif_customization.SMESummaryReport(page).make();
 };
 
 frappe.tif_customization = frappe.tif_customization || {};
@@ -21,6 +23,9 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 		this.page.set_primary_action(__("Refresh"), () => this.load_data(), "refresh");
 		this.page.add_action_item(__("Export CSV"), () => this.export_csv());
 		this.page.add_action_item(__("Print"), () => window.print());
+		if (frappe.tif_customization && frappe.tif_customization.bind_clickable_numbers) {
+			frappe.tif_customization.bind_clickable_numbers($(this.page.body), () => this.get_filters());
+		}
 		this.load_data();
 	}
 
@@ -36,6 +41,9 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 					.sme-sum-table .group{background:#e5e7eb}
 					.sme-sum-table .left{text-align:left}
 					.sme-sum-table .num{text-align:right;font-variant-numeric:tabular-nums}
+					.sme-sum-table .sme-click{cursor:pointer;color:#0f766e;text-decoration:underline}
+					.sme-sum-table .sme-click:hover{background:#ecfdf5}
+					.sme-sum-break{background:#f8fafc;border:1px dashed #94a3b8;border-radius:8px;padding:10px 12px;margin:0 0 12px;font-size:13px;text-align:left}
 					.sme-sum-table tfoot th{background:#f9fafb;font-weight:700}
 					.sme-sum-table .score-col{background:#ecfdf5;font-weight:700}
 					.sme-sum-title{text-align:center;font-size:18px;font-weight:700;margin:8px 0 14px}
@@ -49,7 +57,10 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 					Period summary for School Marketing Executives.
 					Use <strong>Visit From / To Date</strong> to filter by the visit date on each Field Visit
 					(Marketing / M&amp;E / Meeting / Training dates — not document creation date).
-					Grand Total = Followup + New + Meetings + Active + Inactive.
+					<strong>Grand Total</strong> = Followup + New + Meetings + Active + Inactive
+					(Marketing + Meetings + M&amp;E). That is not the same as Total visits
+					(which also includes Training and Academic / Other).
+					Click any visit number to see the Field Visit documents behind it.
 					Score % = KPI points ÷ expected points (Target Base). Workshop score uses session count, not participant heads.
 				</p>
 				<div id="sme-sum-filters" class="sme-sum-filters row" style="margin-bottom:12px;"></div>
@@ -138,6 +149,7 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 			working_days: this.working_days.get_value() || "",
 			region: this.region.get_value() || "karachi",
 			employee: this.employee.get_value() || "",
+			staff: this.employee.get_value() || "",
 		};
 	}
 
@@ -178,6 +190,11 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 		return frappe.format(flt(n || 0), { fieldtype: "Float", precision: 2 });
 	}
 
+	click_td(n, metric, staff) {
+		const staffAttr = staff ? ` data-visit-staff="${frappe.utils.escape_html(staff)}"` : "";
+		return `<td class="num sme-click" data-visit-metric="${metric}"${staffAttr} title="${__("Click to see Field Visits")}">${this.fmt(n)}</td>`;
+	}
+
 	render(data) {
 		const fromLabel = frappe.datetime.str_to_user(data.from_date);
 		const toLabel = frappe.datetime.str_to_user(data.to_date);
@@ -186,28 +203,35 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 
 		const body = rows.length
 			? rows
-					.map(
-						(r) => `
+					.map((r) => {
+						const staff = r.employee_name || r.user_id || "";
+						return `
 				<tr>
 					<td class="left">${frappe.utils.escape_html(r.label || "")}</td>
 					<td>${frappe.utils.escape_html(r.division || r.region_label || "—")}</td>
-					<td class="num">${this.fmt(r.followup)}</td>
-					<td class="num">${this.fmt(r.new)}</td>
-					<td class="num">${this.fmt(r.meetings)}</td>
-					<td class="num">${this.fmt(r.active)}</td>
-					<td class="num">${this.fmt(r.inactive)}</td>
-					<td class="num">${this.fmt(r.schools)}</td>
-					<td class="num">${this.fmt(r.participants)}</td>
-					<td class="num">${this.fmt(r.grand_total)}</td>
+					${this.click_td(r.followup, "followup", staff)}
+					${this.click_td(r.new, "new", staff)}
+					${this.click_td(r.meetings, "meeting", staff)}
+					${this.click_td(r.active, "me_active", staff)}
+					${this.click_td(r.inactive, "me_inactive", staff)}
+					${this.click_td(r.schools, "schools", staff)}
+					${this.click_td(r.participants, "participants", staff)}
+					${this.click_td(r.grand_total, "grand_total", staff)}
 					<td class="num">${this.fmt_cur(r.expenses)}</td>
-					<td class="num">${this.fmt(r.visited_days)}</td>
-				</tr>`
-					)
+					${this.click_td(r.visited_days, "visits", staff)}
+				</tr>`;
+					})
 					.join("")
 			: `<tr><td colspan="12" class="text-center text-muted">${__("No SMEs found")}</td></tr>`;
 
 		$("#sme-sum-body").html(`
 			<div class="sme-sum-title">${__("Summary")} (${__("Visit Date")}: ${fromLabel} ${__("to")} ${toLabel})</div>
+			<div class="sme-sum-break">
+				<strong>${__("Visit numbers are clickable.")}</strong>
+				${__("Grand Total")} = ${__("Followup")} + ${__("New")} + ${__("Meetings")} + ${__("Active")} + ${__("Inactive")}
+				(${__("Marketing + Meetings + M&E")}).
+				${__("Click a number to open the Field Visit documents behind it.")}
+			</div>
 			<div class="sme-sum-meta">
 				${__("Visit Date")}: <strong>${fromLabel} – ${toLabel}</strong>
 				&nbsp;|&nbsp;
@@ -247,16 +271,16 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 						<tr>
 							<th class="left">${__("Grand Total")}</th>
 							<th></th>
-							<th class="num">${this.fmt(t.followup)}</th>
-							<th class="num">${this.fmt(t.new)}</th>
-							<th class="num">${this.fmt(t.meetings)}</th>
-							<th class="num">${this.fmt(t.active)}</th>
-							<th class="num">${this.fmt(t.inactive)}</th>
-							<th class="num">${this.fmt(t.schools)}</th>
-							<th class="num">${this.fmt(t.participants)}</th>
-							<th class="num">${this.fmt(t.grand_total)}</th>
+							${this.click_td(t.followup, "followup", "")}
+							${this.click_td(t.new, "new", "")}
+							${this.click_td(t.meetings, "meeting", "")}
+							${this.click_td(t.active, "me_active", "")}
+							${this.click_td(t.inactive, "me_inactive", "")}
+							${this.click_td(t.schools, "schools", "")}
+							${this.click_td(t.participants, "participants", "")}
+							${this.click_td(t.grand_total, "grand_total", "")}
 							<th class="num">${this.fmt_cur(t.expenses)}</th>
-							<th class="num">${this.fmt(t.visited_days)}</th>
+							${this.click_td(t.visited_days, "visits", "")}
 						</tr>
 					</tfoot>
 				</table>

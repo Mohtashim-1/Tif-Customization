@@ -5,6 +5,19 @@ import frappe
 
 CARD_ORDER = ["HR", "Supply Chain", "Purchase", "Accounts", "Program", "SME", "Book Purchase and Printing"]
 
+# Website routes that are not Frappe Desk Pages (Dynamic Link cannot store these).
+PORTAL_LINKS = {
+	"Program": [
+		{
+			"label": "Training Schedule",
+			"link_type": "URL",
+			"link_to": "/training-schedule",
+			"is_query_report": 0,
+			"highlight": True,
+		}
+	],
+}
+
 
 @frappe.whitelist()
 def get_reports_workspace_menu():
@@ -31,6 +44,8 @@ def get_reports_workspace_menu():
 				}
 			)
 
+	_inject_portal_links(sections)
+
 	order = _get_card_order(workspace) or CARD_ORDER
 	result = []
 	seen = set()
@@ -48,6 +63,17 @@ def get_reports_workspace_menu():
 			result.append(section)
 
 	return result
+
+
+def _inject_portal_links(sections):
+	for title, extras in PORTAL_LINKS.items():
+		if title not in sections:
+			sections[title] = {"title": title, "links": []}
+		existing = {(link.get("label") or "").strip().lower() for link in sections[title]["links"]}
+		for extra in extras:
+			if (extra.get("label") or "").strip().lower() in existing:
+				continue
+			sections[title]["links"].insert(0, extra)
 
 
 def _sort_links_by_color(links):

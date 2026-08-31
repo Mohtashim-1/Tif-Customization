@@ -61,6 +61,7 @@ const form = reactive({
 	program: "",
 	workshop_for: "",
 	tag_school: "",
+	schedule_status: "",
 	zoom_id: "",
 	zoom_link: "",
 	attendance: [],
@@ -110,6 +111,7 @@ function reset() {
 		program: "",
 		workshop_for: "",
 		tag_school: "",
+		schedule_status: "",
 		zoom_id: "",
 		zoom_link: "",
 		attendance: [],
@@ -318,6 +320,15 @@ onMounted(load);
 							Type
 							<select v-model="form.type" required>
 								<option v-for="t in options.types" :key="t" :value="t">{{ t }}</option>
+							</select>
+						</label>
+						<label>
+							Status
+							<select v-model="form.schedule_status">
+								<option value="">Automatic (from date/time)</option>
+								<option value="Upcoming">Upcoming</option>
+								<option value="In Progress">In Progress</option>
+								<option value="Completed">Completed</option>
 							</select>
 						</label>
 						<label class="pick">

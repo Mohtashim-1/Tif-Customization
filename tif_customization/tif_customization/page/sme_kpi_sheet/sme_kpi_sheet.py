@@ -10,6 +10,7 @@ import frappe
 from frappe import _
 from frappe.utils import cint, flt, get_first_day, get_last_day, getdate
 
+from tif_customization.tif_customization.api.field_visit_drilldown import get_visit_type_breakdown
 from tif_customization.tif_customization.page.smes_target_base___k.smes_target_base___k import (
 	_count_actuals,
 	_fiscal_year_start,
@@ -339,6 +340,7 @@ def get_report_data(filters=None):
 	achieved = monthly_total
 	percent = (achieved / expected * 100) if expected else 0
 
+	visit_bd = get_visit_type_breakdown(from_date, to_date, staff)
 	months = _fiscal_months(staff, tokens, sheet, fy_start, working_days)
 	# Put current period score into matching month row
 	cur_month = from_date.month
@@ -373,10 +375,13 @@ def get_report_data(filters=None):
 		"percent": flt(percent, 2),
 		"months": months,
 		"sheets": [{"key": k, "label": v["excel_title"]} for k, v in SHEET_META.items()],
+		"visit_total": visit_bd.get("total") or 0,
+		"visit_breakdown": visit_bd.get("breakdown") or [],
 		"footnotes": [
 			_("* Model School A: Affiliated with at least one Program of 3 departments."),
 			_("** Model School B: Affiliated with at least one Program of 2 departments."),
 			_("*** Total expected targets points depends on total no of working days."),
+			_("Visits (first KPI row) is the total of every Field Visit type. Click any Actual Activities number to see those documents."),
 		],
 	}
 

@@ -17,6 +17,7 @@ from tif_customization.tif_customization.field_visit_permissions import (
 	can_view_all_field_visits,
 	get_team_employee_rows,
 	get_team_match_values,
+	visit_day_sql as _visit_day_sql,
 )
 from tif_customization.tif_customization.page.smes_target_base___k.smes_target_base_kpi_config import (
 	KPI_ACTIVITIES,
@@ -166,20 +167,6 @@ def _resolve_dates(filters):
 	if from_date > to_date:
 		frappe.throw(_("Visit From Date cannot be after Visit To Date."))
 	return from_date, to_date
-
-
-def _visit_day_sql(alias="fv"):
-	"""Effective visit date per Field Visit type (not document creation/modified)."""
-	a = alias
-	return f"""
-		CASE
-			WHEN {a}.type = 'Marketing' THEN COALESCE({a}.visit_date, DATE({a}.timestamp))
-			WHEN {a}.type = 'M&E' THEN COALESCE({a}.me_visit_date, {a}.me_starting_date, DATE({a}.me_timestamp))
-			WHEN {a}.type = 'Training' THEN COALESCE({a}.training_date, DATE({a}.training_timestamp))
-			WHEN {a}.type = 'Meeting' THEN COALESCE({a}.mt_meeting_date, DATE({a}.mt_timestamp))
-			ELSE COALESCE({a}.visit_date, {a}.me_visit_date, {a}.training_date, {a}.mt_meeting_date)
-		END
-	"""
 
 
 def _weekday_count(from_date, to_date):

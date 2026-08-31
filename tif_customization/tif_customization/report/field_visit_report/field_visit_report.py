@@ -16,6 +16,7 @@ from tif_customization.tif_customization.field_visit_permissions import (
 	can_view_all_field_visits,
 	get_employee_for_user,
 	get_team_employee_rows,
+	visit_day_sql as _visit_day_sql,
 )
 
 # Layout / system fields not useful as report columns
@@ -153,7 +154,7 @@ def get_report_field_defs() -> list[dict]:
 def get_columns(field_defs: list[dict]) -> list[dict]:
 	columns = [
 		{
-			"label": _("Visit ID"),
+			"label": _("Document No"),
 			"fieldname": "name",
 			"fieldtype": "Link",
 			"options": "Field Visit",
@@ -249,23 +250,6 @@ def _report_fieldtype(fieldtype: str) -> str:
 	if fieldtype in {"Check"}:
 		return "Check"
 	return fieldtype if fieldtype in WIDTH_BY_TYPE or fieldtype in {"Link", "Data", "Select"} else "Data"
-
-
-def _visit_day_sql(alias: str = "fv") -> str:
-	a = alias
-	return f"""
-		CASE
-			WHEN {a}.type = 'Marketing' THEN COALESCE({a}.visit_date, DATE({a}.timestamp))
-			WHEN {a}.type = 'M&E' THEN COALESCE({a}.me_visit_date, {a}.me_starting_date, DATE({a}.me_timestamp))
-			WHEN {a}.type = 'Training' THEN COALESCE({a}.training_date, DATE({a}.training_timestamp))
-			WHEN {a}.type = 'Meeting' THEN COALESCE({a}.mt_meeting_date, DATE({a}.mt_timestamp))
-			WHEN {a}.type IN ('Academic / Other Official Tasks', 'Other') THEN COALESCE({a}.ot_date, {a}.visit_date)
-			ELSE COALESCE(
-				{a}.visit_date, {a}.me_visit_date, {a}.training_date,
-				{a}.mt_meeting_date, {a}.ot_date, DATE({a}.creation)
-			)
-		END
-	"""
 
 
 def _officer_sql(alias: str = "fv") -> str:

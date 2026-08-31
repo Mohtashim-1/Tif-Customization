@@ -8,7 +8,7 @@ from datetime import time, timedelta
 
 import frappe
 from frappe import _
-from frappe.utils import add_days, cint, get_first_day, get_last_day, get_quarter_ending, get_quarter_start, getdate, nowdate
+from frappe.utils import add_days, cint, get_first_day, get_last_day, get_quarter_ending, get_quarter_start, getdate, now_datetime, nowdate
 
 DOCTYPE = "Upcoming Training"
 
@@ -18,6 +18,7 @@ FIELDS = (
 	"training_date",
 	"training_time",
 	"training_end_time",
+	"schedule_status",
 	"training_type",
 	"workshop_topic",
 	"mode_of_training",
@@ -458,11 +459,37 @@ def _slot_for_time(value) -> str:
 	return best
 
 
-def _status_for_date(training_date, today):
-	d = getdate(training_date)
+def _normalize_status(value):
+	raw = (value or "").strip().lower().replace("-", "_").replace(" ", "_")
+	if raw in ("completed", "complete"):
+		return "completed"
+	if raw in ("in_progress", "live"):
+		return "in_progress"
+	if raw == "upcoming":
+		return "upcoming"
+	return ""
+
+
+def _status_for_date(training_date, today, end_time=None, start_time=None, schedule_status=None):
+	manual = _normalize_status(schedule_status)
+	if manual:
+		return manual
+	d = getdate(training_date) if training_date else None
+	if not d:
+		return "upcoming"
 	if d < today:
 		return "completed"
-	if d == today:
+	if d > today:
+		return "upcoming"
+	now = now_datetime()
+	now_secs = now.hour * 3600 + now.minute * 60 + now.second
+	end_secs = _time_to_seconds(end_time)
+	start_secs = _time_to_seconds(start_time)
+	if end_secs is None and start_secs is not None:
+		end_secs = start_secs + 2 * 3600
+	if end_secs is not None and now_secs >= end_secs:
+		return "completed"
+	if start_secs is not None and now_secs >= start_secs:
 		return "in_progress"
 	return "upcoming"
 
@@ -534,7 +561,15 @@ def _row_to_session(row, today):
 		"trainerColor": _color_for_name(trainer),
 		"room": _venue_for_row(row),
 		"category": _category_for_row(row),
-		"status": _status_for_date(row.training_date, today) if row.training_date else "upcoming",
+		"status": _status_for_date(
+			row.training_date,
+			today,
+			end_time=row.get("training_end_time"),
+			start_time=row.get("training_time"),
+			schedule_status=row.get("schedule_status"),
+		)
+		if row.training_date
+		else "upcoming",
 		"type": row.type or "Training",
 		"program": row.program or "",
 		"mode": row.mode_of_training or "",
@@ -1001,6 +1036,7 @@ def get_session(name):
 		"program": doc.program or "",
 		"workshop_for": doc.workshop_for or "",
 		"tag_school": _resolve_school_link(doc.tag_school, doc.school_name)[0],
+		"schedule_status": getattr(doc, "schedule_status", None) or "",
 		"zoom_id": getattr(doc, "zoom_id", None) or "",
 		"zoom_link": getattr(doc, "zoom_link", None) or "",
 		"attendance": attendance,
@@ -1063,6 +1099,14 @@ def save_session(values=None):
 		if start_secs is not None and (end_secs is None or end_secs <= start_secs):
 			values.training_end_time = _default_end_time(values.training_time)
 
+	if "schedule_status" in values:
+		mapped = {
+			"completed": "Completed",
+			"in_progress": "In Progress",
+			"upcoming": "Upcoming",
+		}
+		values.schedule_status = mapped.get(_normalize_status(values.get("schedule_status"))) or None
+
 	for field in (
 		"type",
 		"training_date",
@@ -1081,6 +1125,7 @@ def save_session(values=None):
 		"program",
 		"workshop_for",
 		"tag_school",
+		"schedule_status",
 		"zoom_id",
 		"zoom_link",
 	):

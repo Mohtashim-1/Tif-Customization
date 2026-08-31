@@ -1,6 +1,8 @@
 frappe.pages["field-staff-report"].on_page_load = function (wrapper) {
 	frappe.require("/assets/tif_customization/css/field_staff_report.css");
-	new FieldStaffReportPage(wrapper);
+	frappe.require("/assets/tif_customization/js/field_visit_drilldown.js", () => {
+		new FieldStaffReportPage(wrapper);
+	});
 };
 
 class FieldStaffReportPage {
@@ -14,8 +16,20 @@ class FieldStaffReportPage {
 
 		this.setup_layout();
 		this.setup_filters();
+		this.apply_route_options();
 		this.bind_actions();
+		this.offset = 0;
+		this.page_size = 100;
 		this.load_data();
+	}
+
+	apply_route_options() {
+		const route = frappe.route_options || {};
+		if (route.from_date && this.filters.from_date) this.filters.from_date.set_value(route.from_date);
+		if (route.to_date && this.filters.to_date) this.filters.to_date.set_value(route.to_date);
+		if (route.user && this.filters.user) this.filters.user.set_value(route.user);
+		if (route.type && this.filters.type) this.filters.type.set_value(route.type);
+		frappe.route_options = null;
 	}
 
 	get_month_start() {
@@ -38,7 +52,8 @@ class FieldStaffReportPage {
 					<div class="row fsr-filter-grid"></div>
 				</div>
 
-				<div class="fsr-kpis mb-3"></div>
+				<div class="fsr-kpis mb-2"></div>
+				<p class="fsr-breakdown fsr-breakdown-note"></p>
 
 				<div class="border rounded p-3">
 					<div class="d-flex align-items-center justify-content-between mb-2">
@@ -56,6 +71,7 @@ class FieldStaffReportPage {
 							<span class="text-muted fsr-count ml-2"></span>
 						</div>
 					</div>
+					<div class="fsr-pager mb-2 d-flex align-items-center"></div>
 					<div class="fsr-table"></div>
 				</div>
 			</div>
@@ -69,10 +85,7 @@ class FieldStaffReportPage {
 		const parent = $('<div></div>').appendTo(col);
 		const control = frappe.ui.form.make_control({
 			parent,
-			df: {
-				...df,
-				change: () => this.on_filter_change()
-			},
+			df: { ...df },
 			render_input: true
 		});
 		control.refresh();
@@ -98,7 +111,7 @@ class FieldStaffReportPage {
 				label: __("Type"),
 				fieldname: "type",
 				fieldtype: "Select",
-				options: "\nMarketing\nM&E\nTraining"
+				options: "\nMarketing\nM&E\nTraining\nMeeting\nAcademic / Other Official Tasks"
 			}),
 			user: this.make_filter({
 				label: __("Field Staff"),
@@ -135,7 +148,10 @@ class FieldStaffReportPage {
 	}
 
 	bind_actions() {
-		this.body.find(".fsr-apply").on("click", () => this.load_data());
+		this.body.find(".fsr-apply").on("click", () => {
+			this.offset = 0;
+			this.load_data();
+		});
 		this.body.find(".fsr-export-excel").on("click", (e) => {
 			e.preventDefault();
 			this.export_excel();
@@ -152,7 +168,27 @@ class FieldStaffReportPage {
 				user: "",
 				province: ""
 			});
+			this.offset = 0;
 			this.load_data();
+		});
+		this.body.find(".fsr-pager").on("click", ".fsr-prev:not(:disabled)", () => {
+			this.offset = Math.max(0, this.offset - this.page_size);
+			this.load_data();
+		});
+		this.body.find(".fsr-pager").on("click", ".fsr-next:not(:disabled)", () => {
+			this.offset = this.offset + this.page_size;
+			this.load_data();
+		});
+		this.body.on("click", "[data-visit-metric]", (e) => {
+			const metric = $(e.currentTarget).attr("data-visit-metric");
+			if (!metric) return;
+			const f = this.get_filter_values();
+			frappe.tif_customization.open_visit_drilldown({
+				from_date: f.from_date,
+				to_date: f.to_date,
+				staff: f.user,
+				metric,
+			});
 		});
 	}
 
@@ -181,16 +217,31 @@ class FieldStaffReportPage {
 
 	load_data() {
 		this.body.find(".fsr-table").html(`<div class="text-muted">${__("Loading...")}</div>`);
+		const filters = {
+			...this.get_filter_values(),
+			limit: this.page_size,
+			offset: this.offset,
+		};
 		frappe.call({
 			method: "tif_customization.tif_customization.page.field_staff_report.field_staff_report.get_report_data",
-			args: { filters: this.get_filter_values() },
+			args: { filters },
 			freeze: false,
 			callback: (r) => {
-				const data = r.message || { rows: [], columns: [], labels: {}, total_count: 0 };
-				const calculated = this.build_client_summary(data.rows || []);
-				this.render_kpis(data.summary || calculated.summary);
+				const data = r.message || { rows: [], columns: [], labels: {}, total_count: 0, summary: {} };
+				this.render_kpis(data.summary || {});
+				this.render_breakdown(data.summary || {});
 				this.render_table(data.rows || [], data.columns || [], data.labels || {});
-				this.body.find(".fsr-count").text(`${data.total_count || 0} ${__("records")}`);
+				this.render_pager(data);
+				const total = data.total_count || 0;
+				const shown = data.shown_count || (data.rows || []).length;
+				this.body.find(".fsr-count").text(
+					total > shown
+						? `${shown} ${__("of")} ${total} ${__("records")}`
+						: `${total} ${__("records")}`
+				);
+			},
+			error: () => {
+				this.body.find(".fsr-table").html(`<div class="text-danger">${__("Failed to load report.")}</div>`);
 			}
 		});
 	}
@@ -263,22 +314,47 @@ class FieldStaffReportPage {
 
 	render_kpis(summary) {
 		const cards = [
-			[__("Total Visits"), summary.total_visits || 0, "primary"],
-			[__("Marketing Visits"), summary.marketing_visits || 0, "marketing"],
-			[__("M&E Visits"), summary.me_visits || 0, "me"],
-			[__("Training Visits"), summary.training_visits || 0, "training"],
-			[__("Meeting Visits"), summary.meeting_visits || 0, "meeting"],
-			[__("Other Visits"), summary.other_visits || 0, "other"],
-			[__("Active Field Staff"), summary.active_staff || 0, "staff"]
+			[__("Total Visits"), summary.total_visits || 0, "primary", "visits"],
+			[__("Marketing Visits"), summary.marketing_visits || 0, "marketing", "marketing"],
+			[__("M&E Visits"), summary.me_visits || 0, "me", "me"],
+			[__("Training Visits"), summary.training_visits || 0, "training", "training"],
+			[__("Meeting Visits"), summary.meeting_visits || 0, "meeting", "meeting"],
+			[__("Other Visits"), summary.other_visits || 0, "other", "other"],
+			[__("Active Field Staff"), summary.active_staff || 0, "staff", ""],
 		];
 
 		this.body.find(".fsr-kpis").html(
-			cards.map(([label, value, style]) => `
-				<div class="fsr-kpi fsr-kpi--${style}">
+			cards
+				.map(
+					([label, value, style, metric]) => `
+				<div class="fsr-kpi fsr-kpi--${style}" ${metric ? `data-visit-metric="${metric}"` : ""}>
 					<div class="fsr-kpi__label">${label}</div>
 					<div class="fsr-kpi__value">${frappe.utils.escape_html(String(value))}</div>
-				</div>
-			`).join("")
+					${metric ? `<div class="fsr-kpi__hint">${__("Click to see documents")}</div>` : ""}
+				</div>`
+				)
+				.join("")
+		);
+	}
+
+	render_breakdown(summary) {
+		const total = summary.total_visits || 0;
+		const parts = [
+			["marketing", __("Marketing"), summary.marketing_visits || 0],
+			["me", __("M&E"), summary.me_visits || 0],
+			["meeting", __("Meetings"), summary.meeting_visits || 0],
+			["training", __("Training"), summary.training_visits || 0],
+			["other", __("Other / Academic"), summary.other_visits || 0],
+		]
+			.map(
+				([metric, label, n]) =>
+					`<span class="fsr-break-part" data-visit-metric="${metric}">${label} ${n}</span>`
+			)
+			.join(" + ");
+		this.body.find(".fsr-breakdown-note").html(
+			`<strong class="fsr-break-part" data-visit-metric="visits">${__("Total visits")}: ${total}</strong>
+			= ${parts}.
+			${__("This is every Field Visit type. Click any number (cards or this line) to open those documents.")}`
 		);
 	}
 
@@ -327,6 +403,24 @@ class FieldStaffReportPage {
 					<tbody>${body}</tbody>
 				</table>
 			</div>
+		`);
+	}
+
+	render_pager(data) {
+		const total = data.total_count || 0;
+		const offset = data.offset || 0;
+		const shown = data.shown_count || (data.rows || []).length;
+		const from = total ? offset + 1 : 0;
+		const to = Math.min(offset + shown, total);
+		const hasPrev = offset > 0;
+		const hasNext = offset + shown < total;
+		this.body.find(".fsr-pager").html(`
+			<button type="button" class="btn btn-xs btn-default fsr-prev" ${hasPrev ? "" : "disabled"}>${__("Previous")}</button>
+			<span class="mx-2 text-muted">
+				${__("Showing")} ${from}–${to} ${__("of")} ${total}.
+				${__("Click Document No for full details. Use Export for the complete list.")}
+			</span>
+			<button type="button" class="btn btn-xs btn-default fsr-next" ${hasNext ? "" : "disabled"}>${__("Next")}</button>
 		`);
 	}
 }

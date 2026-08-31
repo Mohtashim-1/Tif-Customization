@@ -4,6 +4,8 @@ import frappe
 from frappe import _
 from frappe.utils import cint, flt, get_first_day, get_last_day, getdate
 
+from tif_customization.tif_customization.api.field_visit_drilldown import get_visit_type_breakdown
+from tif_customization.tif_customization.field_visit_permissions import staff_match_sql, visit_day_sql
 from tif_customization.tif_customization.page.smes_target_base___k.smes_target_base_kpi_config import (
 	FISCAL_MONTHS,
 	INCREMENT_SCALE,
@@ -49,6 +51,7 @@ def get_report_data(filters=None):
 
 	# Increment tier uses the officer's assigned region (Excel sheet type)
 	focus_percent = (region_totals.get(region) or {}).get("percent") or 0
+	visit_bd = get_visit_type_breakdown(from_date, to_date, staff)
 
 	return {
 		"foundation_title": _("The ILM Foundation"),
@@ -104,11 +107,14 @@ def get_report_data(filters=None):
 		"fiscal_by_region": fiscal_by_region,
 		"increment_scale": INCREMENT_SCALE,
 		"increment_tier": _increment_tier(focus_percent),
+		"visit_total": visit_bd.get("total") or 0,
+		"visit_breakdown": visit_bd.get("breakdown") or [],
 		"footnotes": [
 			_("* Model School A: Affiliated with at least one Program of 3 departments."),
 			_("** Model School B: Affiliated with at least one Program of 2 departments."),
 			_("Total expected target points depend on total number of working days."),
 			_("Officer Type / Division selects which Excel sheet targets apply (Karachi / Urban / Rural)."),
+			_("Visits is the total of every Field Visit type. Click any Act number to see those documents."),
 		],
 		"reward_note": _("Highest % Achiever {0}-{1}: Cash Reward with Shield").format(
 			fiscal_year_start, fiscal_year_start + 1
@@ -128,21 +134,14 @@ def _resolve_field_officer(staff):
 
 
 def _staff_match_tokens(staff, officer_meta=None):
-	tokens = set()
-	if staff:
-		tokens.add(staff)
+	from tif_customization.tif_customization.field_visit_permissions import expand_staff_tokens
+
+	tokens = set(expand_staff_tokens(staff))
 	if officer_meta:
 		for key in ("name", "user", "officer"):
 			val = (officer_meta.get(key) or "").strip()
 			if val:
-				tokens.add(val)
-		# Also employee name variants via Employee link
-		if officer_meta.get("officer"):
-			emp = frappe.db.get_value("Field Officer", officer_meta["officer"], "employee")
-			if emp:
-				emp_name = frappe.db.get_value("Employee", emp, "employee_name")
-				if emp_name:
-					tokens.add(emp_name)
+				tokens.update(expand_staff_tokens(val))
 	return [t for t in tokens if t]
 
 
@@ -350,11 +349,12 @@ def _staff_filter_sql(staff_tokens=None):
 	# Token list match (name + linked user)
 	return """
 		AND (
-			COALESCE(visit_by, '') IN %(staff_tokens)s
-			OR COALESCE(me_visit_by, '') IN %(staff_tokens)s
-			OR COALESCE(training_trainer_name, '') IN %(staff_tokens)s
-			OR COALESCE(training_entry_filled_by, '') IN %(staff_tokens)s
-			OR owner IN %(staff_tokens)s
+			LOWER(TRIM(IFNULL(visit_by, ''))) IN %(staff_tokens)s
+			OR LOWER(TRIM(IFNULL(me_visit_by, ''))) IN %(staff_tokens)s
+			OR LOWER(TRIM(IFNULL(mt_visit_by, ''))) IN %(staff_tokens)s
+			OR LOWER(TRIM(IFNULL(training_trainer_name, ''))) IN %(staff_tokens)s
+			OR LOWER(TRIM(IFNULL(training_entry_filled_by, ''))) IN %(staff_tokens)s
+			OR LOWER(TRIM(IFNULL(owner, ''))) IN %(staff_tokens)s
 		)
 	"""
 
@@ -376,22 +376,22 @@ def _count_actuals(from_date, to_date, staff, staff_tokens=None):
 		"to_date": to_date,
 		"staff": staff or None,
 		"staff_like": f"%{staff}%" if staff else "%",
-		"staff_tokens": tuple(tokens) if tokens else ("",),
+		"staff_tokens": tuple(t.lower() for t in tokens) if tokens else ("",),
 	}
 	staff_sql = _staff_filter_sql(tokens if staff else None)
 
 	counts = {a["metric"]: 0 for a in KPI_ACTIVITIES}
 
-	# Visits: Marketing + M&E
+	visit_day = visit_day_sql("fv")
+	staff_match = staff_match_sql("fv", "staff_tokens") if staff else "AND 1=1"
+
+	# Same universe as Field Staff Report: every Field Visit in the date range.
 	counts["visits"] = _scalar_count(
 		f"""
-		SELECT COUNT(*) FROM `tabField Visit`
-		WHERE docstatus < 2 AND type IN ('Marketing', 'M&E')
-		AND (
-			(type = 'Marketing' AND {_visit_date_expr('Marketing')} BETWEEN %(from_date)s AND %(to_date)s)
-			OR (type = 'M&E' AND {_visit_date_expr('M&E')} BETWEEN %(from_date)s AND %(to_date)s)
-		)
-		{staff_sql}
+		SELECT COUNT(*) FROM `tabField Visit` fv
+		WHERE fv.docstatus < 2
+		AND {visit_day} BETWEEN %(from_date)s AND %(to_date)s
+		{"AND " + staff_match if staff else ""}
 		""",
 		staff_params,
 	)
@@ -465,10 +465,11 @@ def _count_actuals(from_date, to_date, staff, staff_tokens=None):
 
 	counts["academic_task"] = _scalar_count(
 		f"""
-		SELECT COUNT(*) FROM `tabField Visit`
-		WHERE docstatus < 2 AND type = 'Other'
-		AND DATE(modified) BETWEEN %(from_date)s AND %(to_date)s
-		{staff_sql}
+		SELECT COUNT(*) FROM `tabField Visit` fv
+		WHERE fv.docstatus < 2
+		AND fv.type IN ('Other', 'Academic / Other Official Tasks')
+		AND {visit_day} BETWEEN %(from_date)s AND %(to_date)s
+		{"AND " + staff_match if staff else ""}
 		""",
 		staff_params,
 	)

@@ -49,7 +49,7 @@ def _targets(karachi, punjab, urban, rural):
 KPI_ACTIVITIES = [
 	{
 		"key": "visits",
-		"label": "Visits (Marketing, Monitoring, Follow up etc)",
+		"label": "Visits (all Field Visits: Marketing, M&E, Meetings, Academic, etc.)",
 		"category": "Core Responsibility",
 		"metric": "visits",
 		"targets": _targets(_t(3, 2), _t("2-3", 2), _t("2-3", 2), _t(2, 2)),

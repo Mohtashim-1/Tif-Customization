@@ -9,6 +9,30 @@ import re
 import frappe
 
 
+def visit_day_sql(alias: str = "fv") -> str:
+	"""Effective visit date per activity type. Last fallback is creation date so IDs always match a report row."""
+	a = alias
+	return f"""
+		CASE
+			WHEN {a}.type = 'Marketing' THEN COALESCE({a}.visit_date, DATE({a}.timestamp), DATE({a}.creation))
+			WHEN {a}.type = 'M&E' THEN COALESCE({a}.me_visit_date, {a}.me_starting_date, DATE({a}.me_timestamp), DATE({a}.creation))
+			WHEN {a}.type = 'Training' THEN COALESCE({a}.training_date, DATE({a}.training_timestamp), DATE({a}.creation))
+			WHEN {a}.type = 'Meeting' THEN COALESCE({a}.mt_meeting_date, DATE({a}.mt_timestamp), DATE({a}.creation))
+			WHEN {a}.type IN ('Academic / Other Official Tasks', 'Other') THEN COALESCE({a}.ot_date, {a}.visit_date, DATE({a}.creation))
+			WHEN {a}.type = 'Joint Visit with SME' THEN COALESCE({a}.me_visit_date, {a}.visit_date, DATE({a}.creation))
+			WHEN {a}.type = 'Co-curricular Activity' THEN COALESCE({a}.ot_date, {a}.visit_date, {a}.training_date, DATE({a}.creation))
+			WHEN {a}.type IN (
+				'Enrolment of Participants',
+				'Attendance / Registration in One Day / Half day Workshop'
+			) THEN COALESCE({a}.training_date, {a}.visit_date, DATE({a}.creation))
+			ELSE COALESCE(
+				{a}.visit_date, {a}.me_visit_date, {a}.training_date,
+				{a}.mt_meeting_date, {a}.ot_date, DATE({a}.creation)
+			)
+		END
+	"""
+
+
 # Roles that can see all Field Visits / field staff reports
 VIEW_ALL_ROLES = {
 	"System Manager",
@@ -109,6 +133,85 @@ def _name_variants(employee_name: str) -> set[str]:
 		variants.add(compact.lower())
 
 	return {v.strip() for v in variants if v and v.strip()}
+
+
+STAFF_MATCH_FIELDS = (
+	"owner",
+	"visit_by",
+	"me_visit_by",
+	"mt_visit_by",
+	"training_entry_filled_by",
+	"training_trainer_name",
+)
+
+
+def expand_staff_tokens(staff: str) -> list[str]:
+	"""Turn a filter value (name or email) into every spelling used on Field Visit."""
+	staff = (staff or "").strip()
+	if not staff:
+		return []
+	tokens = {staff, staff.lower()}
+	tokens.update(_name_variants(staff))
+
+	emp = None
+	if "@" in staff:
+		emp = frappe.db.get_value(
+			"Employee",
+			{"user_id": staff},
+			["name", "employee_name", "user_id"],
+			as_dict=True,
+		)
+	if not emp:
+		emp = frappe.db.get_value(
+			"Employee",
+			{"employee_name": staff},
+			["name", "employee_name", "user_id"],
+			as_dict=True,
+		)
+	if not emp and frappe.db.exists("DocType", "Field Officer"):
+		fo = frappe.db.get_value(
+			"Field Officer",
+			{"name1": staff},
+			["employee", "user"],
+			as_dict=True,
+		) or frappe.db.get_value(
+			"Field Officer",
+			staff,
+			["employee", "user"],
+			as_dict=True,
+		)
+		if fo:
+			if fo.get("user"):
+				tokens.add(fo.user)
+			if fo.get("employee"):
+				emp = frappe.db.get_value(
+					"Employee",
+					fo.employee,
+					["name", "employee_name", "user_id"],
+					as_dict=True,
+				)
+	if emp:
+		if emp.get("name"):
+			tokens.add(emp.name)
+		if emp.get("user_id"):
+			tokens.add(emp.user_id)
+		if emp.get("employee_name"):
+			tokens.update(_name_variants(emp.employee_name))
+
+	return sorted({t.strip() for t in tokens if t and str(t).strip()})
+
+
+def staff_match_sql(alias: str = "fv", param: str = "staff_tokens") -> str:
+	"""Match any staff field independently (do not COALESCE — that hides owner email)."""
+	parts = [f"LOWER(TRIM(IFNULL({alias}.`{field}`, ''))) IN %({param})s" for field in STAFF_MATCH_FIELDS]
+	return "(" + " OR ".join(parts) + ")"
+
+
+def staff_is_in_team(staff: str, user: str | None = None) -> bool:
+	allowed = {v.lower() for v in get_team_match_values(user)}
+	if not allowed:
+		return False
+	return any((t or "").lower() in allowed for t in expand_staff_tokens(staff))
 
 
 def get_team_owners(user: str | None = None) -> list[str]:

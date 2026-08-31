@@ -1,15 +1,65 @@
 # Copyright (c) 2026, mohtashim and contributors
 # For license information, please see license.txt
 
+import re
+
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import get_url, random_string
+from frappe.model.naming import make_autoname
+from frappe.utils import getdate, nowdate, random_string
 
 from tif_customization.tif_customization.api.training_feedback_portal import build_feedback_link
 
+STANDARD_VISIT_NAME = re.compile(r"^FV-\d{2}-\d{2}-\d+$")
+
 
 class FieldVisit(Document):
+	def set_new_name(self, force=False, set_name=None, set_child_names=True):
+		# Mobile / import sometimes sends school or person name as the ID.
+		if self.name and not STANDARD_VISIT_NAME.match(str(self.name).strip()):
+			self.name = None
+			self.flags.name_set = False
+			force = True
+		super().set_new_name(force=force, set_name=set_name, set_child_names=set_child_names)
+
+	def autoname(self):
+		"""FV-MM-YY-##### using the visit date so the document no matches the visit month."""
+		d = getdate(self.get_visit_date() or nowdate())
+		self.naming_series = "FV-.MM.-.YY.-"
+		self.name = make_autoname(f"FV-{d.strftime('%m')}-{d.strftime('%y')}-.#####")
+
+	def get_visit_date(self):
+		t = (self.type or "").strip()
+		if t == "Marketing":
+			return self.visit_date or (getdate(self.timestamp) if self.timestamp else None)
+		if t == "M&E":
+			return self.me_visit_date or self.me_starting_date or (
+				getdate(self.me_timestamp) if self.me_timestamp else None
+			)
+		if t == "Training":
+			return self.training_date or (
+				getdate(self.training_timestamp) if self.training_timestamp else None
+			)
+		if t == "Meeting":
+			return self.mt_meeting_date or (getdate(self.mt_timestamp) if self.mt_timestamp else None)
+		if t in ("Academic / Other Official Tasks", "Other", "Co-curricular Activity"):
+			return self.ot_date or self.visit_date
+		if t == "Joint Visit with SME":
+			return self.me_visit_date or self.visit_date
+		if t in (
+			"Enrolment of Participants",
+			"Attendance / Registration in One Day / Half day Workshop",
+		):
+			return self.training_date or self.visit_date
+		return (
+			self.visit_date
+			or self.me_visit_date
+			or self.training_date
+			or self.mt_meeting_date
+			or self.ot_date
+		)
+
 	def before_validate(self):
 		# Mobile / older clients may send lowercase "participants"
 		if (self.type or "").strip() == "Enrolment of participants":

@@ -10,6 +10,7 @@
   "training_date",
   "training_time",
   "training_end_time",
+  "schedule_status",
   "month",
   "training_type",
   "workshop_topic",
@@ -64,6 +65,14 @@
    "fieldtype": "Time",
    "in_list_view": 1,
    "label": "End Time"
+  },
+  {
+   "fieldname": "schedule_status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "\nUpcoming\nIn Progress\nCompleted"
   },
   {
    "depends_on": "eval:doc.type == 'Workshop'",
@@ -203,7 +212,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-25 15:55:00.000000",
+ "modified": "2026-08-26 20:35:00.000000",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Upcoming Training",

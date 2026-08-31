@@ -1,11 +1,13 @@
 frappe.pages["sme-kpi-sheet"].on_page_load = function (wrapper) {
-	const page = frappe.ui.make_app_page({
-		parent: wrapper,
-		title: __("SME KPI Sheet"),
-		single_column: true,
+	frappe.require("/assets/tif_customization/js/field_visit_drilldown.js", () => {
+		const page = frappe.ui.make_app_page({
+			parent: wrapper,
+			title: __("SME KPI Sheet"),
+			single_column: true,
+		});
+		wrapper.page = page;
+		wrapper.sme_kpi_sheet = new frappe.tif_customization.SmeKpiSheet(page);
 	});
-	wrapper.page = page;
-	wrapper.sme_kpi_sheet = new frappe.tif_customization.SmeKpiSheet(page);
 };
 
 frappe.pages["sme-kpi-sheet"].on_page_show = function (wrapper) {
@@ -60,6 +62,10 @@ frappe.tif_customization.SmeKpiSheet = class SmeKpiSheet {
 					.sks-sheet .col-hdr{background:#d9e2f3;font-weight:700;font-size:11px}
 					.sks-sheet .row-hdr td{background:#f3f3f3;font-weight:700}
 					.sks-sheet .actual{background:#c6efce;font-weight:700}
+					.sks-sheet .actual.sks-click{cursor:pointer;text-decoration:underline;color:#0f766e}
+					.sks-sheet .actual.sks-click:hover{background:#86efac}
+					.sks-break{background:#f8fafc;border:1px dashed #94a3b8;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:13px}
+					.sks-break [data-visit-metric]{cursor:pointer;text-decoration:underline;color:#0f766e}
 					.sks-sheet .yellow td{background:#ffff99}
 					.sks-sheet .yellow .actual{background:#c6efce}
 					.sks-sheet .sum-green{background:#00b050;color:#fff;font-weight:800}
@@ -218,6 +224,18 @@ frappe.tif_customization.SmeKpiSheet = class SmeKpiSheet {
 		if (this.page && this.page.set_primary_action) {
 			this.page.set_primary_action(__("Refresh"), () => this.load_data(), "refresh");
 		}
+		this.body.on("click", "[data-visit-metric]", (e) => {
+			const metric = $(e.currentTarget).attr("data-visit-metric");
+			if (!metric) return;
+			const f = this.get_filters();
+			if (!f) return;
+			frappe.tif_customization.open_visit_drilldown({
+				from_date: f.from_date,
+				to_date: f.to_date,
+				staff: f.staff,
+				metric,
+			});
+		});
 	}
 
 	show_placeholder() {
@@ -298,6 +316,7 @@ frappe.tif_customization.SmeKpiSheet = class SmeKpiSheet {
 
 	render(data) {
 		const regionCls = data.theme === "blue" ? "region-blue" : "region-tan";
+		const skipClick = { model_school_a: 1, model_school_b: 1 };
 		const rows = (data.rows || [])
 			.map((r) => {
 				const trCls = r.highlight === "yellow" ? "yellow" : "";
@@ -305,13 +324,18 @@ frappe.tif_customization.SmeKpiSheet = class SmeKpiSheet {
 					r.monthly_points != null ? `<td class="actual">${this.fmt(r.monthly_points, 2)}</td>` : `<td></td>`;
 				const yearly =
 					r.yearly_points != null ? `<td class="actual">${this.fmt(r.yearly_points, 3)}</td>` : `<td></td>`;
+				const clickable = !skipClick[r.key];
+				const actualCls = clickable ? "actual sks-click" : "actual";
+				const actualAttr = clickable
+					? ` data-visit-metric="${this.esc(r.key)}" title="${__("Click to see Field Visits")}"`
+					: "";
 				return `<tr class="${trCls}">
 					<td class="left">${this.esc(r.label)}</td>
 					<td class="left">${this.esc(r.category)}</td>
 					<td>${this.esc(r.per_day_target)}</td>
 					<td>${this.esc(r.points)}</td>
 					<td>${this.esc(r.yearly_target)}</td>
-					<td class="actual">${this.fmt(r.actual)}</td>
+					<td class="${actualCls}"${actualAttr}>${this.fmt(r.actual)}</td>
 					${monthly}
 					${yearly}
 				</tr>`;
@@ -330,7 +354,22 @@ frappe.tif_customization.SmeKpiSheet = class SmeKpiSheet {
 			)
 			.join("");
 
+		const visitTotal = data.visit_total != null
+			? data.visit_total
+			: (data.visit_breakdown || []).reduce((s, b) => s + (b.count || 0), 0);
+		const visitParts = (data.visit_breakdown || [])
+			.map(
+				(b) =>
+					`<span data-visit-metric="${this.esc(b.metric || "visits")}">${this.esc(b.type)} ${b.count}</span>`
+			)
+			.join(" + ");
+
 		this.body.find(".sks-body").html(`
+			<div class="sks-break">
+				<strong data-visit-metric="visits">${__("Total visits")}: ${this.fmt(visitTotal)}</strong>
+				${visitParts ? " = " + visitParts : ""}.
+				${__("This is every Field Visit type (Marketing + M&E + Meetings + Training + Other). Click any number to open those documents.")}
+			</div>
 			<div class="sks-sheet-wrap">
 				<table class="sks-sheet">
 					<tr><th colspan="8" class="title">${this.esc(data.foundation_title)}</th></tr>

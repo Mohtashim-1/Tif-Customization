@@ -7,13 +7,27 @@ from frappe.utils import flt, getdate, nowdate
 DEPARTMENTS = [
 	{"key": "cee", "label": "CEE", "keywords": ["cee", "special education", "s.edu", "teacher training"]},
 	{"key": "qps", "label": "QPS", "keywords": ["qps", "quran program"]},
-	{"key": "tps", "label": "TPS", "keywords": ["tps", "tilawat"]},
-	{"key": "fa", "label": "F&A", "keywords": ["f&a", "finance", "accounts", "fa"]},
+	{"key": "tps", "label": "TPS", "keywords": ["tps", "tilawat", "tajweed"]},
+	{"key": "fa", "label": "F&A", "keywords": ["f&a", "finance", "accounts"]},
 	{"key": "hr", "label": "HR", "keywords": ["hr", "human resource"]},
-	{"key": "admin", "label": "Admin", "keywords": ["admin", "administration"]},
-	{"key": "it", "label": "IT", "keywords": ["it", "information technology"]},
+	{"key": "admin", "label": "Admin", "keywords": [
+		"admin",
+		"administration",
+		"head office",
+		"warehouse",
+		"supply chain",
+		"regional office",
+		"peshawar",
+		"lahore",
+		"abbotabad",
+		"abbottabad",
+		"manshera",
+		"mansehra",
+	]},
+	{"key": "it", "label": "IT", "keywords": ["information technology"]},
 	{"key": "marketing", "label": "Marketing", "keywords": ["marketing", "mktg"]},
-	{"key": "ceo", "label": "CEO", "keywords": ["ceo", "management"]},
+	{"key": "ceo", "label": "CEO", "keywords": ["ceo"]},
+	{"key": "other", "label": "Other", "keywords": ["mehmoodabad"]},
 ]
 
 PROGRAM_SALARY_DEPTS = {"qps", "cee", "tps"}
@@ -54,55 +68,154 @@ REPORT_ROWS = [
 	{"row_type": "total", "label": "Total", "section": "Salaries"},
 	{"row_type": "spacer"},
 	{"row_type": "section", "label": "Operational Expenses"},
-	{"row_type": "data", "label": "Training & Workshop Expense", "patterns": ["training", "workshop"]},
-	{"row_type": "data", "label": "TTC Conveyance Allowance", "patterns": ["ttc", "conveyance"]},
+	{
+		"row_type": "data",
+		"label": "Training & Workshop Expense",
+		"account_class": "expense",
+		"patterns": ["training", "workshop", "stipend", "trainee", "visiting faculty", "ttc registration"],
+	},
+	{"row_type": "data", "label": "TTC Conveyance Allowance", "account_class": "expense", "patterns": ["ttc"]},
 	{
 		"row_type": "data",
 		"label": "Book Printing Expense and Transportation",
-		"patterns": ["book printing", "transport", "transportation"],
+		"account_class": "expense",
+		"patterns": ["mqh", "book printing", "book print", "printing of mqh"],
 	},
-	{"row_type": "data", "label": "Office Rentals", "patterns": ["rent"]},
-	{"row_type": "data", "label": "Travelling and Conveyance Expense", "patterns": ["travel", "conveyance"]},
-	{"row_type": "data", "label": "Marketing & Promotions & other activities", "patterns": ["marketing", "promotion"]},
-	{"row_type": "data", "label": "TIF Giveaways", "patterns": ["giveaway"]},
-	{"row_type": "data", "label": "Legal and Professional Core Operational", "patterns": ["legal", "professional"]},
-	{"row_type": "data", "label": "Fees and Subscriptions", "patterns": ["subscription", "fee"]},
-	{"row_type": "data", "label": "Printing, Photocopies & Stationery", "patterns": ["printing", "photocopy", "stationery"]},
-	{"row_type": "data", "label": "Staff Tea and Food Expenses", "patterns": ["food", "tea", "refreshment"]},
-	{"row_type": "data", "label": "Office Supplies (Grocery, Crokery)", "patterns": ["grocery", "crockery", "office supplies"]},
-	{"row_type": "data", "label": "Utlities (K-Electric, Gas, KWSB)", "patterns": ["utility", "electric", "gas", "water"]},
+	{"row_type": "data", "label": "Office Rentals", "account_class": "expense", "patterns": ["rent"]},
+	{
+		"row_type": "data",
+		"label": "Travelling and Conveyance Expense",
+		"account_class": "expense",
+		"patterns": ["travel", "travelling", "conveyance", "ticket"],
+	},
+	{"row_type": "data", "label": "TIF Giveaways", "account_class": "expense", "patterns": ["giveaway"]},
+	{
+		"row_type": "data",
+		"label": "Marketing & Promotions & other activities",
+		"account_class": "expense",
+		"patterns": ["marketing", "promotion", "social media", "event"],
+	},
+	{
+		"row_type": "data",
+		"label": "Legal and Professional Core Operational",
+		"account_class": "expense",
+		"patterns": ["legal", "professional", "advisory", "registration", "noc"],
+	},
+	{
+		"row_type": "data",
+		"label": "Fees and Subscriptions",
+		"account_class": "expense",
+		"patterns": ["subscription", "lms"],
+	},
+	{
+		"row_type": "data",
+		"label": "Printing, Photocopies & Stationery",
+		"account_class": "expense",
+		"patterns": ["printing", "photocopy", "stationery", "stationary", "typing", "proofreading", "visiting card"],
+	},
+	{
+		"row_type": "data",
+		"label": "Staff Tea and Food Expenses",
+		"account_class": "expense",
+		"patterns": ["food", "tea", "refreshment", "entertainment", "drinking water"],
+	},
+	{
+		"row_type": "data",
+		"label": "Office Supplies (Grocery, Crokery)",
+		"account_class": "expense",
+		"patterns": ["grocery", "crockery", "office supplies"],
+	},
+	{
+		"row_type": "data",
+		"label": "Utlities (K-Electric, Gas, KWSB)",
+		"account_class": "expense",
+		"patterns": ["utility", "electric", "electricity", "gas", "water", "sevrage", "sewerage", "kwsb"],
+	},
 	{
 		"row_type": "data",
 		"label": "Communication (PTCL, Mobile Balance & Internet)",
+		"account_class": "expense",
 		"patterns": ["communication", "internet", "mobile", "ptcl", "telephone"],
 	},
-	{"row_type": "data", "label": "Courier charges", "patterns": ["courier"]},
+	{
+		"row_type": "data",
+		"label": "Courier charges",
+		"account_class": "expense",
+		"patterns": ["courier", "postage", "leopard", "cartage"],
+	},
 	{
 		"row_type": "data",
 		"label": "Vehicle running & maintenance",
-		"patterns": ["vehicle running", "vehicle maintenance", "fuel"],
+		"account_class": "expense",
+		"patterns": ["vehicle running", "vehicle maintenance", "vehicle repair", "vehicle fuel", "fuel"],
 	},
-	{"row_type": "data", "label": "Vehicle Takaful", "patterns": ["takaful", "insurance"]},
-	{"row_type": "data", "label": "Office maintenance expense", "patterns": ["office maintenance"]},
-	{"row_type": "data", "label": "Website Maintenance Expense", "patterns": ["website", "domain", "hosting"]},
-	{"row_type": "data", "label": "IT & Computer Expenses", "patterns": ["computer", "software", "it expense"]},
-	{"row_type": "data", "label": "Bank Charges", "patterns": ["bank charge"]},
-	{"row_type": "data", "label": "Depreciation", "patterns": ["depreciation"]},
-	{"row_type": "data", "label": "External Auditor", "patterns": ["auditor", "audit"]},
-	{"row_type": "data", "label": "Donation", "patterns": ["donation"]},
+	{
+		"row_type": "data",
+		"label": "Vehicle Takaful",
+		"account_class": "expense",
+		"patterns": ["takaful", "insurance", "insurace"],
+	},
+	{
+		"row_type": "data",
+		"label": "Office maintenance expense",
+		"account_class": "expense",
+		"patterns": ["office maintenance", "office repair", "office  repair"],
+	},
+	{
+		"row_type": "data",
+		"label": "Website Maintenance Expense",
+		"account_class": "expense",
+		"patterns": ["website", "domain", "hosting"],
+	},
+	{
+		"row_type": "data",
+		"label": "IT & Computer Expenses",
+		"account_class": "expense",
+		"patterns": ["computer", "software", "it expense"],
+	},
+	{"row_type": "data", "label": "Bank Charges", "account_class": "expense", "patterns": ["bank charge"]},
+	{"row_type": "data", "label": "Depreciation", "account_class": "expense", "patterns": ["depreciation"]},
+	{"row_type": "data", "label": "External Auditor", "account_class": "expense", "patterns": ["auditor", "audit"]},
+	{"row_type": "data", "label": "Donation", "account_class": "expense", "patterns": ["donation"]},
+	{"row_type": "data", "label": "Other Expenses", "account_class": "expense", "catch_all": 1},
 	{"row_type": "total", "label": "Total", "section": "Operational Expenses"},
 	{"row_type": "spacer"},
 	{"row_type": "section", "label": "Capital Expenditures"},
-	{"row_type": "data", "label": "Computer Accessories (PC, Laptop, Other)", "patterns": ["computer", "laptop", "accessories"]},
-	{"row_type": "data", "label": "Mobile Phone (Sets)", "patterns": ["mobile phone", "cell phone"]},
-	{"row_type": "data", "label": "Land & Building", "patterns": ["land", "building"]},
-	{"row_type": "data", "label": "Furniture & Fixture", "patterns": ["furniture", "fixture"]},
-	{"row_type": "data", "label": "Intangible - ERP", "patterns": ["erp", "intangible"]},
-	{"row_type": "data", "label": "Electrical equipments", "patterns": ["electrical"]},
-	{"row_type": "data", "label": "UPS System", "patterns": ["ups"]},
-	{"row_type": "data", "label": "Camera (CCTV)", "patterns": ["camera", "cctv"]},
-	{"row_type": "data", "label": "Generator/Solar Energy/Battery", "patterns": ["generator", "solar", "battery"]},
-	{"row_type": "data", "label": "Vehicle", "patterns": ["vehicle purchase", "motor vehicle", "car purchase"]},
+	{
+		"row_type": "data",
+		"label": "Computer Accessories (PC, Laptop, Other)",
+		"account_class": "asset",
+		"patterns": ["computer", "laptop", "accessories"],
+	},
+	{
+		"row_type": "data",
+		"label": "Mobile Phone (Sets)",
+		"account_class": "asset",
+		"patterns": ["mobile phone", "cell phone"],
+	},
+	{"row_type": "data", "label": "Land & Building", "account_class": "asset", "patterns": ["land", "building"]},
+	{"row_type": "data", "label": "Furniture & Fixture", "account_class": "asset", "patterns": ["furniture", "fixture"]},
+	{"row_type": "data", "label": "Intangible - ERP", "account_class": "asset", "patterns": ["erp", "intangible", "software"]},
+	{
+		"row_type": "data",
+		"label": "Electrical equipments",
+		"account_class": "asset",
+		"patterns": ["electrical", "electronic", "office equipment"],
+	},
+	{"row_type": "data", "label": "UPS System", "account_class": "asset", "patterns": ["ups"]},
+	{"row_type": "data", "label": "Camera (CCTV)", "account_class": "asset", "patterns": ["camera", "cctv"]},
+	{
+		"row_type": "data",
+		"label": "Generator/Solar Energy/Battery",
+		"account_class": "asset",
+		"patterns": ["generator", "solar", "battery"],
+	},
+	{
+		"row_type": "data",
+		"label": "Vehicle",
+		"account_class": "asset",
+		"patterns": ["vehicle purchase", "motor vehicle", "car purchase"],
+	},
 	{"row_type": "total", "label": "Total", "section": "Capital Expenditures"},
 	{"row_type": "spacer"},
 	{"row_type": "grand_total", "label": "Total Expenses"},
@@ -204,6 +317,7 @@ def _fetch_gl_data(from_date, to_date):
 			LOWER(COALESCE(parent.parent_cost_center, '')) AS grandparent_cost_center_id,
 			gle.party_type,
 			gle.party,
+			LOWER(COALESCE(acc.root_type, '')) AS root_type,
 			SUM(COALESCE(gle.debit, 0) - COALESCE(gle.credit, 0)) AS amount
 		FROM `tabGL Entry` gle
 		LEFT JOIN `tabAccount` acc ON acc.name = gle.account
@@ -213,14 +327,12 @@ def _fetch_gl_data(from_date, to_date):
 		WHERE gle.docstatus < 2
 		AND gle.posting_date BETWEEN %(from_date)s AND %(to_date)s
 		AND IFNULL(gle.is_cancelled, 0) = 0
-		-- This report is meant for expenses/capex. Exclude Income accounts so
-		-- entries like "Rental Income" don't get netted against "Office Rentals".
-		AND COALESCE(acc.root_type, '') != 'Income'
+		AND COALESCE(acc.root_type, '') IN ('Expense', 'Asset')
 		GROUP BY
 			account_name, account_id, cost_center_name, cost_center_id,
 			parent_cost_center_name, parent_cost_center_id,
 			grandparent_cost_center_name, grandparent_cost_center_id,
-			gle.party_type, gle.party
+			gle.party_type, gle.party, acc.root_type
 		""",
 		{"from_date": from_date, "to_date": to_date},
 		as_dict=True,
@@ -256,6 +368,7 @@ def _attach_employee_departments(rows):
 def _build_rows(entries):
 	rows = []
 	section_bucket = {}
+	used = [False] * len(entries)
 
 	for cfg in REPORT_ROWS:
 		row_type = cfg.get("row_type")
@@ -269,7 +382,7 @@ def _build_rows(entries):
 			continue
 
 		if row_type == "data":
-			row = _build_data_row(cfg, entries)
+			row = _build_data_row(cfg, entries, used)
 			rows.append(row)
 			section = _current_section(rows)
 			if section:
@@ -292,17 +405,26 @@ def _build_rows(entries):
 	return rows
 
 
-def _build_data_row(config, entries):
+def _build_data_row(config, entries, used=None):
 	patterns = [p.lower().strip() for p in (config.get("patterns") or []) if p]
 	exclude_patterns = [p.lower().strip() for p in (config.get("exclude_patterns") or []) if p]
 	is_salary = int(config.get("is_salary") or 0)
+	catch_all = int(config.get("catch_all") or 0)
+	account_class = (config.get("account_class") or "expense").lower()
 	department_keys = set(config.get("department_keys") or [])
 	include_unmatched = int(config.get("include_unmatched") or 0)
+	if used is None:
+		used = [False] * len(entries)
 
 	total = 0.0
 	by_department = {d["key"]: 0.0 for d in DEPARTMENTS}
 
-	for entry in entries:
+	for idx, entry in enumerate(entries):
+		if used[idx]:
+			continue
+		if not _entry_fits_account_class(entry, account_class):
+			continue
+
 		if is_salary:
 			if not _is_salary_account(entry):
 				continue
@@ -311,8 +433,18 @@ def _build_data_row(config, entries):
 				continue
 			amount = flt(entry.get("amount"))
 			total += amount
-			if dept_key:
-				by_department[dept_key] += amount
+			by_department[_department_bucket(dept_key)] += amount
+			used[idx] = True
+			continue
+
+		if catch_all:
+			if _is_salary_account(entry):
+				continue
+			amount = flt(entry.get("amount"))
+			total += amount
+			dept_key = _match_department(entry)
+			by_department[_department_bucket(dept_key)] += amount
+			used[idx] = True
 			continue
 
 		if not _matches_patterns(entry, patterns, exclude_patterns):
@@ -320,8 +452,8 @@ def _build_data_row(config, entries):
 		amount = flt(entry.get("amount"))
 		total += amount
 		dept_key = _match_department(entry)
-		if dept_key:
-			by_department[dept_key] += amount
+		by_department[_department_bucket(dept_key)] += amount
+		used[idx] = True
 
 	return {
 		"row_type": "data",
@@ -329,6 +461,15 @@ def _build_data_row(config, entries):
 		"total": total,
 		"by_department": by_department,
 	}
+
+
+def _entry_fits_account_class(entry, account_class):
+	root = (entry.get("root_type") or "").strip().lower()
+	if account_class == "asset":
+		return root == "asset"
+	if account_class == "expense":
+		return root == "expense" or not root
+	return True
 
 
 def _salary_row_includes_department(dept_key, department_keys, include_unmatched=0):
@@ -345,22 +486,15 @@ def _salary_row_includes_department(dept_key, department_keys, include_unmatched
 
 def _is_salary_account(entry):
 	account_text = f"{entry.get('account_name', '')} {entry.get('account_id', '')}".lower()
-	return "salary" in account_text or "salaries" in account_text
+	return any(token in account_text for token in ("salary", "salaries", "eobi", "bonus", "gratuity", "payroll"))
 
 
 def _matches_patterns(entry, patterns, exclude_patterns=None):
 	if not patterns:
 		return False
 	account_text = f"{entry.get('account_name', '')} {entry.get('account_id', '')}".lower()
-	# Require ALL tokens when multiple are provided (AND), so "qps"+"salary"
-	# style configs do not match every salary account.
-	if not all(token in account_text for token in patterns):
-		# Fallback: single-token patterns still match as before
-		if len(patterns) == 1:
-			if patterns[0] not in account_text:
-				return False
-		else:
-			return False
+	if not any(token in account_text for token in patterns):
+		return False
 	exclude_patterns = exclude_patterns or []
 	if exclude_patterns and any(token in account_text for token in exclude_patterns):
 		return False
@@ -382,6 +516,13 @@ def _department_text(entry):
 
 def cstr_lower(value):
 	return (value or "").lower()
+
+
+def _department_bucket(dept_key):
+	"""Unmatched cost centers go to Other so department columns always sum to Total."""
+	if dept_key and any(d["key"] == dept_key for d in DEPARTMENTS):
+		return dept_key
+	return "other"
 
 
 def _match_department(entry):
@@ -494,6 +635,9 @@ def get_drilldown_entries(row_index, from_date, to_date, department_key=None):
 	if int(cfg.get("is_salary") or 0):
 		return _salary_drilldown(cfg, row_index, from_date, to_date, department_key)
 
+	if int(cfg.get("catch_all") or 0):
+		return _catch_all_drilldown(cfg, row_index, from_date, to_date, department_key)
+
 	patterns = [p.lower().strip() for p in (cfg.get("patterns") or []) if p]
 	exclude_patterns = [p.lower().strip() for p in (cfg.get("exclude_patterns") or []) if p]
 	if not patterns:
@@ -518,7 +662,7 @@ def get_drilldown_entries(row_index, from_date, to_date, department_key=None):
 		key = f"p{idx}"
 		like_clauses.append(f"{account_text_expr} LIKE %({key})s")
 		params[key] = f"%{token}%"
-	where_patterns = " AND ".join(like_clauses) if like_clauses else "1=0"
+	where_patterns = " OR ".join(like_clauses) if like_clauses else "1=0"
 
 	where_exclude = ""
 	if exclude_patterns:
@@ -537,6 +681,10 @@ def get_drilldown_entries(row_index, from_date, to_date, department_key=None):
 			de.append(f"{cost_center_text_expr} LIKE %({key})s")
 			params[key] = f"%{token}%"
 		where_dept = f" AND ( {' OR '.join(de)} ) "
+
+	account_class = (cfg.get("account_class") or "expense").lower()
+	root_filter = "Expense" if account_class != "asset" else "Asset"
+	params["root_type"] = root_filter
 
 	where_sql = f"( {where_patterns} ) {where_exclude} {where_dept}"
 
@@ -559,7 +707,7 @@ def get_drilldown_entries(row_index, from_date, to_date, department_key=None):
 		WHERE gle.docstatus < 2
 		AND IFNULL(gle.is_cancelled, 0) = 0
 		AND gle.posting_date BETWEEN %(from_date)s AND %(to_date)s
-		AND COALESCE(acc.root_type, '') != 'Income'
+		AND COALESCE(acc.root_type, '') = %(root_type)s
 		AND {where_sql}
 		""",
 		params,
@@ -591,7 +739,7 @@ def get_drilldown_entries(row_index, from_date, to_date, department_key=None):
 		WHERE gle.docstatus < 2
 		AND IFNULL(gle.is_cancelled, 0) = 0
 		AND gle.posting_date BETWEEN %(from_date)s AND %(to_date)s
-		AND COALESCE(acc.root_type, '') != 'Income'
+		AND COALESCE(acc.root_type, '') = %(root_type)s
 		AND {where_sql}
 		ORDER BY gle.posting_date ASC, gle.voucher_type ASC, gle.voucher_no ASC, gle.name ASC
 		LIMIT %(limit)s
@@ -657,6 +805,10 @@ def _salary_drilldown(cfg, row_index, from_date, to_date, department_key=None):
 		AND (
 			LOWER(COALESCE(acc.account_name, gle.account, '')) LIKE '%%salary%%'
 			OR LOWER(COALESCE(acc.account_name, gle.account, '')) LIKE '%%salaries%%'
+			OR LOWER(COALESCE(acc.account_name, gle.account, '')) LIKE '%%eobi%%'
+			OR LOWER(COALESCE(acc.account_name, gle.account, '')) LIKE '%%bonus%%'
+			OR LOWER(COALESCE(acc.account_name, gle.account, '')) LIKE '%%gratuity%%'
+			OR LOWER(COALESCE(acc.account_name, gle.account, '')) LIKE '%%payroll%%'
 		)
 		ORDER BY gle.posting_date ASC, gle.voucher_type ASC, gle.voucher_no ASC, gle.name ASC
 		""",
@@ -690,6 +842,98 @@ def _salary_drilldown(cfg, row_index, from_date, to_date, department_key=None):
 		f"{e.get('voucher_type') or ''}::{e.get('voucher_no') or ''}" for e in matched
 	}
 
+	return {
+		"row_index": int(row_index),
+		"row_label": cfg.get("label"),
+		"from_date": from_date,
+		"to_date": to_date,
+		"department_key": department_key,
+		"voucher_count": len(voucher_keys),
+		"total_amount": sum(flt(e.get("amount")) for e in matched),
+		"truncated": truncated,
+		"entries": entries,
+	}
+
+
+def _catch_all_drilldown(cfg, row_index, from_date, to_date, department_key=None):
+	"""Expense GL lines that did not match any named operational head."""
+	raw = frappe.db.sql(
+		"""
+		SELECT
+			gle.posting_date,
+			gle.voucher_type,
+			gle.voucher_no,
+			gle.account,
+			acc.account_name,
+			gle.cost_center,
+			cc.cost_center_name,
+			parent.cost_center_name AS parent_cost_center_name,
+			LOWER(COALESCE(cc.cost_center_name, gle.cost_center, '')) AS cost_center_name_l,
+			LOWER(COALESCE(gle.cost_center, '')) AS cost_center_id,
+			LOWER(COALESCE(parent.cost_center_name, '')) AS parent_cost_center_name_l,
+			LOWER(COALESCE(cc.parent_cost_center, '')) AS parent_cost_center_id,
+			LOWER(COALESCE(gparent.cost_center_name, '')) AS grandparent_cost_center_name,
+			LOWER(COALESCE(parent.parent_cost_center, '')) AS grandparent_cost_center_id,
+			gle.party_type,
+			gle.party,
+			emp.department AS employee_department,
+			gle.debit,
+			gle.credit,
+			( COALESCE(gle.debit, 0) - COALESCE(gle.credit, 0) ) AS amount,
+			gle.remarks,
+			LOWER(COALESCE(acc.account_name, gle.account, '')) AS account_name_l,
+			LOWER(COALESCE(gle.account, '')) AS account_id
+		FROM `tabGL Entry` gle
+		LEFT JOIN `tabAccount` acc ON acc.name = gle.account
+		LEFT JOIN `tabCost Center` cc ON cc.name = gle.cost_center
+		LEFT JOIN `tabCost Center` parent ON parent.name = cc.parent_cost_center
+		LEFT JOIN `tabCost Center` gparent ON gparent.name = parent.parent_cost_center
+		LEFT JOIN `tabEmployee` emp
+			ON gle.party_type = 'Employee' AND emp.name = gle.party
+		WHERE gle.docstatus < 2
+		AND IFNULL(gle.is_cancelled, 0) = 0
+		AND gle.posting_date BETWEEN %(from_date)s AND %(to_date)s
+		AND COALESCE(acc.root_type, '') = 'Expense'
+		ORDER BY gle.posting_date ASC, gle.voucher_type ASC, gle.voucher_no ASC, gle.name ASC
+		""",
+		{"from_date": from_date, "to_date": to_date},
+		as_dict=True,
+	)
+
+	named_patterns = []
+	for row_cfg in REPORT_ROWS:
+		if row_cfg.get("row_type") != "data" or row_cfg.get("is_salary") or row_cfg.get("catch_all"):
+			continue
+		if (row_cfg.get("account_class") or "expense") != "expense":
+			continue
+		named_patterns.extend([p.lower().strip() for p in (row_cfg.get("patterns") or []) if p])
+
+	matched = []
+	for row in raw:
+		entry = {
+			"account_name": row.get("account_name_l"),
+			"account_id": row.get("account_id"),
+			"cost_center_name": row.get("cost_center_name_l"),
+			"cost_center_id": row.get("cost_center_id"),
+			"parent_cost_center_name": row.get("parent_cost_center_name_l"),
+			"parent_cost_center_id": row.get("parent_cost_center_id"),
+			"grandparent_cost_center_name": row.get("grandparent_cost_center_name"),
+			"grandparent_cost_center_id": row.get("grandparent_cost_center_id"),
+			"employee_department": (row.get("employee_department") or "").lower(),
+			"root_type": "expense",
+		}
+		if _is_salary_account(entry):
+			continue
+		if _matches_patterns(entry, named_patterns):
+			continue
+		if department_key and _match_department(entry) != department_key:
+			continue
+		matched.append(row)
+
+	limit = 2000
+	truncated = len(matched) > limit
+	entries = matched[:limit]
+	voucher_keys = {f"{e.get('voucher_type') or ''}::{e.get('voucher_no') or ''}" for e in matched}
 	return {
 		"row_index": int(row_index),
 		"row_label": cfg.get("label"),

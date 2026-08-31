@@ -1,5 +1,7 @@
 frappe.pages["smes-target-base---k"].on_page_load = function (wrapper) {
-	new SmesTargetBasePage(wrapper);
+	frappe.require("/assets/tif_customization/js/field_visit_drilldown.js", () => {
+		new SmesTargetBasePage(wrapper);
+	});
 };
 
 const SME_REGIONS = ["karachi", "punjab", "urban", "rural"];
@@ -91,6 +93,13 @@ class SmesTargetBasePage {
 				.sme-sheet .row-bold td { font-weight: 700; background: #f5f5f5; }
 				.sme-sheet .row-header td { font-weight: 600; background: #fafafa; }
 				.sme-sheet .actual-cell { font-weight: 700; color: #0f172a; }
+				.sme-sheet .actual-cell.sme-click, .sme-break [data-visit-metric] {
+					cursor: pointer; text-decoration: underline; color: #0f766e;
+				}
+				.sme-break {
+					background: #f8fafc; border: 1px dashed #94a3b8; border-radius: 8px;
+					padding: 10px 12px; margin: 0 0 12px; font-size: 13px;
+				}
 				.sme-bottom { display: flex; flex-wrap: wrap; gap: 20px; margin-top: 16px; }
 				.sme-bottom-block { flex: 1; min-width: 280px; }
 				.sme-month-table { font-size: 11px; min-width: 220px; }
@@ -235,6 +244,18 @@ class SmesTargetBasePage {
 			this.filters.working_days.set_value(21);
 			this.show_placeholder();
 		});
+		this.body.on("click", "[data-visit-metric]", (e) => {
+			const metric = $(e.currentTarget).attr("data-visit-metric");
+			if (!metric) return;
+			const f = this.get_filter_values();
+			if (!f) return;
+			frappe.tif_customization.open_visit_drilldown({
+				from_date: f.from_date,
+				to_date: f.to_date,
+				staff: f.staff,
+				metric,
+			});
+		});
 	}
 
 	show_placeholder() {
@@ -310,6 +331,7 @@ class SmesTargetBasePage {
 			})
 			.join("");
 
+		const skipClick = { model_school_a: 1, model_school_b: 1, per_day_points: 1 };
 		const activityRows = (data.activity_rows || [])
 			.map((row) => {
 				const trClass = row.is_header ? "row-header" : "";
@@ -321,9 +343,13 @@ class SmesTargetBasePage {
 							const reg = (row.regions || {})[rk] || {};
 							const theme = themeMap[rk] || "tan";
 							const cls = theme === "blue" ? "col-blue" : "col-tan";
+							const clickable = !row.is_header && !skipClick[row.key] && reg.actual != null;
+							const actualHtml = clickable
+								? `<div class="actual-cell sme-click" data-visit-metric="${frappe.utils.escape_html(row.key)}" title="${__("Click to see Field Visits")}">${__("Act")}: ${this.fmt(reg.actual)}</div>`
+								: (reg.actual != null ? `<div class="actual-cell">${__("Act")}: ${this.fmt(reg.actual)}</div>` : "");
 							const pdt = row.is_header
 								? ""
-								: `<span>${this.fmt(reg.per_day_target, { precision: 2 })}</span>${reg.actual != null ? `<div class="actual-cell" style="font-size:10px;">${__("Act")}: ${this.fmt(reg.actual)}</div>` : ""}`;
+								: `<span>${this.fmt(reg.per_day_target, { precision: 2 })}</span>${actualHtml}`;
 							const pts = this.fmt(reg.points);
 							return `
 								<td class="${cls}">${pdt}</td>
@@ -354,8 +380,20 @@ class SmesTargetBasePage {
 			.join("");
 
 		const colSpan = 2 + regionKeys.length * 3;
+		const visitTotal = data.visit_total != null ? data.visit_total : 0;
+		const visitParts = (data.visit_breakdown || [])
+			.map(
+				(b) =>
+					`<span data-visit-metric="${frappe.utils.escape_html(b.metric || "visits")}">${frappe.utils.escape_html(b.type)} ${b.count}</span>`
+			)
+			.join(" + ");
 
 		return `
+			<div class="sme-break">
+				<strong data-visit-metric="visits">${__("Total visits")}: ${visitTotal}</strong>
+				${visitParts ? " = " + visitParts : ""}.
+				${__("This is every Field Visit type. Click Total, a type count, or any Act number to open those documents.")}
+			</div>
 			<div class="sme-sheet-wrap">
 				<table class="sme-sheet">
 					<tr><th colspan="${colSpan}" class="hdr-title">${frappe.utils.escape_html(data.foundation_title || "")}</th></tr>
@@ -378,7 +416,7 @@ class SmesTargetBasePage {
 				${__("Period")}: ${frappe.utils.escape_html(data.from_date || "")} — ${frappe.utils.escape_html(data.to_date || "")}
 				| ${frappe.utils.escape_html(data.staff_label || "")}
 				| ${__("KPI Sheet")}: <strong>${frappe.utils.escape_html(data.focus_region_label || "")}</strong>
-				| ${__("Act = Field Visit count in selected date range")}
+				| ${__("Act = Field Visit count in selected date range — click a number to open those documents")}
 			</p>
 		`;
 	}

@@ -74,7 +74,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Stock Report & Dashboard",
+   "label": "Supply Chain Dashboard",
    "link_count": 0,
    "link_to": "stock-detail",
    "link_type": "Page",
@@ -94,7 +94,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Courier Dispatch Report",
+   "label": "Dispatch & Courier Cost Report",
    "link_count": 0,
    "link_to": "dispatch-detail-report",
    "link_type": "Page",
@@ -104,7 +104,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "School Wise Dispatched Report",
+   "label": "Book Distribution Report",
    "link_count": 0,
    "link_to": "dispatch-report",
    "link_type": "Page",
@@ -114,7 +114,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "School Wise Book Dispatched",
+   "label": "City Wise Dispatched Report",
    "link_count": 0,
    "link_to": "school-wise-book-dispatched",
    "link_type": "Page",
@@ -145,16 +145,6 @@
    "label": "Material Request and Purchase Order",
    "link_count": 0,
    "link_to": "items-receiving-repo",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Book Purchase & Printing Dashboard",
-   "link_count": 0,
-   "link_to": "book-purchase-printing-dashboard",
    "link_type": "Page",
    "onboard": 0,
    "type": "Link"
@@ -595,7 +585,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-08-25 09:48:25.522271",
+ "modified": "2026-08-27 12:43:27.675994",
  "modified_by": "farhan.hussain@tif.edu.pk",
  "module": "Tif Customization",
  "name": "Reports",

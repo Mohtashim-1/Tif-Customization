@@ -11,6 +11,37 @@
 	background: var(--card-bg, #fff);
 	padding: 16px;
 	box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+	cursor: pointer;
+}
+.fsr-kpi:not([data-visit-metric]) {
+	cursor: default;
+}
+.fsr-kpi:hover {
+	box-shadow: 0 4px 14px rgba(15, 23, 42, 0.12);
+}
+.fsr-break-part,
+.fsr-breakdown [data-visit-metric] {
+	cursor: pointer;
+	text-decoration: underline;
+	color: #0f766e;
+}
+.fsr-break-part:hover,
+.fsr-breakdown [data-visit-metric]:hover {
+	color: #115e59;
+}
+.fsr-kpi__hint {
+	margin-top: 8px;
+	font-size: 11px;
+	color: #64748b;
+}
+.fsr-breakdown {
+	margin: 0 0 12px;
+	padding: 10px 12px;
+	background: #f8fafc;
+	border: 1px dashed #cbd5e1;
+	border-radius: 8px;
+	font-size: 13px;
+	color: #334155;
 }
 
 .fsr-kpi--primary { border-top-color: #2563eb; }
