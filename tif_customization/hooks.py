@@ -197,6 +197,9 @@ doc_events = {
     "Employee Attendance": {
         "validate": "tif_customization.tif_customization.doctype.employee_attendance.employee_attendance.validate_sat_attendance"
     },
+	"Employee Checkin": {
+		"before_insert": "tif_customization.tif_customization.overrides.employee_checkin.close_stale_open_checkin",
+	},
     "Purchase Receipt": {
         "on_submit": "tif_customization.tif_customization.doctype.purchase_receipt.purchase_receipt.on_submit"
     },
