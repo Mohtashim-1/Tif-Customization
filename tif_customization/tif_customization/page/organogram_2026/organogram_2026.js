@@ -186,6 +186,13 @@ frappe.tif_customization.Organogram2026 = class Organogram2026 {
 			.on("click", function () {
 				self.show_people($(this).attr("data-og-key") || "");
 			});
+		$(this.page.body)
+			.find(".og-scroll")
+			.off("scroll.ogwires")
+			.on("scroll.ogwires", () => {
+				clearTimeout(this._wire_t);
+				this._wire_t = setTimeout(() => this.draw_connectors(), 40);
+			});
 		requestAnimationFrame(() => {
 			this.draw_connectors();
 			setTimeout(() => this.draw_connectors(), 80);
@@ -250,15 +257,38 @@ frappe.tif_customization.Organogram2026 = class Organogram2026 {
 
 	anchor(el, canvas) {
 		const circle = el.querySelector(".og-circle") || el;
-		const er = circle.getBoundingClientRect();
-		const rr = canvas.getBoundingClientRect();
-		const sx = rr.width / (canvas.offsetWidth || rr.width || 1);
-		const sy = rr.height / (canvas.offsetHeight || rr.height || 1);
+		let x = 0;
+		let y = 0;
+		let n = circle;
+		while (n && n !== canvas) {
+			x += n.offsetLeft;
+			y += n.offsetTop;
+			n = n.offsetParent;
+		}
+		if (!n) {
+			const er = circle.getBoundingClientRect();
+			const rr = canvas.getBoundingClientRect();
+			const sx = rr.width / (canvas.offsetWidth || rr.width || 1);
+			const sy = rr.height / (canvas.offsetHeight || rr.height || 1);
+			return {
+				x: (er.left + er.width / 2 - rr.left) / sx,
+				top: (er.top - rr.top) / sy,
+				bottom: (er.bottom - rr.top) / sy,
+			};
+		}
 		return {
-			x: (er.left + er.width / 2 - rr.left) / sx,
-			top: (er.top - rr.top) / sy,
-			bottom: (er.bottom - rr.top) / sy,
+			x: x + circle.offsetWidth / 2,
+			top: y,
+			bottom: y + circle.offsetHeight,
 		};
+	}
+
+	parent_in_view(el) {
+		const scroller = $(this.page.body).find(".og-scroll").get(0);
+		if (!scroller) return true;
+		const er = el.getBoundingClientRect();
+		const sr = scroller.getBoundingClientRect();
+		return er.bottom > sr.top + 12 && er.top < sr.bottom - 8;
 	}
 
 	svg_line(svg, x1, y1, x2, y2) {
@@ -305,12 +335,14 @@ frappe.tif_customization.Organogram2026 = class Organogram2026 {
 		const canvas = $(this.page.body).find(".og-canvas").get(0);
 		if (!canvas || !this.data) return;
 		canvas.querySelectorAll("svg.og-wires").forEach((el) => el.remove());
+		const w = canvas.scrollWidth || canvas.offsetWidth;
+		const h = canvas.scrollHeight || canvas.offsetHeight;
 		const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
 		svg.setAttribute("class", "og-wires");
-		svg.setAttribute("width", String(canvas.offsetWidth || canvas.scrollWidth));
-		svg.setAttribute("height", String(canvas.offsetHeight || canvas.scrollHeight));
-		svg.style.cssText =
-			"position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:1;overflow:visible";
+		svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+		svg.setAttribute("width", String(w));
+		svg.setAttribute("height", String(h));
+		svg.style.cssText = `position:absolute;left:0;top:0;width:${w}px;height:${h}px;pointer-events:none;z-index:1;overflow:visible`;
 		canvas.appendChild(svg);
 
 		const map = {};
@@ -323,39 +355,82 @@ frappe.tif_customization.Organogram2026 = class Organogram2026 {
 			(groups[link.parent] ||= []).push(map[link.child]);
 		}
 		for (const pkey of Object.keys(groups)) {
-			this.draw_fork(svg, map[pkey], groups[pkey], canvas);
+			const parent_el = map[pkey];
+			if (!this.parent_in_view(parent_el)) continue;
+			this.draw_fork(svg, parent_el, groups[pkey], canvas);
 		}
+	}
+
+	emp_type_style(employment_type) {
+		const key = (employment_type || "").trim();
+		const palette = {
+			"Full Time -  (Permanent)": { bg: "#e8f5e9", border: "#2e7d32", text: "#1b5e20" },
+			"Part Time - (Permanent)": { bg: "#fce8e8", border: "#7f1d1d", text: "#7f1d1d" },
+			"Contract Base - (Fixed Salary)": { bg: "#fff3e0", border: "#ef6c00", text: "#e65100" },
+			"QPS - Contract Staff": { bg: "#fff8e1", border: "#ca8a04", text: "#854d0e" },
+			"TPS - Contract Staff": { bg: "#fff8e1", border: "#ca8a04", text: "#854d0e" },
+			"Teacher Training - Contract Staff": { bg: "#fff8e1", border: "#ca8a04", text: "#854d0e" },
+		};
+		if (palette[key]) return palette[key];
+		if (/part time/i.test(key)) return palette["Part Time - (Permanent)"];
+		if (/fixed salary|contract base/i.test(key)) return palette["Contract Base - (Fixed Salary)"];
+		if (/full time/i.test(key)) return palette["Full Time -  (Permanent)"];
+		return { bg: "#f8fafc", border: "#94a3b8", text: "#334155" };
+	}
+
+	child_report_count(key) {
+		return this.collect_links(this.data).filter((l) => l.parent === key).length;
+	}
+
+	person_card_html(p, reports) {
+		const name = frappe.utils.escape_html(p.name || "");
+		const desig = frappe.utils.escape_html(p.designation || "");
+		const dept = frappe.utils.escape_html(p.department || "");
+		const grade = frappe.utils.escape_html(p.grades || p.grade || "");
+		const emp = p.employment_type || "";
+		const st = this.emp_type_style(emp);
+		const initial = (p.name || "?").trim().charAt(0).toUpperCase();
+		const photo = p.image
+			? `<img src="${frappe.utils.escape_html(p.image)}" alt="">`
+			: `<span class="og-emp-fallback">${frappe.utils.escape_html(initial)}</span>`;
+		const href = `/app/employee/${encodeURIComponent(p.id)}`;
+		return `<a class="og-emp-card" href="${href}">
+			<div class="og-emp-photo">${photo}</div>
+			<div class="og-emp-name">${name}</div>
+			<div class="og-emp-title">${desig}</div>
+			<div class="og-emp-pills">
+				${grade ? `<span>${__("Grade")}: ${grade}</span>` : ""}
+				${dept ? `<span>${dept}</span>` : ""}
+			</div>
+			${reports > 0 ? `<div class="og-emp-reports">${reports} ${__("Reports")}</div>` : ""}
+			${emp ? `<span class="og-emp-type" style="background:${st.bg};color:${st.text};border-color:${st.border}">${frappe.utils.escape_html(emp)}</span>` : ""}
+		</a>`;
 	}
 
 	show_people(key) {
 		const node = this.find_node(this.data, key);
 		if (!node) return;
 		const people = node.people || [];
-		const rows = people.length
-			? people
-					.map(
-						(p) => `<tr>
-				<td><a href="/app/employee/${encodeURIComponent(p.id)}">${frappe.utils.escape_html(p.name)}</a></td>
-				<td>${frappe.utils.escape_html(p.designation || "")}</td>
-				<td>${frappe.utils.escape_html(p.employment_type || "")}</td>
-				<td>${frappe.utils.escape_html(p.department || "")}</td>
-			</tr>`
-					)
-					.join("")
-			: `<tr><td colspan="4" class="text-muted">${__("No active employee matched this role yet.")}</td></tr>`;
+		const reports = this.child_report_count(key);
+		const body = people.length
+			? `<div class="og-card-grid">${people
+					.map((p) => this.person_card_html(p, people.length === 1 ? reports : 0))
+					.join("")}</div>`
+			: `<div class="og-emp-empty">${__("No active employee matched this role yet.")}</div>`;
 		const d = new frappe.ui.Dialog({
 			title: (node.title || "").replace(/\n/g, " "),
-			size: "large",
+			size: people.length > 2 ? "extra-large" : "large",
 			fields: [{ fieldtype: "HTML", fieldname: "html" }],
 			primary_action_label: __("Close"),
 			primary_action: () => d.hide(),
 		});
+		d.$wrapper.addClass("og-staff-dialog");
 		d.fields_dict.html.$wrapper.html(`
-			<p class="text-muted">${people.length} ${__("active staff")}</p>
-			<table class="table table-bordered" style="font-size:13px">
-				<thead><tr><th>${__("Name")}</th><th>${__("Designation")}</th><th>${__("Employment Type")}</th><th>${__("Department")}</th></tr></thead>
-				<tbody>${rows}</tbody>
-			</table>
+			<div class="og-dialog-lead">
+				<span>${people.length} ${__("active staff")}</span>
+				${reports ? `<span>· ${reports} ${__("reporting lines below")}</span>` : ""}
+			</div>
+			${body}
 		`);
 		d.show();
 	}
@@ -433,6 +508,20 @@ frappe.tif_customization.Organogram2026 = class Organogram2026 {
 			.og-contract_fix .og-circle,.og-swatch.og-contract_fix{border-color:#ea580c;color:#ea580c}
 			.og-board .og-circle,.og-swatch.og-board{border-color:#15803d;color:#15803d}
 			.og-node:hover .og-circle{transform:scale(1.06)}
+			.og-dialog-lead{font-size:12px;color:#64748b;margin:0 0 14px}
+			.og-card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(188px,1fr));gap:14px}
+			.og-emp-card{display:flex;flex-direction:column;align-items:center;text-align:center;text-decoration:none;color:inherit;background:#f4fbf6;border:2px solid #4ade80;border-radius:14px;padding:16px 12px 14px;box-shadow:0 2px 8px rgba(15,23,42,.06);transition:transform .15s,box-shadow .15s}
+			.og-emp-card:hover{transform:translateY(-2px);box-shadow:0 8px 18px rgba(15,23,42,.12);color:inherit}
+			.og-emp-photo img,.og-emp-fallback{width:64px;height:64px;border-radius:50%;object-fit:cover;display:block;margin:0 auto 10px}
+			.og-emp-fallback{background:#0d6efd;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:22px}
+			.og-emp-name{font-size:14px;font-weight:800;color:#0f172a;line-height:1.25}
+			.og-emp-title{font-size:12px;color:#64748b;margin:3px 0 8px;line-height:1.3}
+			.og-emp-pills{display:flex;flex-direction:column;align-items:center;gap:5px;width:100%;margin-bottom:8px}
+			.og-emp-pills span{font-size:11px;color:#475569;background:#fff;border:1px solid #e2e8f0;border-radius:999px;padding:3px 10px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+			.og-emp-reports{font-size:12px;font-weight:700;color:#2563eb;margin:2px 0 8px}
+			.og-emp-type{display:inline-block;font-size:11px;font-weight:700;border:1.5px solid;border-radius:999px;padding:4px 10px;line-height:1.2;max-width:100%}
+			.og-emp-empty{padding:28px 12px;text-align:center;color:#64748b;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:12px}
+			.og-staff-dialog .modal-body{background:#f8fafc}
 			@media print{
 				@page{size:A3 landscape;margin:8mm}
 				.page-head,.og-toolbar{display:none!important}

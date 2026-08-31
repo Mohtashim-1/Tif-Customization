@@ -24,20 +24,25 @@ def get_organogram():
 	if not frappe.has_permission("Employee", "read"):
 		frappe.throw(_("You are not permitted to view Employee data."))
 
+	fields = [
+		"name",
+		"employee_name",
+		"designation",
+		"gender",
+		"employment_type",
+		"department",
+		"image",
+		"cell_number",
+		"company_email",
+		"grade",
+	]
+	if frappe.db.has_column("Employee", "grades"):
+		fields.append("grades")
+
 	rows = frappe.get_all(
 		"Employee",
 		filters={"status": "Active"},
-		fields=[
-			"name",
-			"employee_name",
-			"designation",
-			"gender",
-			"employment_type",
-			"department",
-			"image",
-			"cell_number",
-			"company_email",
-		],
+		fields=fields,
 		order_by="employee_name asc",
 	)
 	by_desig = {}
@@ -607,6 +612,8 @@ def _person(row):
 		"gender": row.gender,
 		"employment_type": row.employment_type,
 		"department": row.department,
+		"grade": getattr(row, "grade", None),
+		"grades": getattr(row, "grades", None),
 		"image": row.image,
 		"cell_number": row.cell_number,
 		"company_email": row.company_email,
