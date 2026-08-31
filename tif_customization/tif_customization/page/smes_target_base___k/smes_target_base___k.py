@@ -369,7 +369,7 @@ def _visit_date_expr(type_field):
 	return "COALESCE(modified, creation)"
 
 
-def _count_actuals(from_date, to_date, staff, staff_tokens=None):
+def _count_actuals(from_date, to_date, staff, staff_tokens=None, submitted_only=False):
 	tokens = staff_tokens or ([staff] if staff else [])
 	staff_params = {
 		"from_date": from_date,
@@ -384,12 +384,14 @@ def _count_actuals(from_date, to_date, staff, staff_tokens=None):
 
 	visit_day = visit_day_sql("fv")
 	staff_match = staff_match_sql("fv", "staff_tokens") if staff else "AND 1=1"
+	ds = "docstatus = 1" if submitted_only else "docstatus < 2"
+	ds_fv = f"fv.{ds}"
 
 	# Same universe as Field Staff Report: every Field Visit in the date range.
 	counts["visits"] = _scalar_count(
 		f"""
 		SELECT COUNT(*) FROM `tabField Visit` fv
-		WHERE fv.docstatus < 2
+		WHERE {ds_fv}
 		AND {visit_day} BETWEEN %(from_date)s AND %(to_date)s
 		{"AND " + staff_match if staff else ""}
 		""",
@@ -399,7 +401,7 @@ def _count_actuals(from_date, to_date, staff, staff_tokens=None):
 	counts["half_day_workshop"] = _scalar_count(
 		f"""
 		SELECT COUNT(*) FROM `tabField Visit`
-		WHERE docstatus < 2 AND type = 'Training'
+		WHERE {ds} AND type = 'Training'
 		AND {_visit_date_expr('Training')} BETWEEN %(from_date)s AND %(to_date)s
 		AND LOWER(COALESCE(training_session_category, '')) LIKE '%%half%%'
 		{staff_sql}
@@ -410,7 +412,7 @@ def _count_actuals(from_date, to_date, staff, staff_tokens=None):
 	counts["full_day_session"] = _scalar_count(
 		f"""
 		SELECT COUNT(*) FROM `tabField Visit`
-		WHERE docstatus < 2 AND type = 'Training'
+		WHERE {ds} AND type = 'Training'
 		AND {_visit_date_expr('Training')} BETWEEN %(from_date)s AND %(to_date)s
 		AND LOWER(COALESCE(training_session_category, '')) NOT LIKE '%%half%%'
 		{staff_sql}
@@ -421,7 +423,7 @@ def _count_actuals(from_date, to_date, staff, staff_tokens=None):
 	counts["meeting_ulama"] = _scalar_count(
 		f"""
 		SELECT COUNT(*) FROM `tabField Visit`
-		WHERE docstatus < 2 AND type = 'Marketing'
+		WHERE {ds} AND type = 'Marketing'
 		AND {_visit_date_expr('Marketing')} BETWEEN %(from_date)s AND %(to_date)s
 		AND (
 			LOWER(COALESCE(meeting_with, '')) LIKE '%%ulama%%'
@@ -436,7 +438,7 @@ def _count_actuals(from_date, to_date, staff, staff_tokens=None):
 	counts["teachers_training_meeting"] = _scalar_count(
 		f"""
 		SELECT COUNT(*) FROM `tabField Visit`
-		WHERE docstatus < 2 AND type = 'M&E'
+		WHERE {ds} AND type = 'M&E'
 		AND {_visit_date_expr('M&E')} BETWEEN %(from_date)s AND %(to_date)s
 		AND COALESCE(me_teachers_training_session, 0) = 1
 		{staff_sql}
@@ -447,7 +449,7 @@ def _count_actuals(from_date, to_date, staff, staff_tokens=None):
 	counts["headoffice_visit"] = _scalar_count(
 		f"""
 		SELECT COUNT(*) FROM `tabField Visit`
-		WHERE docstatus < 2
+		WHERE {ds}
 		AND (
 			(type = 'Marketing' AND {_visit_date_expr('Marketing')} BETWEEN %(from_date)s AND %(to_date)s)
 			OR (type = 'M&E' AND {_visit_date_expr('M&E')} BETWEEN %(from_date)s AND %(to_date)s)
@@ -466,7 +468,7 @@ def _count_actuals(from_date, to_date, staff, staff_tokens=None):
 	counts["academic_task"] = _scalar_count(
 		f"""
 		SELECT COUNT(*) FROM `tabField Visit` fv
-		WHERE fv.docstatus < 2
+		WHERE {ds_fv}
 		AND fv.type IN ('Other', 'Academic / Other Official Tasks')
 		AND {visit_day} BETWEEN %(from_date)s AND %(to_date)s
 		{"AND " + staff_match if staff else ""}
@@ -479,7 +481,7 @@ def _count_actuals(from_date, to_date, staff, staff_tokens=None):
 	counts["new_school_registration"] = _scalar_count(
 		f"""
 		SELECT COUNT(*) FROM `tabField Visit`
-		WHERE docstatus < 2 AND type = 'Marketing'
+		WHERE {ds} AND type = 'Marketing'
 		AND marketing_visit_category = 'New'
 		AND {_visit_date_expr('Marketing')} BETWEEN %(from_date)s AND %(to_date)s
 		{staff_sql}
@@ -491,7 +493,7 @@ def _count_actuals(from_date, to_date, staff, staff_tokens=None):
 		f"""
 		SELECT COALESCE(SUM(COALESCE(training_no_of_participants, 0)), 0)
 		FROM `tabField Visit`
-		WHERE docstatus < 2 AND type = 'Training'
+		WHERE {ds} AND type = 'Training'
 		AND {_visit_date_expr('Training')} BETWEEN %(from_date)s AND %(to_date)s
 		{staff_sql}
 		""",
@@ -501,7 +503,7 @@ def _count_actuals(from_date, to_date, staff, staff_tokens=None):
 	counts["co_curricular"] = _scalar_count(
 		f"""
 		SELECT COUNT(*) FROM `tabField Visit`
-		WHERE docstatus < 2 AND type = 'Marketing'
+		WHERE {ds} AND type = 'Marketing'
 		AND marketing_visit_category = 'TPS Visits'
 		AND {_visit_date_expr('Marketing')} BETWEEN %(from_date)s AND %(to_date)s
 		{staff_sql}

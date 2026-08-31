@@ -198,8 +198,10 @@ def get_visit_drilldown(filters=None, metric=None, staff=None):
 		frappe.throw(_("From Date cannot be after To Date."))
 
 	visit_day = visit_day_sql("fv")
+	submitted_only = cint(filters.get("submitted_only") or filters.get("submitted") or 0)
+	docstatus_sql = "fv.docstatus = 1" if submitted_only else "fv.docstatus < 2"
 	conditions = [
-		"fv.docstatus < 2",
+		docstatus_sql,
 		f"{visit_day} BETWEEN %(from_date)s AND %(to_date)s",
 		_metric_condition(metric, "fv"),
 	]

@@ -15,6 +15,7 @@ from frappe.utils import cint, flt, getdate
 from tif_customization.tif_customization.field_visit_permissions import (
 	_name_variants,
 	can_view_all_field_visits,
+	expand_staff_tokens,
 	get_team_employee_rows,
 	get_team_match_values,
 	visit_day_sql as _visit_day_sql,
@@ -34,6 +35,19 @@ SME_DESIGNATION = "School Marketing Executive"
 
 # Activity types that roll into the summary columns / visited days
 SUMMARY_TYPES = ("Marketing", "Meeting", "M&E", "Training")
+
+# Target Base KPI counts shown as extra columns (click-through uses `metric`)
+KPI_COLUMNS = (
+	{"key": "visits", "label": "Total Visits", "metric": "visits"},
+	{"key": "half_day_workshop", "label": "Half Day WS", "metric": "half_day_workshop"},
+	{"key": "full_day_session", "label": "Full Day Session", "metric": "full_day_session"},
+	{"key": "meeting_ulama", "label": "Ulama / Educationist", "metric": "meeting_ulama"},
+	{"key": "teachers_training_meeting", "label": "Teachers Training", "metric": "teachers_training_meeting"},
+	{"key": "headoffice_visit", "label": "Head / Regional Office", "metric": "headoffice_visit"},
+	{"key": "academic_task", "label": "Academic", "metric": "academic_task"},
+	{"key": "co_curricular", "label": "Co-curricular", "metric": "co_curricular"},	
+)
+KPI_KEYS = tuple(c["key"] for c in KPI_COLUMNS)
 
 
 @frappe.whitelist()
@@ -77,9 +91,11 @@ def get_report_data(filters=None):
 
 		staff_region = _staff_region(staff) or region
 		staff_expected = expected_points_by_region.get(staff_region) or default_expected
-		score_points, score_pct = _compute_score(
+		earned_points, score_pct, actuals = _compute_score(
 			staff, from_date, to_date, staff_region, staff_expected, stats
 		)
+		per_day = REGION_SUMMARY.get(staff_region, REGION_SUMMARY["karachi"])["per_day_target_points"]
+		breakdown = _points_breakdown(actuals, staff_region)
 
 		row = {
 			"employee": staff.get("employee"),
@@ -100,11 +116,18 @@ def get_report_data(filters=None):
 			"expenses": expense_amt,
 			"visited_days": visited_days,
 			"difference": difference,
-			# Score column = KPI achievement % (raw points kept for export/tooltip)
+			"total_points": flt(staff_expected, 2),
+			"earned_points": flt(earned_points, 2),
+			"percentage": flt(score_pct, 2),
 			"score": score_pct,
-			"score_points": score_points,
-			"score_pct": score_pct,
+			"score_points": flt(earned_points, 2),
+			"score_pct": flt(score_pct, 2),
+			"working_days": working_days,
+			"per_day_points": per_day,
+			"points_breakdown": breakdown,
 		}
+		for col in KPI_COLUMNS:
+			row[col["key"]] = cint(actuals.get(col["key"]) or 0)
 		rows.append(row)
 		for k in (
 			"followup",
@@ -118,21 +141,32 @@ def get_report_data(filters=None):
 			"expenses",
 			"visited_days",
 			"difference",
+			"total_points",
+			"earned_points",
 			"score",
 			"score_points",
+			*KPI_KEYS,
 		):
 			totals[k] += flt(row.get(k) or 0)
 
 	rows.sort(key=lambda r: (r.get("employee_name") or "").lower())
 
-	n = len(rows) or 1
+	money_or_points = ("expenses", "score_points", "total_points", "earned_points")
 	totals_out = {
-		k: (flt(v, 2) if k in ("expenses", "score_points") else cint(v))
+		k: (flt(v, 2) if k in money_or_points else cint(v))
 		for k, v in totals.items()
 		if k not in ("score",)
 	}
-	# Footer Score % = average achievement across SMEs (not sum)
-	totals_out["score"] = flt(totals.get("score", 0) / n, 2)
+	# Footer % = overall earned ÷ expected (not a sum of percents)
+	totals_out["percentage"] = flt(
+		(totals.get("earned_points", 0) / totals.get("total_points", 0) * 100)
+		if totals.get("total_points")
+		else 0,
+		2,
+	)
+	totals_out["score"] = totals_out["percentage"]
+	totals_out["points_breakdown"] = _sum_points_breakdown(rows)
+	totals_out["working_days"] = working_days
 
 	return {
 		"from_date": str(from_date),
@@ -141,8 +175,32 @@ def get_report_data(filters=None):
 		"region": region,
 		"region_label": REGION_LABELS.get(region, region),
 		"expected_points": flt(default_expected, 2),
+		"points_guide": [
+			{
+				"key": rk,
+				"label": REGION_LABELS[rk],
+				"per_day": REGION_SUMMARY[rk]["per_day_target_points"],
+			}
+			for rk in REGION_KEYS
+		],
 		"rows": rows,
 		"totals": totals_out,
+		"kpi_columns": list(KPI_COLUMNS),
+		"kpis": {
+			"visits": cint(totals.get("visits") or 0),
+			"marketing": cint(totals.get("followup") or 0) + cint(totals.get("new") or 0),
+			"meetings": cint(totals.get("meetings") or 0),
+			"me": cint(totals.get("active") or 0) + cint(totals.get("inactive") or 0),
+			"training": cint(totals.get("half_day_workshop") or 0)
+			+ cint(totals.get("full_day_session") or 0),
+			"academic": cint(totals.get("academic_task") or 0),
+			"ulama": cint(totals.get("meeting_ulama") or 0),
+			"teachers_training": cint(totals.get("teachers_training_meeting") or 0),
+			"total_points": flt(totals.get("total_points") or 0, 2),
+			"earned_points": flt(totals.get("earned_points") or 0, 2),
+			"percentage": totals_out["percentage"],
+			"sme_count": len(rows),
+		},
 		"regions": [{"key": rk, "label": REGION_LABELS[rk]} for rk in REGION_KEYS],
 	}
 
@@ -181,7 +239,7 @@ def _weekday_count(from_date, to_date):
 
 
 def _get_sme_staff(filters):
-	"""Active SMEs; field leads only see their team."""
+	"""Active SMEs plus Active Field Officers (so all rostered officers appear)."""
 	employee_filter = (filters.get("employee") or "").strip() or None
 	rows = frappe.get_all(
 		"Employee",
@@ -189,6 +247,36 @@ def _get_sme_staff(filters):
 		fields=["name", "employee_name", "user_id", "department"],
 		order_by="employee_name asc",
 	)
+	seen = {r.name for r in rows}
+
+	if frappe.db.exists("DocType", "Field Officer"):
+		for fo in frappe.get_all(
+			"Field Officer",
+			filters={"status": "Active"},
+			fields=["employee", "user", "name1"],
+		):
+			emp_name = fo.employee
+			if emp_name and emp_name in seen:
+				continue
+			emp = None
+			if emp_name:
+				emp = frappe.db.get_value(
+					"Employee",
+					emp_name,
+					["name", "employee_name", "user_id", "department", "status"],
+					as_dict=True,
+				)
+			if not emp and fo.user:
+				emp = frappe.db.get_value(
+					"Employee",
+					{"user_id": fo.user},
+					["name", "employee_name", "user_id", "department", "status"],
+					as_dict=True,
+				)
+			if not emp or emp.status != "Active" or emp.name in seen:
+				continue
+			rows.append(emp)
+			seen.add(emp.name)
 
 	if not can_view_all_field_visits():
 		allowed = {e.get("name") for e in get_team_employee_rows(include_self=True)}
@@ -315,7 +403,7 @@ def _load_visit_stats(from_date, to_date, staff_rows):
 			COALESCE(fv.training_no_of_participants, 0) AS participants,
 			{visit_day} AS visit_day
 		FROM `tabField Visit` fv
-		WHERE fv.docstatus < 2
+		WHERE fv.docstatus = 1
 		AND fv.type IN %(types)s
 		AND {visit_day} IS NOT NULL
 		AND {visit_day} BETWEEN %(from_date)s AND %(to_date)s
@@ -452,10 +540,19 @@ def _compute_score(staff, from_date, to_date, region, expected_points, stats):
 	training sessions (not sum of participants) so one large session cannot inflate
 	Score to thousands of points / >1000%.
 	"""
-	staff_token = staff.get("user_id") or staff.get("employee_name") or ""
-	actuals = _count_actuals(from_date, to_date, staff_token) if staff_token else {}
-	if not any(actuals.values()) and staff.get("employee_name") and staff.get("employee_name") != staff_token:
-		actuals = _count_actuals(from_date, to_date, staff["employee_name"])
+	staff_token = staff.get("user_id") or staff.get("employee_name") or staff.get("employee") or ""
+	tokens = set(staff.get("match_values") or [])
+	# One expand is enough: user_id/name lookup adds email + dotted name variants.
+	tokens.update(expand_staff_tokens(staff_token))
+	if not staff_token and tokens:
+		staff_token = next(iter(tokens))
+	actuals = (
+		_count_actuals(
+			from_date, to_date, staff_token, staff_tokens=list(tokens), submitted_only=True
+		)
+		if staff_token
+		else {}
+	)
 
 	# Correct workshop_registration: count sessions attributed to this SME, not heads
 	actuals["workshop_registration"] = cint((stats or {}).get("trainings") or 0)
@@ -467,4 +564,44 @@ def _compute_score(staff, from_date, to_date, region, expected_points, stats):
 		score += flt(actuals.get(activity["metric"], 0)) * points
 
 	pct = (score / expected_points * 100) if expected_points else 0
-	return flt(score, 2), flt(pct, 2)
+	return flt(score, 2), flt(pct, 2), actuals
+
+
+def _points_breakdown(actuals, region):
+	"""One line per Target Base KPI: actual × region points = earned."""
+	lines = []
+	for activity in KPI_ACTIVITIES:
+		cfg = (activity.get("targets") or {}).get(region) or {}
+		points = _points_for_scoring(cfg)
+		actual = flt(actuals.get(activity["metric"], 0))
+		lines.append(
+			{
+				"key": activity["key"],
+				"label": activity["label"],
+				"metric": activity["metric"],
+				"actual": flt(actual, 2),
+				"points": flt(points, 2),
+				"earned": flt(actual * points, 2),
+			}
+		)
+	return lines
+
+
+def _sum_points_breakdown(rows):
+	agg = {}
+	for row in rows:
+		for line in row.get("points_breakdown") or []:
+			bucket = agg.setdefault(
+				line["key"],
+				{
+					"key": line["key"],
+					"label": line["label"],
+					"metric": line["metric"],
+					"actual": 0.0,
+					"earned": 0.0,
+					"points": None,
+				},
+			)
+			bucket["actual"] = flt(bucket["actual"] + flt(line.get("actual") or 0), 2)
+			bucket["earned"] = flt(bucket["earned"] + flt(line.get("earned") or 0), 2)
+	return list(agg.values())
