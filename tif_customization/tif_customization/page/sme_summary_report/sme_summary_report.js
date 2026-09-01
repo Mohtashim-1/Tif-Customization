@@ -73,8 +73,7 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 					.sme-sum-kpi--training{border-top-color:#ea580c}
 					.sme-sum-kpi--academic{border-top-color:#64748b}
 					.sme-sum-kpi--ulama{border-top-color:#0891b2}
-					.sme-sum-kpi--points{border-top-color:#2563eb}
-					.sme-sum-kpi--pct{border-top-color:#059669}
+					.sme-sum-kpi--school{border-top-color:#0f766e}
 					@media print{
 						.page-head,.layout-side-section,.sme-sum-filters{display:none!important}
 						.sme-sum-table{font-size:10px}
@@ -267,8 +266,12 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 			[__("Training"), this.fmt(k.training), "training", "training"],
 			[__("Academic"), this.fmt(k.academic), "academic", "academic_task"],
 			[__("Ulama / Educationist"), this.fmt(k.ulama), "ulama", "meeting_ulama"],
-			[__("Total Earned Points"), this.fmt_score(k.earned_points), "points", "", "earned"],
-			[__("Achievement"), this.fmt_pct(k.percentage), "pct", "", "pct"],
+			[
+				__("School Visit"),
+				this.fmt(k.school_visits != null ? k.school_visits : flt(k.marketing) + flt(k.me)),
+				"school",
+				"school_visits",
+			],
 		];
 		return `<div class="sme-sum-kpis">${cards
 			.map(

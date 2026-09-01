@@ -196,6 +196,10 @@ def get_report_data(filters=None):
 			"academic": cint(totals.get("academic_task") or 0),
 			"ulama": cint(totals.get("meeting_ulama") or 0),
 			"teachers_training": cint(totals.get("teachers_training_meeting") or 0),
+			"school_visits": cint(totals.get("followup") or 0)
+			+ cint(totals.get("new") or 0)
+			+ cint(totals.get("active") or 0)
+			+ cint(totals.get("inactive") or 0),
 			"total_points": flt(totals.get("total_points") or 0, 2),
 			"earned_points": flt(totals.get("earned_points") or 0, 2),
 			"percentage": totals_out["percentage"],

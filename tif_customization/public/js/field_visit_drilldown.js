@@ -13,7 +13,13 @@ frappe.tif_customization.open_visit_drilldown = function (opts) {
 	frappe.call({
 		method: "tif_customization.tif_customization.api.field_visit_drilldown.get_visit_drilldown",
 		args: {
-			filters: { from_date, to_date, staff, metric },
+			filters: {
+				from_date,
+				to_date,
+				staff,
+				metric,
+				submitted_only: opts.submitted_only || opts.submitted || 0,
+			},
 			metric,
 			staff,
 		},
@@ -101,6 +107,7 @@ frappe.tif_customization.bind_clickable_numbers = function ($root, get_ctx) {
 			to_date: ctx.to_date,
 			staff: staff || ctx.staff || ctx.user || ctx.employee || "",
 			metric,
+			submitted_only: ctx.submitted_only || ctx.submitted || 0,
 		});
 	});
 };
