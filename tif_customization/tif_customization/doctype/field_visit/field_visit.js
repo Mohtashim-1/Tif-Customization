@@ -41,7 +41,9 @@ function apply_field_visit_logic(frm) {
 		"school_name",
 		"meeting_with",
 		"designation",
+		"designation_other",
 		"contact_number",
+		"school_contacts",
 		"marketing_material_provided",
 		"reference",
 		"status",
@@ -58,10 +60,11 @@ function apply_field_visit_logic(frm) {
 		"qps_affiliated",
 		"tps_affiliated",
 		"cee_affiliated",
+		"designation_other",
+		"school_contacts",
 		"section_break_qps_services",
 		"qps_mqh_books",
 		"qps_mqh_teachers_guides",
-		"qps_meeting_educationalist",
 		"qps_onsite_training",
 		"qps_online_training",
 		"qps_registration_lms",
@@ -73,14 +76,13 @@ function apply_field_visit_logic(frm) {
 		"tps_1_day_tajweed_females",
 		"tps_ttc_tajweed_khi",
 		"tps_tajweed_customize",
+		"tps_noorani_qaida_workbook_khi",
+		"tps_tajweed_workshop_kids_khi",
 		"section_break_cee_services",
 		"cee_elp",
 		"cee_tecc_foundation",
 		"cee_tecc_professional",
 		"cee_one_day_workshop",
-		"section_break_participants",
-		"participant_names_enrolled",
-		"participant_contact_numbers",
 		"model_school",
 		"registered_volunteer",
 		"section_break_volunteers",
@@ -127,6 +129,18 @@ function apply_field_visit_logic(frm) {
 		"me_class_duration",
 		"me_took_assessment",
 		"me_student_behavior_changes",
+		"section_break_nazra",
+		"me_nazra_quran_status",
+		"me_nazra_demand_from_school",
+		"me_nazra_tajweed_training",
+		"me_nazra_teachers_count",
+		"me_nazra_teachers_other",
+		"me_nazra_used_teachers_guide",
+		"me_nazra_book_taught",
+		"me_nazra_classes_per_week",
+		"me_nazra_class_duration",
+		"me_nazra_took_assessment",
+		"me_nazra_tajweed_changes",
 		"me_assessment_taken_from",
 		"me_assessment_from_multi",
 		"me_changes_made",
@@ -150,6 +164,8 @@ function apply_field_visit_logic(frm) {
 		"training_month",
 		"training_quarter",
 		"training_session_category",
+		"training_workshop_topic",
+		"training_mode",
 		"training_school_category",
 		"training_date",
 		"training_trainer_name",
@@ -161,6 +177,7 @@ function apply_field_visit_logic(frm) {
 		"training_no_of_schools_attended",
 		"training_arrange_by",
 		"training_conducted_by",
+		"training_conducted_by_other",
 		"section_break_attendees",
 		"training_attendees",
 	];
@@ -281,7 +298,9 @@ function apply_field_visit_logic(frm) {
 				"school_name",
 				"meeting_with",
 				"designation",
+				"designation_other",
 				"contact_number",
+				"school_contacts",
 				"school_type",
 				"reference",
 			],
@@ -322,6 +341,57 @@ function apply_field_visit_logic(frm) {
 	if (SCHOOL_TYPES.includes(type)) {
 		set_hidden(frm, school_fields, false);
 		set_hidden(frm, attachment_fields, false);
+		if (type === "Training") {
+			set_hidden(
+				frm,
+				[
+					"school_additional_remarks",
+					"qps_affiliated",
+					"tps_affiliated",
+					"cee_affiliated",
+					"section_break_qps_services",
+					"qps_mqh_books",
+					"qps_mqh_teachers_guides",
+					"qps_onsite_training",
+					"qps_online_training",
+					"qps_registration_lms",
+					"qps_50_days_syllabus",
+					"qps_mqh_quiz",
+					"section_break_tps_services",
+					"tps_noorani_qaida",
+					"tps_noorani_qaida_guide",
+					"tps_1_day_tajweed_females",
+					"tps_ttc_tajweed_khi",
+					"tps_tajweed_customize",
+					"tps_noorani_qaida_workbook_khi",
+					"tps_tajweed_workshop_kids_khi",
+					"section_break_cee_services",
+					"cee_elp",
+					"cee_tecc_foundation",
+					"cee_tecc_professional",
+					"cee_one_day_workshop",
+					"model_school",
+					"registered_volunteer",
+					"section_break_volunteers",
+					"volunteer_enrolments",
+				],
+				true,
+			);
+			set_hidden(
+				frm,
+				[
+					"school_name",
+					"meeting_with",
+					"designation",
+					"designation_other",
+					"contact_number",
+					"school_contacts",
+					"school_address",
+					"section_break_school_detail",
+				],
+				false,
+			);
+		}
 	} else if (type) {
 		// Meetings / Academic / Co-curricular / Enrolment / Workshop still get attachments
 		set_hidden(frm, attachment_fields, false);
@@ -352,6 +422,16 @@ function apply_field_visit_logic(frm) {
 		frm,
 		["me_teachers_mqh_other"],
 		!(type === "M&E" && frm.doc.me_number_of_teachers_mqh === "Others"),
+	);
+	set_hidden(
+		frm,
+		["me_nazra_teachers_other"],
+		!(type === "M&E" && frm.doc.me_nazra_teachers_count === "Others"),
+	);
+	set_hidden(
+		frm,
+		["training_conducted_by_other"],
+		!(type === "Training" && frm.doc.training_conducted_by === "Other"),
 	);
 
 	// M&E: assessment from
@@ -416,7 +496,7 @@ function apply_field_visit_logic(frm) {
 	set_hidden(frm, ["ot_visit_meeting_detail"], !is_visit_task);
 
 	// School affiliation service matrices
-	const show_school = SCHOOL_TYPES.includes(type);
+	const show_school = SCHOOL_TYPES.includes(type) && type !== "Training";
 	const show_qps = show_school && is_affiliated_yes(frm.doc.qps_affiliated);
 	const show_tps = show_school && is_affiliated_yes(frm.doc.tps_affiliated);
 	const show_cee = show_school && is_affiliated_yes(frm.doc.cee_affiliated);
@@ -427,7 +507,6 @@ function apply_field_visit_logic(frm) {
 			"section_break_qps_services",
 			"qps_mqh_books",
 			"qps_mqh_teachers_guides",
-			"qps_meeting_educationalist",
 			"qps_onsite_training",
 			"qps_online_training",
 			"qps_registration_lms",
@@ -445,6 +524,8 @@ function apply_field_visit_logic(frm) {
 			"tps_1_day_tajweed_females",
 			"tps_ttc_tajweed_khi",
 			"tps_tajweed_customize",
+			"tps_noorani_qaida_workbook_khi",
+			"tps_tajweed_workshop_kids_khi",
 		],
 		!show_tps,
 	);
@@ -458,6 +539,17 @@ function apply_field_visit_logic(frm) {
 			"cee_one_day_workshop",
 		],
 		!show_cee,
+	);
+	set_hidden(
+		frm,
+		[
+			"qps_meeting_educationalist",
+			"section_break_participants",
+			"participant_names_enrolled",
+			"column_break_part",
+			"participant_contact_numbers",
+		],
+		true,
 	);
 }
 
@@ -797,11 +889,12 @@ frappe.ui.form.on("Field Visit", {
 	me_mqh_book_status: apply_field_visit_logic,
 	me_activity_status: apply_field_visit_logic,
 	me_number_of_teachers_mqh: apply_field_visit_logic,
+	me_nazra_teachers_count: apply_field_visit_logic,
 	me_took_assessment: apply_field_visit_logic,
 	me_changes_made: apply_field_visit_logic,
 	mt_meeting_type: apply_field_visit_logic,
 	ot_type_of_task: apply_field_visit_logic,
-	ot_academic_task_types: apply_field_visit_logic,
+	training_conducted_by: apply_field_visit_logic,
 
 	volunteer_enrolments_add(frm, cdt, cdn) {
 		const row = locals[cdt][cdn];

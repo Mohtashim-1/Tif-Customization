@@ -15,6 +15,8 @@
   "training_month",
   "training_quarter",
   "training_session_category",
+  "training_workshop_topic",
+  "training_mode",
   "column_break_gwcl",
   "training_school_category",
   "training_date",
@@ -57,6 +59,18 @@
   "me_class_duration",
   "me_took_assessment",
   "me_student_behavior_changes",
+  "section_break_nazra",
+  "me_nazra_quran_status",
+  "me_nazra_demand_from_school",
+  "me_nazra_tajweed_training",
+  "me_nazra_teachers_count",
+  "me_nazra_teachers_other",
+  "me_nazra_used_teachers_guide",
+  "me_nazra_book_taught",
+  "me_nazra_classes_per_week",
+  "me_nazra_class_duration",
+  "me_nazra_took_assessment",
+  "me_nazra_tajweed_changes",
   "me_changes_made",
   "me_details_of_changes_made",
   "column_break_vwur",
@@ -104,6 +118,8 @@
   "column_break_tps",
   "tps_ttc_tajweed_khi",
   "tps_tajweed_customize",
+  "tps_noorani_qaida_workbook_khi",
+  "tps_tajweed_workshop_kids_khi",
   "section_break_cee_services",
   "cee_elp",
   "cee_tecc_foundation",
@@ -137,7 +153,9 @@
   "school_name",
   "meeting_with",
   "designation",
+  "designation_other",
   "contact_number",
+  "school_contacts",
   "marketing_material_provided",
   "reference",
   "section_break_meeting",
@@ -178,6 +196,7 @@
   "joint_sme_skill_rating",
   "training_arrange_by",
   "training_conducted_by",
+  "training_conducted_by_other",
   "mt_meeting_type",
   "mt_meeting_mode",
   "mt_internal_meeting_with",
@@ -256,7 +275,19 @@
    "fieldname": "training_session_category",
    "fieldtype": "Select",
    "label": "Training Category",
-   "options": "\nFull Day Session\nHalf Day Workshop\nTeachers Training Meeting (One to One)\nAwareness Session"
+   "options": "\nFull Day Session\nHalf Day Workshop\nTeachers Training Meeting (One to One)"
+  },
+  {
+   "depends_on": "eval:doc.type == 'Training'",
+   "fieldname": "training_workshop_topic",
+   "fieldtype": "Small Text",
+   "label": "Training and Workshop Topics"
+  },
+  {
+   "depends_on": "eval:doc.type == 'Training'",
+   "fieldname": "training_mode",
+   "fieldtype": "Small Text",
+   "label": "Training Mode"
   },
   {
    "depends_on": "eval:doc.type == 'Training'",
@@ -504,6 +535,78 @@
   },
   {
    "depends_on": "eval:doc.type == 'M&E'",
+   "fieldname": "section_break_nazra",
+   "fieldtype": "Section Break",
+   "label": "Nazra Program"
+  },
+  {
+   "depends_on": "eval:doc.type == 'M&E'",
+   "fieldname": "me_nazra_quran_status",
+   "fieldtype": "Small Text",
+   "label": "Nazra Quran Status (M&E)"
+  },
+  {
+   "depends_on": "eval:doc.type == 'M&E'",
+   "fieldname": "me_nazra_demand_from_school",
+   "fieldtype": "Small Text",
+   "label": "Did you receive Nazra's request from School?"
+  },
+  {
+   "depends_on": "eval:doc.type == 'M&E'",
+   "fieldname": "me_nazra_tajweed_training",
+   "fieldtype": "Small Text",
+   "label": "Has any Teachers Training Session Occurred in School related to Tajweed?"
+  },
+  {
+   "depends_on": "eval:doc.type == 'M&E'",
+   "fieldname": "me_nazra_teachers_count",
+   "fieldtype": "Small Text",
+   "label": "Number of Teachers designated for Nazra Quran"
+  },
+  {
+   "depends_on": "eval:doc.type=='M&E' && doc.me_nazra_teachers_count=='Others'",
+   "fieldname": "me_nazra_teachers_other",
+   "fieldtype": "Small Text",
+   "label": "Number of Teachers (Nazra Other)"
+  },
+  {
+   "depends_on": "eval:doc.type == 'M&E'",
+   "fieldname": "me_nazra_used_teachers_guide",
+   "fieldtype": "Small Text",
+   "label": "Did you use the Teacher's Guide of Nazra Quran for Teaching?"
+  },
+  {
+   "depends_on": "eval:doc.type == 'M&E'",
+   "fieldname": "me_nazra_book_taught",
+   "fieldtype": "Small Text",
+   "label": "Which Book of Nazra Quran Taught?"
+  },
+  {
+   "depends_on": "eval:doc.type == 'M&E'",
+   "fieldname": "me_nazra_classes_per_week",
+   "fieldtype": "Small Text",
+   "label": "How many classes are allocated per week for Nazra Quran?"
+  },
+  {
+   "depends_on": "eval:doc.type == 'M&E'",
+   "fieldname": "me_nazra_class_duration",
+   "fieldtype": "Small Text",
+   "label": "Nazra Duration of Class (in Minutes)"
+  },
+  {
+   "depends_on": "eval:doc.type == 'M&E'",
+   "fieldname": "me_nazra_took_assessment",
+   "fieldtype": "Small Text",
+   "label": "Does the teacher conduct assessments for Nazra Quran?"
+  },
+  {
+   "depends_on": "eval:doc.type == 'M&E'",
+   "fieldname": "me_nazra_tajweed_changes",
+   "fieldtype": "Small Text",
+   "label": "What kind of changes noticed in students regarding Tajweed?"
+  },
+  {
+   "depends_on": "eval:doc.type == 'M&E'",
    "fieldname": "me_changes_made",
    "fieldtype": "Small Text",
    "label": "What changes have been Made?"
@@ -666,13 +769,27 @@
    "fieldname": "designation",
    "fieldtype": "Select",
    "label": "Designation",
-   "options": "\nOwner\nDirector\nPrincipal\nAdmin\nCoordinator\nTeacher\nReceptionist"
+   "options": "\nOwner\nDirector\nPrincipal\nVice Principal\nAdmin\nAdministrator\nIncharge\nCoordinator\nTeacher\nReceptionist\nFront Desk Officer (FDO)\nOther"
+  },
+  {
+   "depends_on": "eval:in_list(['Marketing','Joint Visit with SME','M&E','Training'], doc.type) && doc.designation=='Other'",
+   "fieldname": "designation_other",
+   "fieldtype": "Data",
+   "label": "Other Designation"
   },
   {
    "depends_on": "eval:in_list(['Marketing','Joint Visit with SME'], doc.type)",
    "fieldname": "contact_number",
    "fieldtype": "Data",
    "label": "Contact Number"
+  },
+  {
+   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training'], doc.type)",
+   "description": "Add one row per person if you met more than one contact.",
+   "fieldname": "school_contacts",
+   "fieldtype": "Table",
+   "label": "Contact Persons",
+   "options": "Field Visit School Contact"
   },
   {
    "default": "0",
@@ -997,9 +1114,9 @@
   {
    "fieldname": "qps_meeting_educationalist",
    "fieldtype": "Select",
+   "hidden": 1,
    "label": "Meeting with Educationalist, Ulama-e-Kiram and Known Personalities",
-   "options": "\nYes\nNo",
-   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training'], doc.type) && in_list(['Yes - Already Affiliated','Yes - Newly Registered'], doc.qps_affiliated)"
+   "options": "\nYes\nNo"
   },
   {
    "fieldname": "qps_onsite_training",
@@ -1086,6 +1203,22 @@
    "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training'], doc.type) && in_list(['Yes - Already Affiliated','Yes - Newly Registered'], doc.tps_affiliated)"
   },
   {
+   "fieldname": "tps_noorani_qaida_workbook_khi",
+   "fieldtype": "Select",
+   "label": "Noorani Qaida Workbook (for Karachi)",
+   "length": 64,
+   "options": "\nYes\nNo",
+   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training'], doc.type) && in_list(['Yes - Already Affiliated','Yes - Newly Registered'], doc.tps_affiliated)"
+  },
+  {
+   "fieldname": "tps_tajweed_workshop_kids_khi",
+   "fieldtype": "Select",
+   "label": "Tajweed Workshop for Kids (For Specific Schools in Karachi)",
+   "length": 64,
+   "options": "\nYes\nNo",
+   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training'], doc.type) && in_list(['Yes - Already Affiliated','Yes - Newly Registered'], doc.tps_affiliated)"
+  },
+  {
    "fieldname": "section_break_cee_services",
    "fieldtype": "Section Break",
    "label": "CEE Services Adopted",
@@ -1126,25 +1259,26 @@
   {
    "fieldname": "section_break_participants",
    "fieldtype": "Section Break",
-   "label": "Course Participants",
-   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME'], doc.type)"
+   "hidden": 1,
+   "label": "Course Participants"
   },
   {
    "fieldname": "participant_names_enrolled",
    "fieldtype": "Small Text",
+   "hidden": 1,
    "label": "Name of Participant enrolled in ELP/ TECC/ 90 Days TTC/ Online Tajweed Customize Course 30/60/90 (Nazra Teachers)/ Story Telling Session",
-   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training'], doc.type)",
-   "description": "If multiple participants in different courses, write like: Zaid - ELP, Nasir - TECC"
+   "description": "Moved to Enrolment of Participants activity type"
   },
   {
    "fieldname": "column_break_part",
-   "fieldtype": "Column Break"
+   "fieldtype": "Column Break",
+   "hidden": 1
   },
   {
    "fieldname": "participant_contact_numbers",
    "fieldtype": "Data",
-   "label": "Contact Number of Above Participant(s)",
-   "depends_on": "eval:in_list(['Marketing','M&E','Joint Visit with SME','Training'], doc.type)"
+   "hidden": 1,
+   "label": "Contact Number of Above Participant(s)"
   },
   {
    "fieldname": "model_school",
@@ -1242,9 +1376,9 @@
   },
   {
    "fieldname": "me_mqh_book_part",
-   "fieldtype": "Select",
+   "fieldtype": "Small Text",
    "label": "Which Part of Mutalae Quran-e-Hakeem Book Taught?",
-   "options": "\nPart-1\nPart-2\nPart-3\nPart-4\nPart-5\nPart-6\nPart-7\nOther",
+   "description": "Multiple parts can be selected (Part-1 to Part-7, Other).",
    "depends_on": "eval:doc.type=='M&E'"
   },
   {
@@ -1291,6 +1425,12 @@
    "depends_on": "eval:doc.type=='Training'"
   },
   {
+   "depends_on": "eval:doc.type=='Training' && doc.training_conducted_by=='Other'",
+   "fieldname": "training_conducted_by_other",
+   "fieldtype": "Small Text",
+   "label": "Trainer Name (Other)"
+  },
+  {
    "fieldname": "mt_meeting_type",
    "fieldtype": "Select",
    "label": "Meeting Type",
@@ -1315,7 +1455,7 @@
    "fieldname": "mt_external_meeting_with",
    "fieldtype": "Select",
    "label": "External Meeting with",
-   "options": "\nUlma Karam\nEducationalist\nOwner / Director of Chain of School\nGovt officials\nInfluential Personalities\nSocial Media Activist\nTeachers Training",
+   "options": "\nUlma Karam\nEducationalist\nOwner / Director of Chain of School\nGovt officials\nInfluential Personalities\nSocial Media Activist",
    "depends_on": "eval:doc.type=='Meeting' && doc.mt_meeting_type=='External Meeting (Meeting with Others)'"
   },
   {
@@ -1503,7 +1643,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-07-16 00:15:00.000000",
+ "modified": "2026-09-02 02:40:00.000000",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Field Visit",

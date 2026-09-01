@@ -1,4 +1,4 @@
-const SMES_LS_META = "smes_activity_form_meta_v3";
+const SMES_LS_META = "smes_activity_form_meta_v4";
 const SMES_LS_DRAFT = "smes_activity_form_draft_v3";
 const SMES_LS_QUEUE = "smes_activity_form_queue_v1";
 
@@ -74,11 +74,22 @@ class SmesActivityForm {
 			me_teachers_mqh_other: "",
 			me_used_teachers_guide: "",
 			me_mqh_book_version: "",
-			me_mqh_book_part: "",
+			me_mqh_book_part: [],
 			me_classes_per_week: "",
 			me_class_duration: "",
 			me_took_assessment: "",
 			me_student_behavior_changes: "",
+			me_nazra_quran_status: "",
+			me_nazra_demand_from_school: "",
+			me_nazra_tajweed_training: "",
+			me_nazra_teachers_count: "",
+			me_nazra_teachers_other: "",
+			me_nazra_used_teachers_guide: "",
+			me_nazra_book_taught: "",
+			me_nazra_classes_per_week: "",
+			me_nazra_class_duration: "",
+			me_nazra_took_assessment: "",
+			me_nazra_tajweed_changes: "",
 			me_assessment_from: [],
 			me_changes_made: [],
 			me_details_of_changes_made: "",
@@ -93,7 +104,10 @@ class SmesActivityForm {
 			// Training
 			training_arrange_by: [],
 			training_conducted_by: "",
+			training_conducted_by_other: "",
 			training_session_category: "",
+			training_workshop_topic: "",
+			training_mode: "",
 			training_venue_name: "",
 			training_no_of_participants: "",
 			training_no_of_schools_attended: "",
@@ -128,6 +142,8 @@ class SmesActivityForm {
 			contact_person_name: "",
 			contact_number: "",
 			designation: "",
+			designation_other: "",
+			school_contacts: [],
 			school_address: "",
 			school_type: "",
 			reference: "",
@@ -381,6 +397,16 @@ class SmesActivityForm {
 	is_school_visit() {
 		const k = this.activity_kind();
 		return ["marketing", "me", "joint", "training"].includes(k);
+	}
+
+	unique_activity_types() {
+		const seen = new Set();
+		return (this.meta.activity_types || []).filter((t) => {
+			const key = (t || "").toLowerCase();
+			if (!key || seen.has(key)) return false;
+			seen.add(key);
+			return true;
+		});
 	}
 
 	is_enrolment_or_workshop() {
@@ -741,6 +767,8 @@ class SmesActivityForm {
 			"me_number_of_teachers_mqh",
 			"me_took_assessment",
 			"me_changes_made",
+			"me_nazra_teachers_count",
+			"training_conducted_by",
 			"mt_meeting_type",
 			"ot_type_of_task",
 			"ot_academic_task_types",
@@ -798,7 +826,10 @@ class SmesActivityForm {
 				${this.field("month", __("Month"), "select", { reqd: 1, options: this.meta.months || [] })}
 				${this.field("visit_date", __("Date"), "date", { reqd: 1 })}
 			</div>
-			${this.field("activity_type", __("Type of Activity"), "radio", { reqd: 1, options: this.meta.activity_types || [] })}
+			${this.field("activity_type", __("Type of Activity"), "radio", {
+				reqd: 1,
+				options: this.unique_activity_types(),
+			})}
 			<div class="smes-row-2">
 				${this.field("starting_time", __("Starting Time"), "time")}
 				${this.field("ending_time", __("Ending Time"), "time")}
@@ -890,7 +921,7 @@ class SmesActivityForm {
 				reqd: 1,
 				options: this.meta.me_mqh_versions || [],
 			})}
-			${this.field("me_mqh_book_part", __("Which Part of Mutalae Quran-e-Hakeem Book Taught?"), "radio", {
+			${this.field("me_mqh_book_part", __("Which Part of Mutalae Quran-e-Hakeem Book Taught?"), "checkboxes", {
 				reqd: 1,
 				options: this.meta.me_mqh_parts || [],
 			})}
@@ -918,6 +949,60 @@ class SmesActivityForm {
 						})
 					: ""
 			}
+			<div class="smes-section-note">
+				<strong>${__("Nazra Program")}</strong>
+			</div>
+			${this.field("me_nazra_quran_status", __("Nazra Quran Status (M&E)"), "radio", {
+				reqd: 1,
+				options: ["Active", "In-Active"],
+			})}
+			${this.field("me_nazra_demand_from_school", __("Did you receive Nazra's request from School?"), "radio", {
+				reqd: 1,
+				options: this.meta.me_demand_options || [],
+			})}
+			${this.field(
+				"me_nazra_tajweed_training",
+				__("Has any Teachers Training Session Occurred in School related to Tajweed?"),
+				"radio",
+				{ reqd: 1, options: ["Yes", "No"] },
+			)}
+			${this.field("me_nazra_teachers_count", __("Number of Teachers designated for Nazra Quran"), "radio", {
+				reqd: 1,
+				options: this.meta.me_teachers_count || [],
+			})}
+			${
+				this.data.me_nazra_teachers_count === "Others"
+					? this.field("me_nazra_teachers_other", __("Specify number of teachers"), "text", { reqd: 1 })
+					: ""
+			}
+			${this.field(
+				"me_nazra_used_teachers_guide",
+				__("Did you use the Teacher's Guide of Nazra Quran for Teaching?"),
+				"radio",
+				{ reqd: 1, options: ["Yes", "No"] },
+			)}
+			${this.field("me_nazra_book_taught", __("Which Book of Nazra Quran Taught?"), "radio", {
+				reqd: 1,
+				options: this.meta.me_nazra_books || [],
+			})}
+			${this.field("me_nazra_classes_per_week", __("How many classes are allocated per week for Nazra Quran?"), "radio", {
+				reqd: 1,
+				options: this.meta.me_classes_per_week || [],
+			})}
+			${this.field("me_nazra_class_duration", __("Duration of Class (in Minutes)"), "radio", {
+				reqd: 1,
+				options: this.meta.me_class_durations || [],
+			})}
+			${this.field("me_nazra_took_assessment", __("Does the teacher conduct assessments for Nazra Quran?"), "radio", {
+				reqd: 1,
+				options: ["Yes", "No"],
+			})}
+			${this.field(
+				"me_nazra_tajweed_changes",
+				__("What kind of changes have the teacher or principal noticed in students regarding Tajweed?"),
+				"radio",
+				{ reqd: 1, options: this.meta.me_behavior_changes || [] },
+			)}
 			<div class="smes-section-note">
 				<strong>${__("Updates for TIF Office (If Any Changes)")}</strong>
 				<span>${__("(School Name, Contact Person, Contact Number, Address)")}</span>
@@ -969,9 +1054,25 @@ class SmesActivityForm {
 				reqd: 1,
 				options: this.meta.training_conducted_by_options || [],
 			})}
+			${
+				this.data.training_conducted_by === "Other"
+					? this.field("training_conducted_by_other", __("Trainer Name"), "text", {
+							reqd: 1,
+							hint: __("Write the name of the new trainer"),
+						})
+					: ""
+			}
 			${this.field("training_session_category", __("Training Category"), "radio", {
 				reqd: 1,
 				options: this.meta.training_categories || [],
+			})}
+			${this.field("training_workshop_topic", __("Training and Workshop Topics"), "radio", {
+				reqd: 1,
+				options: this.meta.training_workshop_topics || [],
+			})}
+			${this.field("training_mode", __("Training Mode"), "radio", {
+				reqd: 1,
+				options: this.meta.training_modes || [],
 			})}
 			${this.field("training_venue_name", __("Venue Name"), "text", { reqd: 1 })}
 			${this.field("training_no_of_participants", __("No. of participants"), "text", { reqd: 1 })}
@@ -1105,21 +1206,69 @@ class SmesActivityForm {
 		if (!this.is_school_visit()) {
 			return `<h3>${__("School Related Detail")}</h3><p class="text-muted">${__("School section is for Marketing / M&E / Joint / Training visits. Click Next.")}</p>`;
 		}
+		this.ensure_school_contacts();
 		const aff = this.meta.affiliation_options || [
 			"Yes - Already Affiliated",
 			"Yes - Newly Registered",
 			"No - Not Affiliated",
 		];
-		return `
+		const designations = this.meta.designations || [];
+		const contact_rows = this.data.school_contacts
+			.map((row, idx) => {
+				const show_other = row.designation === "Other";
+				return `
+				<div class="smes-multi-row" data-multi="school_contact" data-idx="${idx}">
+					<div class="smes-multi-row__head">
+						<strong>${__("Contact Person")} ${idx + 1}</strong>
+						<button type="button" class="btn btn-xs btn-default smes-remove-row" data-multi="school_contact" data-idx="${idx}">
+							${__("Remove")}
+						</button>
+					</div>
+					${this.multi_field(idx, "school_contact", "person_name", __("Contact Person Name"), "text", {
+						value: row.person_name,
+					})}
+					${this.multi_field(idx, "school_contact", "contact_number", __("Contact Number"), "tel", {
+						value: row.contact_number,
+					})}
+					${this.multi_field(idx, "school_contact", "designation", __("Designation"), "radio", {
+						reqd: 1,
+						options: designations,
+						value: row.designation,
+					})}
+					${
+						show_other
+							? this.multi_field(
+									idx,
+									"school_contact",
+									"designation_other",
+									__("Other Designation"),
+									"text",
+									{
+										reqd: 1,
+										value: row.designation_other,
+										hint: __("Please specify the designation"),
+									},
+								)
+							: ""
+					}
+				</div>`;
+			})
+			.join("");
+		const basics = `
 			<h3>${__("School Related Detail")}</h3>
 			${this.field("school_name", __("School Name"), "text", { reqd: 1 })}
-			${this.field("contact_person_name", __("Contact Person Name"), "text")}
-			${this.field("contact_number", __("Contact Number"), "tel")}
-			${this.field("designation", __("Designation"), "radio", {
-				reqd: 1,
-				options: this.meta.designations || [],
-			})}
+			<p class="text-muted">${__("Add one row per person if you met more than one contact.")}</p>
+			<div class="smes-multi-list">${contact_rows}</div>
+			<div class="smes-multi-actions">
+				<button type="button" class="btn btn-default btn-sm smes-add-row" data-multi="school_contact">${__("Add Person")}</button>
+			</div>
 			${this.field("school_address", __("School Address"), "textarea", { reqd: 1 })}
+		`;
+		if (this.activity_kind() === "training") {
+			return basics;
+		}
+		return `
+			${basics}
 			${this.field("school_type", __("School Type"), "radio", {
 				reqd: 1,
 				options: this.meta.school_types || [],
@@ -1155,15 +1304,6 @@ class SmesActivityForm {
 					? `<div class="smes-field"><label>${__("Which CEE services are adopted by the school?")}</label>${this.yn_matrix(this.meta.cee_services)}</div>`
 					: ""
 			}
-			${this.field(
-				"participant_names_enrolled",
-				__(
-					"Name of Participant enrolled in ELP/ TECC/ 90 Days TTC / Online Tajweed Customize Course / Story Telling Session",
-				),
-				"textarea",
-				{ hint: __("Example: Zaid - ELP, Nasir - TECC") },
-			)}
-			${this.field("participant_contact_numbers", __("Contact Number of Above Participant(s)"), "text")}
 			${this.field("model_school", __("Is this a Model School"), "radio", {
 				options: this.meta.model_school_options || [],
 			})}
@@ -1199,6 +1339,35 @@ class SmesActivityForm {
 				${this.attach_field("attendance_sheet_excel", __("MS Excel of Attendance Sheet"), ".xlsx,.xls,.csv,image/*,.pdf")}
 			</div>
 		`;
+	}
+
+	blank_school_contact_row() {
+		return {
+			person_name: "",
+			contact_number: "",
+			designation: "",
+			designation_other: "",
+		};
+	}
+
+	ensure_school_contacts() {
+		if (!Array.isArray(this.data.school_contacts) || !this.data.school_contacts.length) {
+			const seeded = this.blank_school_contact_row();
+			seeded.person_name = this.data.contact_person_name || "";
+			seeded.contact_number = this.data.contact_number || "";
+			seeded.designation = this.data.designation || "";
+			seeded.designation_other = this.data.designation_other || "";
+			this.data.school_contacts = [seeded];
+		}
+	}
+
+	sync_first_school_contact() {
+		const first = (this.data.school_contacts || [])[0] || {};
+		this.data.contact_person_name = first.person_name || "";
+		this.data.contact_number = first.contact_number || "";
+		this.data.designation = first.designation || "";
+		this.data.designation_other =
+			first.designation === "Other" ? first.designation_other || "" : "";
 	}
 
 	ensure_enrolment_rows() {
@@ -1378,6 +1547,33 @@ class SmesActivityForm {
 		const kind = this.activity_kind();
 		const esc = frappe.utils.escape_html;
 		let rows_html = "";
+		let school_contacts_html = "";
+		if (this.is_school_visit()) {
+			const sc_rows = (this.data.school_contacts || [])
+				.map((r, i) => {
+					const desig =
+						r.designation === "Other"
+							? `${esc(r.designation || "")}${r.designation_other ? ` (${esc(r.designation_other)})` : ""}`
+							: esc(r.designation || "");
+					return `
+				<tr>
+					<td>${i + 1}</td>
+					<td>${esc(r.person_name || "")}</td>
+					<td>${esc(r.contact_number || "")}</td>
+					<td>${desig}</td>
+				</tr>`;
+				})
+				.join("");
+			school_contacts_html = `
+				<table class="table table-bordered table-sm smes-preview-table">
+					<thead>
+						<tr>
+							<th>#</th><th>${__("Contact Person")}</th><th>${__("Contact Number")}</th><th>${__("Designation")}</th>
+						</tr>
+					</thead>
+					<tbody>${sc_rows || `<tr><td colspan="4">${__("No contact persons")}</td></tr>`}</tbody>
+				</table>`;
+		}
 		if (kind === "enrolment") {
 			rows_html = (this.data.enrolment_participants || [])
 				.map(
@@ -1404,7 +1600,7 @@ class SmesActivityForm {
 					</thead>
 					<tbody>${rows_html || `<tr><td colspan="8">${__("No participants")}</td></tr>`}</tbody>
 				</table>`;
-		} else {
+		} else if (kind === "workshop_attendance") {
 			rows_html = (this.data.workshop_attendees || [])
 				.map(
 					(r, i) => `
@@ -1441,6 +1637,7 @@ class SmesActivityForm {
 					${esc(this.data.city || "")} / ${esc(this.data.area || "")} / ${esc(this.data.province || "")}
 				</p>
 			</div>
+			${school_contacts_html}
 			${rows_html}
 			<div class="smes-preview-block">
 				<p><strong>${__("Travel")}:</strong>
@@ -1470,6 +1667,13 @@ class SmesActivityForm {
 				)
 				.join("");
 			control = `<select data-multi-field="${name}" data-multi="${multi}" data-idx="${idx}">${options}</select>`;
+		} else if (type === "radio") {
+			control = `<div class="smes-radio-group">${(opts.options || [])
+				.map((o) => {
+					const checked = val === o ? "checked" : "";
+					return `<label><input type="radio" name="${multi}-${name}-${idx}" data-multi-field="${name}" data-multi="${multi}" data-idx="${idx}" value="${frappe.utils.escape_html(o)}" ${checked}/><span>${frappe.utils.escape_html(o)}</span></label>`;
+				})
+				.join("")}</div>`;
 		} else if (type === "date") {
 			control = `<input type="date" data-multi-field="${name}" data-multi="${multi}" data-idx="${idx}" value="${frappe.utils.escape_html(val || "")}" />`;
 		} else {
@@ -1483,6 +1687,7 @@ class SmesActivityForm {
 			const map = {};
 			this.$root.find(`[data-multi="${multi}"][data-multi-field]`).each((_, el) => {
 				const $el = $(el);
+				if ($el.attr("type") === "radio" && !$el.is(":checked")) return;
 				const idx = cint($el.data("idx"));
 				const field = $el.data("multi-field");
 				if (!map[idx]) map[idx] = {};
@@ -1495,6 +1700,8 @@ class SmesActivityForm {
 		};
 		collect("enrolment", "enrolment_participants");
 		collect("workshop", "workshop_attendees");
+		collect("school_contact", "school_contacts");
+		this.sync_first_school_contact();
 	}
 
 	bind_multi_row_actions() {
@@ -1505,6 +1712,9 @@ class SmesActivityForm {
 				this.ensure_enrolment_rows();
 				const prev = this.data.enrolment_participants[this.data.enrolment_participants.length - 1];
 				this.data.enrolment_participants.push(this.blank_enrolment_row(prev));
+			} else if (multi === "school_contact") {
+				this.ensure_school_contacts();
+				this.data.school_contacts.push(this.blank_school_contact_row());
 			} else {
 				this.ensure_workshop_rows();
 				const prev = this.data.workshop_attendees[this.data.workshop_attendees.length - 1];
@@ -1554,6 +1764,9 @@ class SmesActivityForm {
 			if (multi === "enrolment") {
 				this.data.enrolment_participants.splice(idx, 1);
 				this.ensure_enrolment_rows();
+			} else if (multi === "school_contact") {
+				this.data.school_contacts.splice(idx, 1);
+				this.ensure_school_contacts();
 			} else {
 				this.data.workshop_attendees.splice(idx, 1);
 				this.ensure_workshop_rows();
@@ -1564,6 +1777,13 @@ class SmesActivityForm {
 			this.collect();
 			this.render_step();
 		});
+		this.$root
+			.find("[data-multi='school_contact'][data-multi-field='designation']")
+			.off("change.smesOther")
+			.on("change.smesOther", () => {
+				this.collect();
+				this.render_step();
+			});
 	}
 
 	bind_uploads() {
@@ -1674,6 +1894,22 @@ class SmesActivityForm {
 			if (this.data.me_mqh_book_status === "In-Active" && !this.need(["me_inactive_reasons"])) return false;
 			if (this.data.me_number_of_teachers_mqh === "Others" && !this.need(["me_teachers_mqh_other"])) return false;
 			if (this.data.me_took_assessment === "Yes" && !this.need(["me_assessment_from"])) return false;
+			const nazra_req = [
+				"me_nazra_quran_status",
+				"me_nazra_demand_from_school",
+				"me_nazra_tajweed_training",
+				"me_nazra_teachers_count",
+				"me_nazra_used_teachers_guide",
+				"me_nazra_book_taught",
+				"me_nazra_classes_per_week",
+				"me_nazra_class_duration",
+				"me_nazra_took_assessment",
+				"me_nazra_tajweed_changes",
+			];
+			if (!this.need(nazra_req, __("Fill Nazra Program required fields"))) return false;
+			if (this.data.me_nazra_teachers_count === "Others" && !this.need(["me_nazra_teachers_other"])) {
+				return false;
+			}
 			return true;
 		}
 		if (key === "joint") {
@@ -1683,17 +1919,27 @@ class SmesActivityForm {
 			);
 		}
 		if (key === "training") {
-			return this.need(
-				[
-					"training_arrange_by",
-					"training_conducted_by",
-					"training_session_category",
-					"training_venue_name",
-					"training_no_of_participants",
-					"training_no_of_schools_attended",
-				],
-				__("Fill Trainings & Workshops required fields"),
-			);
+			if (
+				!this.need(
+					[
+						"training_arrange_by",
+						"training_conducted_by",
+						"training_session_category",
+						"training_workshop_topic",
+						"training_mode",
+						"training_venue_name",
+						"training_no_of_participants",
+						"training_no_of_schools_attended",
+					],
+					__("Fill Trainings & Workshops required fields"),
+				)
+			) {
+				return false;
+			}
+			if (this.data.training_conducted_by === "Other" && !this.need(["training_conducted_by_other"])) {
+				return false;
+			}
+			return true;
 		}
 		if (key === "meeting") {
 			if (!this.need(["mt_meeting_type", "mt_meeting_mode"], __("Fill Meetings required fields"))) {
@@ -1723,19 +1969,56 @@ class SmesActivityForm {
 			return this.need(["cc_activity"], __("Select Co-curricular Activity"));
 		}
 		if (key === "school" && this.is_school_visit()) {
-			return this.need(
-				[
-					"school_name",
-					"designation",
-					"school_address",
-					"school_type",
-					"qps_affiliated",
-					"tps_affiliated",
-					"cee_affiliated",
-					"registered_volunteer",
-				],
-				__("Fill required School Detail fields"),
+			const school_req =
+				this.activity_kind() === "training"
+					? ["school_name", "school_address"]
+					: [
+							"school_name",
+							"school_address",
+							"school_type",
+							"qps_affiliated",
+							"tps_affiliated",
+							"cee_affiliated",
+							"registered_volunteer",
+						];
+			if (!this.need(school_req, __("Fill required School Detail fields"))) {
+				return false;
+			}
+			const rows = this.data.school_contacts || [];
+			const filled = rows.filter(
+				(r) =>
+					cstr(r.person_name).trim() ||
+					cstr(r.contact_number).trim() ||
+					cstr(r.designation).trim(),
 			);
+			if (!filled.length || !cstr((filled[0] || {}).designation).trim()) {
+				frappe.show_alert(
+					{ message: __("Select Designation for at least one contact person"), indicator: "orange" },
+					5,
+				);
+				return false;
+			}
+			for (let i = 0; i < filled.length; i += 1) {
+				const r = filled[i];
+				if (!cstr(r.designation).trim()) {
+					frappe.show_alert(
+						{ message: __("Contact Person {0}: Designation is required", [i + 1]), indicator: "orange" },
+						5,
+					);
+					return false;
+				}
+				if (r.designation === "Other" && !cstr(r.designation_other).trim()) {
+					frappe.show_alert(
+						{
+							message: __("Contact Person {0}: Please specify the other designation", [i + 1]),
+							indicator: "orange",
+						},
+						5,
+					);
+					return false;
+				}
+			}
+			return true;
 		}
 		if (key === "enrolment") {
 			const rows = this.data.enrolment_participants || [];

@@ -81,9 +81,6 @@ ENROLMENT_COURSE_OPTIONS = [
 	"ETQ - Effective Teaching of the Holy Quran",
 	"TTC - 90 Days Tajweed Training Course",
 	"Online Tajweed Customized Course 30/60/90 Days",
-	"Intro to Tajweed Workshop",
-	"Tajweed for Kids Workshop",
-	"V Campers - Story Telling Workshops",
 	"Other Special Session Offered by TIF",
 ]
 
@@ -223,7 +220,7 @@ def get_form_meta():
 			"November",
 			"December",
 		],
-		"activity_types": list(ACTIVITY_TYPE_MAP.keys()),
+		"activity_types": [k for k in ACTIVITY_TYPE_MAP if k != "Enrolment of participants"],
 		"enrolment_courses": ENROLMENT_COURSE_OPTIONS,
 		"travel_modes": [
 			"Public Transport",
@@ -272,10 +269,15 @@ def get_form_meta():
 			"Owner",
 			"Director",
 			"Principal",
+			"Vice Principal",
 			"Admin",
+			"Administrator",
+			"Incharge",
 			"Coordinator",
 			"Teacher",
 			"Receptionist",
+			"Front Desk Officer (FDO)",
+			"Other",
 		],
 		"affiliation_options": [
 			"Yes - Already Affiliated",
@@ -306,7 +308,6 @@ def get_form_meta():
 			"Govt officials",
 			"Influential Personalities",
 			"Social Media Activist",
-			"Teachers Training",
 		],
 		"academic_task_types": [
 			"Academic Tasks",
@@ -356,10 +357,6 @@ def get_form_meta():
 		"qps_services": [
 			{"field": "qps_mqh_books", "label": "MQH Books"},
 			{"field": "qps_mqh_teachers_guides", "label": "MQH Teachers Guides"},
-			{
-				"field": "qps_meeting_educationalist",
-				"label": "Meeting with Educationalist, Ulama-e-Kiram and Known Personalities",
-			},
 			{"field": "qps_onsite_training", "label": "Onsite Training"},
 			{"field": "qps_online_training", "label": "Online Training"},
 			{"field": "qps_registration_lms", "label": "Registration in LMS"},
@@ -377,6 +374,14 @@ def get_form_meta():
 			{
 				"field": "tps_tajweed_customize",
 				"label": "Tajweed Customize Course 30/60/90 (Nazra Teachers)",
+			},
+			{
+				"field": "tps_noorani_qaida_workbook_khi",
+				"label": "Noorani Qaida Workbook (for Karachi)",
+			},
+			{
+				"field": "tps_tajweed_workshop_kids_khi",
+				"label": "Tajweed Workshop for Kids (For Specific Schools in Karachi)",
 			},
 		],
 		"cee_services": [
@@ -462,8 +467,15 @@ def get_form_meta():
 			"Full Day Session",
 			"Half Day Workshop",
 			"Teachers Training Meeting (One to One)",
-			"Awareness Session",
 		],
+		"training_workshop_topics": [
+			"ETQ - Effective Teaching of the Holy Quran",
+			"Intro to Tajweed Workshop",
+			"Tajweed Workshop for Kids (For Specific Schools in Karachi)",
+			"Other Special Session Offered by TIF",
+		],
+		"training_modes": ["Online", "OnSite"],
+		"me_nazra_books": ["Noorani Qaida", "Noorani Qaida Workbook"],
 		"sme_name_options": _sme_display_names(staff_list),
 		"training_conducted_by_options": _training_conducted_by_options(staff_list),
 	}
@@ -492,6 +504,8 @@ def _training_conducted_by_options(staff_list):
 		"Arif Irfanullah",
 		"Hafiz Shah Nawaz Awan",
 		"Syed Wajahat Ali",
+		"Ms. Sumaiya",
+		"Ms. Javeria",
 	]
 	smes = _sme_display_names(staff_list)
 	seen = set()
@@ -500,6 +514,7 @@ def _training_conducted_by_options(staff_list):
 		if n and n not in seen:
 			seen.add(n)
 			out.append(n)
+	out.append("Other")
 	return out
 
 
@@ -567,9 +582,7 @@ def submit_smes_activity(data):
 	doc.school_remarks_follow_up = data.get("school_remarks_follow_up")
 
 	doc.school_name = data.get("school_name")
-	doc.meeting_with = data.get("contact_person_name")
-	doc.contact_number = data.get("contact_number")
-	doc.designation = data.get("designation")
+	_apply_school_contacts(doc, data)
 	doc.school_address = data.get("school_address")
 	doc.school_type = data.get("school_type")
 	doc.reference = data.get("reference")
@@ -582,7 +595,6 @@ def submit_smes_activity(data):
 	for key in (
 		"qps_mqh_books",
 		"qps_mqh_teachers_guides",
-		"qps_meeting_educationalist",
 		"qps_onsite_training",
 		"qps_online_training",
 		"qps_registration_lms",
@@ -593,6 +605,8 @@ def submit_smes_activity(data):
 		"tps_1_day_tajweed_females",
 		"tps_ttc_tajweed_khi",
 		"tps_tajweed_customize",
+		"tps_noorani_qaida_workbook_khi",
+		"tps_tajweed_workshop_kids_khi",
 		"cee_elp",
 		"cee_tecc_foundation",
 		"cee_tecc_professional",
@@ -601,8 +615,6 @@ def submit_smes_activity(data):
 		if data.get(key):
 			doc.set(key, data.get(key))
 
-	doc.participant_names_enrolled = data.get("participant_names_enrolled")
-	doc.participant_contact_numbers = data.get("participant_contact_numbers")
 	doc.model_school = data.get("model_school")
 	doc.registered_volunteer = data.get("registered_volunteer")
 
@@ -624,7 +636,9 @@ def submit_smes_activity(data):
 		doc.me_province = doc.province
 		doc.me_school_name = doc.school_name
 		doc.me_meeting_with_person_name = doc.meeting_with
-		doc.me_designation_meeting_with = doc.designation
+		doc.me_designation_meeting_with = (
+			doc.designation_other if doc.designation == "Other" else doc.designation
+		)
 		doc.me_contact_no_meeting_with = doc.contact_number
 
 		doc.me_mqh_book_status = data.get("me_mqh_book_status")
@@ -638,11 +652,22 @@ def submit_smes_activity(data):
 		doc.me_teachers_mqh_other = data.get("me_teachers_mqh_other")
 		doc.me_used_teachers_guide = data.get("me_used_teachers_guide")
 		doc.me_mqh_book_version = data.get("me_mqh_book_version")
-		doc.me_mqh_book_part = data.get("me_mqh_book_part")
+		doc.me_mqh_book_part = "\n".join(_as_list(data.get("me_mqh_book_part")))
 		doc.me_classes_per_week = data.get("me_classes_per_week")
 		doc.me_class_duration = data.get("me_class_duration")
 		doc.me_took_assessment = data.get("me_took_assessment")
 		doc.me_student_behavior_changes = data.get("me_student_behavior_changes")
+		doc.me_nazra_quran_status = data.get("me_nazra_quran_status")
+		doc.me_nazra_demand_from_school = data.get("me_nazra_demand_from_school")
+		doc.me_nazra_tajweed_training = data.get("me_nazra_tajweed_training")
+		doc.me_nazra_teachers_count = data.get("me_nazra_teachers_count")
+		doc.me_nazra_teachers_other = data.get("me_nazra_teachers_other")
+		doc.me_nazra_used_teachers_guide = data.get("me_nazra_used_teachers_guide")
+		doc.me_nazra_book_taught = data.get("me_nazra_book_taught")
+		doc.me_nazra_classes_per_week = data.get("me_nazra_classes_per_week")
+		doc.me_nazra_class_duration = data.get("me_nazra_class_duration")
+		doc.me_nazra_took_assessment = data.get("me_nazra_took_assessment")
+		doc.me_nazra_tajweed_changes = data.get("me_nazra_tajweed_changes")
 		assessment_from = _as_list(data.get("me_assessment_from"))
 		doc.me_assessment_from_multi = "\n".join(assessment_from)
 		doc.me_assessment_taken_from = ", ".join(assessment_from)
@@ -716,12 +741,18 @@ def submit_smes_activity(data):
 		doc.training_city = doc.city
 		doc.training_province = doc.province
 		doc.training_session_category = data.get("training_session_category")
+		doc.training_workshop_topic = data.get("training_workshop_topic")
+		doc.training_mode = data.get("training_mode")
 		doc.training_venue_name = data.get("training_venue_name") or doc.school_name
 		doc.training_no_of_participants = data.get("training_no_of_participants")
 		doc.training_no_of_schools_attended = data.get("training_no_of_schools_attended")
 		arrange = _as_list(data.get("training_arrange_by"))
 		doc.training_arrange_by = "\n".join(arrange)
-		doc.training_conducted_by = data.get("training_conducted_by")
+		conducted = cstr(data.get("training_conducted_by")).strip()
+		if conducted == "Other":
+			conducted = cstr(data.get("training_conducted_by_other")).strip() or "Other"
+		doc.training_conducted_by = conducted
+		doc.training_conducted_by_other = data.get("training_conducted_by_other")
 	elif doc_type == "Enrolment of Participants":
 		_append_enrolment_rows(doc, data)
 		_apply_travel_fields(doc, data)
@@ -737,6 +768,67 @@ def submit_smes_activity(data):
 		"url": get_url(f"/app/field-visit/{doc.name}"),
 		"message": _("Activity saved as {0}").format(doc.name),
 	}
+
+
+def _parse_rows(value):
+	rows = value or []
+	if isinstance(rows, str):
+		try:
+			rows = frappe.parse_json(rows) or []
+		except Exception:
+			rows = []
+	return rows if isinstance(rows, list) else []
+
+
+def _apply_school_contacts(doc, data):
+	rows = _parse_rows(data.get("school_contacts"))
+	if not rows:
+		rows = [
+			{
+				"person_name": data.get("contact_person_name"),
+				"contact_number": data.get("contact_number"),
+				"designation": data.get("designation"),
+				"designation_other": data.get("designation_other"),
+			}
+		]
+
+	first = None
+	for row in rows:
+		if not isinstance(row, dict):
+			continue
+		name = cstr(row.get("person_name") or row.get("contact_person_name") or "").strip()
+		contact = cstr(row.get("contact_number") or "").strip()
+		designation = cstr(row.get("designation") or "").strip()
+		other = cstr(row.get("designation_other") or "").strip()
+		if not (name or contact or designation):
+			continue
+		doc.append(
+			"school_contacts",
+			{
+				"person_name": name,
+				"contact_number": contact,
+				"designation": designation,
+				"designation_other": other if designation == "Other" else "",
+			},
+		)
+		if first is None:
+			first = {
+				"person_name": name,
+				"contact_number": contact,
+				"designation": designation,
+				"designation_other": other if designation == "Other" else "",
+			}
+
+	if first:
+		doc.meeting_with = first["person_name"]
+		doc.contact_number = first["contact_number"]
+		doc.designation = first["designation"]
+		doc.designation_other = first["designation_other"]
+	else:
+		doc.meeting_with = data.get("contact_person_name")
+		doc.contact_number = data.get("contact_number")
+		doc.designation = data.get("designation")
+		doc.designation_other = data.get("designation_other")
 
 
 def _apply_travel_fields(doc, data):

@@ -52,7 +52,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Enroll in (Course Name)",
-   "options": "\nTECC - Foundation\nTECC - Professional\nELP - Education Leadership Program\nETQ - Effective Teaching of the Holy Quran\nTTC - 90 Days Tajweed Training Course\nOnline Tajweed Customized Course 30/60/90 Days\nIntro to Tajweed Workshop\nTajweed for Kids Workshop\nV Campers - Story Telling Workshops\nOther Special Session Offered by TIF",
+   "options": "\nTECC - Foundation\nTECC - Professional\nELP - Education Leadership Program\nETQ - Effective Teaching of the Holy Quran\nTTC - 90 Days Tajweed Training Course\nOnline Tajweed Customized Course 30/60/90 Days\nOther Special Session Offered by TIF",
    "reqd": 1
   },
   {
@@ -74,7 +74,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-08-10 15:00:00.000000",
+ "modified": "2026-09-02 02:40:00.000000",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Field Visit Enrolment Participant",
