@@ -149,7 +149,7 @@ def get_report_data(filters=None):
 		):
 			totals[k] += flt(row.get(k) or 0)
 
-	rows.sort(key=lambda r: (flt(r.get("percentage") or 0), (r.get("employee_name") or "").lower()))
+	rows.sort(key=lambda r: (-flt(r.get("percentage") or 0), (r.get("employee_name") or "").lower()))
 
 	money_or_points = ("expenses", "score_points", "total_points", "earned_points")
 	totals_out = {

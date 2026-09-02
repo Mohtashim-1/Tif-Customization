@@ -296,7 +296,7 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 		const fromLabel = frappe.datetime.str_to_user(data.from_date);
 		const toLabel = frappe.datetime.str_to_user(data.to_date);
 		const rows = [...(data.rows || [])].sort(
-			(a, b) => flt(a.percentage) - flt(b.percentage) || String(a.employee_name || "").localeCompare(String(b.employee_name || "")),
+			(a, b) => flt(b.percentage) - flt(a.percentage) || String(a.employee_name || "").localeCompare(String(b.employee_name || "")),
 		);
 		const t = data.totals || {};
 		const kpiCols = this.kpi_columns(data);
@@ -579,7 +579,7 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 		const lines = [headers.join(",")];
 		const kpiCols = this.kpi_columns(this.data);
 		const csvRows = [...(this.data.rows || [])].sort(
-			(a, b) => flt(a.percentage) - flt(b.percentage) || String(a.employee_name || "").localeCompare(String(b.employee_name || "")),
+			(a, b) => flt(b.percentage) - flt(a.percentage) || String(a.employee_name || "").localeCompare(String(b.employee_name || "")),
 		);
 		csvRows.forEach((r) => {
 			lines.push(
