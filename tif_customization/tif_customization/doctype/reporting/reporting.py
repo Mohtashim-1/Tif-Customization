@@ -6,7 +6,7 @@ from collections import Counter, defaultdict
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import cint, flt, getdate
+from frappe.utils import add_days, cint, flt, getdate, today
 
 
 class Reporting(Document):
@@ -113,6 +113,121 @@ def _build_section_users_wise(rows):
 	return sorted(section_list, key=lambda item: (-item["total_reports"], item["section"].lower()))
 
 
+def _working_dates(from_date, to_date):
+	"""Mon–Sat dates in range, excluding Sunday and any day after today."""
+	if not from_date or not to_date:
+		return []
+	start = getdate(from_date)
+	end = getdate(to_date)
+	cutoff = getdate(today())
+	if end > cutoff:
+		end = cutoff
+	if start > end:
+		return []
+	dates = []
+	cur = start
+	while cur <= end:
+		if cur.weekday() != 6:  # Sunday
+			dates.append(cur)
+		cur = add_days(cur, 1)
+	return dates
+
+
+def _expected_reporting_employees(section=None, employee_user=None):
+	filters = {"status": "Active", "user_id": ["is", "set"]}
+	if section:
+		filters["department"] = section
+	if employee_user:
+		filters["user_id"] = employee_user
+	rows = frappe.get_all(
+		"Employee",
+		filters=filters,
+		fields=["name", "employee_name", "user_id", "department", "date_of_joining", "relieving_date"],
+	)
+	user_ids = [r.user_id for r in rows if r.user_id]
+	enabled = set()
+	if user_ids:
+		enabled = set(
+			frappe.get_all(
+				"User",
+				filters={"name": ["in", user_ids], "enabled": 1},
+				pluck="name",
+			)
+		)
+	return [r for r in rows if r.user_id in enabled]
+
+
+def _reported_dates_by_user(from_date, to_date):
+	reported_by_sql = _resolved_reported_by_sql()
+	rows = frappe.db.sql(
+		f"""
+		SELECT DISTINCT
+			r.posting_date,
+			{reported_by_sql} AS reported_by
+		FROM `tabReporting` r
+		WHERE r.docstatus < 2
+			AND r.posting_date >= %(from_date)s
+			AND r.posting_date <= %(to_date)s
+			AND IFNULL(r.posting_date, '') != ''
+		""",
+		{"from_date": from_date, "to_date": to_date},
+		as_dict=True,
+	)
+	by_user = defaultdict(set)
+	for row in rows:
+		if row.reported_by and row.posting_date:
+			by_user[row.reported_by].add(getdate(row.posting_date))
+	return by_user
+
+
+def _missing_report_payload(from_date, to_date, section=None, employee_user=None):
+	working_dates = _working_dates(from_date, to_date)
+	empty = {
+		"employee_count": 0,
+		"working_days": cint(len(working_dates)),
+		"expected_employees": 0,
+		"employees": [],
+	}
+	if not working_dates:
+		return empty
+
+	employees = _expected_reporting_employees(section=section, employee_user=employee_user)
+	reported = _reported_dates_by_user(working_dates[0], working_dates[-1])
+	missing_rows = []
+	for emp in employees:
+		join = getdate(emp.date_of_joining) if emp.date_of_joining else None
+		relieve = getdate(emp.relieving_date) if emp.relieving_date else None
+		have = reported.get(emp.user_id) or set()
+		missed = []
+		for d in working_dates:
+			if join and d < join:
+				continue
+			if relieve and d > relieve:
+				continue
+			if d not in have:
+				missed.append(str(d))
+		if not missed:
+			continue
+		missing_rows.append(
+			{
+				"employee": emp.name,
+				"employee_name": emp.employee_name or emp.name,
+				"user": emp.user_id,
+				"department": emp.department or _("Unassigned"),
+				"missing_days": cint(len(missed)),
+				"missing_dates": missed,
+			}
+		)
+
+	missing_rows.sort(key=lambda r: (-r["missing_days"], (r["employee_name"] or "").lower()))
+	return {
+		"employee_count": cint(len(missing_rows)),
+		"working_days": cint(len(working_dates)),
+		"expected_employees": cint(len(employees)),
+		"employees": missing_rows,
+	}
+
+
 @frappe.whitelist()
 def get_reporting_dashboard_data(
 	from_date=None, to_date=None, employee=None, section=None, status=None, work_type=None
@@ -160,6 +275,7 @@ def get_reporting_dashboard_data(
 	if section:
 		section_users = _get_users_for_section(section)
 		if not section_users:
+			empty_missing = _missing_report_payload(from_date, to_date, section=section, employee_user=employee)
 			return {
 				"can_view_all": can_view_all,
 				"rows": [],
@@ -176,6 +292,7 @@ def get_reporting_dashboard_data(
 					"daily_trend": {"labels": [], "values": []},
 				},
 				"section_users_wise": [],
+				"missing_reports": empty_missing,
 			}
 		conditions.append(f"{_resolved_reported_by_sql()} IN %(section_users)s")
 		params["section_users"] = tuple(section_users)
@@ -234,11 +351,15 @@ def get_reporting_dashboard_data(
 	trend_counts = [date_counter[d] for d in trend_dates]
 	completion_rate = flt((completed_tasks / total_tasks) * 100, 2) if total_tasks else 0
 	section_users_wise = _build_section_users_wise(data)
+	missing_reports = _missing_report_payload(
+		from_date, to_date, section=section, employee_user=employee
+	)
 
 	return {
 		"can_view_all": can_view_all,
 		"rows": data,
 		"section_users_wise": section_users_wise,
+		"missing_reports": missing_reports,
 		"kpis": {
 			"total_reports": cint(len(report_names)),
 			"total_tasks": cint(total_tasks),

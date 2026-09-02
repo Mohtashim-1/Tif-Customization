@@ -44,11 +44,23 @@ class ReportingDataPage {
 					<div class="row reporting-filter-grid"></div>
 				</div>
 
+				<div class="reporting-kpis mb-3"></div>
+
 				<div class="border rounded p-3">
 					<h5 class="mb-2">${__("Report Details")}</h5>
 					<div class="reporting-report-list"></div>
 				</div>
 			</div>
+			<style>
+				.reporting-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
+				.reporting-kpi{border:1px solid var(--border-color,#e5e7eb);border-top:4px solid #64748b;border-radius:10px;background:#fff;padding:14px 16px;box-shadow:0 2px 8px rgba(15,23,42,.05)}
+				.reporting-kpi__label{color:#64748b;font-size:12px;margin-bottom:6px}
+				.reporting-kpi__value{color:#0f172a;font-size:24px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums}
+				.reporting-kpi__hint{margin-top:6px;font-size:11px;color:#94a3b8}
+				.reporting-kpi--missing{border-top-color:#dc2626;cursor:pointer}
+				.reporting-kpi--missing:hover{box-shadow:0 4px 14px rgba(15,23,42,.12)}
+				.reporting-missing-dates{font-size:12px;color:#475569;max-width:420px}
+			</style>
 		`);
 
 		$(this.page.body).empty().append(this.body);
@@ -162,7 +174,9 @@ class ReportingDataPage {
 			freeze: false,
 			callback: (r) => {
 				const payload = r.message || {};
+				this.payload = payload;
 				this.apply_permissions(payload);
+				this.render_kpis(payload);
 				this.render_table(payload.rows || []);
 				this.bind_drilldown_actions();
 			}
@@ -213,6 +227,122 @@ class ReportingDataPage {
 			e.preventDefault();
 			const raw = $(e.currentTarget).attr("data-value") || "";
 			this.set_filter_and_reload("work_type", decodeURIComponent(raw));
+		});
+		this.body.find(".reporting-kpi--missing").off("click").on("click", () => {
+			this.show_missing_report_detail();
+		});
+	}
+
+	render_kpis(payload) {
+		const k = payload.kpis || {};
+		const missing = payload.missing_reports || {};
+		const missing_count = missing.employee_count || 0;
+		const working_days = missing.working_days || 0;
+		const expected = missing.expected_employees || 0;
+		const cards = [
+			[__("Total Reports"), k.total_reports || 0, "", ""],
+			[__("Active Employees"), k.active_employees || 0, "", ""],
+			[
+				__("Did not add reports"),
+				missing_count,
+				"reporting-kpi--missing",
+				__(
+					"{0} of {1} employees missed at least one day · Sundays excluded · {2} working days · click for names",
+					[missing_count, expected, working_days],
+				),
+			],
+		];
+		this.body.find(".reporting-kpis").html(
+			cards
+				.map(
+					([label, value, extra, hint]) => `
+				<div class="reporting-kpi ${extra}">
+					<div class="reporting-kpi__label">${label}</div>
+					<div class="reporting-kpi__value">${frappe.utils.escape_html(String(value))}</div>
+					${hint ? `<div class="reporting-kpi__hint">${hint}</div>` : ""}
+				</div>`
+				)
+				.join(""),
+		);
+	}
+
+	show_missing_report_detail() {
+		const missing = (this.payload && this.payload.missing_reports) || {};
+		const rows = missing.employees || [];
+		if (!rows.length) {
+			frappe.msgprint({
+				title: __("Employees without reports"),
+				message: __("Everyone submitted a report on working days in this range. Sundays are excluded."),
+				indicator: "green",
+			});
+			return;
+		}
+
+		const body = rows
+			.map((row) => {
+				const dates = (row.missing_dates || [])
+					.map((d) => frappe.datetime.str_to_user(d))
+					.join(", ");
+				const emp = frappe.utils.escape_html(row.employee_name || row.employee || "");
+				const emp_id = frappe.utils.escape_html(row.employee || "");
+				const dept = frappe.utils.escape_html(row.department || "-");
+				const user = encodeURIComponent(row.user || "");
+				return `
+					<tr>
+						<td>
+							<a href="/app/employee/${emp_id}">${emp}</a>
+							<div class="text-muted" style="font-size:11px">${emp_id}</div>
+						</td>
+						<td>${dept}</td>
+						<td class="text-right">${cint(row.missing_days)}</td>
+						<td class="reporting-missing-dates">${frappe.utils.escape_html(dates)}</td>
+						<td>
+							${
+								row.user
+									? `<a href="#" class="missing-filter-emp" data-user="${user}">${__("Show reports")}</a>`
+									: "-"
+							}
+						</td>
+					</tr>`;
+			})
+			.join("");
+
+		const dialog = new frappe.ui.Dialog({
+			title: __("Employees who did not add reports ({0})", [rows.length]),
+			size: "extra-large",
+			fields: [
+				{
+					fieldtype: "HTML",
+					fieldname: "missing_html",
+				},
+			],
+		});
+		dialog.fields_dict.missing_html.$wrapper.html(`
+			<p class="text-muted">
+				${__("Working days in range (Sundays excluded)")}: <strong>${cint(missing.working_days)}</strong>.
+				${__("Active employees expected")}: <strong>${cint(missing.expected_employees)}</strong>.
+			</p>
+			<div class="table-responsive">
+				<table class="table table-bordered table-hover">
+					<thead>
+						<tr>
+							<th>${__("Employee")}</th>
+							<th>${__("Section")}</th>
+							<th>${__("Missing days")}</th>
+							<th>${__("Missing dates")}</th>
+							<th></th>
+						</tr>
+					</thead>
+					<tbody>${body}</tbody>
+				</table>
+			</div>
+		`);
+		dialog.show();
+		dialog.$wrapper.find(".missing-filter-emp").on("click", (e) => {
+			e.preventDefault();
+			const user = decodeURIComponent($(e.currentTarget).attr("data-user") || "");
+			dialog.hide();
+			if (user) this.set_filter_and_reload("employee", user);
 		});
 	}
 
