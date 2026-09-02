@@ -363,96 +363,183 @@ frappe.pages["program-wise-expense"].on_page_load = function (wrapper) {
 
 			show_drilldown_dialog(data) {
 				const entries = data.entries || [];
+				const categories = data.categories || [];
+				const programs = data.programs || [];
 				const toFloat = (value) => {
 					if (value === null || value === undefined) return 0;
 					if (typeof value === "number") return value;
 					const parsed = parseFloat(value);
 					return Number.isFinite(parsed) ? parsed : 0;
 				};
+				const escape = (value) => frappe.utils.escape_html(cstr(value || ""));
+				const deptLabel =
+					data.department_label ||
+					((this.data && (this.data.departments || []).find((d) => d.key === data.department_key)) || {})
+						.label ||
+					(data.department_key || "All programs");
+				const fromLabel = data.from_date ? frappe.datetime.str_to_user(data.from_date) : "";
+				const toLabel = data.to_date ? frappe.datetime.str_to_user(data.to_date) : "";
+				const rangeLabel = fromLabel && toLabel ? `${fromLabel} – ${toLabel}` : "";
 
 				const debitTotal = entries.reduce((acc, e) => acc + toFloat(e.debit), 0);
 				const creditTotal = entries.reduce((acc, e) => acc + toFloat(e.credit), 0);
 				const amountTotalShown = entries.reduce((acc, e) => acc + toFloat(e.amount), 0);
 
-				const titleParts = [
-					data.row_label || "Drilldown",
-					data.department_key ? `Dept: ${data.department_key}` : "",
-					data.from_date && data.to_date ? `${data.from_date} to ${data.to_date}` : "",
-				].filter(Boolean);
+				const card = (label, value, hint) => `
+					<div class="pwe-dd-kpi">
+						<div class="pwe-dd-kpi__label">${escape(label)}</div>
+						<div class="pwe-dd-kpi__value">${value}</div>
+						${hint ? `<div class="pwe-dd-kpi__hint">${escape(hint)}</div>` : ""}
+					</div>`;
 
-				const truncatedNote = data.truncated
-					? `<div class="text-muted small" style="margin-bottom:8px;">Showing first 2000 GL entries (truncated).</div>`
-					: "";
+				const categoryCards = (items, kind) => {
+					if (!items.length) return "";
+					const title = kind === "program" ? "Programs" : "Categories";
+					return `
+						<div class="pwe-dd-section">
+							<div class="pwe-dd-section__title">${title}</div>
+							<div class="pwe-dd-cats">
+								${items
+									.map(
+										(item) => `
+									<button type="button" class="pwe-dd-cat" data-filter-kind="${kind}" data-filter-value="${escape(
+											item.label
+										)}">
+										<div class="pwe-dd-cat__name">${escape(item.label)}</div>
+										<div class="pwe-dd-cat__amt">${this.format_amount(item.amount)}</div>
+										<div class="pwe-dd-cat__meta">${cint(item.vouchers || item.count || 0)} voucher${
+											cint(item.vouchers || item.count || 0) === 1 ? "" : "s"
+										}</div>
+									</button>`
+									)
+									.join("")}
+							</div>
+						</div>`;
+				};
 
 				const rowsHtml = entries
 					.map((e) => {
 						const voucher =
 							e.voucher_type && e.voucher_no
 								? frappe.utils.get_form_link(e.voucher_type, e.voucher_no, true)
-								: frappe.utils.escape_html(e.voucher_no || "");
+								: escape(e.voucher_no || "");
 						const party = [e.party_type, e.party].filter(Boolean).join(": ");
+						const account = e.account_name || e.account || "";
+						const program = e.program || "Other";
 						return `
-							<tr>
-								<td>${frappe.utils.escape_html(e.posting_date || "")}</td>
+							<tr data-account="${escape(account)}" data-program="${escape(program)}">
+								<td>${escape(e.posting_date || "")}</td>
 								<td>${voucher}</td>
-								<td>${frappe.utils.escape_html(e.account_name || e.account || "")}</td>
-								<td>${frappe.utils.escape_html(e.cost_center_name || e.cost_center || "")}</td>
-								<td>${frappe.utils.escape_html(party)}</td>
+								<td>${escape(account)}</td>
+								<td>${escape(e.cost_center_name || e.cost_center || "")}</td>
+								<td>${escape(party)}</td>
 								<td class="text-right">${this.format_amount(e.debit)}</td>
 								<td class="text-right">${this.format_amount(e.credit)}</td>
-								<td class="text-right">${this.format_amount(e.amount)}</td>
-								<td>${frappe.utils.escape_html(e.remarks || "")}</td>
+								<td class="text-right"><strong>${this.format_amount(e.amount)}</strong></td>
+								<td class="text-muted">${escape(e.remarks || "")}</td>
 							</tr>
 						`;
 					})
 					.join("");
 
-				const summaryHtml = `
-					<div style="margin-bottom:8px;">
-						<div><strong>Voucher Count:</strong> ${frappe.utils.escape_html(String(data.voucher_count || 0))}</div>
-						<div><strong>Total Amount:</strong> ${this.format_amount(data.total_amount || 0)}</div>
-					</div>
-				`;
-
 				const html = `
-					${summaryHtml}
-					${truncatedNote}
-					<div class="table-responsive">
-						<table class="table table-bordered table-hover pwe-drilldown-table">
-							<thead>
-								<tr>
-									<th style="width: 110px;">Date</th>
-									<th style="width: 170px;">Voucher</th>
-									<th>Account</th>
-									<th>Cost Center</th>
-									<th style="width: 160px;">Party</th>
-									<th class="text-right" style="width: 110px;">Debit</th>
-									<th class="text-right" style="width: 110px;">Credit</th>
-									<th class="text-right" style="width: 110px;">Amount</th>
-									<th>Remarks</th>
-								</tr>
-							</thead>
-							<tbody>
-								${rowsHtml}
-								<tr class="pwe-drilldown-total-row">
-									<td colspan="5"><strong>Total (Shown)</strong></td>
-									<td class="text-right"><strong>${this.format_amount(debitTotal)}</strong></td>
-									<td class="text-right"><strong>${this.format_amount(creditTotal)}</strong></td>
-									<td class="text-right"><strong>${this.format_amount(amountTotalShown)}</strong></td>
-									<td></td>
-								</tr>
-							</tbody>
-						</table>
+					<style>
+						.pwe-dd{font-size:13px;color:#0f172a}
+						.pwe-dd-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:0 0 14px}
+						.pwe-dd-kpi{background:#fff;border:1px solid #e2e8f0;border-top:3px solid #2563eb;border-radius:10px;padding:10px 12px}
+						.pwe-dd-kpi__label{font-size:11px;color:#64748b;margin-bottom:4px}
+						.pwe-dd-kpi__value{font-size:18px;font-weight:700;line-height:1.2}
+						.pwe-dd-kpi__hint{font-size:11px;color:#94a3b8;margin-top:4px}
+						.pwe-dd-section{margin:0 0 14px}
+						.pwe-dd-section__title{font-size:12px;font-weight:700;color:#334155;margin:0 0 8px;letter-spacing:.02em;text-transform:uppercase}
+						.pwe-dd-cats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px}
+						.pwe-dd-cat{text-align:left;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;cursor:pointer}
+						.pwe-dd-cat:hover,.pwe-dd-cat.is-active{border-color:#2563eb;background:#eff6ff}
+						.pwe-dd-cat__name{font-size:12px;font-weight:600;color:#1e293b;margin-bottom:4px}
+						.pwe-dd-cat__amt{font-size:15px;font-weight:700}
+						.pwe-dd-cat__meta{font-size:11px;color:#64748b;margin-top:3px}
+						.pwe-dd-note{font-size:12px;color:#64748b;margin:0 0 8px}
+						.pwe-dd-table-wrap{max-height:420px;overflow:auto;border:1px solid #e2e8f0;border-radius:8px}
+						.pwe-drilldown-table{margin:0;font-size:12px}
+						.pwe-drilldown-table thead th{background:#f1f5f9;position:sticky;top:0;z-index:1;white-space:nowrap}
+						.pwe-drilldown-total-row td{background:#f8fafc;font-weight:700}
+					</style>
+					<div class="pwe-dd">
+						<div class="pwe-dd-kpis">
+							${card("Total Amount", this.format_amount(data.total_amount || 0), data.row_label || "")}
+							${card("Vouchers", cint(data.voucher_count || 0), `${entries.length} line${entries.length === 1 ? "" : "s"}`)}
+							${card("Program", escape(deptLabel), data.department_key ? "Filtered" : "All columns")}
+							${card("Period", escape(rangeLabel || "—"), "")}
+						</div>
+						${categoryCards(categories, "account")}
+						${!data.department_key && programs.length > 1 ? categoryCards(programs, "program") : ""}
+						${
+							data.truncated
+								? `<div class="pwe-dd-note">Showing first 2000 GL entries (truncated).</div>`
+								: `<div class="pwe-dd-note">Click a category to filter the voucher list. Click it again to show all.</div>`
+						}
+						<div class="pwe-dd-table-wrap">
+							<table class="table table-bordered table-hover pwe-drilldown-table">
+								<thead>
+									<tr>
+										<th style="width: 110px;">Date</th>
+										<th style="width: 170px;">Voucher</th>
+										<th>Account</th>
+										<th>Cost Center</th>
+										<th style="width: 160px;">Party</th>
+										<th class="text-right" style="width: 110px;">Debit</th>
+										<th class="text-right" style="width: 110px;">Credit</th>
+										<th class="text-right" style="width: 110px;">Amount</th>
+										<th>Remarks</th>
+									</tr>
+								</thead>
+								<tbody>
+									${
+										rowsHtml ||
+										`<tr><td colspan="9" class="text-center text-muted">No vouchers</td></tr>`
+									}
+									<tr class="pwe-drilldown-total-row">
+										<td colspan="5">Total (Shown)</td>
+										<td class="text-right">${this.format_amount(debitTotal)}</td>
+										<td class="text-right">${this.format_amount(creditTotal)}</td>
+										<td class="text-right">${this.format_amount(amountTotalShown)}</td>
+										<td></td>
+									</tr>
+								</tbody>
+							</table>
+						</div>
 					</div>
 				`;
 
 				const d = new frappe.ui.Dialog({
-					title: titleParts.join(" — "),
+					title: [data.row_label || "Voucher details", deptLabel, rangeLabel].filter(Boolean).join(" · "),
 					size: "extra-large",
 					fields: [{ fieldtype: "HTML", fieldname: "html" }],
 				});
 				d.fields_dict.html.$wrapper.html(html);
+				this.bind_category_filters(d.$wrapper);
 				d.show();
+			}
+
+			bind_category_filters($root) {
+				const $table = $root.find(".pwe-drilldown-table");
+				$root.find(".pwe-dd-cat").on("click", function () {
+					const $btn = $(this);
+					const kind = $btn.attr("data-filter-kind");
+					const value = $btn.attr("data-filter-value") || "";
+					const turningOff = $btn.hasClass("is-active");
+					$root.find(".pwe-dd-cat").removeClass("is-active");
+					if (turningOff) {
+						$table.find("tbody tr[data-account]").show();
+						return;
+					}
+					$btn.addClass("is-active");
+					const attr = kind === "program" ? "data-program" : "data-account";
+					$table.find("tbody tr[data-account]").each(function () {
+						const $row = $(this);
+						$row.toggle($row.attr(attr) === value);
+					});
+				});
 			}
 
 			inject_styles() {

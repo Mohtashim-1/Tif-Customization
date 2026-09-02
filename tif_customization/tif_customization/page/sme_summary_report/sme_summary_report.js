@@ -54,8 +54,12 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 					.sme-sum-table .sme-click:hover{background:#ecfdf5}
 					.sme-sum-break{background:#f8fafc;border:1px dashed #94a3b8;border-radius:8px;padding:10px 12px;margin:0 0 12px;font-size:13px;text-align:left}
 					.sme-sum-table tfoot th{background:#f9fafb;font-weight:700}
-					.sme-sum-table .score-col{background:#ecfdf5;font-weight:700}
-					.sme-sum-table .pts-col{background:#eff6ff}
+					.sme-sum-table .sme-low{background:#fef2f2}
+					.sme-sum-table .sme-low td,
+					.sme-sum-table .sme-low .kpi-col{background:#fef2f2}
+					.sme-sum-table .sme-low .sme-click:hover{background:#fecaca}
+					.sme-sum-table .sme-low .score-col,
+					.sme-sum-table .sme-low .pts-col{background:#fee2e2;font-weight:700;color:#991b1b}
 					.sme-sum-table .kpi-col{background:#f8fafc}
 					.sme-sum-title{text-align:center;font-size:18px;font-weight:700;margin:8px 0 14px}
 					.sme-sum-meta{text-align:center;font-size:12px;color:#6b7280;margin-bottom:12px}
@@ -77,6 +81,7 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 					@media print{
 						.page-head,.layout-side-section,.sme-sum-filters{display:none!important}
 						.sme-sum-table{font-size:10px}
+						.sme-sum-table .sme-low td{background:#fef2f2!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 					}
 				</style>
 				<p class="sme-sum-note">
@@ -290,7 +295,9 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 	render(data) {
 		const fromLabel = frappe.datetime.str_to_user(data.from_date);
 		const toLabel = frappe.datetime.str_to_user(data.to_date);
-		const rows = data.rows || [];
+		const rows = [...(data.rows || [])].sort(
+			(a, b) => flt(a.percentage) - flt(b.percentage) || String(a.employee_name || "").localeCompare(String(b.employee_name || "")),
+		);
 		const t = data.totals || {};
 		const kpiCols = this.kpi_columns(data);
 		const colCount = 14 + kpiCols.length;
@@ -304,8 +311,9 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 			? rows
 					.map((r) => {
 						const staff = r.employee_name || r.user_id || "";
+						const low = flt(r.percentage) < 50;
 						return `
-				<tr>
+				<tr class="${low ? "sme-low" : ""}">
 					<td class="left">${frappe.utils.escape_html(r.label || "")}</td>
 					<td>${frappe.utils.escape_html(r.division || r.region_label || "—")}</td>
 					${this.click_td(r.followup, "followup", staff)}
@@ -570,7 +578,10 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 		];
 		const lines = [headers.join(",")];
 		const kpiCols = this.kpi_columns(this.data);
-		(this.data.rows || []).forEach((r) => {
+		const csvRows = [...(this.data.rows || [])].sort(
+			(a, b) => flt(a.percentage) - flt(b.percentage) || String(a.employee_name || "").localeCompare(String(b.employee_name || "")),
+		);
+		csvRows.forEach((r) => {
 			lines.push(
 				[
 					`"${(r.label || "").replace(/"/g, '""')}"`,

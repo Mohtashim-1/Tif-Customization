@@ -1,0 +1,60 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-09-02 01:20:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "person_name",
+  "contact_number",
+  "designation",
+  "designation_other"
+ ],
+ "fields": [
+  {
+   "columns": 3,
+   "fieldname": "person_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Contact Person Name"
+  },
+  {
+   "columns": 2,
+   "fieldname": "contact_number",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Contact Number"
+  },
+  {
+   "columns": 2,
+   "fieldname": "designation",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Designation",
+   "options": "\nOwner\nDirector\nPrincipal\nVice Principal\nAdmin\nAdministrator\nIncharge\nCoordinator\nTeacher\nReceptionist\nFront Desk Officer (FDO)\nOther"
+  },
+  {
+   "columns": 3,
+   "depends_on": "eval:doc.designation=='Other'",
+   "fieldname": "designation_other",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Other Designation"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-09-02 01:20:00.000000",
+ "modified_by": "Administrator",
+ "module": "Tif Customization",
+ "name": "Field Visit School Contact",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

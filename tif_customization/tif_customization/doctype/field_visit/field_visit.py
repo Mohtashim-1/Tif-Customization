@@ -72,6 +72,7 @@ class FieldVisit(Document):
 		self._validate_volunteer_enrolments()
 		self._validate_enrolment_participants()
 		self._validate_workshop_attendees()
+		self._sync_school_contacts()
 
 	def before_submit(self):
 		if self.type == "Training":
@@ -148,6 +149,29 @@ class FieldVisit(Document):
 				if email in emails:
 					frappe.throw(_("Duplicate attendee email: {0}").format(row.email))
 				emails.add(email)
+
+	def _sync_school_contacts(self):
+		"""Keep the first contact person in the parent fields for reports / legacy screens."""
+		filled = [
+			row
+			for row in (self.school_contacts or [])
+			if (row.person_name or row.contact_number or row.designation)
+		]
+		for row in filled:
+			if row.designation == "Other" and not (row.designation_other or "").strip():
+				frappe.throw(
+					_("Please specify Other Designation for {0}.").format(
+						row.person_name or _("the contact person")
+					)
+				)
+		if filled:
+			first = filled[0]
+			self.meeting_with = first.person_name
+			self.contact_number = first.contact_number
+			self.designation = first.designation
+			self.designation_other = first.designation_other if first.designation == "Other" else ""
+		elif self.designation == "Other" and not (self.designation_other or "").strip():
+			frappe.throw(_("Please specify Other Designation."))
 
 	def _ensure_feedback_tokens(self):
 		for row in self.training_attendees or []:

@@ -46,16 +46,6 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Upcoming Training and Workshop (UAT)",
-   "link_count": 0,
-   "link_to": "upcoming-training-report",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
    "label": "School Database Database",
    "link_count": 0,
    "link_to": "school-location-report",
@@ -163,7 +153,7 @@
    "hidden": 0,
    "is_query_report": 0,
    "label": "HR",
-   "link_count": 12,
+   "link_count": 11,
    "onboard": 0,
    "type": "Card Break"
   },
@@ -220,17 +210,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Organization Chart (UAT) 29-Jun-26",
-   "link_count": 0,
-   "link_to": "organization-chart-(",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Organogram 2026",
+   "label": "Organization Chart ",
    "link_count": 0,
    "link_to": "organogram-2026",
    "link_type": "Page",
@@ -468,7 +448,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Reconciliation with Bank Statements Summary ",
+   "label": "Reconciliation with Bank Statements Summary (UAT)",
    "link_count": 0,
    "link_to": "reconcillation-with-",
    "link_type": "Page",
@@ -583,19 +563,9 @@
    "link_type": "Page",
    "onboard": 0,
    "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "SME KPI Sheet (Excel)",
-   "link_count": 0,
-   "link_to": "sme-kpi-sheet",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
   }
  ],
- "modified": "2026-08-27 12:43:27.675994",
+ "modified": "2026-09-02 15:04:48.501886",
  "modified_by": "farhan.hussain@tif.edu.pk",
  "module": "Tif Customization",
  "name": "Reports",
