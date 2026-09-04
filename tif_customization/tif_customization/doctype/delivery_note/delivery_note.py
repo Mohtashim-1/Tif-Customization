@@ -150,6 +150,72 @@ def on_cancel(doc, method):
 		frappe.log_error(frappe.get_traceback(), "Delivery Note Courier JV Cancel")
 
 
+DELIVERY_DETAIL_FIELDS = [
+	"custom_city",
+	"custom_total_delivery_weightage",
+	"custom_shipment_tracking_no",
+	"custom_courier_mode_of_payment",
+	"custom_supply_chain_cost_center",
+	"custom_book_purchase_supplier",
+	"custom_delivery_rate",
+	"custom_delivery_mode",
+	"custom_return_remarks",
+	"custom_by_hand",
+	"custom_area",
+	"custom_courier",
+	"custom_courier_service",
+]
+
+
+@frappe.whitelist()
+def save_delivery_details(docname, values=None):
+	"""Update delivery fields on a submitted Delivery Note and post courier JV if rate is set."""
+	if isinstance(values, str):
+		values = frappe.parse_json(values) or {}
+	values = values or {}
+
+	doc = frappe.get_doc("Delivery Note", docname)
+	if doc.docstatus != 1:
+		frappe.throw(_("Submit the Delivery Note first."))
+	if cint(doc.is_return):
+		frappe.throw(_("Cannot add delivery details on a return Delivery Note."))
+
+	for fieldname in DELIVERY_DETAIL_FIELDS:
+		if fieldname not in values:
+			continue
+		if not frappe.db.has_column("Delivery Note", fieldname):
+			continue
+		doc.set(fieldname, values.get(fieldname))
+		frappe.db.set_value("Delivery Note", doc.name, fieldname, values.get(fieldname), update_modified=True)
+
+	doc.reload()
+	if doc.custom_delivery_mode == "Courier" and flt(doc.custom_delivery_rate) > 0:
+		if not doc.custom_courier:
+			frappe.throw(_("Select Courier before posting a courier amount."))
+		if not doc.custom_courier_mode_of_payment:
+			frappe.throw(_("Select Courier Mode of Payment before posting a courier amount."))
+
+	journal_entry = None
+	if (
+		doc.custom_delivery_mode == "Courier"
+		and flt(doc.custom_delivery_rate) > 0
+		and not getattr(doc, "custom_courier_journal_entry", None)
+	):
+		result = post_courier_amount(doc.name)
+		journal_entry = (result or {}).get("journal_entry")
+
+	if frappe.db.has_column("Delivery Note", "custom_delivery_details_saved"):
+		frappe.db.set_value(
+			"Delivery Note",
+			doc.name,
+			"custom_delivery_details_saved",
+			1,
+			update_modified=False,
+		)
+
+	return {"ok": True, "journal_entry": journal_entry}
+
+
 @frappe.whitelist()
 def post_courier_amount(docname):
 	"""Book courier expense after partner bill is received (submitted DN only)."""

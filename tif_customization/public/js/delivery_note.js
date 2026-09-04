@@ -52,6 +52,18 @@ frappe.ui.form.on('Delivery Note', {
             }, __('Actions'));
         }
 
+		// After submit: add delivery details (city, courier, rate, …)
+		if (
+			frm.doc.docstatus === 1
+			&& !frm.doc.is_return
+			&& !frm.doc.custom_courier_journal_entry
+			&& !cint(frm.doc.custom_delivery_details_saved)
+		) {
+			frm.add_custom_button(__('Add Delivery Details'), function() {
+				show_delivery_details_dialog(frm);
+			});
+		}
+
 		// After stock-out submit: post courier amount when partner bill is received
 		if (
 			frm.doc.docstatus === 1
@@ -89,9 +101,144 @@ frappe.ui.form.on('Delivery Note', {
 					}
 				);
 			}, __('Actions'));
-		}
+        }
     }
 });
+
+function show_delivery_details_dialog(frm) {
+	const d = new frappe.ui.Dialog({
+		title: __('Add Delivery Details'),
+		size: 'large',
+		fields: [
+			{
+				fieldname: 'custom_city',
+				label: __('City'),
+				fieldtype: 'Data',
+				default: frm.doc.custom_city,
+			},
+			{
+				fieldname: 'custom_total_delivery_weightage',
+				label: __('Total Delivery Weightage (in Kgs)'),
+				fieldtype: 'Float',
+				non_negative: 1,
+				default: frm.doc.custom_total_delivery_weightage,
+			},
+			{
+				fieldname: 'custom_shipment_tracking_no',
+				label: __('Shipment Tracking No'),
+				fieldtype: 'Data',
+				default: frm.doc.custom_shipment_tracking_no,
+			},
+			{
+				fieldname: 'custom_courier_mode_of_payment',
+				label: __('Courier Mode of Payment'),
+				fieldtype: 'Select',
+				options: 'Cash\nAccount\nNon-Cost',
+				default: frm.doc.custom_courier_mode_of_payment,
+			},
+			{
+				fieldname: 'custom_supply_chain_cost_center',
+				label: __('Supply Chain Cost Center'),
+				fieldtype: 'Link',
+				options: 'Cost Center',
+				default: frm.doc.custom_supply_chain_cost_center,
+			},
+			{
+				fieldname: 'custom_book_purchase_supplier',
+				label: __('Book Purchase Supplier'),
+				fieldtype: 'Link',
+				options: 'Supplier',
+				default: frm.doc.custom_book_purchase_supplier,
+				description: __(
+					'Include this delivery note on the Book Purchase & Printing dashboard for the selected supplier.'
+				),
+			},
+			{
+				fieldname: 'custom_delivery_rate',
+				label: __('Delivery Rate'),
+				fieldtype: 'Float',
+				default: frm.doc.custom_delivery_rate,
+				description: __('Enter after courier partner bill is received. A Journal Entry is created on save when rate is set.'),
+			},
+			{
+				fieldname: 'custom_delivery_mode',
+				label: __('Delivery Mode'),
+				fieldtype: 'Select',
+				options: 'Courier\nTransport\nBy Hand',
+				default: frm.doc.custom_delivery_mode,
+				reqd: 1,
+			},
+			{
+				fieldname: 'custom_courier',
+				label: __('Courier'),
+				fieldtype: 'Link',
+				options: 'Courier',
+				default: frm.doc.custom_courier,
+				depends_on: 'eval:doc.custom_delivery_mode=="Courier"',
+				mandatory_depends_on: 'eval:doc.custom_delivery_mode=="Courier" && doc.custom_delivery_rate > 0',
+			},
+			{
+				fieldname: 'custom_courier_service',
+				label: __('Courier Service'),
+				fieldtype: 'Link',
+				options: 'Courier Service',
+				default: frm.doc.custom_courier_service,
+				depends_on: 'eval:doc.custom_delivery_mode=="Courier"',
+			},
+			{
+				fieldname: 'custom_return_remarks',
+				label: __('Return Remarks'),
+				fieldtype: 'Small Text',
+				default: frm.doc.custom_return_remarks,
+			},
+			{
+				fieldname: 'custom_by_hand',
+				label: __('By Hand'),
+				fieldtype: 'Link',
+				options: 'By Hand',
+				default: frm.doc.custom_by_hand,
+				depends_on: 'eval:doc.custom_delivery_mode=="By Hand"',
+				get_query: function() {
+					return { filters: { active: 1 } };
+				},
+			},
+			{
+				fieldname: 'custom_area',
+				label: __('Area'),
+				fieldtype: 'Data',
+				default: frm.doc.custom_area,
+			},
+		],
+		primary_action_label: __('Save'),
+		primary_action: function(values) {
+			frappe.call({
+				method: 'tif_customization.tif_customization.doctype.delivery_note.delivery_note.save_delivery_details',
+				args: {
+					docname: frm.doc.name,
+					values: values,
+				},
+				freeze: true,
+				freeze_message: __('Saving delivery details...'),
+				callback: function(r) {
+					d.hide();
+					if (r.message && r.message.journal_entry) {
+						frappe.show_alert({
+							message: __('Courier Journal Entry {0} created', [r.message.journal_entry]),
+							indicator: 'green',
+						});
+					} else {
+						frappe.show_alert({
+							message: __('Delivery details saved'),
+							indicator: 'green',
+						});
+					}
+					frm.reload_doc();
+				},
+			});
+		},
+	});
+	d.show();
+}
 
 // Handle selection changes in Courier Charges table
 frappe.ui.form.on('Courier Charges', {
