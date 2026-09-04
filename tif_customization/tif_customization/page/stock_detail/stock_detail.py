@@ -99,11 +99,10 @@ def get_item_department(item_code):
 
 
 def _last_sle_qty_by_warehouse(item_code, to_date, warehouses=None):
-    """Qty as of to_date per warehouse.
+    """Qty as of to_date: last SLE per warehouse by posting date/time (same as Stock Balance).
 
-    Use last SLE by posting date/time. If a Stock Reconciliation was submitted
-    later than that row (backdated recon), use the recon qty instead — that is
-    the physical count the user just posted (e.g. Head Office 400).
+    Do not use SLE creation time. A backdated Stock Reconciliation created today
+    must not override later deliveries (MQKPUT12 recon 400 vs actual 196).
     """
     extra = ""
     params = [item_code, to_date]
@@ -112,15 +111,13 @@ def _last_sle_qty_by_warehouse(item_code, to_date, warehouses=None):
         extra = f"AND warehouse IN ({placeholders})"
         params.extend(warehouses)
 
-    last_posted = frappe.db.sql(
+    rows = frappe.db.sql(
         f"""
-        SELECT warehouse, qty_after_transaction, voucher_type, creation
+        SELECT warehouse, qty_after_transaction
         FROM (
             SELECT
                 warehouse,
                 qty_after_transaction,
-                voucher_type,
-                creation,
                 ROW_NUMBER() OVER (
                     PARTITION BY warehouse
                     ORDER BY posting_datetime DESC, creation DESC
@@ -136,41 +133,7 @@ def _last_sle_qty_by_warehouse(item_code, to_date, warehouses=None):
         tuple(params),
         as_dict=True,
     )
-    last_recon = frappe.db.sql(
-        f"""
-        SELECT warehouse, qty_after_transaction, creation
-        FROM (
-            SELECT
-                warehouse,
-                qty_after_transaction,
-                creation,
-                ROW_NUMBER() OVER (
-                    PARTITION BY warehouse
-                    ORDER BY creation DESC
-                ) AS rn
-            FROM `tabStock Ledger Entry`
-            WHERE item_code = %s
-              AND posting_date <= %s
-              AND is_cancelled = 0
-              AND voucher_type = 'Stock Reconciliation'
-              {extra}
-        ) ranked
-        WHERE rn = 1
-        """,
-        tuple(params),
-        as_dict=True,
-    )
-    recon_by_wh = {r.warehouse: r for r in last_recon}
-    balances = {}
-    for row in last_posted:
-        recon = recon_by_wh.get(row.warehouse)
-        if recon and recon.creation and row.creation and recon.creation > row.creation:
-            balances[row.warehouse] = flt(recon.qty_after_transaction)
-        else:
-            balances[row.warehouse] = flt(row.qty_after_transaction)
-    for warehouse, recon in recon_by_wh.items():
-        if warehouse not in balances:
-            balances[warehouse] = flt(recon.qty_after_transaction)
+    balances = {r.warehouse: flt(r.qty_after_transaction) for r in rows}
     return sum(balances.values()), balances
 
 def get_context(context):

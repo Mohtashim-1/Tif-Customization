@@ -324,10 +324,8 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 		// First day of current month
 		const firstDay = new Date(year, month, 1);
 		const fromDate = formatDate(firstDay);
-		
-		// Last day of current month
-		const lastDay = new Date(year, month + 1, 0);
-		const toDate = formatDate(lastDay);
+		// As-of today (same as Stock Balance), not month-end
+		const toDate = formatDate(now);
 		
 		return { fromDate, toDate };
 	}
