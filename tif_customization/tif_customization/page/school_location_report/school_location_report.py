@@ -1,7 +1,8 @@
+from collections import defaultdict
 import json
 
 import frappe
-from frappe.utils import cint
+from frappe.utils import cint, flt
 
 
 PROGRAMS = ("tps", "qps", "cee")
@@ -181,7 +182,7 @@ def _department_summary(rows):
 
 
 def _school_details(rows):
-	return [
+	details = [
 		{
 			"name": row.get("name"),
 			"school_name": row.get("school_name"),
@@ -194,9 +195,81 @@ def _school_details(rows):
 			"cee": row.get("cee"),
 			"students": cint(row.get("no_of_students")),
 			"address": row.get("complete_school_address"),
+			"book_items": [],
 		}
 		for row in rows[:500]
 	]
+	_attach_delivered_books(details)
+	return details
+
+
+def _attach_delivered_books(details):
+	"""Item name + qty delivered to each school via submitted Delivery Notes."""
+	if not details:
+		return
+	school_ids = [row["name"] for row in details if row.get("name")]
+	school_names = [row["school_name"] for row in details if row.get("school_name")]
+	if not school_ids and not school_names:
+		return
+
+	params = {}
+	match_clauses = []
+	if school_ids:
+		params["school_ids"] = school_ids
+		match_clauses.append("dn.customer IN %(school_ids)s")
+	if school_names:
+		params["school_names"] = school_names
+		match_clauses.append("dn.customer_name IN %(school_names)s")
+
+	dn_rows = frappe.db.sql(
+		f"""
+		SELECT
+			dn.customer AS customer,
+			dn.customer_name AS customer_name,
+			COALESCE(NULLIF(TRIM(dni.item_name), ''), dni.item_code) AS item_name,
+			SUM(
+				CASE
+					WHEN IFNULL(dn.is_return, 0) = 1 THEN -ABS(COALESCE(dni.qty, 0))
+					ELSE COALESCE(dni.qty, 0)
+				END
+			) AS qty
+		FROM `tabDelivery Note` dn
+		INNER JOIN `tabDelivery Note Item` dni ON dni.parent = dn.name
+		WHERE dn.docstatus = 1
+			AND ({" OR ".join(match_clauses)})
+		GROUP BY dn.customer, dn.customer_name, COALESCE(NULLIF(TRIM(dni.item_name), ''), dni.item_code)
+		HAVING qty != 0
+		ORDER BY qty DESC
+		""",
+		params,
+		as_dict=True,
+	)
+
+	by_id = {row["name"]: row for row in details if row.get("name")}
+	by_name = {}
+	for row in details:
+		name = (row.get("school_name") or "").strip()
+		if name and name not in by_name:
+			by_name[name] = row
+
+	merged = defaultdict(lambda: defaultdict(float))
+	for row in dn_rows or []:
+		item_name = (row.get("item_name") or "").strip()
+		qty = flt(row.get("qty"))
+		if not item_name or not qty:
+			continue
+		school = by_id.get(row.get("customer")) or by_name.get(row.get("customer_name"))
+		if not school:
+			continue
+		merged[school["name"]][item_name] += qty
+
+	for school in details:
+		items = merged.get(school.get("name")) or {}
+		school["book_items"] = [
+			{"item_name": item_name, "qty": cint(qty) if qty == cint(qty) else flt(qty, 2)}
+			for item_name, qty in sorted(items.items(), key=lambda item: (-item[1], item[0].lower()))
+			if qty
+		]
 
 
 def _blank_location_row(location):

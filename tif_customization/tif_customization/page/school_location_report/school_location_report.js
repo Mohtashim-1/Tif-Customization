@@ -327,6 +327,7 @@ frappe.pages["school-location-report"].on_page_load = function (wrapper) {
 					[
 						{ key: "name", label: __("ID"), link: "School" },
 						{ key: "school_name", label: __("School") },
+						{ key: "book_items", label: __("Book Detail"), books: true },
 						{ key: "province", label: __("Province") },
 						{ key: "city", label: __("City") },
 						{ key: "tps", label: __("TPS") },
@@ -364,14 +365,20 @@ frappe.pages["school-location-report"].on_page_load = function (wrapper) {
 						const cells = columns
 							.map((column) => {
 								let value = row[column.key];
-								if (column.num) value = this.num(value);
-								else value = this.escape(value == null ? "" : String(value));
-								if (column.link && row[column.key]) {
-									value = `<span class="school-loc-link" data-doctype="${column.link}" data-name="${this.escape(row[column.key])}">${value}</span>`;
+								if (column.books) {
+									value = this.render_book_details(row.book_items);
+								} else if (column.num) {
+									value = this.num(value);
+								} else {
+									value = this.escape(value == null ? "" : String(value));
+									if (column.link && row[column.key]) {
+										value = `<span class="school-loc-link" data-doctype="${column.link}" data-name="${this.escape(row[column.key])}">${value}</span>`;
+									}
 								}
 								const classes = [
 									column.num ? "text-right school-loc-num" : "",
 									column.strong ? "school-loc-strong" : "",
+									column.books ? "school-loc-books-cell" : "",
 									column.cls || "",
 								]
 									.filter(Boolean)
@@ -390,6 +397,21 @@ frappe.pages["school-location-report"].on_page_load = function (wrapper) {
 
 			num(value) {
 				return format_number(flt(value), null, 0);
+			}
+
+			render_book_details(items) {
+				if (!items || !items.length) {
+					return `<span class="text-muted">—</span>`;
+				}
+				return `<div class="school-loc-books">${items
+					.map(
+						(item) => `
+						<div class="school-loc-book">
+							<span class="school-loc-book__name">${this.escape(item.item_name || "")}</span>
+							<span class="school-loc-book__qty">${this.num(item.qty)}</span>
+						</div>`
+					)
+					.join("")}</div>`;
 			}
 
 			escape(value) {
@@ -439,6 +461,11 @@ frappe.pages["school-location-report"].on_page_load = function (wrapper) {
 						.school-loc-link { color:var(--primary,#2563eb); cursor:pointer; font-weight:700; }
 						.school-loc-link:hover { text-decoration:underline; }
 						.school-loc-address { min-width:320px; max-width:520px; white-space:normal !important; line-height:1.4; }
+						.school-loc-books-cell { min-width:240px; max-width:360px; white-space:normal !important; }
+						.school-loc-books { display:flex; flex-direction:column; gap:3px; }
+						.school-loc-book { display:flex; justify-content:space-between; gap:10px; align-items:baseline; line-height:1.35; }
+						.school-loc-book__name { color:#0f172a; }
+						.school-loc-book__qty { font-weight:800; font-variant-numeric:tabular-nums; white-space:nowrap; }
 						.school-loc-empty { padding:28px; text-align:center; color:var(--text-muted,#6b7280); }
 						@media(max-width:1100px){ .school-loc-kpis,.school-loc-grid,.school-loc-grid--wide { grid-template-columns:1fr; } .school-loc-hero__stats { min-width:100%; } }
 						@media(max-width:700px){ .school-loc-hero__stats { grid-template-columns:1fr; } .school-loc-hero h2 { font-size:23px; } }

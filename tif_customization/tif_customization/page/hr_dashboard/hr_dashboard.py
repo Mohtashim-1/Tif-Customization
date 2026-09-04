@@ -141,15 +141,21 @@ def get_dashboard_data(filters=None):
 	# This calendar month, payroll, Pakistan/Qatar headcount, CNIC compliance
 	month_start = get_first_day(today)
 	month_end = get_last_day(today)
-	year_start = getdate(f"{today.year}-01-01")
 	payroll_year_start, payroll_year_end = _get_payroll_fiscal_year_bounds(today)
+	fiscal_year_start, fiscal_year_end, fiscal_year_name = _get_company_fiscal_year_bounds(today, company)
+	hire_year_end = today if today < fiscal_year_end else fiscal_year_end
 	data["new_hires_this_month"] = _count_new_hires(month_start, month_end, company, branch, department)
 	data["left_employees_this_month"] = _count_left_employees(period_start, period_end, company, branch, department)
 	data["attrition_this_month"] = data["left_employees_this_month"]
 	hc_month = max(cint(data["active_headcount"]), 1)
 	data["attrition_rate_this_month"] = flt(data["attrition_this_month"]) / flt(hc_month) * 100.0
 	data["attrition_month_label"] = data["payroll_month_label"]
-	data["new_hires_this_year"] = _count_new_hires(year_start, today, company, branch, department)
+	data["new_hires_this_year"] = _count_new_hires(
+		fiscal_year_start, hire_year_end, company, branch, department
+	)
+	data["fiscal_year_label"] = _fiscal_year_period_label(
+		fiscal_year_name, fiscal_year_start, fiscal_year_end
+	)
 	data["left_employees_this_year"] = _count_left_employees(
 		payroll_year_start, payroll_year_end, company, branch, department
 	)
@@ -190,11 +196,13 @@ def get_card_drilldown(card_key=None, filters=None):
 	to_date = getdate(filters.get("to_date") or today)
 	month_start = get_first_day(today)
 	month_end = get_last_day(today)
-	year_start = getdate(f"{today.year}-01-01")
 	payroll_month_start, payroll_month_end, _, _ = _get_payroll_period_bounds(today)
 	payroll_year_start, payroll_year_end = _get_payroll_fiscal_year_bounds(today)
 	payroll_month_label = _payroll_period_label(payroll_month_start, payroll_month_end)
 	payroll_year_label = _payroll_period_label(payroll_year_start, payroll_year_end)
+	fiscal_year_start, fiscal_year_end, fiscal_year_name = _get_company_fiscal_year_bounds(today, company)
+	hire_year_end = today if today < fiscal_year_end else fiscal_year_end
+	fiscal_year_label = _fiscal_year_period_label(fiscal_year_name, fiscal_year_start, fiscal_year_end)
 
 	card_key = (card_key or "").strip()
 	handlers = {
@@ -245,7 +253,10 @@ def get_card_drilldown(card_key=None, filters=None):
 		"overall_male_staff": lambda: _drill_active_by_gender(company, branch, department, "Male"),
 		"overall_female_staff": lambda: _drill_active_by_gender(company, branch, department, "Female"),
 		"new_hires_this_month": lambda: _drill_new_hires(month_start, month_end, company, branch, department),
-		"new_hires_this_year": lambda: _drill_new_hires(year_start, today, company, branch, department),
+		"new_hires_this_year": lambda: _drill_payload(
+			f"New Hires — {fiscal_year_label}",
+			_fetch_hire_rows(fiscal_year_start, hire_year_end, company, branch, department, limit=500),
+		),
 		"left_employees_this_month": lambda: _drill_payload(
 			f"Left Employees — {payroll_month_label}",
 			_fetch_left_rows(payroll_month_start, payroll_month_end, company, branch, department, limit=500),
@@ -367,6 +378,7 @@ def _empty_payload(from_date, to_date, company, branch, department="", employee=
 		"payroll_salary_slips_this_month": 0,
 		"payroll_net_pay_this_month": 0.0,
 		"new_hires_this_year": 0,
+		"fiscal_year_label": "",
 		"left_employees_this_year": 0,
 		"total_left_employees": 0,
 		"active_headcount_pakistan": 0,
@@ -516,6 +528,46 @@ def _current_payroll_ea_month_keys(reference_date=None):
 
 def _payroll_period_label(period_start, period_end):
 	return f"{formatdate(period_start, 'dd MMM yyyy')} – {formatdate(period_end, 'dd MMM yyyy')}"
+
+
+def _fiscal_year_period_label(fy_name, period_start, period_end):
+	span = _payroll_period_label(period_start, period_end)
+	return f"{fy_name} ({span})" if fy_name else span
+
+
+def _get_company_fiscal_year_bounds(reference_date=None, company=None):
+	"""Current ERP Fiscal Year (Jul–Jun for TIF), not calendar / academic year."""
+	from datetime import date as dt_date
+
+	reference_date = getdate(reference_date or nowdate())
+	company = (company or "").strip() or None
+	try:
+		from erpnext.accounts.utils import get_fiscal_year
+
+		fy = get_fiscal_year(date=reference_date, company=company, as_dict=True)
+		if isinstance(fy, dict):
+			start = getdate(fy.get("year_start_date"))
+			end = getdate(fy.get("year_end_date"))
+			name = fy.get("name") or fy.get("year") or ""
+			if start and end:
+				return start, end, name
+		elif fy:
+			name, start, end = fy[0], getdate(fy[1]), getdate(fy[2])
+			if start and end:
+				return start, end, name
+	except Exception:
+		pass
+
+	# Pakistan / TIF fiscal year fallback: 1 Jul – 30 Jun
+	if reference_date.month >= 7:
+		start = dt_date(reference_date.year, 7, 1)
+		end = dt_date(reference_date.year + 1, 6, 30)
+		name = f"{reference_date.year}-{str(reference_date.year + 1)[2:]}"
+	else:
+		start = dt_date(reference_date.year - 1, 7, 1)
+		end = dt_date(reference_date.year, 6, 30)
+		name = f"{reference_date.year - 1}-{str(reference_date.year)[2:]}"
+	return start, end, name
 
 
 def _get_payroll_fiscal_year_bounds(reference_date=None):
