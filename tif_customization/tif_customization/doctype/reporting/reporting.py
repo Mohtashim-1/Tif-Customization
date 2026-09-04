@@ -113,8 +113,96 @@ def _build_section_users_wise(rows):
 	return sorted(section_list, key=lambda item: (-item["total_reports"], item["section"].lower()))
 
 
+# Special Education Center (Mehmoodabad) — same departments as HR Dashboard.
+MEHMOODABAD_DEPARTMENTS = (
+	"Special Education Center - TIF",
+	"Special Education S.EDU - TIF",
+)
+
+
+def _is_skipped_employment_type(employment_type):
+	"""Contract staff and part-timers are not expected to file daily Reporting."""
+	text = (employment_type or "").lower()
+	return "part time" in text or "part-time" in text or "contract" in text
+
+
+def _is_mehmoodabad_staff(emp):
+	dept = (emp.get("department") or "").strip()
+	if dept in MEHMOODABAD_DEPARTMENTS:
+		return True
+	branch = (emp.get("branch") or "").lower()
+	return "mehmoodabad" in branch
+
+
+def _gazetted_holiday_dates(from_date, to_date):
+	"""Public holidays (weekly_off=0) from holiday lists used by active employees."""
+	if not from_date or not to_date:
+		return set()
+	lists = {
+		row
+		for row in frappe.get_all(
+			"Employee",
+			filters={"status": "Active", "holiday_list": ["is", "set"]},
+			pluck="holiday_list",
+		)
+		if row
+	}
+	if not lists:
+		return set()
+	rows = frappe.db.sql(
+		"""
+		SELECT DISTINCT holiday_date
+		FROM `tabHoliday`
+		WHERE parent IN %(lists)s
+			AND holiday_date BETWEEN %(start)s AND %(end)s
+			AND IFNULL(weekly_off, 0) = 0
+		""",
+		{"lists": list(lists), "start": from_date, "end": to_date},
+	)
+	return {getdate(row[0]) for row in rows if row and row[0]}
+
+
+def _leave_dates_by_employee(from_date, to_date, employee_ids):
+	"""Approved leave days keyed by employee, within the report range."""
+	out = defaultdict(set)
+	if not from_date or not to_date or not employee_ids:
+		return out
+	if not frappe.db.table_exists("Leave Application"):
+		return out
+	rows = frappe.db.sql(
+		"""
+		SELECT employee, from_date, to_date
+		FROM `tabLeave Application`
+		WHERE docstatus = 1
+			AND status = 'Approved'
+			AND employee IN %(employees)s
+			AND from_date <= %(to_date)s
+			AND to_date >= %(from_date)s
+			AND IFNULL(from_date, '') != ''
+			AND IFNULL(to_date, '') != ''
+		""",
+		{"employees": list(employee_ids), "from_date": from_date, "to_date": to_date},
+		as_dict=True,
+	)
+	start = getdate(from_date)
+	end = getdate(to_date)
+	for row in rows:
+		if not row.employee:
+			continue
+		cur = getdate(row.from_date)
+		leave_end = getdate(row.to_date)
+		if cur < start:
+			cur = start
+		if leave_end > end:
+			leave_end = end
+		while cur <= leave_end:
+			out[row.employee].add(cur)
+			cur = add_days(cur, 1)
+	return out
+
+
 def _working_dates(from_date, to_date):
-	"""Mon–Sat dates in range, excluding Sunday and any day after today."""
+	"""Mon–Sat dates in range, excluding Sunday, gazetted holidays, and any day after today."""
 	if not from_date or not to_date:
 		return []
 	start = getdate(from_date)
@@ -124,10 +212,11 @@ def _working_dates(from_date, to_date):
 		end = cutoff
 	if start > end:
 		return []
+	holidays = _gazetted_holiday_dates(start, end)
 	dates = []
 	cur = start
 	while cur <= end:
-		if cur.weekday() != 6:  # Sunday
+		if cur.weekday() != 6 and cur not in holidays:  # Sunday + gazetted holidays
 			dates.append(cur)
 		cur = add_days(cur, 1)
 	return dates
@@ -169,7 +258,16 @@ def _expected_reporting_employees(section=None, employee_user=None):
 	rows = frappe.get_all(
 		"Employee",
 		filters=filters,
-		fields=["name", "employee_name", "user_id", "department", "date_of_joining", "relieving_date"],
+		fields=[
+			"name",
+			"employee_name",
+			"user_id",
+			"department",
+			"branch",
+			"employment_type",
+			"date_of_joining",
+			"relieving_date",
+		],
 	)
 	user_ids = [r.user_id for r in rows if r.user_id]
 	enabled = set()
@@ -185,7 +283,11 @@ def _expected_reporting_employees(section=None, employee_user=None):
 	return [
 		r
 		for r in rows
-		if r.user_id in enabled and r.name not in skip_employees and r.user_id not in skip_users
+		if r.user_id in enabled
+		and r.name not in skip_employees
+		and r.user_id not in skip_users
+		and not _is_mehmoodabad_staff(r)
+		and not _is_skipped_employment_type(r.employment_type)
 	]
 
 
@@ -225,16 +327,22 @@ def _missing_report_payload(from_date, to_date, section=None, employee_user=None
 
 	employees = _expected_reporting_employees(section=section, employee_user=employee_user)
 	reported = _reported_dates_by_user(working_dates[0], working_dates[-1])
+	on_leave = _leave_dates_by_employee(
+		working_dates[0], working_dates[-1], [emp.name for emp in employees]
+	)
 	missing_rows = []
 	for emp in employees:
 		join = getdate(emp.date_of_joining) if emp.date_of_joining else None
 		relieve = getdate(emp.relieving_date) if emp.relieving_date else None
 		have = reported.get(emp.user_id) or set()
+		leave_days = on_leave.get(emp.name) or set()
 		missed = []
 		for d in working_dates:
 			if join and d < join:
 				continue
 			if relieve and d > relieve:
+				continue
+			if d in leave_days:
 				continue
 			if d not in have:
 				missed.append(str(d))

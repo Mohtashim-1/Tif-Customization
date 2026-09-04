@@ -247,7 +247,7 @@ class ReportingDataPage {
 				missing_count,
 				"reporting-kpi--missing",
 				__(
-					"{0} of {1} office staff missed at least one day · Field Officers excluded · Sundays excluded · {2} working days · click for names",
+					"{0} of {1} office staff missed at least one day · Field Officers, Mehmoodabad, contract and part-time excluded · Sundays, gazetted holidays and leave days excluded · {2} working days · click for names",
 					[missing_count, expected, working_days],
 				),
 			],
@@ -272,7 +272,7 @@ class ReportingDataPage {
 		if (!rows.length) {
 			frappe.msgprint({
 				title: __("Employees without reports"),
-				message: __("Everyone submitted a report on working days in this range. Sundays are excluded."),
+				message: __("Everyone submitted a report on working days in this range. Sundays, gazetted holidays and leave days are excluded."),
 				indicator: "green",
 			});
 			return;
@@ -319,8 +319,8 @@ class ReportingDataPage {
 		});
 		dialog.fields_dict.missing_html.$wrapper.html(`
 			<p class="text-muted">
-				${__("Office staff only. Field Officers are not included.")}
-				${__("Working days in range (Sundays excluded)")}: <strong>${cint(missing.working_days)}</strong>.
+				${__("Office staff only. Field Officers, Mehmoodabad staff, contract staff and part-timers are not included.")}
+				${__("Working days in range (Sundays and gazetted holidays excluded; leave days skipped per employee)")}: <strong>${cint(missing.working_days)}</strong>.
 				${__("Active employees expected")}: <strong>${cint(missing.expected_employees)}</strong>.
 			</p>
 			<div class="table-responsive">
