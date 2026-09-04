@@ -424,6 +424,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 		// Ensure date defaults are applied (can be empty on first soft navigation)
 		stock_detail_filters.set_value('from_date', defaultFromDate);
 		stock_detail_filters.set_value('to_date', defaultToDate);
+		stock_detail_filters.set_value('warehouses', ['TIF Head Office - TIF']);
 	}
 
 	function getFilterValues() {
@@ -433,7 +434,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 				to_date: defaultToDate,
 				item: null,
 				item_group: null,
-				warehouses: [],
+				warehouses: ['TIF Head Office - TIF'],
 				warehouse: null,
 				warehouse_sections: []
 			};
@@ -857,7 +858,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 				to_date: toDate,
 				item_group: [],
 				item: [],
-				warehouses: []
+				warehouses: ['TIF Head Office - TIF']
 			});
 		}
 		

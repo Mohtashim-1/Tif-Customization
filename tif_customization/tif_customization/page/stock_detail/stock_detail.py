@@ -71,11 +71,107 @@ def get_filtered_item_codes(filters=None):
 	return codes
 
 
+HEAD_OFFICE_WAREHOUSE = "TIF Head Office - TIF"
+
+
+def _report_warehouses(filters=None):
+	"""Warehouses for KPI / available stock. Default is Head Office only.
+
+	Empty warehouse filter used to sum every warehouse, so Head Office 400
+	plus leftover Stores qty showed as 628 for MQKPUT12.
+	"""
+	filters = filters or {}
+	selected = _as_list(filters.get("warehouses"))
+	if not selected and filters.get("warehouse"):
+		selected = _as_list(filters.get("warehouse"))
+	if selected:
+		return selected
+	if frappe.db.exists("Warehouse", HEAD_OFFICE_WAREHOUSE):
+		return [HEAD_OFFICE_WAREHOUSE]
+	return []
+
+
 def get_item_department(item_code):
     """Determine if an item belongs to TPS or QPS department"""
     if item_code in TPS_ITEM_CODES:
         return 'TPS'
     return 'QPS'
+
+
+def _last_sle_qty_by_warehouse(item_code, to_date, warehouses=None):
+    """Qty as of to_date per warehouse.
+
+    Use last SLE by posting date/time. If a Stock Reconciliation was submitted
+    later than that row (backdated recon), use the recon qty instead — that is
+    the physical count the user just posted (e.g. Head Office 400).
+    """
+    extra = ""
+    params = [item_code, to_date]
+    if warehouses:
+        placeholders = ",".join(["%s"] * len(warehouses))
+        extra = f"AND warehouse IN ({placeholders})"
+        params.extend(warehouses)
+
+    last_posted = frappe.db.sql(
+        f"""
+        SELECT warehouse, qty_after_transaction, voucher_type, creation
+        FROM (
+            SELECT
+                warehouse,
+                qty_after_transaction,
+                voucher_type,
+                creation,
+                ROW_NUMBER() OVER (
+                    PARTITION BY warehouse
+                    ORDER BY posting_datetime DESC, creation DESC
+                ) AS rn
+            FROM `tabStock Ledger Entry`
+            WHERE item_code = %s
+              AND posting_date <= %s
+              AND is_cancelled = 0
+              {extra}
+        ) ranked
+        WHERE rn = 1
+        """,
+        tuple(params),
+        as_dict=True,
+    )
+    last_recon = frappe.db.sql(
+        f"""
+        SELECT warehouse, qty_after_transaction, creation
+        FROM (
+            SELECT
+                warehouse,
+                qty_after_transaction,
+                creation,
+                ROW_NUMBER() OVER (
+                    PARTITION BY warehouse
+                    ORDER BY creation DESC
+                ) AS rn
+            FROM `tabStock Ledger Entry`
+            WHERE item_code = %s
+              AND posting_date <= %s
+              AND is_cancelled = 0
+              AND voucher_type = 'Stock Reconciliation'
+              {extra}
+        ) ranked
+        WHERE rn = 1
+        """,
+        tuple(params),
+        as_dict=True,
+    )
+    recon_by_wh = {r.warehouse: r for r in last_recon}
+    balances = {}
+    for row in last_posted:
+        recon = recon_by_wh.get(row.warehouse)
+        if recon and recon.creation and row.creation and recon.creation > row.creation:
+            balances[row.warehouse] = flt(recon.qty_after_transaction)
+        else:
+            balances[row.warehouse] = flt(row.qty_after_transaction)
+    for warehouse, recon in recon_by_wh.items():
+        if warehouse not in balances:
+            balances[warehouse] = flt(recon.qty_after_transaction)
+    return sum(balances.values()), balances
 
 def get_context(context):
     context.title = "Stock Detail Report"
@@ -352,10 +448,12 @@ def get_mqh_urdu_books_data(filters=None):
         return []
 
 def get_item_stock_data(item_code, filters=None):
-    """Get stock data for a specific item - sums across ALL warehouses"""
+    """Get stock data for a specific item (Head Office by default, or selected warehouses)."""
     try:
         if not filters:
             filters = {}
+
+        warehouses = _report_warehouses(filters)
             
         # Use filter dates or default to current month
         from frappe.utils import get_datetime, getdate
@@ -381,10 +479,17 @@ def get_item_stock_data(item_code, filters=None):
         # 3. Get all entries ordered by posting_datetime, then accumulate based on posting_date
         # Note: from_date and to_date are now date objects (not strings)
         
-        # Get ALL stock ledger entries for this item (across all warehouses)
-        # Match Stock Balance report: get qty_after_transaction, batch_no, serial_no for Stock Reconciliation
-        all_entries = frappe.db.sql("""
-            SELECT 
+        # Stock ledger for selected warehouses (Head Office by default)
+        sle_params = [item_code]
+        warehouse_sql = ""
+        if warehouses:
+            placeholders = ",".join(["%s"] * len(warehouses))
+            warehouse_sql = f"AND warehouse IN ({placeholders})"
+            sle_params.extend(warehouses)
+
+        all_entries = frappe.db.sql(
+            f"""
+            SELECT
                 posting_date,
                 posting_datetime,
                 actual_qty,
@@ -398,8 +503,12 @@ def get_item_stock_data(item_code, filters=None):
             FROM `tabStock Ledger Entry`
             WHERE item_code = %s
             AND is_cancelled = 0
+            {warehouse_sql}
             ORDER BY posting_datetime, creation
-        """, (item_code,), as_dict=True)
+            """,
+            tuple(sle_params),
+            as_dict=True,
+        )
         
         # Get opening vouchers (like Stock Balance report line 570-599)
         # Note: Stock Balance uses posting_date <= self.to_date (not from_date)
@@ -569,53 +678,11 @@ def get_item_stock_data(item_code, filters=None):
             AND si.docstatus = 1
         """, (item_code, from_date.strftime('%Y-%m-%d'), to_date.strftime('%Y-%m-%d')), as_dict=True)
         
-        # Get actual stock balance across all warehouses
-        # Use a reliable approach: get max posting_datetime per warehouse, then get entry with max creation
-        actual_balance = 0
-        warehouse_final_balances = {}
-        
-        # First, get the max posting_datetime for each warehouse
-        max_entries = frappe.db.sql("""
-            SELECT 
-                warehouse,
-                MAX(posting_datetime) as max_datetime
-            FROM `tabStock Ledger Entry`
-            WHERE item_code = %s
-            AND posting_date <= %s
-            AND is_cancelled = 0
-            GROUP BY warehouse
-        """, (item_code, to_date_str), as_dict=True)
-        
-        # Debug: Check if we found any warehouses
-        if item_code == 'MQHWB-01/U/12':
-            print(f"[DEBUG get_item_stock_data] Found {len(max_entries)} warehouses with max_datetime query")
-        
-        # For each warehouse, get the entry with max_datetime and max creation for that datetime
-        for max_entry in max_entries:
-            warehouse = max_entry.warehouse
-            max_datetime = max_entry.max_datetime
-            
-            # Get the entry with max_datetime and max creation for that datetime
-            last_entry = frappe.db.sql("""
-                SELECT qty_after_transaction, posting_datetime, creation
-                FROM `tabStock Ledger Entry`
-                WHERE item_code = %s
-                AND warehouse = %s
-                AND posting_datetime = %s
-                AND posting_date <= %s
-                AND is_cancelled = 0
-                ORDER BY creation DESC
-                LIMIT 1
-            """, (item_code, warehouse, max_datetime, to_date_str), as_dict=True)
-            
-            if last_entry and len(last_entry) > 0:
-                balance = flt(last_entry[0].qty_after_transaction)
-                warehouse_final_balances[warehouse] = balance
-                actual_balance += balance
-            else:
-                warehouse_final_balances[warehouse] = 0
-        
-        # Use actual balance from Stock Ledger Entry (matches Stock Balance report)
+        # Last SLE per warehouse by posting_datetime (not creation).
+        # Backdated Stock Reconciliation must not override later deliveries.
+        actual_balance, warehouse_final_balances = _last_sle_qty_by_warehouse(
+            item_code, to_date_str, warehouses
+        )
         final_available_stock = actual_balance
         
         # Debug: Always log for MQHWB-01/U/12
