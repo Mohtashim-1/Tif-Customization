@@ -133,6 +133,33 @@ def _working_dates(from_date, to_date):
 	return dates
 
 
+def _field_officer_skip_ids():
+	"""Employees / users who report via Field Visit, not daily Reporting."""
+	employees = set()
+	users = set()
+	if frappe.db.exists("DocType", "Field Officer"):
+		for row in frappe.get_all(
+			"Field Officer",
+			filters={"status": "Active"},
+			fields=["employee", "user"],
+		):
+			if row.employee:
+				employees.add(row.employee)
+			if row.user:
+				users.add(row.user)
+	role_users = frappe.get_all(
+		"Has Role",
+		filters={"role": ["in", ["Field Staff", "Supervisor Field Staff"]], "parenttype": "User"},
+		pluck="parent",
+		distinct=True,
+	)
+	if role_users:
+		users.update(role_users)
+		for emp in frappe.get_all("Employee", filters={"user_id": ["in", role_users]}, pluck="name"):
+			employees.add(emp)
+	return employees, users
+
+
 def _expected_reporting_employees(section=None, employee_user=None):
 	filters = {"status": "Active", "user_id": ["is", "set"]}
 	if section:
@@ -154,7 +181,12 @@ def _expected_reporting_employees(section=None, employee_user=None):
 				pluck="name",
 			)
 		)
-	return [r for r in rows if r.user_id in enabled]
+	skip_employees, skip_users = _field_officer_skip_ids()
+	return [
+		r
+		for r in rows
+		if r.user_id in enabled and r.name not in skip_employees and r.user_id not in skip_users
+	]
 
 
 def _reported_dates_by_user(from_date, to_date):

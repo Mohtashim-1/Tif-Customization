@@ -247,7 +247,7 @@ class ReportingDataPage {
 				missing_count,
 				"reporting-kpi--missing",
 				__(
-					"{0} of {1} employees missed at least one day · Sundays excluded · {2} working days · click for names",
+					"{0} of {1} office staff missed at least one day · Field Officers excluded · Sundays excluded · {2} working days · click for names",
 					[missing_count, expected, working_days],
 				),
 			],
@@ -319,6 +319,7 @@ class ReportingDataPage {
 		});
 		dialog.fields_dict.missing_html.$wrapper.html(`
 			<p class="text-muted">
+				${__("Office staff only. Field Officers are not included.")}
 				${__("Working days in range (Sundays excluded)")}: <strong>${cint(missing.working_days)}</strong>.
 				${__("Active employees expected")}: <strong>${cint(missing.expected_employees)}</strong>.
 			</p>
