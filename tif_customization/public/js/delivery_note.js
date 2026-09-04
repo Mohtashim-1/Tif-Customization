@@ -143,6 +143,10 @@ function show_delivery_details_dialog(frm) {
 				options: 'Cost Center',
 				default: frm.doc.custom_supply_chain_cost_center,
 			},
+
+            {
+                fieldtype: 'Column Break',
+            },
 			{
 				fieldname: 'custom_book_purchase_supplier',
 				label: __('Book Purchase Supplier'),
@@ -153,6 +157,7 @@ function show_delivery_details_dialog(frm) {
 					'Include this delivery note on the Book Purchase & Printing dashboard for the selected supplier.'
 				),
 			},
+
 			{
 				fieldname: 'custom_delivery_rate',
 				label: __('Delivery Rate'),
@@ -177,6 +182,11 @@ function show_delivery_details_dialog(frm) {
 				depends_on: 'eval:doc.custom_delivery_mode=="Courier"',
 				mandatory_depends_on: 'eval:doc.custom_delivery_mode=="Courier" && doc.custom_delivery_rate > 0',
 			},
+
+            {
+
+                fieldtype: 'Column Break',
+            },
 			{
 				fieldname: 'custom_courier_service',
 				label: __('Courier Service'),
@@ -202,6 +212,7 @@ function show_delivery_details_dialog(frm) {
 					return { filters: { active: 1 } };
 				},
 			},
+
 			{
 				fieldname: 'custom_area',
 				label: __('Area'),
