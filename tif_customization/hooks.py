@@ -33,7 +33,10 @@ fixtures = [
 
 # include js, css files in header of desk.html
 # app_include_css = "/assets/tif_customization/css/tif_customization.css"
-app_include_js = "/assets/tif_customization/js/workspace_sidebar.js"
+app_include_js = [
+	"/assets/tif_customization/js/workspace_sidebar.js",
+	"/assets/tif_customization/js/stock_report_recon_filter.js",
+]
 
 # include js, css files in header of web template
 # web_include_css = "/assets/tif_customization/css/tif_customization.css"
@@ -328,3 +331,10 @@ website_route_rules = [
 # default_log_clearing_doctypes = {
 # 	"Logging DocType Name": 30  # days to retain logs
 # }
+
+try:
+	from tif_customization.tif_customization.overrides.stock_reports import apply as _apply_stock_report_patches
+
+	_apply_stock_report_patches()
+except Exception:
+	pass

@@ -21,6 +21,13 @@ def get_workspace_sidebar_items():
 
 def boot_session(bootinfo):
 	"""Drop hidden default workspace so login/home route does not crash."""
+	try:
+		from tif_customization.tif_customization.overrides.stock_reports import apply as apply_stock_report_patches
+
+		apply_stock_report_patches()
+	except Exception:
+		pass
+
 	hidden = get_hidden_workspaces_for_user(frappe.session.user)
 	if not hidden:
 		return
