@@ -236,32 +236,29 @@ def _field_officer_skip_ids():
 				employees.add(row.employee)
 			if row.user:
 				users.add(row.user)
-	role_users = frappe.get_all(
-		"Has Role",
-		filters={"role": ["in", ["Field Staff", "Supervisor Field Staff"]], "parenttype": "User"},
-		pluck="parent",
-		distinct=True,
-	)
-	if role_users:
-		users.update(role_users)
-		for emp in frappe.get_all("Employee", filters={"user_id": ["in", role_users]}, pluck="name"):
-			employees.add(emp)
 	return employees, users
 
 
+def _resolved_employee_user(emp):
+	"""Login used for daily Reporting: Employee User ID, else company email."""
+	return (emp.get("user_id") or emp.get("company_email") or "").strip()
+
 def _expected_reporting_employees(section=None, employee_user=None):
-	filters = {"status": "Active", "user_id": ["is", "set"]}
+	filters = {"status": "Active"}
 	if section:
 		filters["department"] = section
+	or_filters = None
 	if employee_user:
-		filters["user_id"] = employee_user
+		or_filters = {"user_id": employee_user, "company_email": employee_user}
 	rows = frappe.get_all(
 		"Employee",
 		filters=filters,
+		or_filters=or_filters,
 		fields=[
 			"name",
 			"employee_name",
 			"user_id",
+			"company_email",
 			"department",
 			"branch",
 			"employment_type",
@@ -269,6 +266,8 @@ def _expected_reporting_employees(section=None, employee_user=None):
 			"relieving_date",
 		],
 	)
+	for emp in rows:
+		emp.user_id = _resolved_employee_user(emp)
 	user_ids = [r.user_id for r in rows if r.user_id]
 	enabled = set()
 	if user_ids:
@@ -283,7 +282,8 @@ def _expected_reporting_employees(section=None, employee_user=None):
 	return [
 		r
 		for r in rows
-		if r.user_id in enabled
+		if r.user_id
+		and r.user_id in enabled
 		and r.name not in skip_employees
 		and r.user_id not in skip_users
 		and not _is_mehmoodabad_staff(r)
