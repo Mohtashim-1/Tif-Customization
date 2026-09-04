@@ -412,11 +412,13 @@ EMPLOYMENT_CARD_TYPES = {
 	"emp_part_time_probation": ["Part Time (Probation)"],
 	"emp_contract_fixed_salary": ["Contract Base - (Fixed Salary)"],
 	"emp_contract_as_per_need": [
+		"Contract Base - As per need",
 		"Contract Base - Consultant",
 		"QPS - Contract Staff",
 		"TPS - Contract Staff",
 		"Teacher Training - Contract Staff",
 		"CEE - Contract Staff",
+		"OTR - Contract Staff",
 		"Contract",
 		"Contract - Zakat Employee",
 		"Storyteller - Contract",
