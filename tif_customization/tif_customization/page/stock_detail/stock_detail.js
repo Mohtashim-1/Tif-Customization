@@ -220,11 +220,11 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 			.book-card__media { height:150px; background:linear-gradient(180deg,#f8fafc,#eef2ff); display:flex; align-items:center; justify-content:center; overflow:hidden; }
 			.book-card__media img { width:100%; height:150px; object-fit:contain; background:#fff; }
 			.book-card__media--empty { color:#94a3b8; font-size:42px; }
-			.book-card__body { padding:10px 12px 12px; display:flex; flex-direction:column; gap:4px; flex:1; }
-			.book-card__code { font-size:11px; font-weight:700; color:#64748b; word-break:break-word; }
-			.book-card__name { margin:0; font-size:13px; font-weight:750; color:#0f172a; line-height:1.3; min-height:2.6em; }
-			.book-card__qty { margin-top:auto; font-size:22px; font-weight:850; color:#0f172a; font-variant-numeric:tabular-nums; }
-			.book-card__label { font-size:11px; color:#64748b; }
+			.book-card__body { padding:10px 12px 12px; display:flex; flex-direction:column; gap:4px; flex:1; align-items:center; text-align:center; }
+			.book-card__code { font-size:11px; font-weight:700; color:#64748b; word-break:break-word; text-align:center; width:100%; }
+			.book-card__name { margin:0; font-size:13px; font-weight:750; color:#0f172a; line-height:1.3; min-height:2.6em; text-align:center; width:100%; }
+			.book-card__qty { margin-top:auto; font-size:22px; font-weight:850; color:#0f172a; font-variant-numeric:tabular-nums; text-align:center; width:100%; }
+			.book-card__label { font-size:11px; color:#64748b; text-align:center; width:100%; }
 			.kpi-dept-row {
 				display: flex;
 				flex-wrap: wrap;
