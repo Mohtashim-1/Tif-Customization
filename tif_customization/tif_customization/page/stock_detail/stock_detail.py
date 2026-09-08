@@ -72,30 +72,26 @@ def get_filtered_item_codes(filters=None):
 
 
 HEAD_OFFICE_WAREHOUSE = "TIF Head Office - TIF"
+OLD_OFFICE_WAREHOUSE = "Old TIF Office - TIF"
+FILTER_WAREHOUSES = (HEAD_OFFICE_WAREHOUSE, OLD_OFFICE_WAREHOUSE)
 
 
-def _all_leaf_warehouses():
-	"""Enabled non-group warehouses (company-wide stock)."""
-	return frappe.get_all(
-		"Warehouse",
-		filters={"disabled": 0, "is_group": 0},
-		pluck="name",
-	)
+def _filter_warehouses():
+	"""Only Head Office and Old TIF Office are used on this report."""
+	return [name for name in FILTER_WAREHOUSES if frappe.db.exists("Warehouse", name)]
 
 
 def _report_warehouses(filters=None):
-	"""Warehouses for KPI / available stock.
-
-	No warehouse selected → all leaf warehouses (company total).
-	Selected warehouses → those only.
-	"""
+	"""Warehouses for KPI / available stock: Head Office + Old Office, or a subset."""
+	allowed = _filter_warehouses()
 	filters = filters or {}
 	selected = _as_list(filters.get("warehouses"))
 	if not selected and filters.get("warehouse"):
 		selected = _as_list(filters.get("warehouse"))
+	selected = [wh for wh in selected if wh in allowed]
 	if selected:
 		return selected
-	return _all_leaf_warehouses()
+	return allowed
 
 
 def get_item_department(item_code):
@@ -1277,6 +1273,25 @@ def calculate_nazimabad_totals(data):
     """Calculate totals for Nazimabad Warehouse data"""
     return calculate_head_office_totals(data)  # Same structure
 
+
+def _attach_item_images(items):
+	"""Attach Item.image onto KPI rows for ecommerce-style cards."""
+	codes = [row.get("item_code") for row in items if row.get("item_code")]
+	if not codes:
+		return
+	rows = frappe.db.sql(
+		"""
+		SELECT name, image
+		FROM `tabItem`
+		WHERE name IN %(codes)s
+		""",
+		{"codes": codes},
+		as_dict=True,
+	)
+	images = {row.name: (row.image or "").strip() for row in rows}
+	for item in items:
+		item["image"] = images.get(item.get("item_code")) or ""
+
 def calculate_kpis_for_specific_items(data, filters=None):
     """Calculate KPIs for specific items - returns both totals and individual item KPIs
     Ensures all items from SPECIFIC_ITEM_CODES are included"""
@@ -1377,6 +1392,8 @@ def calculate_kpis_for_specific_items(data, filters=None):
                 print(f"  [{idx}] available_stock: {item.get('available_stock')}")
         elif len(mqhwb01_in_list) == 1:
             print(f"[DEBUG calculate_kpis] Final MQHWB-01/U/12 in items_kpi: available_stock = {mqhwb01_in_list[0].get('available_stock')}")
+
+        _attach_item_images(items_kpi)
         
         # Calculate totals from all items
         totals = {
@@ -1961,7 +1978,7 @@ def get_stock_data(filters=None):
         if kpi_data is None:
             kpi_data = {}
         kpi_data["stock_scope_label"] = (
-            ", ".join(selected_wh) if selected_wh else "All warehouses"
+            " + ".join(selected_wh) if selected_wh else "Head Office + Old Office"
         )
         
         # Debug: Check if MQHWB-01/U/12 balance is correct in KPI data
@@ -2050,35 +2067,22 @@ def get_stock_data(filters=None):
 
 @frappe.whitelist()
 def get_warehouses(txt=None):
-    """Get list of warehouses for MultiSelectList filter (all leaf warehouses)."""
+    """Warehouse filter: TIF Head Office and Old TIF Office only."""
     try:
-        txt = (txt or "").strip()
-        params = []
-        search_filter = ""
-        if txt:
-            search_filter = "AND (name LIKE %s OR warehouse_name LIKE %s)"
-            like = f"%{txt}%"
-            params.extend([like, like])
-
-        warehouses = frappe.db.sql(
-            f"""
-            SELECT name, warehouse_name
-            FROM `tabWarehouse`
-            WHERE disabled = 0
-            AND IFNULL(is_group, 0) = 0
-            {search_filter}
-            ORDER BY warehouse_name
-            """,
-            tuple(params) if params else (),
-            as_dict=True,
-        )
-        return [
-            {
-                "value": w.name,
-                "description": w.warehouse_name or w.name,
-            }
-            for w in warehouses
-        ]
+        txt = (txt or "").strip().lower()
+        rows = []
+        for name in _filter_warehouses():
+            warehouse_name = frappe.db.get_value("Warehouse", name, "warehouse_name") or name
+            haystack = f"{name} {warehouse_name}".lower()
+            if txt and txt not in haystack:
+                continue
+            rows.append(
+                {
+                    "value": name,
+                    "description": warehouse_name,
+                }
+            )
+        return rows
     except Exception as e:
         print(f"Error getting warehouses: {str(e)}")
         return []
