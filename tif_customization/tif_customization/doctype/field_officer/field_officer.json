@@ -14,7 +14,12 @@
   "user",
   "branch",
   "section_break_help",
-  "help_html"
+  "help_html",
+  "lft",
+  "rgt",
+  "is_group",
+  "old_parent",
+  "parent_field_officer"
  ],
  "fields": [
   {
@@ -82,17 +87,53 @@
   {
    "fieldname": "help_html",
    "fieldtype": "HTML",
-   "options": "<p class=\"text-muted\">Type / Division controls which SME Target Base KPI sheet applies:<br><b>Karachi</b> (6 pts/day) · <b>Urban Areas</b> (5 pts/day) · <b>Rural Areas</b> (4 pts/day) · <b>Punjab</b> (5 pts/day).<br>Link the User so Field Visits and KPI reports resolve to this officer.</p>"
+   "options": "<p class=\"text-muted\">Type / Division controls which SME Target Base KPI sheet applies:<br><b>Karachi</b> (6 pts/day) \u00b7 <b>Urban Areas</b> (5 pts/day) \u00b7 <b>Rural Areas</b> (4 pts/day) \u00b7 <b>Punjab</b> (5 pts/day).<br>Link the User so Field Visits and KPI reports resolve to this officer.</p>"
+  },
+  {
+   "fieldname": "lft",
+   "fieldtype": "Int",
+   "hidden": 1,
+   "label": "Left",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "rgt",
+   "fieldtype": "Int",
+   "hidden": 1,
+   "label": "Right",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "is_group",
+   "fieldtype": "Check",
+   "label": "Is Group"
+  },
+  {
+   "fieldname": "old_parent",
+   "fieldtype": "Link",
+   "label": "Old Parent",
+   "options": "Field Officer"
+  },
+  {
+   "fieldname": "parent_field_officer",
+   "fieldtype": "Link",
+   "ignore_user_permissions": 1,
+   "label": "Parent Field Officer",
+   "options": "Field Officer"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
+ "is_tree": 1,
  "links": [],
- "modified": "2026-08-13 11:45:00.000000",
+ "modified": "2026-09-08 12:27:37.399083",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Field Officer",
  "naming_rule": "By fieldname",
+ "nsm_parent_field": "parent_field_officer",
  "owner": "Administrator",
  "permissions": [
   {

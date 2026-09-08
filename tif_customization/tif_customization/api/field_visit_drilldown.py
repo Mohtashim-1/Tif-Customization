@@ -41,6 +41,7 @@ METRIC_LABELS = {
 	"other_official": _("Other Official Tasks"),
 	"co_curricular": _("Co-curricular Activities"),
 	"new_school_registration": _("Registration of New Schools"),
+	"new_schools": _("New school visits (Marketing / M&E)"),
 	"workshop_registration": _("Workshop / Training sessions"),
 	"enrolment": _("Enrolment visits"),
 	"volunteers": _("Volunteer visits"),
@@ -48,6 +49,8 @@ METRIC_LABELS = {
 	"participants": _("Training visits (participants)"),
 	"school_visits": _("School Visits"),
 	"school_visit": _("School Visits"),
+	"model_school_a": _("Model School A"),
+	"model_school_b": _("Model School B"),
 }
 
 TYPE_TO_METRIC = {
@@ -92,6 +95,17 @@ def _metric_condition(metric: str, alias: str = "fv") -> str:
 		return f"{a}.type = 'Marketing' AND IFNULL({a}.marketing_visit_category, '') != 'New'"
 	if m == "new" or m == "new_school_registration":
 		return f"{a}.type = 'Marketing' AND {a}.marketing_visit_category = 'New'"
+	if m in ("new_schools", "new_school"):
+		return f"""{a}.type IN ('Marketing', 'M&E', 'Joint Visit with SME') AND (
+			({a}.type = 'Marketing' AND {a}.marketing_visit_category = 'New')
+			OR {a}.qps_affiliated = 'Yes - Newly Registered'
+			OR {a}.tps_affiliated = 'Yes - Newly Registered'
+			OR {a}.cee_affiliated = 'Yes - Newly Registered'
+		)"""
+	if m == "model_school_a":
+		return f"{a}.model_school LIKE '%%Model School A%%'"
+	if m == "model_school_b":
+		return f"{a}.model_school LIKE '%%Model School B%%'"
 	if m == "me_active":
 		return f"""{a}.type = 'M&E' AND LOWER(REPLACE(REPLACE(IFNULL({a}.me_activity_status,''),'-',' '),'  ',' ')) = 'active'"""
 	if m == "me_inactive":
@@ -130,7 +144,10 @@ def _metric_condition(metric: str, alias: str = "fv") -> str:
 			OR LOWER(IFNULL({a}.me_new_school_address,'')) LIKE '%%head%%office%%'
 		)"""
 	if m == "co_curricular":
-		return f"{a}.type = 'Marketing' AND {a}.marketing_visit_category = 'TPS Visits'"
+		return f"""(
+			{a}.type = 'Co-curricular Activity'
+			OR ({a}.type = 'Marketing' AND {a}.marketing_visit_category = 'TPS Visits')
+		)"""
 	return "1=0"
 
 
