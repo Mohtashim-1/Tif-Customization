@@ -1,7 +1,7 @@
 frappe.pages["school-wise-book-dispatched"].on_page_load = function (wrapper) {
 	const page = frappe.ui.make_app_page({
 		parent: wrapper,
-		title: __("School Wise Book Dispatched"),
+		title: __("City Wise Book Dispatched"),
 		single_column: true,
 	});
 	new frappe.tif_customization.SchoolWiseBookDispatched(page).make();
