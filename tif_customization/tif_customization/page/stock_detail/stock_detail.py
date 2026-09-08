@@ -74,11 +74,20 @@ def get_filtered_item_codes(filters=None):
 HEAD_OFFICE_WAREHOUSE = "TIF Head Office - TIF"
 
 
-def _report_warehouses(filters=None):
-	"""Warehouses for KPI / available stock. Default is Head Office only.
+def _all_leaf_warehouses():
+	"""Enabled non-group warehouses (company-wide stock)."""
+	return frappe.get_all(
+		"Warehouse",
+		filters={"disabled": 0, "is_group": 0},
+		pluck="name",
+	)
 
-	Empty warehouse filter used to sum every warehouse, so Head Office 400
-	plus leftover Stores qty showed as 628 for MQKPUT12.
+
+def _report_warehouses(filters=None):
+	"""Warehouses for KPI / available stock.
+
+	No warehouse selected → all leaf warehouses (company total).
+	Selected warehouses → those only.
 	"""
 	filters = filters or {}
 	selected = _as_list(filters.get("warehouses"))
@@ -86,9 +95,7 @@ def _report_warehouses(filters=None):
 		selected = _as_list(filters.get("warehouse"))
 	if selected:
 		return selected
-	if frappe.db.exists("Warehouse", HEAD_OFFICE_WAREHOUSE):
-		return [HEAD_OFFICE_WAREHOUSE]
-	return []
+	return _all_leaf_warehouses()
 
 
 def get_item_department(item_code):
@@ -1948,6 +1955,14 @@ def get_stock_data(filters=None):
             print(f"[DEBUG get_stock_data] MQHWB-01/U/12 in mqh_books_data: available_stock = {mqhwb01_in_mqh[0].get('available_stock')}")
         
         kpi_data = calculate_kpis_for_specific_items(mqh_books_data, filters)
+        selected_wh = _as_list(filters.get("warehouses"))
+        if not selected_wh and filters.get("warehouse"):
+            selected_wh = _as_list(filters.get("warehouse"))
+        if kpi_data is None:
+            kpi_data = {}
+        kpi_data["stock_scope_label"] = (
+            ", ".join(selected_wh) if selected_wh else "All warehouses"
+        )
         
         # Debug: Check if MQHWB-01/U/12 balance is correct in KPI data
         if kpi_data and kpi_data.get('items'):

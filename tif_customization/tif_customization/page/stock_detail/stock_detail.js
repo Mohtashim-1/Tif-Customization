@@ -422,7 +422,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 		// Ensure date defaults are applied (can be empty on first soft navigation)
 		stock_detail_filters.set_value('from_date', defaultFromDate);
 		stock_detail_filters.set_value('to_date', defaultToDate);
-		stock_detail_filters.set_value('warehouses', ['TIF Head Office - TIF']);
+		stock_detail_filters.set_value('warehouses', []);
 	}
 
 	function getFilterValues() {
@@ -432,7 +432,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 				to_date: defaultToDate,
 				item: null,
 				item_group: null,
-				warehouses: ['TIF Head Office - TIF'],
+				warehouses: [],
 				warehouse: null,
 				warehouse_sections: []
 			};
@@ -856,7 +856,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 				to_date: toDate,
 				item_group: [],
 				item: [],
-				warehouses: ['TIF Head Office - TIF']
+				warehouses: []
 			});
 		}
 		
@@ -1619,7 +1619,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 					<div class="kpi-card summary-kpi" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: black; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
 						<h5 class="kpi-title">Total Available Stock</h5>
 						<div class="kpi-value">${formatNumber(kpiData.total_available_stock || 0)}</div>
-						<p class="kpi-sub">Units</p>
+						<p class="kpi-sub">${frappe.utils.escape_html(kpiData.stock_scope_label || "All warehouses")}</p>
 					</div>
 				</div>
 				<div class="kpi-col">
