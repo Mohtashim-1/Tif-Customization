@@ -152,7 +152,7 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 								<div class="tif-card tif-card--clickable" data-card="new_hires_this_year" title="Click for detail">
 									<div class="tif-card__label">New hires (This Year)</div>
 									<div class="tif-card__value">—</div>
-									<div class="tif-card__hint">Fiscal year (Jul–Jun)</div>
+									<div class="tif-card__hint">Payroll year (26 Jun – 25 Jun)</div>
 								</div>
 								<div class="tif-card tif-card--clickable" data-card="attrition_this_month" title="Click for detail">
 									<div class="tif-card__label">Attrition (This Month)</div>
@@ -820,7 +820,7 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 				this.set_card("new_hires_this_year", data.new_hires_this_year);
 				this.set_card_hint(
 					"new_hires_this_year",
-					data.fiscal_year_label || "Fiscal year (Jul–Jun)",
+					data.fiscal_year_label || "Payroll year (26 Jun – 25 Jun)",
 				);
 				this.set_card("attrition_this_month", data.attrition_this_month);
 				const payrollMonthLabel = data.payroll_month_label || "";

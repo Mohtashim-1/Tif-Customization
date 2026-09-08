@@ -142,8 +142,8 @@ def get_dashboard_data(filters=None):
 	month_start = get_first_day(today)
 	month_end = get_last_day(today)
 	payroll_year_start, payroll_year_end = _get_payroll_fiscal_year_bounds(today)
-	fiscal_year_start, fiscal_year_end, fiscal_year_name = _get_company_fiscal_year_bounds(today, company)
-	hire_year_end = today if today < fiscal_year_end else fiscal_year_end
+	hire_year_start, hire_year_end_bound = _get_current_payroll_year_bounds(today)
+	hire_year_end = today if today < hire_year_end_bound else hire_year_end_bound
 	data["new_hires_this_month"] = _count_new_hires(month_start, month_end, company, branch, department)
 	data["left_employees_this_month"] = _count_left_employees(period_start, period_end, company, branch, department)
 	data["attrition_this_month"] = data["left_employees_this_month"]
@@ -151,11 +151,9 @@ def get_dashboard_data(filters=None):
 	data["attrition_rate_this_month"] = flt(data["attrition_this_month"]) / flt(hc_month) * 100.0
 	data["attrition_month_label"] = data["payroll_month_label"]
 	data["new_hires_this_year"] = _count_new_hires(
-		fiscal_year_start, hire_year_end, company, branch, department
+		hire_year_start, hire_year_end, company, branch, department
 	)
-	data["fiscal_year_label"] = _fiscal_year_period_label(
-		fiscal_year_name, fiscal_year_start, fiscal_year_end
-	)
+	data["fiscal_year_label"] = _payroll_period_label(hire_year_start, hire_year_end_bound)
 	data["left_employees_this_year"] = _count_left_employees(
 		payroll_year_start, payroll_year_end, company, branch, department
 	)
@@ -200,9 +198,9 @@ def get_card_drilldown(card_key=None, filters=None):
 	payroll_year_start, payroll_year_end = _get_payroll_fiscal_year_bounds(today)
 	payroll_month_label = _payroll_period_label(payroll_month_start, payroll_month_end)
 	payroll_year_label = _payroll_period_label(payroll_year_start, payroll_year_end)
-	fiscal_year_start, fiscal_year_end, fiscal_year_name = _get_company_fiscal_year_bounds(today, company)
-	hire_year_end = today if today < fiscal_year_end else fiscal_year_end
-	fiscal_year_label = _fiscal_year_period_label(fiscal_year_name, fiscal_year_start, fiscal_year_end)
+	hire_year_start, hire_year_end_bound = _get_current_payroll_year_bounds(today)
+	hire_year_end = today if today < hire_year_end_bound else hire_year_end_bound
+	fiscal_year_label = _payroll_period_label(hire_year_start, hire_year_end_bound)
 
 	card_key = (card_key or "").strip()
 	handlers = {
@@ -255,7 +253,7 @@ def get_card_drilldown(card_key=None, filters=None):
 		"new_hires_this_month": lambda: _drill_new_hires(month_start, month_end, company, branch, department),
 		"new_hires_this_year": lambda: _drill_payload(
 			f"New Hires — {fiscal_year_label}",
-			_fetch_hire_rows(fiscal_year_start, hire_year_end, company, branch, department, limit=500),
+			_fetch_hire_rows(hire_year_start, hire_year_end, company, branch, department, limit=500),
 		),
 		"left_employees_this_month": lambda: _drill_payload(
 			f"Left Employees — {payroll_month_label}",
@@ -568,6 +566,18 @@ def _get_company_fiscal_year_bounds(reference_date=None, company=None):
 		end = dt_date(reference_date.year, 6, 30)
 		name = f"{reference_date.year - 1}-{str(reference_date.year)[2:]}"
 	return start, end, name
+
+
+def _get_current_payroll_year_bounds(reference_date=None):
+	"""Payroll year that contains the date: 26 Jun → 25 Jun."""
+	from datetime import date as dt_date
+
+	reference_date = getdate(reference_date or nowdate())
+	period_from, period_to = _payroll_period_settings()
+	this_start = dt_date(reference_date.year, 6, period_from)
+	if reference_date >= this_start:
+		return this_start, dt_date(reference_date.year + 1, 6, period_to)
+	return dt_date(reference_date.year - 1, 6, period_from), dt_date(reference_date.year, 6, period_to)
 
 
 def _get_payroll_fiscal_year_bounds(reference_date=None):
