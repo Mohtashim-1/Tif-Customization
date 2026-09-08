@@ -2,6 +2,7 @@
 # For license information, please see license.txt
 
 from collections import Counter, defaultdict
+import json
 
 import frappe
 from frappe import _
@@ -370,7 +371,7 @@ def _missing_report_payload(from_date, to_date, section=None, employee_user=None
 
 @frappe.whitelist()
 def get_reporting_dashboard_data(
-	from_date=None, to_date=None, employee=None, section=None, status=None, work_type=None
+	from_date=None, to_date=None, employee=None, section=None, status=None, work_type=None, for_export=0
 ):
 	if not frappe.has_permission("Reporting", "read"):
 		frappe.throw(_("You are not permitted to view Reporting data."))
@@ -459,7 +460,7 @@ def get_reporting_dashboard_data(
 			AND sr.parenttype = 'Reporting'
 		WHERE {condition_sql}
 		ORDER BY r.posting_date DESC, r.posting_time DESC, r.modified DESC
-		LIMIT 500
+		{"" if cint(for_export) else "LIMIT 500"}
 		""",
 		params,
 		as_dict=True,
@@ -522,3 +523,245 @@ def get_reporting_dashboard_data(
 			},
 		},
 	}
+
+
+def _parse_export_filters(filters=None, **kwargs):
+	if isinstance(filters, str):
+		try:
+			filters = json.loads(filters) or {}
+		except Exception:
+			filters = {}
+	filters = filters or {}
+	return {
+		"from_date": filters.get("from_date") or kwargs.get("from_date"),
+		"to_date": filters.get("to_date") or kwargs.get("to_date"),
+		"employee": filters.get("employee") or kwargs.get("employee"),
+		"section": filters.get("section") or kwargs.get("section"),
+		"status": filters.get("status") or kwargs.get("status"),
+		"work_type": filters.get("work_type") or kwargs.get("work_type"),
+	}
+
+
+def _reporting_status_text(row):
+	if row.get("task_status"):
+		return row.get("task_status")
+	return "Submitted" if cint(row.get("docstatus")) == 1 else "Draft"
+
+
+def _reporting_export_payload(filters=None, **kwargs):
+	args = _parse_export_filters(filters, **kwargs)
+	args["for_export"] = 1
+	return get_reporting_dashboard_data(**args)
+
+
+@frappe.whitelist()
+def download_reporting_excel(filters=None, from_date=None, to_date=None, employee=None, section=None, status=None, work_type=None):
+	from frappe.utils.xlsxutils import make_xlsx
+
+	payload = _reporting_export_payload(
+		filters,
+		from_date=from_date,
+		to_date=to_date,
+		employee=employee,
+		section=section,
+		status=status,
+		work_type=work_type,
+	)
+	args = _parse_export_filters(filters, from_date=from_date, to_date=to_date, employee=employee, section=section, status=status, work_type=work_type)
+	kpis = payload.get("kpis") or {}
+	missing = payload.get("missing_reports") or {}
+
+	sheet = [
+		[_("Reporting Report")],
+		[_("From Date"), args.get("from_date") or ""],
+		[_("To Date"), args.get("to_date") or ""],
+		[_("Employee"), args.get("employee") or _("All")],
+		[_("Section"), args.get("section") or _("All")],
+		[_("Status"), args.get("status") or _("All")],
+		[_("Work Type"), args.get("work_type") or _("All")],
+		[],
+		[_("Total Reports"), kpis.get("total_reports") or 0],
+		[_("Active Employees"), kpis.get("active_employees") or 0],
+		[_("Did not add reports"), (missing.get("employee_count") or 0)],
+		[],
+		[
+			_("Report"),
+			_("Employee"),
+			_("Date"),
+			_("Time"),
+			_("Work Type"),
+			_("Task / Activity"),
+			_("Status"),
+		],
+	]
+	for row in payload.get("rows") or []:
+		sheet.append(
+			[
+				row.get("name") or "",
+				row.get("reported_by") or "",
+				str(row.get("posting_date") or ""),
+				str(row.get("posting_time") or ""),
+				row.get("work_type") or "",
+				row.get("activity") or row.get("description") or "",
+				_reporting_status_text(row),
+			]
+		)
+
+	sheet.extend(
+		[
+			[],
+			[_("Employees who did not add reports")],
+			[_("Employee"), _("Employee ID"), _("Section"), _("Missing days"), _("Missing dates")],
+		]
+	)
+	for emp in missing.get("employees") or []:
+		sheet.append(
+			[
+				emp.get("employee_name") or "",
+				emp.get("employee") or "",
+				emp.get("department") or "",
+				cint(emp.get("missing_days")),
+				", ".join(emp.get("missing_dates") or []),
+			]
+		)
+
+	xlsx_file = make_xlsx(sheet, "Reporting Report")
+	frappe.response["filename"] = "reporting_report.xlsx"
+	frappe.response["filecontent"] = xlsx_file.getvalue()
+	frappe.response["type"] = "binary"
+
+
+@frappe.whitelist()
+def download_reporting_pdf(filters=None, from_date=None, to_date=None, employee=None, section=None, status=None, work_type=None):
+	from frappe.utils.pdf import get_pdf
+
+	payload = _reporting_export_payload(
+		filters,
+		from_date=from_date,
+		to_date=to_date,
+		employee=employee,
+		section=section,
+		status=status,
+		work_type=work_type,
+	)
+	args = _parse_export_filters(
+		filters,
+		from_date=from_date,
+		to_date=to_date,
+		employee=employee,
+		section=section,
+		status=status,
+		work_type=work_type,
+	)
+	html = _reporting_pdf_html(payload, args)
+	try:
+		filecontent = get_pdf(html)
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "Reporting Report PDF")
+		frappe.throw(_("Could not generate PDF. Use Print and choose Save as PDF."))
+	frappe.local.response.filename = "reporting_report.pdf"
+	frappe.local.response.filecontent = filecontent
+	frappe.local.response.type = "pdf"
+
+
+def _esc(value):
+	return frappe.utils.escape_html("" if value is None else str(value))
+
+
+def _reporting_pdf_html(payload, args):
+	kpis = payload.get("kpis") or {}
+	missing = payload.get("missing_reports") or {}
+	rows = payload.get("rows") or []
+	row_html = []
+	for row in rows:
+		dt = f"{row.get('posting_date') or ''} {row.get('posting_time') or ''}".strip()
+		row_html.append(
+			"<tr>"
+			f"<td>{_esc(row.get('name'))}</td>"
+			f"<td>{_esc(row.get('reported_by'))}</td>"
+			f"<td>{_esc(dt)}</td>"
+			f"<td>{_esc(row.get('work_type'))}</td>"
+			f"<td>{_esc(row.get('activity') or row.get('description'))}</td>"
+			f"<td>{_esc(_reporting_status_text(row))}</td>"
+			"</tr>"
+		)
+	if not row_html:
+		row_html.append(f'<tr><td colspan="6">{_esc(_("No reports found for selected filters."))}</td></tr>')
+
+	missing_html = []
+	for emp in missing.get("employees") or []:
+		missing_html.append(
+			"<tr>"
+			f"<td>{_esc(emp.get('employee_name'))}</td>"
+			f"<td>{_esc(emp.get('employee'))}</td>"
+			f"<td>{_esc(emp.get('department'))}</td>"
+			f"<td>{cint(emp.get('missing_days'))}</td>"
+			f"<td>{_esc(', '.join(emp.get('missing_dates') or []))}</td>"
+			"</tr>"
+		)
+	if not missing_html:
+		missing_html.append(
+			f'<tr><td colspan="5">{_esc(_("Everyone submitted a report on working days in this range."))}</td></tr>'
+		)
+
+	return f"""
+	<html>
+	<head>
+		<meta charset="utf-8">
+		<style>
+			body {{ font-family: DejaVu Sans, sans-serif; font-size: 11px; color: #111; }}
+			h1 {{ font-size: 18px; margin: 0 0 8px; }}
+			.meta {{ margin-bottom: 12px; color: #444; }}
+			.kpis td {{ padding: 4px 10px 4px 0; }}
+			table.data {{ width: 100%; border-collapse: collapse; margin-top: 8px; }}
+			table.data th, table.data td {{ border: 1px solid #ccc; padding: 5px 6px; vertical-align: top; }}
+			table.data th {{ background: #f3f4f6; text-align: left; }}
+			h2 {{ font-size: 13px; margin: 16px 0 6px; }}
+		</style>
+	</head>
+	<body>
+		<h1>{_esc(_("Reporting Report"))}</h1>
+		<div class="meta">
+			{_esc(_("From Date"))}: <b>{_esc(args.get("from_date") or "-")}</b>
+			&nbsp;|&nbsp; {_esc(_("To Date"))}: <b>{_esc(args.get("to_date") or "-")}</b>
+			&nbsp;|&nbsp; {_esc(_("Employee"))}: <b>{_esc(args.get("employee") or _("All"))}</b>
+			&nbsp;|&nbsp; {_esc(_("Section"))}: <b>{_esc(args.get("section") or _("All"))}</b>
+		</div>
+		<table class="kpis">
+			<tr>
+				<td>{_esc(_("Total Reports"))}: <b>{cint(kpis.get("total_reports"))}</b></td>
+				<td>{_esc(_("Active Employees"))}: <b>{cint(kpis.get("active_employees"))}</b></td>
+				<td>{_esc(_("Did not add reports"))}: <b>{cint(missing.get("employee_count"))}</b></td>
+			</tr>
+		</table>
+		<h2>{_esc(_("Report Details"))}</h2>
+		<table class="data">
+			<thead>
+				<tr>
+					<th>{_esc(_("Report"))}</th>
+					<th>{_esc(_("Employee"))}</th>
+					<th>{_esc(_("Date/Time"))}</th>
+					<th>{_esc(_("Work Type"))}</th>
+					<th>{_esc(_("Task / Activity"))}</th>
+					<th>{_esc(_("Status"))}</th>
+				</tr>
+			</thead>
+			<tbody>{"".join(row_html)}</tbody>
+		</table>
+		<h2>{_esc(_("Employees who did not add reports"))}</h2>
+		<table class="data">
+			<thead>
+				<tr>
+					<th>{_esc(_("Employee"))}</th>
+					<th>{_esc(_("Employee ID"))}</th>
+					<th>{_esc(_("Section"))}</th>
+					<th>{_esc(_("Missing days"))}</th>
+					<th>{_esc(_("Missing dates"))}</th>
+				</tr>
+			</thead>
+			<tbody>{"".join(missing_html)}</tbody>
+		</table>
+	</body>
+	</html>
+	"""
+

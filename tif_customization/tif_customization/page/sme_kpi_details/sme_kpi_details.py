@@ -23,13 +23,13 @@ from tif_customization.tif_customization.field_visit_permissions import (
 from tif_customization.tif_customization.page.sme_kpi_sheet.sme_kpi_sheet import (
 	SHEET_META,
 	_build_rows,
-	_sheet_actuals,
 )
 from tif_customization.tif_customization.page.smes_target_base___k.smes_target_base_kpi_config import (
 	FISCAL_MONTHS,
 	INCREMENT_SCALE,
 )
 from tif_customization.tif_customization.page.smes_target_base___k.smes_target_base___k import (
+	_count_actuals,
 	_fiscal_year_start,
 	_increment_tier,
 	_resolve_field_officer,
@@ -249,7 +249,7 @@ def _staff_detail(staff, from_date, to_date, ytd_from, filters, officer_row=None
 	)
 	increment_tier = _increment_tier(overall_pct)
 
-	visit_bd = get_visit_type_breakdown(from_date, to_date, staff)
+	visit_bd = get_visit_type_breakdown(from_date, to_date, staff, submitted_only=True)
 
 	return {
 		"staff": staff,
@@ -291,7 +291,16 @@ def _staff_detail(staff, from_date, to_date, ytd_from, filters, officer_row=None
 
 
 def _enriched_actuals(from_date, to_date, staff, tokens):
-	actuals = _sheet_actuals(from_date, to_date, staff, tokens)
+	actuals = _count_actuals(
+		from_date, to_date, staff, staff_tokens=tokens, submitted_only=True
+	)
+	actuals["enrolment"] = _child_count(
+		"Field Visit Enrolment Participant", from_date, to_date, tokens
+	)
+	actuals["volunteers"] = _child_count("Field Visit Volunteer", from_date, to_date, tokens)
+	workshop_children = _child_count(
+		"Field Visit Workshop Attendee", from_date, to_date, tokens
+	)
 	actuals["co_curricular"] = _visit_count(from_date, to_date, tokens, CO_CURRICULAR_SQL)
 	actuals["new_schools"] = _distinct_schools(from_date, to_date, tokens, NEW_SCHOOL_SQL)
 	actuals["new_school_registration"] = actuals["new_schools"]
@@ -302,7 +311,7 @@ def _enriched_actuals(from_date, to_date, staff, tokens):
 		from_date, to_date, tokens, "fv.model_school LIKE '%%Model School B%%'"
 	)
 	sum_participants = _training_participants(from_date, to_date, tokens)
-	actuals["workshop_registration"] = max(cint(actuals.get("workshop_registration") or 0), sum_participants)
+	actuals["workshop_registration"] = max(workshop_children, sum_participants)
 	return actuals
 
 
@@ -328,6 +337,27 @@ def _staff_where(tokens):
 	return staff_match_sql("fv", "staff_tokens")
 
 
+def _child_count(doctype, from_date, to_date, tokens):
+	if not frappe.db.exists("DocType", doctype):
+		return 0
+	visit_day = visit_day_sql("fv")
+	params = _staff_params(from_date, to_date, tokens)
+	return cint(
+		frappe.db.sql(
+			f"""
+			SELECT COUNT(*)
+			FROM `tab{doctype}` c
+			INNER JOIN `tabField Visit` fv ON fv.name = c.parent
+			WHERE fv.docstatus = 1
+			  AND {visit_day} BETWEEN %(from_date)s AND %(to_date)s
+			  AND {_staff_where(tokens)}
+			""",
+			params,
+		)[0][0]
+		or 0
+	)
+
+
 def _visit_count(from_date, to_date, tokens, extra_sql):
 	visit_day = visit_day_sql("fv")
 	params = _staff_params(from_date, to_date, tokens)
@@ -336,7 +366,7 @@ def _visit_count(from_date, to_date, tokens, extra_sql):
 			f"""
 			SELECT COUNT(*)
 			FROM `tabField Visit` fv
-			WHERE fv.docstatus < 2
+			WHERE fv.docstatus = 1
 			  AND {visit_day} BETWEEN %(from_date)s AND %(to_date)s
 			  AND {_staff_where(tokens)}
 			  AND ({extra_sql})
@@ -357,7 +387,7 @@ def _distinct_schools(from_date, to_date, tokens, extra_sql):
 			SELECT COUNT(*) FROM (
 				SELECT {school} AS school
 				FROM `tabField Visit` fv
-				WHERE fv.docstatus < 2
+				WHERE fv.docstatus = 1
 				  AND {visit_day} BETWEEN %(from_date)s AND %(to_date)s
 				  AND {_staff_where(tokens)}
 				  AND ({extra_sql})
@@ -380,7 +410,7 @@ def _training_participants(from_date, to_date, tokens):
 			f"""
 			SELECT COALESCE(SUM(COALESCE(fv.training_no_of_participants, 0)), 0)
 			FROM `tabField Visit` fv
-			WHERE fv.docstatus < 2
+			WHERE fv.docstatus = 1
 			  AND fv.type = 'Training'
 			  AND {visit_day} BETWEEN %(from_date)s AND %(to_date)s
 			  AND {_staff_where(tokens)}
@@ -545,7 +575,7 @@ def _fiscal_month_rows(staff, tokens, officer, sheet, fy_start):
 
 def _footnotes():
 	return [
-		_("Working days = calendar days minus Sunday, gazetted holidays, and approved leave."),
+		_("Only submitted Field Visits are counted. Draft documents are excluded."),
 		_("Activity % = period points ÷ (working days × daily points). Daily points: Karachi 6, Urban 5, Rural 4."),
 		_("Outcome % = average of yearly compulsory mins (YTD). New schools are distinct school names from Marketing New visits and M&E / Joint visits marked Newly Registered — not School master records."),
 		_("Overall % = 70% activity + 30% outcome. Annual increment band uses Overall %."),

@@ -206,6 +206,7 @@ frappe.tif_customization.SmeKpiDetails = class SmeKpiDetails {
 				to_date: f.to_date,
 				staff,
 				metric,
+				submitted_only: 1,
 			});
 		});
 		this.body.on("click", "[data-open-staff]", (e) => {

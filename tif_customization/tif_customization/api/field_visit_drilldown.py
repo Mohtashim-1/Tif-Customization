@@ -151,11 +151,12 @@ def _metric_condition(metric: str, alias: str = "fv") -> str:
 	return "1=0"
 
 
-def get_visit_type_breakdown(from_date, to_date, staff=""):
+def get_visit_type_breakdown(from_date, to_date, staff="", submitted_only=False):
 	"""Counts of every Field Visit type in the date range (no 500-row cap)."""
 	visit_day = visit_day_sql("fv")
+	ds = "fv.docstatus = 1" if submitted_only else "fv.docstatus < 2"
 	conditions = [
-		"fv.docstatus < 2",
+		ds,
 		f"{visit_day} BETWEEN %(from_date)s AND %(to_date)s",
 	]
 	params = {"from_date": from_date, "to_date": to_date}

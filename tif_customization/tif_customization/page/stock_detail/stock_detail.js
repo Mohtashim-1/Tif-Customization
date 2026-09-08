@@ -214,17 +214,6 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 				white-space: normal;
 				word-break: break-word;
 			}
-			.book-card-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(168px,1fr)); gap:14px; margin-bottom:20px; }
-			.book-card { background:#fff; border:1px solid #e5e7eb; border-radius:14px; overflow:hidden; box-shadow:0 1px 3px rgba(15,23,42,.08); display:flex; flex-direction:column; min-height:268px; transition:transform .15s ease, box-shadow .15s ease; }
-			.book-card:hover { transform:translateY(-4px); box-shadow:0 12px 24px rgba(15,23,42,.12); }
-			.book-card__media { height:150px; background:linear-gradient(180deg,#f8fafc,#eef2ff); display:flex; align-items:center; justify-content:center; overflow:hidden; }
-			.book-card__media img { width:100%; height:150px; object-fit:contain; background:#fff; }
-			.book-card__media--empty { color:#94a3b8; font-size:42px; }
-			.book-card__body { padding:10px 12px 12px; display:flex; flex-direction:column; gap:4px; flex:1; align-items:center; text-align:center; }
-			.book-card__code { font-size:11px; font-weight:700; color:#64748b; word-break:break-word; text-align:center; width:100%; }
-			.book-card__name { margin:0; font-size:13px; font-weight:750; color:#0f172a; line-height:1.3; min-height:2.6em; text-align:center; width:100%; }
-			.book-card__qty { margin-top:auto; font-size:22px; font-weight:850; color:#0f172a; font-variant-numeric:tabular-nums; text-align:center; width:100%; }
-			.book-card__label { font-size:11px; color:#64748b; text-align:center; width:100%; }
 			.kpi-dept-row {
 				display: flex;
 				flex-wrap: wrap;
@@ -1599,30 +1588,6 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 		`);
 		tfoot.append(totalRow);
 	}
-	
-	function renderBookProductCard(item, displayName) {
-		const itemCode = frappe.utils.escape_html(item.item_code || displayName || "-");
-		const rawName = displayName || item.item_name || "";
-		const itemName = frappe.utils.escape_html(
-			rawName && rawName !== item.item_code ? rawName : item.item_code || displayName || ""
-		);
-		const src = (item.image || "").trim();
-		const media = src
-			? `<img src="${frappe.utils.escape_html(src)}" alt="${itemName}">`
-			: `<span class="fa fa-book"></span>`;
-		const mediaClass = src ? "" : " book-card__media--empty";
-		return `
-			<div class="book-card" title="${itemName}">
-				<div class="book-card__media${mediaClass}">${media}</div>
-				<div class="book-card__body">
-					<div class="book-card__code">${itemCode}</div>
-					<p class="book-card__name">${itemName}</p>
-					<div class="book-card__qty">${formatNumber(item.available_stock || 0)}</div>
-					<div class="book-card__label">${__("Available Stock")}</div>
-				</div>
-			</div>
-		`;
-	}
 
 	function renderKPIs(kpiData) {
 		if (!kpiData) {
@@ -1831,10 +1796,68 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 			
 			itemsHtml = `
 				<h5 style="margin-bottom: 15px; margin-top: 30px; font-weight: bold; color: #495057;">Book Wise Count</h5>
-				<div class="book-card-grid">
-					${filteredItems.map((item) => renderBookProductCard(item)).join("")}
-					${renderBookProductCard(panjPara2630 || { item_code: "Panj Para 26-30", item_name: "Panj Para 26-30", available_stock: 0, image: "" }, "Panj Para 26-30")}
-					${renderBookProductCard(panjPara15 || { item_code: "Panj Para 1-5", item_name: "Panj Para 1-5", available_stock: 0, image: "" }, "Panj Para 1-5")}
+				<div class="row" style="margin-bottom: 20px;">
+					${filteredItems.map((item, index) => {
+						const balance = item.available_stock || 0;
+						const colorGradient = colorGradients[index % colorGradients.length];
+						const itemCode = frappe.utils.escape_html(item.item_code || '-');
+						const rawItemName = item.item_name || '';
+						const itemName = frappe.utils.escape_html(
+							rawItemName && rawItemName !== item.item_code ? rawItemName : ''
+						);
+						const nameTitle = itemName
+							? ` title="${frappe.utils.escape_html(rawItemName)}"`
+							: '';
+
+						return `
+							<div class="col-md-2" style="margin-bottom: 10px;">
+								<div class="kpi-card stock-item-card" style="background: ${colorGradient}; color: black; padding: 12px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); min-height: 118px;">
+									<h6 style="margin: 0 0 5px 0; font-size: 12px; color: black; opacity: 0.95; font-weight: bold; line-height: 1.2; word-break: break-word;">${itemCode}</h6>
+									<p class="stock-item-name"${nameTitle}>${itemName || '&nbsp;'}</p>
+									<h2 style="margin: 0; font-size: 22px; font-weight: bold; text-align: center;">${formatNumber(balance)}</h2>
+									<p style="margin: 5px 0 0 0; font-size: 12px;color: black; opacity: 0.85; text-align: center;">Available Stock</p>
+								</div>
+							</div>
+						`;
+					}).join('')}
+					${panjPara2630 ? `
+						<div class="col-md-2" style="margin-bottom: 10px;">
+							<div class="kpi-card stock-item-card" style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); color: black; padding: 12px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); min-height: 118px;">
+								<h6 style="margin: 0 0 5px 0; font-size: 12px; color: black; opacity: 0.95; font-weight: bold; line-height: 1.2; word-break: break-word;">${frappe.utils.escape_html(panjPara2630.item_code || 'Panj Para 26-30')}</h6>
+								<p class="stock-item-name">Panj Para 26-30</p>
+								<h2 style="margin: 0; font-size: 22px; font-weight: bold; text-align: center;">${formatNumber(panjPara2630.available_stock || 0)}</h2>
+								<p style="margin: 5px 0 0 0; font-size: 12px;color: black; opacity: 0.85; text-align: center;">Available Stock</p>
+							</div>
+						</div>
+					` : `
+						<div class="col-md-2" style="margin-bottom: 10px;">
+							<div class="kpi-card stock-item-card" style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); color: black; padding: 12px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); min-height: 118px;">
+								<h6 style="margin: 0 0 5px 0; font-size: 12px; color: black; opacity: 0.95; font-weight: bold; line-height: 1.2;">Panj Para 26-30</h6>
+								<p class="stock-item-name">&nbsp;</p>
+								<h2 style="margin: 0; font-size: 22px; font-weight: bold; text-align: center;">${formatNumber(0)}</h2>
+								<p style="margin: 5px 0 0 0; font-size: 12px;color: black; opacity: 0.85; text-align: center;">Available Stock</p>
+							</div>
+						</div>
+					`}
+					${panjPara15 ? `
+						<div class="col-md-2" style="margin-bottom: 10px;">
+							<div class="kpi-card stock-item-card" style="background: linear-gradient(135deg, #4ecdc4 0%, #44a08d 100%); color: black; padding: 12px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); min-height: 118px;">
+								<h6 style="margin: 0 0 5px 0; font-size: 12px; color: black; opacity: 0.95; font-weight: bold; line-height: 1.2; word-break: break-word;">${frappe.utils.escape_html(panjPara15.item_code || 'Panj Para 1-5')}</h6>
+								<p class="stock-item-name">Panj Para 1-5</p>
+								<h2 style="margin: 0; font-size: 22px; font-weight: bold; text-align: center;">${formatNumber(panjPara15.available_stock || 0)}</h2>
+								<p style="margin: 5px 0 0 0; font-size: 12px;color: black; opacity: 0.85; text-align: center;">Available Stock</p>
+							</div>
+						</div>
+					` : `
+						<div class="col-md-2" style="margin-bottom: 10px;">
+							<div class="kpi-card stock-item-card" style="background: linear-gradient(135deg, #4ecdc4 0%, #44a08d 100%); color: black; padding: 12px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); min-height: 118px;">
+								<h6 style="margin: 0 0 5px 0; font-size: 12px; color: black; opacity: 0.95; font-weight: bold; line-height: 1.2;">Panj Para 1-5</h6>
+								<p class="stock-item-name">&nbsp;</p>
+								<h2 style="margin: 0; font-size: 22px; font-weight: bold; text-align: center;">${formatNumber(0)}</h2>
+								<p style="margin: 5px 0 0 0; font-size: 12px;color: black; opacity: 0.85; text-align: center;">Available Stock</p>
+							</div>
+						</div>
+					`}
 				</div>
 				
 				<!-- Detailed Table for Individual Items -->

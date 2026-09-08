@@ -22,6 +22,9 @@ class ReportingDataPage {
 		this.page.set_primary_action(__("Add Daily Report"), () => {
 			frappe.new_doc("Reporting");
 		});
+		this.page.add_action_item(__("Export Excel"), () => this.export_excel());
+		this.page.add_action_item(__("Export PDF"), () => this.export_pdf());
+		this.page.add_action_item(__("Print"), () => window.print());
 	}
 
 	get_month_start() {
@@ -33,12 +36,21 @@ class ReportingDataPage {
 	setup_layout() {
 		this.body = $(`
 			<div class="p-2">
-				<div class="border rounded p-3 mb-3">
+				<div class="border rounded p-3 mb-3 reporting-filter-bar no-print">
 					<div class="d-flex align-items-center justify-content-between mb-2">
 						<h5 class="mb-0">${__("Filters")}</h5>
 						<div>
 							<button class="btn btn-sm btn-primary reporting-apply-filter">${__("Apply")}</button>
 							<button class="btn btn-sm btn-default reporting-reset-filter">${__("Reset")}</button>
+							<button class="btn btn-sm btn-success reporting-export-excel">
+								<i class="fa fa-file-excel-o"></i> ${__("Excel")}
+							</button>
+							<button class="btn btn-sm btn-danger reporting-export-pdf">
+								<i class="fa fa-file-pdf-o"></i> ${__("PDF")}
+							</button>
+							<button class="btn btn-sm btn-info reporting-print">
+								<i class="fa fa-print"></i> ${__("Print")}
+							</button>
 						</div>
 					</div>
 					<div class="row reporting-filter-grid"></div>
@@ -60,6 +72,11 @@ class ReportingDataPage {
 				.reporting-kpi--missing{border-top-color:#dc2626;cursor:pointer}
 				.reporting-kpi--missing:hover{box-shadow:0 4px 14px rgba(15,23,42,.12)}
 				.reporting-missing-dates{font-size:12px;color:#475569;max-width:420px}
+				@media print{
+					.page-head,.navbar,.reporting-filter-bar,.no-print{display:none!important}
+					.reporting-kpis{break-inside:avoid}
+					body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+				}
 			</style>
 		`);
 
@@ -142,6 +159,9 @@ class ReportingDataPage {
 
 	bind_filter_actions() {
 		this.body.find(".reporting-apply-filter").on("click", () => this.load_data());
+		this.body.find(".reporting-export-excel").on("click", () => this.export_excel());
+		this.body.find(".reporting-export-pdf").on("click", () => this.export_pdf());
+		this.body.find(".reporting-print").on("click", () => window.print());
 		this.body.find(".reporting-reset-filter").on("click", () => {
 			const values = {
 				from_date: this.get_month_start(),
@@ -165,6 +185,19 @@ class ReportingDataPage {
 			status: this.filters.status.get_value(),
 			work_type: this.filters.work_type.get_value()
 		};
+	}
+
+	get_export_url(method) {
+		const filters = encodeURIComponent(JSON.stringify(this.get_filter_values()));
+		return `/api/method/tif_customization.tif_customization.doctype.reporting.reporting.${method}?filters=${filters}`;
+	}
+
+	export_excel() {
+		window.open(this.get_export_url("download_reporting_excel"), "_blank");
+	}
+
+	export_pdf() {
+		window.open(this.get_export_url("download_reporting_pdf"), "_blank");
 	}
 
 	load_data() {

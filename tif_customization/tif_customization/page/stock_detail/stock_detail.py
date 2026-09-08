@@ -1274,24 +1274,6 @@ def calculate_nazimabad_totals(data):
     return calculate_head_office_totals(data)  # Same structure
 
 
-def _attach_item_images(items):
-	"""Attach Item.image onto KPI rows for ecommerce-style cards."""
-	codes = [row.get("item_code") for row in items if row.get("item_code")]
-	if not codes:
-		return
-	rows = frappe.db.sql(
-		"""
-		SELECT name, image
-		FROM `tabItem`
-		WHERE name IN %(codes)s
-		""",
-		{"codes": codes},
-		as_dict=True,
-	)
-	images = {row.name: (row.image or "").strip() for row in rows}
-	for item in items:
-		item["image"] = images.get(item.get("item_code")) or ""
-
 def calculate_kpis_for_specific_items(data, filters=None):
     """Calculate KPIs for specific items - returns both totals and individual item KPIs
     Ensures all items from SPECIFIC_ITEM_CODES are included"""
@@ -1393,8 +1375,6 @@ def calculate_kpis_for_specific_items(data, filters=None):
         elif len(mqhwb01_in_list) == 1:
             print(f"[DEBUG calculate_kpis] Final MQHWB-01/U/12 in items_kpi: available_stock = {mqhwb01_in_list[0].get('available_stock')}")
 
-        _attach_item_images(items_kpi)
-        
         # Calculate totals from all items
         totals = {
             "total_items": len(items_kpi),
