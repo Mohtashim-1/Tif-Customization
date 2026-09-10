@@ -51,6 +51,68 @@ KPI_KEYS = tuple(c["key"] for c in KPI_COLUMNS)
 
 
 @frappe.whitelist()
+def get_expense_drilldown(filters=None):
+	"""Return submitted Expense Claims for SMEs in the report period."""
+	if not frappe.has_permission("Expense Claim", "read"):
+		frappe.throw(_("You are not permitted to view Expense Claim data."))
+
+	filters = _parse_filters(filters)
+	from_date, to_date = _resolve_dates(filters)
+	staff_rows = _get_sme_staff(filters)
+	emp_ids = [s["employee"] for s in staff_rows if s.get("employee")]
+	if not emp_ids:
+		return {"rows": [], "count": 0, "total": 0.0, "from_date": str(from_date), "to_date": str(to_date)}
+
+	try:
+		claims = frappe.db.sql(
+			"""
+			SELECT
+				ec.name,
+				ec.employee,
+				ec.employee_name,
+				ec.posting_date,
+				COALESCE(ec.total_claimed_amount, ec.grand_total, 0) AS amount,
+				ec.approval_status
+			FROM `tabExpense Claim` ec
+			WHERE ec.employee IN %(emps)s
+			AND ec.docstatus = 1
+			AND ec.posting_date BETWEEN %(from_date)s AND %(to_date)s
+			ORDER BY ec.posting_date DESC, ec.name DESC
+			LIMIT 1000
+			""",
+			{"emps": tuple(emp_ids), "from_date": from_date, "to_date": to_date},
+			as_dict=True,
+		)
+	except Exception:
+		return {"rows": [], "count": 0, "total": 0.0, "from_date": str(from_date), "to_date": str(to_date)}
+
+	rows = []
+	total = 0.0
+	for c in claims:
+		amt = flt(c.amount)
+		total += amt
+		rows.append(
+			{
+				"name": c.name,
+				"employee": c.employee,
+				"employee_name": c.employee_name or c.employee,
+				"posting_date": str(c.posting_date) if c.posting_date else "",
+				"amount": flt(amt, 2),
+				"status": c.approval_status or "",
+				"url": f"/app/expense-claim/{c.name}",
+			}
+		)
+
+	return {
+		"rows": rows,
+		"count": len(rows),
+		"total": flt(total, 2),
+		"from_date": str(from_date),
+		"to_date": str(to_date),
+	}
+
+
+@frappe.whitelist()
 def get_report_data(filters=None):
 	if not frappe.has_permission("Field Visit", "read"):
 		frappe.throw(_("You are not permitted to view Field Visit data."))

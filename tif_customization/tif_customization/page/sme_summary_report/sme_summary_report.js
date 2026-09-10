@@ -23,17 +23,7 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 		this.page.set_primary_action(__("Refresh"), () => this.load_data(), "refresh");
 		this.page.add_action_item(__("Export CSV"), () => this.export_csv());
 		this.page.add_action_item(__("Print"), () => window.print());
-		if (frappe.tif_customization && frappe.tif_customization.bind_clickable_numbers) {
-			frappe.tif_customization.bind_clickable_numbers($(this.page.body), () => this.get_filters());
-		}
-		$(this.page.body)
-			.off("click.tifPoints")
-			.on("click.tifPoints", "[data-points-kind]", (e) => {
-				e.preventDefault();
-				e.stopPropagation();
-				const $el = $(e.currentTarget);
-				this.show_points_detail($el.attr("data-points-kind"), $el.attr("data-employee") || "");
-			});
+		this.bind_interactions();
 		this.load_data();
 	}
 
@@ -67,8 +57,8 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 					.sme-sum-kpi-group__title{font-size:12px;font-weight:700;color:#475569;margin:0 0 8px;text-transform:uppercase;letter-spacing:.04em}
 					.sme-sum-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:10px}
 					.sme-sum-kpi{border:1px solid var(--border-color,#e5e7eb);border-top:4px solid #64748b;border-radius:10px;background:#fff;padding:12px 14px;box-shadow:0 2px 8px rgba(15,23,42,.05)}
-					.sme-sum-kpi[data-visit-metric],.sme-sum-kpi[data-points-kind]{cursor:pointer}
-					.sme-sum-kpi[data-visit-metric]:hover,.sme-sum-kpi[data-points-kind]:hover{box-shadow:0 4px 14px rgba(15,23,42,.12)}
+					.sme-sum-kpi[data-visit-metric],.sme-sum-kpi[data-points-kind],.sme-sum-kpi[data-card-kind]{cursor:pointer}
+					.sme-sum-kpi[data-visit-metric]:hover,.sme-sum-kpi[data-points-kind]:hover,.sme-sum-kpi[data-card-kind]:hover{box-shadow:0 4px 14px rgba(15,23,42,.12)}
 					.sme-sum-kpi__label{color:#64748b;font-size:11px;margin-bottom:6px;line-height:1.25}
 					.sme-sum-kpi__value{color:#0f172a;font-size:22px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums}
 					.sme-sum-kpi__hint{margin-top:6px;font-size:10px;color:#94a3b8}
@@ -318,7 +308,7 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 				cards: [
 					{ label: __("Schools Attended"), value: this.fmt(k.schools), style: "schools", metric: "schools" },
 					{ label: __("Participants"), value: this.fmt(k.participants), style: "participants", metric: "participants" },
-					{ label: __("Expenses"), value: this.fmt_cur(k.expenses), style: "expenses" },
+					{ label: __("Expenses"), value: this.fmt_cur(k.expenses), style: "expenses", cardKind: "expenses" },
 					{ label: __("Visited Days"), value: this.fmt(k.visited_days), style: "visited", metric: "visits" },
 				],
 			},
@@ -386,7 +376,7 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 						style: "pct",
 						pointsKind: "pct",
 					},
-					{ label: __("SMEs in Report"), value: this.fmt(k.sme_count), style: "sme" },
+					{ label: __("SMEs in Report"), value: this.fmt(k.sme_count), style: "sme", cardKind: "sme_count" },
 				],
 			},
 		];
@@ -394,12 +384,13 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 
 	render_kpi_card(card) {
 		const attrs = [];
-		if (card.metric) attrs.push(`data-visit-metric="${card.metric}"`);
-		if (card.pointsKind) attrs.push(`data-points-kind="${card.pointsKind}"`);
-		const hint =
-			card.metric || card.pointsKind ? __("Click to see details") : __("Period total");
+		if (card.metric) attrs.push(`data-visit-metric="${frappe.utils.escape_html(card.metric)}"`);
+		if (card.pointsKind) attrs.push(`data-points-kind="${frappe.utils.escape_html(card.pointsKind)}"`);
+		if (card.cardKind) attrs.push(`data-card-kind="${frappe.utils.escape_html(card.cardKind)}"`);
+		const clickable = card.metric || card.pointsKind || card.cardKind;
+		const hint = clickable ? __("Click to see details") : __("Period total");
 		return `
-			<div class="sme-sum-kpi sme-sum-kpi--${card.style}" ${attrs.join(" ")}>
+			<div class="sme-sum-kpi sme-sum-kpi--${card.style}" ${attrs.join(" ")} title="${clickable ? __("Click to see details") : ""}">
 				<div class="sme-sum-kpi__label">${card.label}</div>
 				<div class="sme-sum-kpi__value">${card.value}</div>
 				<div class="sme-sum-kpi__hint">${hint}</div>
@@ -535,6 +526,171 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 				</table>
 			</div>
 		`);
+		this.bind_interactions();
+	}
+
+	bind_interactions() {
+		const $root = $(".sme-sum");
+		const me = this;
+
+		$root.off("click.smeSumVisit click.smeSumPoints click.smeSumCard");
+
+		$root.on("click.smeSumVisit", "[data-visit-metric]", function (e) {
+			e.preventDefault();
+			e.stopPropagation();
+			const metric = $(this).attr("data-visit-metric");
+			if (!metric) return;
+			const staff = $(this).attr("data-visit-staff") || "";
+			const ctx = me.get_filters();
+			if (!ctx.from_date || !ctx.to_date) {
+				frappe.msgprint(__("Please select Visit From Date and Visit To Date."));
+				return;
+			}
+			if (!frappe.tif_customization || !frappe.tif_customization.open_visit_drilldown) {
+				frappe.msgprint(__("Drill-down module is still loading. Please refresh the page."));
+				return;
+			}
+			frappe.tif_customization.open_visit_drilldown({
+				from_date: ctx.from_date,
+				to_date: ctx.to_date,
+				staff: staff || ctx.staff || ctx.employee || "",
+				metric,
+				submitted_only: ctx.submitted_only || 1,
+			});
+		});
+
+		$root.on("click.smeSumPoints", "[data-points-kind]", function (e) {
+			e.preventDefault();
+			e.stopPropagation();
+			me.show_points_detail($(this).attr("data-points-kind") || "", $(this).attr("data-employee") || "");
+		});
+
+		$root.on("click.smeSumCard", "[data-card-kind]", function (e) {
+			e.preventDefault();
+			e.stopPropagation();
+			const kind = $(this).attr("data-card-kind");
+			if (kind === "expenses") me.show_expense_detail();
+			else if (kind === "sme_count") me.show_sme_list();
+		});
+	}
+
+	show_sme_list() {
+		const data = this.data || {};
+		const rows = [...(data.rows || [])].sort(
+			(a, b) => flt(b.percentage) - flt(a.percentage) || String(a.employee_name || "").localeCompare(String(b.employee_name || "")),
+		);
+		const body = rows.length
+			? rows
+					.map(
+						(r) => `<tr>
+				<td>${frappe.utils.escape_html(r.label || r.employee_name || "")}</td>
+				<td>${frappe.utils.escape_html(r.division || r.region_label || "—")}</td>
+				<td class="num">${this.fmt(r.grand_total)}</td>
+				<td class="num">${this.fmt_score(r.earned_points)}</td>
+				<td class="num">${this.fmt_pct(r.percentage)}</td>
+			</tr>`,
+					)
+					.join("")
+			: `<tr><td colspan="5" class="text-muted text-center">${__("No SMEs found")}</td></tr>`;
+
+		const d = new frappe.ui.Dialog({
+			title: __("SMEs in Report"),
+			size: "large",
+			fields: [{ fieldtype: "HTML", fieldname: "html" }],
+			primary_action_label: __("Close"),
+			primary_action: () => d.hide(),
+		});
+		d.fields_dict.html.$wrapper.html(`
+			<p class="text-muted" style="font-size:12px;margin-bottom:10px;">
+				${__("Visit Date")}: ${frappe.utils.escape_html(frappe.datetime.str_to_user(data.from_date || ""))}
+				– ${frappe.utils.escape_html(frappe.datetime.str_to_user(data.to_date || ""))}
+				&nbsp;·&nbsp; ${__("Total")}: <strong>${rows.length}</strong>
+			</p>
+			<div class="table-responsive" style="max-height:420px;overflow:auto;">
+				<table class="table table-bordered table-hover" style="font-size:12px;margin:0;">
+					<thead>
+						<tr>
+							<th>${__("Name")}</th>
+							<th>${__("Type / Division")}</th>
+							<th class="text-right">${__("Grand Total")}</th>
+							<th class="text-right">${__("Earned Points")}</th>
+							<th class="text-right">${__("Percentage")}</th>
+						</tr>
+					</thead>
+					<tbody>${body}</tbody>
+				</table>
+			</div>
+		`);
+		d.show();
+	}
+
+	show_expense_detail() {
+		const filters = this.get_filters();
+		if (!filters.from_date || !filters.to_date) {
+			frappe.msgprint(__("Please select Visit From Date and Visit To Date."));
+			return;
+		}
+		const d = new frappe.ui.Dialog({
+			title: __("Expense Claims"),
+			size: "extra-large",
+			fields: [{ fieldtype: "HTML", fieldname: "html" }],
+			primary_action_label: __("Close"),
+			primary_action: () => d.hide(),
+		});
+		d.fields_dict.html.$wrapper.html(
+			`<div class="text-muted" style="padding:20px;text-align:center">${__("Loading…")}</div>`,
+		);
+		d.show();
+
+		frappe.call({
+			method:
+				"tif_customization.tif_customization.page.sme_summary_report.sme_summary_report.get_expense_drilldown",
+			args: { filters },
+			callback: (r) => {
+				const payload = r.message || {};
+				const rows = payload.rows || [];
+				const body = rows.length
+					? rows
+							.map(
+								(row) => `<tr>
+						<td><a href="${frappe.utils.escape_html(row.url)}">${frappe.utils.escape_html(row.name)}</a></td>
+						<td>${frappe.utils.escape_html(row.posting_date || "")}</td>
+						<td>${frappe.utils.escape_html(row.employee_name || "")}</td>
+						<td class="text-right">${frappe.format(row.amount || 0, { fieldtype: "Currency" })}</td>
+						<td>${frappe.utils.escape_html(row.status || "")}</td>
+					</tr>`,
+							)
+							.join("")
+					: `<tr><td colspan="5" class="text-muted text-center">${__("No expense claims in this period.")}</td></tr>`;
+
+				d.fields_dict.html.$wrapper.html(`
+					<div class="mb-2">
+						${__("Total")}: <strong>${payload.count || 0}</strong>
+						&nbsp;·&nbsp;
+						${__("Amount")}: <strong>${frappe.format(payload.total || 0, { fieldtype: "Currency" })}</strong>
+					</div>
+					<div class="table-responsive" style="max-height:420px;overflow:auto;">
+						<table class="table table-bordered table-hover" style="font-size:12px;margin:0;">
+							<thead>
+								<tr>
+									<th>${__("Claim No")}</th>
+									<th>${__("Posting Date")}</th>
+									<th>${__("Employee")}</th>
+									<th class="text-right">${__("Amount")}</th>
+									<th>${__("Status")}</th>
+								</tr>
+							</thead>
+							<tbody>${body}</tbody>
+						</table>
+					</div>
+				`);
+			},
+			error: () => {
+				d.fields_dict.html.$wrapper.html(
+					`<p class="text-danger text-center">${__("Failed to load expense claims.")}</p>`,
+				);
+			},
+		});
 	}
 
 	fmt_plain(n, digits = 2) {
