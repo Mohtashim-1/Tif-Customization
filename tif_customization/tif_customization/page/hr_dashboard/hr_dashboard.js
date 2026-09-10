@@ -164,8 +164,13 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 									<div class="tif-card__value">—</div>
 									<div class="tif-card__hint">Payroll month (26–25)</div>
 								</div>
+								<div class="tif-card tif-card--clickable" data-card="left_employees_last_month" title="Click for detail">
+									<div class="tif-card__label">Left Employees (Last Month)</div>
+									<div class="tif-card__value">—</div>
+									<div class="tif-card__hint">Last completed payroll month (26–25)</div>
+								</div>
 								<div class="tif-card tif-card--clickable" data-card="left_employees_this_year" title="Click for detail">
-									<div class="tif-card__label">Left Employees (This Year)</div>
+									<div class="tif-card__label">Left Employees (Last Year)</div>
 									<div class="tif-card__value">—</div>
 									<div class="tif-card__hint">Payroll year (26 Jun – 25 Jun)</div>
 								</div>
@@ -458,6 +463,7 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 					.tif-card[data-card="new_hires_this_month"],
 					.tif-card[data-card="new_hires_this_year"]{--tif-card-accent:#059669;--tif-card-accent-text:#047857;--tif-card-muted:#064e3b;background:linear-gradient(135deg,#ecfdf5 0%,#d1fae5 100%);border-color:#a7f3d0}
 					.tif-card[data-card="left_employees_this_month"],
+					.tif-card[data-card="left_employees_last_month"],
 					.tif-card[data-card="left_employees_this_year"],
 					.tif-card[data-card="attrition_this_month"]{--tif-card-accent:#f97316;--tif-card-accent-text:#c2410c;--tif-card-muted:#7c2d12;background:linear-gradient(135deg,#fff7ed 0%,#ffedd5 100%);border-color:#fed7aa}
 					.tif-card[data-card="eobi_added"]{--tif-card-accent:#ca8a04;--tif-card-accent-text:#a16207;--tif-card-muted:#713f12;background:linear-gradient(135deg,#fefce8 0%,#fef3c7 100%);border-color:#fde68a}
@@ -835,6 +841,11 @@ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 				this.set_card_hint(
 					"left_employees_this_month",
 					payrollMonthLabel || "Payroll month (26–25)",
+				);
+				this.set_card("left_employees_last_month", data.left_employees_last_month);
+				this.set_card_hint(
+					"left_employees_last_month",
+					data.punctuality_last_month_label || "Last completed payroll month (26–25)",
 				);
 				this.set_card("left_employees_this_year", data.left_employees_this_year);
 				this.set_card_hint(

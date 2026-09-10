@@ -63,21 +63,33 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 					.sme-sum-table .kpi-col{background:#f8fafc}
 					.sme-sum-title{text-align:center;font-size:18px;font-weight:700;margin:8px 0 14px}
 					.sme-sum-meta{text-align:center;font-size:12px;color:#6b7280;margin-bottom:12px}
-					.sme-sum-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:0 0 14px}
+					.sme-sum-kpi-groups{display:flex;flex-direction:column;gap:12px;margin:0 0 14px}
+					.sme-sum-kpi-group__title{font-size:12px;font-weight:700;color:#475569;margin:0 0 8px;text-transform:uppercase;letter-spacing:.04em}
+					.sme-sum-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:10px}
 					.sme-sum-kpi{border:1px solid var(--border-color,#e5e7eb);border-top:4px solid #64748b;border-radius:10px;background:#fff;padding:12px 14px;box-shadow:0 2px 8px rgba(15,23,42,.05)}
-					.sme-sum-kpi[data-visit-metric]{cursor:pointer}
-					.sme-sum-kpi[data-visit-metric]:hover{box-shadow:0 4px 14px rgba(15,23,42,.12)}
-					.sme-sum-kpi__label{color:#64748b;font-size:11px;margin-bottom:6px}
+					.sme-sum-kpi[data-visit-metric],.sme-sum-kpi[data-points-kind]{cursor:pointer}
+					.sme-sum-kpi[data-visit-metric]:hover,.sme-sum-kpi[data-points-kind]:hover{box-shadow:0 4px 14px rgba(15,23,42,.12)}
+					.sme-sum-kpi__label{color:#64748b;font-size:11px;margin-bottom:6px;line-height:1.25}
 					.sme-sum-kpi__value{color:#0f172a;font-size:22px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums}
 					.sme-sum-kpi__hint{margin-top:6px;font-size:10px;color:#94a3b8}
-					.sme-sum-kpi--visits{border-top-color:#2563eb}
-					.sme-sum-kpi--marketing{border-top-color:#0d9488}
+					.sme-sum-kpi--followup,.sme-sum-kpi--new,.sme-sum-kpi--marketing{border-top-color:#0d9488}
 					.sme-sum-kpi--meeting{border-top-color:#ca8a04}
-					.sme-sum-kpi--me{border-top-color:#7c3aed}
-					.sme-sum-kpi--training{border-top-color:#ea580c}
-					.sme-sum-kpi--academic{border-top-color:#64748b}
+					.sme-sum-kpi--active,.sme-sum-kpi--inactive,.sme-sum-kpi--me{border-top-color:#7c3aed}
+					.sme-sum-kpi--schools,.sme-sum-kpi--participants,.sme-sum-kpi--training{border-top-color:#ea580c}
+					.sme-sum-kpi--expenses{border-top-color:#b45309}
+					.sme-sum-kpi--visited{border-top-color:#2563eb}
+					.sme-sum-kpi--visits,.sme-sum-kpi--half_day,.sme-sum-kpi--full_day{border-top-color:#1d4ed8}
 					.sme-sum-kpi--ulama{border-top-color:#0891b2}
+					.sme-sum-kpi--teachers{border-top-color:#0284c7}
+					.sme-sum-kpi--headoffice{border-top-color:#6366f1}
+					.sme-sum-kpi--academic{border-top-color:#64748b}
+					.sme-sum-kpi--co_curricular{border-top-color:#9333ea}
+					.sme-sum-kpi--grand{border-top-color:#334155}
 					.sme-sum-kpi--school{border-top-color:#0f766e}
+					.sme-sum-kpi--points{border-top-color:#2563eb}
+					.sme-sum-kpi--earned{border-top-color:#0f766e}
+					.sme-sum-kpi--pct{border-top-color:#059669}
+					.sme-sum-kpi--sme{border-top-color:#475569}
 					@media print{
 						.page-head,.layout-side-section,.sme-sum-filters{display:none!important}
 						.sme-sum-table{font-size:10px}
@@ -106,21 +118,30 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 		`);
 	}
 
-	make_filters() {
+	get_current_month_range() {
 		const today = frappe.datetime.get_today();
-		const month_start = frappe.datetime.month_start();
+		return {
+			from_date: frappe.datetime.month_start(today),
+			to_date: today,
+		};
+	}
+
+	make_filters() {
+		const { from_date, to_date } = this.get_current_month_range();
 
 		this.from_date = this.make_filter({
 			label: __("Visit From Date"),
 			fieldtype: "Date",
 			fieldname: "from_date",
-			default: month_start,
+			reqd: 1,
+			default: from_date,
 		});
 		this.to_date = this.make_filter({
 			label: __("Visit To Date"),
 			fieldtype: "Date",
 			fieldname: "to_date",
-			default: today,
+			reqd: 1,
+			default: to_date,
 		});
 		this.working_days = this.make_filter({
 			label: __("Working Days"),
@@ -168,11 +189,16 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 	make_filter(df) {
 		const wrap = $('<div class="col-md-2" style="margin-bottom:8px;"></div>');
 		$("#sme-sum-filters").append(wrap);
-		return frappe.ui.form.make_control({
+		const control = frappe.ui.form.make_control({
 			parent: wrap,
 			df: Object.assign({ change: () => this.schedule_load() }, df),
 			render_input: true,
 		});
+		control.refresh();
+		if (df.default !== undefined && df.default !== null && df.default !== "") {
+			control.set_value(df.default);
+		}
+		return control;
 	}
 
 	schedule_load() {
@@ -181,9 +207,10 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 	}
 
 	get_filters() {
+		const month = this.get_current_month_range();
 		return {
-			from_date: this.from_date.get_value(),
-			to_date: this.to_date.get_value(),
+			from_date: this.from_date.get_value() || month.from_date,
+			to_date: this.to_date.get_value() || month.to_date,
 			working_days: this.working_days.get_value() || "",
 			region: this.region.get_value() || "karachi",
 			employee: this.employee.get_value() || "",
@@ -261,32 +288,132 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 		);
 	}
 
-	render_kpi_cards(data) {
+	kpi_card_groups(data) {
 		const k = data.kpis || {};
-		const cards = [
-			[__("Total Visits"), this.fmt(k.visits), "visits", "visits"],
-			[__("Marketing"), this.fmt(k.marketing), "marketing", "marketing"],
-			[__("Meetings"), this.fmt(k.meetings), "meeting", "meeting"],
-			[__("M&E"), this.fmt(k.me), "me", "me"],
-			[__("Training"), this.fmt(k.training), "training", "training"],
-			[__("Academic"), this.fmt(k.academic), "academic", "academic_task"],
-			[__("Ulama / Educationist"), this.fmt(k.ulama), "ulama", "meeting_ulama"],
-			[
-				__("School Visit"),
-				this.fmt(k.school_visits != null ? k.school_visits : flt(k.marketing) + flt(k.me)),
-				"school",
-				"school_visits",
-			],
+		return [
+			{
+				title: __("Marketing & M&E"),
+				cards: [
+					{ label: __("Followup & Other Visits"), value: this.fmt(k.followup), style: "followup", metric: "followup" },
+					{ label: __("New"), value: this.fmt(k.new), style: "new", metric: "new" },
+					{ label: __("Meetings"), value: this.fmt(k.meetings), style: "meeting", metric: "meeting" },
+					{ label: __("M&E Active"), value: this.fmt(k.active), style: "active", metric: "me_active" },
+					{ label: __("M&E Inactive"), value: this.fmt(k.inactive), style: "inactive", metric: "me_inactive" },
+					{
+						label: __("Grand Total"),
+						value: this.fmt(k.grand_total),
+						style: "grand",
+						metric: "grand_total",
+					},
+					{
+						label: __("School Visits"),
+						value: this.fmt(k.school_visits),
+						style: "school",
+						metric: "school_visits",
+					},
+				],
+			},
+			{
+				title: __("Training & Expenses"),
+				cards: [
+					{ label: __("Schools Attended"), value: this.fmt(k.schools), style: "schools", metric: "schools" },
+					{ label: __("Participants"), value: this.fmt(k.participants), style: "participants", metric: "participants" },
+					{ label: __("Expenses"), value: this.fmt_cur(k.expenses), style: "expenses" },
+					{ label: __("Visited Days"), value: this.fmt(k.visited_days), style: "visited", metric: "visits" },
+				],
+			},
+			{
+				title: __("KPI Activities"),
+				cards: [
+					{ label: __("Total Visits"), value: this.fmt(k.visits), style: "visits", metric: "visits" },
+					{
+						label: __("Half Day WS"),
+						value: this.fmt(k.half_day_workshop),
+						style: "half_day",
+						metric: "half_day_workshop",
+					},
+					{
+						label: __("Full Day Session"),
+						value: this.fmt(k.full_day_session),
+						style: "full_day",
+						metric: "full_day_session",
+					},
+					{
+						label: __("Ulama / Educationist"),
+						value: this.fmt(k.meeting_ulama),
+						style: "ulama",
+						metric: "meeting_ulama",
+					},
+					{
+						label: __("Teachers Training"),
+						value: this.fmt(k.teachers_training_meeting),
+						style: "teachers",
+						metric: "teachers_training_meeting",
+					},
+					{
+						label: __("Head / Regional Office"),
+						value: this.fmt(k.headoffice_visit),
+						style: "headoffice",
+						metric: "headoffice_visit",
+					},
+					{ label: __("Academic"), value: this.fmt(k.academic_task), style: "academic", metric: "academic_task" },
+					{
+						label: __("Co-curricular"),
+						value: this.fmt(k.co_curricular),
+						style: "co_curricular",
+						metric: "co_curricular",
+					},
+				],
+			},
+			{
+				title: __("Score"),
+				cards: [
+					{
+						label: __("Total Points"),
+						value: this.fmt_score(k.total_points),
+						style: "points",
+						pointsKind: "total",
+					},
+					{
+						label: __("Total Earned Points"),
+						value: this.fmt_score(k.earned_points),
+						style: "earned",
+						pointsKind: "earned",
+					},
+					{
+						label: __("Percentage"),
+						value: this.fmt_pct(k.percentage),
+						style: "pct",
+						pointsKind: "pct",
+					},
+					{ label: __("SMEs in Report"), value: this.fmt(k.sme_count), style: "sme" },
+				],
+			},
 		];
-		return `<div class="sme-sum-kpis">${cards
+	}
+
+	render_kpi_card(card) {
+		const attrs = [];
+		if (card.metric) attrs.push(`data-visit-metric="${card.metric}"`);
+		if (card.pointsKind) attrs.push(`data-points-kind="${card.pointsKind}"`);
+		const hint =
+			card.metric || card.pointsKind ? __("Click to see details") : __("Period total");
+		return `
+			<div class="sme-sum-kpi sme-sum-kpi--${card.style}" ${attrs.join(" ")}>
+				<div class="sme-sum-kpi__label">${card.label}</div>
+				<div class="sme-sum-kpi__value">${card.value}</div>
+				<div class="sme-sum-kpi__hint">${hint}</div>
+			</div>`;
+	}
+
+	render_kpi_cards(data) {
+		const groups = this.kpi_card_groups(data);
+		return `<div class="sme-sum-kpi-groups">${groups
 			.map(
-				([label, value, style, metric, pointsKind]) => `
-			<div class="sme-sum-kpi sme-sum-kpi--${style}" ${
-				metric ? `data-visit-metric="${metric}"` : pointsKind ? `data-points-kind="${pointsKind}"` : ""
-			}>
-				<div class="sme-sum-kpi__label">${label}</div>
-				<div class="sme-sum-kpi__value">${value}</div>
-				<div class="sme-sum-kpi__hint">${__("Click to see details")}</div>
+				(group) => `
+			<div class="sme-sum-kpi-group">
+				<div class="sme-sum-kpi-group__title">${group.title}</div>
+				<div class="sme-sum-kpis">${group.cards.map((c) => this.render_kpi_card(c)).join("")}</div>
 			</div>`
 			)
 			.join("")}</div>`;

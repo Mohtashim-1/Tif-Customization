@@ -157,6 +157,9 @@ def get_dashboard_data(filters=None):
 	data["left_employees_this_year"] = _count_left_employees(
 		payroll_year_start, payroll_year_end, company, branch, department
 	)
+	data["left_employees_last_month"] = _count_left_employees(
+		lm_start, lm_end, company, branch, department
+	)
 	data["payroll_year_label"] = _payroll_period_label(payroll_year_start, payroll_year_end)
 	data["total_left_employees"] = _count_total_left_employees(company, branch, department)
 	data.update(_payroll_month_summary(company, branch, department, month_start, month_end))
@@ -198,6 +201,8 @@ def get_card_drilldown(card_key=None, filters=None):
 	payroll_year_start, payroll_year_end = _get_payroll_fiscal_year_bounds(today)
 	payroll_month_label = _payroll_period_label(payroll_month_start, payroll_month_end)
 	payroll_year_label = _payroll_period_label(payroll_year_start, payroll_year_end)
+	lm_start, lm_end, _, _ = _get_payroll_period_bounds(add_days(payroll_month_start, -1))
+	lm_label = _payroll_period_label(lm_start, lm_end)
 	hire_year_start, hire_year_end_bound = _get_current_payroll_year_bounds(today)
 	hire_year_end = today if today < hire_year_end_bound else hire_year_end_bound
 	fiscal_year_label = _payroll_period_label(hire_year_start, hire_year_end_bound)
@@ -266,6 +271,10 @@ def get_card_drilldown(card_key=None, filters=None):
 		"left_employees_this_year": lambda: _drill_payload(
 			f"Left Employees — {payroll_year_label}",
 			_fetch_left_rows(payroll_year_start, payroll_year_end, company, branch, department, limit=500),
+		),
+		"left_employees_last_month": lambda: _drill_payload(
+			f"Left Employees — {lm_label}",
+			_fetch_left_rows(lm_start, lm_end, company, branch, department, limit=500),
 		),
 		"eobi_added": lambda: _drill_eobi_added(company, branch, department),
 		"pak_qatar_enrolled": lambda: _drill_pak_qatar_enrolled(company, branch, department),
@@ -378,6 +387,7 @@ def _empty_payload(from_date, to_date, company, branch, department="", employee=
 		"new_hires_this_year": 0,
 		"fiscal_year_label": "",
 		"left_employees_this_year": 0,
+		"left_employees_last_month": 0,
 		"total_left_employees": 0,
 		"active_headcount_pakistan": 0,
 		"active_headcount_qatar": 0,

@@ -10,7 +10,7 @@ from datetime import timedelta
 
 import frappe
 from frappe import _
-from frappe.utils import cint, flt, getdate
+from frappe.utils import cint, flt, get_first_day, getdate, today
 
 from tif_customization.tif_customization.field_visit_permissions import (
 	_name_variants,
@@ -187,15 +187,28 @@ def get_report_data(filters=None):
 		"totals": totals_out,
 		"kpi_columns": list(KPI_COLUMNS),
 		"kpis": {
-			"visits": cint(totals.get("visits") or 0),
-			"marketing": cint(totals.get("followup") or 0) + cint(totals.get("new") or 0),
+			"followup": cint(totals.get("followup") or 0),
+			"new": cint(totals.get("new") or 0),
 			"meetings": cint(totals.get("meetings") or 0),
+			"active": cint(totals.get("active") or 0),
+			"inactive": cint(totals.get("inactive") or 0),
+			"schools": cint(totals.get("schools") or 0),
+			"participants": cint(totals.get("participants") or 0),
+			"expenses": flt(totals.get("expenses") or 0, 2),
+			"visited_days": cint(totals.get("visited_days") or 0),
+			"grand_total": cint(totals.get("grand_total") or 0),
+			"visits": cint(totals.get("visits") or 0),
+			"half_day_workshop": cint(totals.get("half_day_workshop") or 0),
+			"full_day_session": cint(totals.get("full_day_session") or 0),
+			"meeting_ulama": cint(totals.get("meeting_ulama") or 0),
+			"teachers_training_meeting": cint(totals.get("teachers_training_meeting") or 0),
+			"headoffice_visit": cint(totals.get("headoffice_visit") or 0),
+			"academic_task": cint(totals.get("academic_task") or 0),
+			"co_curricular": cint(totals.get("co_curricular") or 0),
+			"marketing": cint(totals.get("followup") or 0) + cint(totals.get("new") or 0),
 			"me": cint(totals.get("active") or 0) + cint(totals.get("inactive") or 0),
 			"training": cint(totals.get("half_day_workshop") or 0)
 			+ cint(totals.get("full_day_session") or 0),
-			"academic": cint(totals.get("academic_task") or 0),
-			"ulama": cint(totals.get("meeting_ulama") or 0),
-			"teachers_training": cint(totals.get("teachers_training_meeting") or 0),
 			"school_visits": cint(totals.get("followup") or 0)
 			+ cint(totals.get("new") or 0)
 			+ cint(totals.get("active") or 0)
@@ -220,12 +233,12 @@ def _parse_filters(filters):
 
 def _resolve_dates(filters):
 	"""Resolve Visit From / Visit To Date (filters Field Visit by visit date)."""
-	today = getdate()
+	report_day = getdate(today())
 	# Accept either from_date/to_date or visit_from_date/visit_to_date
 	from_raw = filters.get("visit_from_date") or filters.get("from_date")
 	to_raw = filters.get("visit_to_date") or filters.get("to_date")
-	from_date = getdate(from_raw or today.replace(day=1))
-	to_date = getdate(to_raw or today)
+	from_date = getdate(from_raw or get_first_day(report_day))
+	to_date = getdate(to_raw or report_day)
 	if from_date > to_date:
 		frappe.throw(_("Visit From Date cannot be after Visit To Date."))
 	return from_date, to_date
