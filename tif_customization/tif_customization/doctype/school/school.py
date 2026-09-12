@@ -2,14 +2,22 @@
 # For license information, please see license.txt
 
 import frappe
+from frappe import _
 from frappe.model.document import Document
+
+from tif_customization.tif_customization.doctype.school.school_customer import (
+	create_customer_from_school,
+)
 
 
 class School(Document):
+	def before_insert(self):
+		if frappe.session.user == "Guest" and not self.status:
+			self.status = "In Process"
+
 	def validate(self):
 		self.validate_contact_details()
 		self.validate_school_details()
-	
 	def validate_contact_details(self):
 		"""Validate contact details"""
 		if self.director_principal_email and not frappe.utils.validate_email_address(self.director_principal_email):
@@ -30,12 +38,14 @@ class School(Document):
 			frappe.throw("Number of Quranic teachers cannot be negative")
 	
 	def on_submit(self):
-		"""Actions to perform when document is submitted"""
-		frappe.msgprint("School registration submitted successfully!")
-	
+		"""Approval: create Customer (type School) with mapped field data."""
+		if not self.customer:
+			create_customer_from_school(self)
+		if self.status == "In Process":
+			self.db_set("status", "Active", update_modified=False)
+
 	def on_cancel(self):
-		"""Actions to perform when document is cancelled"""
-		frappe.msgprint("School registration has been cancelled.")
+		frappe.msgprint(_("School opening request cancelled. No customer was created or removed."))
 
 @frappe.whitelist()
 def send_welcome_email(school):

@@ -54,6 +54,7 @@ app_include_js = [
 
 # include js in doctype views
 doctype_js = {
+	"School Opening Application": "tif_customization/doctype/school_opening_application/school_opening_application.js",
 	"Delivery Note": "public/js/delivery_note.js",
 	"Leave Application": "public/js/leave_application.js",
 	"Loan Application": "tif_customization/doctype/loan_application/loan_application.js",
@@ -73,6 +74,7 @@ page_js = {
 	"book-purchase-printing-dashboard" : "tif_customization/page/book_purchase_printing_dashboard/book_purchase_printing_dashboard.js",
 	"procurement-expense" : "tif_customization/page/procurement_expense/procurement_expense.js",
 	"funds-dashboard" : "tif_customization/page/funds_dashboard/funds_dashboard.js",
+	"school-opening-registry": "tif_customization/page/school_opening_registry/school_opening_registry.js",
 }
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 doctype_list_js = {
@@ -158,10 +160,12 @@ jinja = {
 
 permission_query_conditions = {
 	"Field Visit": "tif_customization.tif_customization.field_visit_permissions.get_permission_query_conditions",
+	"Field Officer": "tif_customization.tif_customization.doctype.field_officer.field_officer_permissions.get_permission_query_conditions",
 }
 
 has_permission = {
 	"Field Visit": "tif_customization.tif_customization.field_visit_permissions.has_permission",
+	"Field Officer": "tif_customization.tif_customization.doctype.field_officer.field_officer_permissions.has_permission",
 }
 
 # DocType Class
@@ -323,6 +327,7 @@ override_whitelisted_methods = {
 # Training Schedule Vue portal SPA routes
 website_route_rules = [
 	{"from_route": "/training-schedule/<path:app_path>", "to_route": "training-schedule"},
+	{"from_route": "/school_opening_print", "to_route": "school-opening-print"},
 ]
 
 # Automatically update python controller files with type annotations for this app.

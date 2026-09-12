@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from "vue";
-import { apiGet, apiPost, METHOD } from "../lib/api";
+import { apiGet, apiPost, apiUpload, METHOD } from "../lib/api";
 import DatePicker from "./DatePicker.vue";
 import LinkSelect from "./LinkSelect.vue";
 import TimePicker from "./TimePicker.vue";
@@ -15,12 +15,16 @@ const emit = defineEmits(["close", "saved"]);
 const loading = ref(false);
 const saving = ref(false);
 const importing = ref(false);
+const uploadingAttachment = ref(false);
 const creatingType = ref(false);
 const creatingLink = ref("");
 const error = ref("");
 const importMsg = ref("");
+const attachMsg = ref("");
 const importMode = ref("replace");
 const fileInput = ref(null);
+const attachmentInput = ref(null);
+const attachments = ref([]);
 const options = ref({
 	trainers: [],
 	programs: [],
@@ -64,6 +68,7 @@ const form = reactive({
 	schedule_status: "",
 	zoom_id: "",
 	zoom_link: "",
+	zoom_attendance_file: "",
 	attendance: [],
 });
 
@@ -114,9 +119,66 @@ function reset() {
 		schedule_status: "",
 		zoom_id: "",
 		zoom_link: "",
+		zoom_attendance_file: "",
 		attendance: [],
 	});
 	importMsg.value = "";
+	attachMsg.value = "";
+	attachments.value = [];
+}
+
+function formatFileSize(bytes) {
+	const n = Number(bytes || 0);
+	if (!n) return "";
+	if (n < 1024) return `${n} B`;
+	if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+	return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function triggerAttachmentUpload() {
+	if (!form.name) {
+		error.value = "Save the training first, then upload attachments.";
+		return;
+	}
+	attachmentInput.value?.click();
+}
+
+async function onAttachmentFile(event) {
+	const file = event.target?.files?.[0];
+	if (!file) return;
+	if (!form.name) {
+		error.value = "Save the training first, then upload attachments.";
+		if (event.target) event.target.value = "";
+		return;
+	}
+	uploadingAttachment.value = true;
+	error.value = "";
+	attachMsg.value = "";
+	try {
+		const result = await apiUpload(`${METHOD}.upload_attachment`, { name: form.name }, file);
+		attachments.value = result.files || [];
+		attachMsg.value = result.message || `Attached ${file.name}.`;
+	} catch (e) {
+		error.value = e.message || String(e);
+	} finally {
+		uploadingAttachment.value = false;
+		if (event.target) event.target.value = "";
+	}
+}
+
+async function removeAttachment(file) {
+	if (!file?.name) return;
+	if (!window.confirm(`Remove ${file.file_name}?`)) return;
+	try {
+		const result = await apiPost(`${METHOD}.delete_attachment`, {
+			file_id: file.name,
+			name: form.name,
+		});
+		attachments.value = result.files || [];
+		attachMsg.value = result.message || "Attachment removed.";
+	} catch (e) {
+		error.value = e.message || String(e);
+	}
 }
 
 function addAttendee() {
@@ -160,8 +222,11 @@ async function onImportFile(event) {
 				name: form.name,
 				content,
 				mode: importMode.value,
+				filename: file.name,
 			});
 			form.attendance = (result.attendance || []).map((a) => ({ ...blankAttendee(), ...a }));
+			if (result.zoom_attendance_file) form.zoom_attendance_file = result.zoom_attendance_file;
+			if (result.attachments) attachments.value = result.attachments;
 			importMsg.value = result.message || `Imported ${result.added || 0} row(s).`;
 			emit("saved", { ...result, silent: true });
 		} else {
@@ -258,6 +323,7 @@ async function load() {
 				...doc,
 				attendance: (doc.attendance || []).map((a) => ({ ...blankAttendee(), ...a })),
 			});
+			attachments.value = doc.attachments || [];
 		} else {
 			reset();
 		}
@@ -277,6 +343,9 @@ async function save() {
 			attendance: (form.attendance || []).filter((a) => (a.participant_name || "").trim()),
 		};
 		const result = await apiPost(`${METHOD}.save_session`, { values: payload });
+		if (result.name) form.name = result.name;
+		const doc = await apiGet(`${METHOD}.get_session`, { name: result.name || form.name });
+		attachments.value = doc.attachments || [];
 		emit("saved", result);
 	} catch (e) {
 		error.value = e.message || String(e);
@@ -479,6 +548,52 @@ onMounted(load);
 					</div>
 				</section>
 
+				<section class="sec">
+					<div class="attend-head">
+						<div>
+							<h3>Attachments</h3>
+							<p>Upload Zoom CSV, photos, PDFs, or other training files.</p>
+						</div>
+						<div class="attend-actions">
+							<input ref="attachmentInput" type="file" hidden @change="onAttachmentFile" />
+							<button
+								type="button"
+								class="ghost"
+								:disabled="uploadingAttachment || !form.name"
+								@click="triggerAttachmentUpload"
+							>
+								{{ uploadingAttachment ? "Uploading…" : "+ Upload attachment" }}
+							</button>
+						</div>
+					</div>
+					<p v-if="!form.name" class="import-hint">
+						Save the training once, then you can upload attachments here.
+					</p>
+					<p v-if="attachMsg" class="import-ok">{{ attachMsg }}</p>
+					<div v-if="attachments.length" class="attach-list">
+						<div v-for="file in attachments" :key="file.file_url || file.name" class="attach-item">
+							<div class="attach-item__main">
+								<a :href="file.file_url" target="_blank" rel="noopener" class="attach-link">
+									{{ file.file_name }}
+								</a>
+								<span v-if="file.is_zoom_csv" class="attach-tag">Zoom CSV</span>
+								<span v-if="file.file_size" class="attach-size">{{ formatFileSize(file.file_size) }}</span>
+							</div>
+							<button
+								v-if="file.name"
+								type="button"
+								class="linkish"
+								@click="removeAttachment(file)"
+							>
+								Remove
+							</button>
+						</div>
+					</div>
+					<div v-else-if="form.name" class="attend-empty">
+						No attachments yet. Upload a file or import Zoom CSV in Attendance below.
+					</div>
+				</section>
+
 				<section class="sec attend-block">
 					<div class="attend-head">
 						<div>
@@ -512,7 +627,16 @@ onMounted(load);
 					</div>
 
 					<p v-if="importMsg" class="import-ok">{{ importMsg }}</p>
-					<p class="import-hint">CSV: Name, Email, Join time, Leave time, Duration, Guest, Disclaimer, Waiting room.</p>
+					<div v-if="form.zoom_attendance_file" class="attach-row">
+						<span class="attach-label">Attached CSV</span>
+						<a :href="form.zoom_attendance_file" target="_blank" rel="noopener" class="attach-link">
+							{{ form.zoom_attendance_file.split("/").pop() }}
+						</a>
+					</div>
+					<p class="import-hint">
+						CSV: Name, Email, Join time, Leave time, Duration, Guest, Disclaimer, Waiting room.
+						The file is saved as an attachment on this training after import.
+					</p>
 
 					<div v-if="!form.attendance.length" class="attend-empty">
 						No attendance yet. Import a Zoom CSV or add a participant.
@@ -733,6 +857,64 @@ select:focus {
 	color: #047857;
 	font-size: 12px;
 	font-weight: 600;
+}
+.attach-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin: 0 0 8px;
+	padding: 8px 10px;
+	border-radius: 8px;
+	background: #eff6ff;
+	font-size: 12px;
+}
+.attach-label {
+	font-weight: 700;
+	color: #1d4ed8;
+}
+.attach-link {
+	color: #2563eb;
+	font-weight: 600;
+	text-decoration: none;
+}
+.attach-link:hover {
+	text-decoration: underline;
+}
+.attach-list {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+.attach-item {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 10px;
+	padding: 10px 12px;
+	border: 1px solid #e5e7eb;
+	border-radius: 10px;
+	background: #fff;
+}
+.attach-item__main {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+	min-width: 0;
+}
+.attach-tag {
+	font-size: 10px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: #7c3aed;
+	background: #f5f3ff;
+	padding: 2px 6px;
+	border-radius: 999px;
+}
+.attach-size {
+	font-size: 11px;
+	color: #9ca3af;
 }
 .attend-empty {
 	padding: 14px;

@@ -1,0 +1,256 @@
+{# Read-only SC-1.2 — same layout/classes as /school-opening guest form #}
+{% macro chk(options, selected) -%}
+<div class="soa-check-grid">
+	{%- set sel = selected or [] -%}
+	{%- for opt in options -%}
+	<label><input type="checkbox" disabled {% if opt in sel %}checked{% endif %}> {{ opt }}</label>
+	{%- endfor -%}
+</div>
+{%- endmacro %}
+
+{% macro rad(options, selected, name) -%}
+<div class="soa-check-grid">
+	{%- for opt in options -%}
+	<label><input type="radio" disabled name="{{ name }}" {% if selected == opt %}checked{% endif %}> {{ opt }}</label>
+	{%- endfor -%}
+</div>
+{%- endmacro %}
+
+{% macro ro_input(label, value, required=false) -%}
+<div class="soa-field">
+	<label>{{ label }}</label>
+	<input type="text" class="soa-control" readonly value="{{ value if value is not none else '' }}" {% if required %}required{% endif %}>
+</div>
+{%- endmacro %}
+
+{% macro ro_textarea(label, value) -%}
+<div class="soa-field">
+	<label>{{ label }}</label>
+	<textarea class="soa-control" rows="2" readonly>{{ value if value is not none else '' }}</textarea>
+</div>
+{%- endmacro %}
+
+<div id="school-opening-portal" class="school-opening-portal">
+	{% if not print_mode %}
+	<div class="soa-print-toolbar no-print">
+		<button type="button" class="btn btn-primary btn-sm" onclick="window.print()">{{ _("Print") }}</button>
+		<a class="btn btn-default btn-sm soa-pdf-download" href="#" data-customer="{{ data.customer or '' }}">{{ _("Download PDF") }}</a>
+		<a class="btn btn-default btn-sm" href="/app/school-opening-registry">{{ _("Back to list") }}</a>
+	</div>
+	{% endif %}
+
+	<div class="soa-sheet soa-readonly-form">
+		<div class="soa-letterhead">
+			<div class="org">THE ILM FOUNDATION</div>
+			<div class="addr">245-1/I, Block-6, PECHS Society, Karachi-75400, Pakistan • Tel: 021-34304450-51 • info@tif.edu.pk</div>
+			<div class="erp-note">For ERP School-Opening Use</div>
+		</div>
+
+		<div class="soa-title-row">
+			<h1>School Opening — Need Analysis Form</h1>
+			<div class="soa-meta-inline">
+				<span class="soa-form-no">Form No.: <strong>{{ data.form_no }}</strong></span>
+				<label class="soa-date-inline">Date:</label>
+				<div class="soa-date-picker">
+					<div class="soa-date-picker-input-wrap">
+						<input type="text" class="soa-control soa-date-display" readonly value="{{ data.form_date_display }}">
+						<button type="button" class="soa-date-picker-btn" disabled tabindex="-1" aria-hidden="true">
+							<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+						</button>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<section class="soa-section">
+			<div class="soa-section-title">1 Institution Profile</div>
+			<div class="soa-block">
+				<div class="soa-label">Type of Institution</div>
+				{{ chk(["School", "College", "University", "Madaris", "Library", "Special School"], data.institution_types) }}
+			</div>
+			<div class="soa-row-2">
+				{{ ro_input("Name of School *", data.school_name, true) }}
+				{{ ro_input("TIF Representative", data.tif_representative) }}
+			</div>
+			<div class="soa-block">
+				<div class="soa-label">Category</div>
+				{{ rad(["Provincial Govt.", "Private"], data.institution_category, "institution_category") }}
+			</div>
+			<div class="soa-block">
+				<div class="soa-label">Educational System</div>
+				{{ chk(["Pre-Primary", "Primary", "Matric", "Intermediate", "Hifz-o-Nazra", "Cambridge", "O / A Levels"], data.educational_system) }}
+			</div>
+			<div class="soa-row-3">
+				{{ ro_input("Type of School", data.type_of_school) }}
+				{{ ro_input("No. of Campuses", data.no_of_campuses) }}
+				{{ ro_input("No. of Students", data.no_of_students) }}
+			</div>
+			<div class="soa-row-2">
+				<div class="soa-block">
+					<div class="soa-label">Structure</div>
+					{{ rad(["Single Campus", "Chain"], data.structure, "structure") }}
+				</div>
+				<div class="soa-block">
+					<div class="soa-label">Academic Session — Shift</div>
+					{{ rad(["Morning", "Evening", "Both"], data.academic_shift, "academic_shift") }}
+				</div>
+			</div>
+		</section>
+
+		<section class="soa-section">
+			<div class="soa-section-title">2 Services of Interest</div>
+			<div class="soa-block">
+				<div class="soa-label">Teacher Training Services</div>
+				{{ chk([
+					"ELP",
+					"One Day Workshop (Intro of Tajweed)",
+					"TECC Professional",
+					"TECC Foundation",
+					"V-Campers",
+					"Effective Teaching of the Holy Qur'an Workshop",
+					"PEF Pakistan",
+					"Intro to Tajweed — One Day Workshop",
+					"Tajweed Training Course",
+				], data.teacher_training_services) }}
+			</div>
+			<div class="soa-block">
+				<div class="soa-label">Tilawat Program for School Services — Workshops &amp; Trainings</div>
+				{{ chk([
+					"Noorani Qaida — NQ Teachers Guide",
+					"Tajweed Workshop for Kids",
+					"Teachers Training (Online)",
+					"Teachers Training (On-site)",
+					"Noorani Qaida — NQ Workbook",
+				], data.tilawat_services) }}
+			</div>
+			<div class="soa-block">
+				<div class="soa-label">Quran Program for Student Services</div>
+				{{ chk([
+					"MQH Part-1 + Part-1 (Sample)",
+					"MQH Part-1 (MQH T.G Part-1)",
+					"MQH Part-2 (MQH T.G Part-2)",
+					"MQH Part-3 (MQH T.G Part-3)",
+					"MQH Part-4 (MQH T.G Part-4)",
+					"MQH Part-5 (MQH T.G Part-5)",
+					"MQH Part-6",
+					"MQH Part-7",
+					"MQH Part-1 — English Version",
+					"MQH Part-2 — English Version",
+					"MQH Part-1 — Sindhi Version",
+					"MQH Part-2 — Sindhi Version",
+					"MQH Part-3 — Sindhi Version",
+					"Intro Workshops",
+				], data.quran_program_services) }}
+			</div>
+		</section>
+
+		<section class="soa-section">
+			<div class="soa-section-title">3 Current Engagement with TIF</div>
+			<div class="soa-block">
+				<div class="soa-label">School Already Running TIF Services</div>
+				{{ chk(["Quran Program for Student", "Tilawat Program for School", "Teacher Training"], data.running_tif_services) }}
+			</div>
+			<div class="soa-block">
+				<div class="soa-label">Curriculum Currently in Use</div>
+				{{ chk([
+					"Oral Nazra", "Qaida", "Afaq", "National Book Foundation",
+					"Noorani Qaida (Not TPS)", "Iqra Qaida", "Spectrum",
+					"Rehmani Qaida", "Madni Qaida", "Gaba",
+					"Jamiat Qaida", "Qurani Qaida", "Moonlight",
+					"Islamic Values", "CEF", "Zia ul Quran",
+				], data.curriculum_in_use) }}
+				<div class="soa-field" style="margin-top:8px">
+					<label>Others</label>
+					<input type="text" class="soa-control" readonly value="{{ data.curriculum_others or '' }}">
+				</div>
+			</div>
+		</section>
+
+		<section class="soa-section">
+			<div class="soa-section-title">4 Attachments</div>
+			<div class="soa-row-3">
+				<div class="soa-field">
+					<label>Visiting Card</label>
+					{% if data.visiting_card %}<a class="soa-control soa-file-link" href="{{ data.visiting_card }}" target="_blank">{{ _("View file") }}</a>
+					{% else %}<input type="text" class="soa-control" readonly value="">{% endif %}
+				</div>
+				<div class="soa-field">
+					<label>School Picture</label>
+					{% if data.school_picture %}<a class="soa-control soa-file-link" href="{{ data.school_picture }}" target="_blank">{{ _("View file") }}</a>
+					{% else %}<input type="text" class="soa-control" readonly value="">{% endif %}
+				</div>
+				<div class="soa-field">
+					<label>Meeting Picture</label>
+					{% if data.meeting_picture %}<a class="soa-control soa-file-link" href="{{ data.meeting_picture }}" target="_blank">{{ _("View file") }}</a>
+					{% else %}<input type="text" class="soa-control" readonly value="">{% endif %}
+				</div>
+			</div>
+			<div class="soa-block">
+				<div class="soa-label">Fee Structure</div>
+				{{ rad(["Above 15K", "Between 5K – 15K", "Below 5K"], data.fee_structure, "fee_structure") }}
+			</div>
+		</section>
+
+		<section class="soa-section">
+			<div class="soa-section-title">5 Online Presence</div>
+			<div class="soa-row-2">
+				{{ ro_input("Website", data.website) }}
+				{{ ro_input("Facebook", data.facebook) }}
+				{{ ro_input("Instagram", data.instagram) }}
+				{{ ro_input("LinkedIn", data.linkedin) }}
+			</div>
+			{{ ro_textarea("Other Links", data.other_links) }}
+		</section>
+
+		<section class="soa-section">
+			<div class="soa-section-title">6 Location</div>
+			{{ ro_textarea("Address", data.address) }}
+			<div class="soa-row-2">
+				{{ ro_input("Area", data.area) }}
+				{{ ro_input("City", data.city) }}
+			</div>
+			<div class="soa-block">
+				<div class="soa-label">Province</div>
+				{{ rad(["Sindh", "Punjab", "KPK", "Balochistan", "Gilgit-Baltistan", "Azad Jammu & Kashmir"], data.province, "province") }}
+			</div>
+			<div class="soa-row-2">
+				{{ ro_input("Country", data.country or "Pakistan") }}
+				<div class="soa-block">
+					<div class="soa-label">Marketing Sample Provided</div>
+					{{ rad(["Yes", "No"], data.marketing_sample_provided, "marketing_sample_provided") }}
+				</div>
+			</div>
+		</section>
+
+		<section class="soa-section">
+			<div class="soa-section-title">7 Key Contacts</div>
+			<table class="soa-contacts-table">
+				<thead><tr><th>Role</th><th>Name</th><th>Cell No.</th></tr></thead>
+				<tbody>
+				{% for role in data.contact_roles %}
+				<tr>
+					<td>{{ role }}</td>
+					<td><input type="text" class="soa-control" readonly value="{{ data.key_contacts.get(role, {}).get('name', '') }}"></td>
+					<td><input type="text" class="soa-control" readonly value="{{ data.key_contacts.get(role, {}).get('cell', '') }}"></td>
+				</tr>
+				{% endfor %}
+				</tbody>
+			</table>
+		</section>
+
+		<section class="soa-section">
+			<div class="soa-section-title">8 School Communication Channels</div>
+			<div class="soa-row-2">
+				{{ ro_input("School PTCL", data.school_ptcl) }}
+				{{ ro_input("School Mobile", data.school_mobile) }}
+				{{ ro_input("School WhatsApp", data.school_whatsapp) }}
+				{{ ro_input("School Email", data.school_email) }}
+			</div>
+		</section>
+
+		<p class="soa-ho-note">
+			{{ _("Head Office use") }} — {{ _("ERP School Code") }}: <strong>{{ data.erp_school_code or data.customer }}</strong>
+			{% if data.application %} · {{ _("Application") }}: {{ data.application }}{% endif %}
+		</p>
+	</div>
+</div>

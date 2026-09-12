@@ -51,12 +51,15 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 					.sme-sum-table .sme-low .score-col,
 					.sme-sum-table .sme-low .pts-col{background:#fee2e2;font-weight:700;color:#991b1b}
 					.sme-sum-table .kpi-col{background:#f8fafc}
+					.sme-sum-table .me-col{background:#f5f3ff;font-weight:600;color:#5b21b6}
+					.sme-sum-table .me-col.sme-click{color:#6d28d9}
+					.sme-sum-table .me-col.sme-click:hover{background:#ede9fe}
 					.sme-sum-title{text-align:center;font-size:18px;font-weight:700;margin:8px 0 14px}
 					.sme-sum-meta{text-align:center;font-size:12px;color:#6b7280;margin-bottom:12px}
 					.sme-sum-kpi-groups{display:flex;flex-direction:column;gap:12px;margin:0 0 14px}
 					.sme-sum-kpi-group__title{font-size:12px;font-weight:700;color:#475569;margin:0 0 8px;text-transform:uppercase;letter-spacing:.04em}
-					.sme-sum-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:10px}
-					.sme-sum-kpi{border:1px solid var(--border-color,#e5e7eb);border-top:4px solid #64748b;border-radius:10px;background:#fff;padding:12px 14px;box-shadow:0 2px 8px rgba(15,23,42,.05)}
+					.sme-sum-kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,150px));gap:10px;justify-content:start}
+					.sme-sum-kpi{border:1px solid var(--border-color,#e5e7eb);border-top:4px solid #64748b;border-radius:10px;background:#fff;padding:12px 14px;box-shadow:0 2px 8px rgba(15,23,42,.05);max-width:150px;min-width:132px}
 					.sme-sum-kpi[data-visit-metric],.sme-sum-kpi[data-points-kind],.sme-sum-kpi[data-card-kind]{cursor:pointer}
 					.sme-sum-kpi[data-visit-metric]:hover,.sme-sum-kpi[data-points-kind]:hover,.sme-sum-kpi[data-card-kind]:hover{box-shadow:0 4px 14px rgba(15,23,42,.12)}
 					.sme-sum-kpi__label{color:#64748b;font-size:11px;margin-bottom:6px;line-height:1.25}
@@ -80,10 +83,22 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 					.sme-sum-kpi--earned{border-top-color:#0f766e}
 					.sme-sum-kpi--pct{border-top-color:#059669}
 					.sme-sum-kpi--sme{border-top-color:#475569}
+					.sme-sum-kpi--supervisor{border-top-color:#7c2d12}
 					@media print{
-						.page-head,.layout-side-section,.sme-sum-filters{display:none!important}
-						.sme-sum-table{font-size:10px}
+						@page{size:A4 landscape;margin:8mm}
+						html,body{width:100%!important;height:auto!important;overflow:visible!important;background:#fff!important}
+						.navbar,.page-head,.layout-side-section,.layout-side-section,.desk-sidebar,.page-actions,.page-form-actions,.sme-sum-filters,.sme-sum-note,.sme-sum-break,.no-print{display:none!important}
+						.layout-main,.layout-main-section-wrapper,.layout-main-section,.page-content,.page-container,.container,.sme-sum{padding:0!important;margin:0!important;max-width:none!important;width:100%!important;overflow:visible!important}
+						.sme-sum-kpi__hint{display:none}
+						.sme-sum-kpi{box-shadow:none;break-inside:avoid}
+						.sme-sum-table-wrap{overflow:visible!important;border:none;border-radius:0}
+						.sme-sum-table{width:100%!important;min-width:0!important;font-size:8px;table-layout:fixed}
+						.sme-sum-table th,.sme-sum-table td{padding:4px 5px;word-wrap:break-word;overflow-wrap:anywhere}
+						.sme-sum-table .sme-click{color:#0f172a!important;text-decoration:none!important}
+						.sme-sum-title{font-size:14px;margin:0 0 6px}
+						.sme-sum-meta{font-size:9px;margin-bottom:6px}
 						.sme-sum-table .sme-low td{background:#fef2f2!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+						.sme-sum-kpi-groups,.sme-sum-table-wrap{break-inside:avoid-page}
 					}
 				</style>
 				<p class="sme-sum-note">
@@ -162,18 +177,66 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 			$sel.find('option[value="rural"]').text(__("Other Province Rural"));
 		}, 0);
 
+		this.supervisor = this.make_filter({
+			label: __("Supervisor"),
+			fieldtype: "Autocomplete",
+			fieldname: "supervisor",
+			options: [],
+			description: __("Filter by Field Supervisor on Field Officer (line manager, not HR Reports To)"),
+			change: () => {
+				this.employee.set_value("");
+				this.schedule_load();
+			},
+		});
+		this.setup_supervisor_autocomplete();
+
 		this.employee = this.make_filter({
 			label: __("SME"),
 			fieldtype: "Link",
 			fieldname: "employee",
 			options: "Employee",
-			get_query: () => ({
-				filters: {
-					status: "Active",
-					designation: "School Marketing Executive",
-				},
-			}),
+			get_query: () => {
+				const supervisor = (this.supervisor.get_value() || "").trim();
+				if (supervisor) {
+					return {
+						query:
+							"tif_customization.tif_customization.page.sme_summary_report.sme_summary_report.get_sme_employee_query",
+						filters: { supervisor },
+					};
+				}
+				return {
+					filters: {
+						status: "Active",
+						designation: "School Marketing Executive",
+					},
+				};
+			},
 		});
+	}
+
+	setup_supervisor_autocomplete() {
+		this.supervisor.df.get_query = () => ({
+			query:
+				"tif_customization.tif_customization.page.supervisor_target_ba.supervisor_target_ba.get_supervisor_options",
+		});
+		this.supervisor.refresh();
+	}
+
+	update_supervisor_hint(data) {
+		const stats = (data && data.supervisor_stats) || {};
+		const total = stats.total || 0;
+		const smeSup = stats.sme_supervisors || 0;
+		const officers = stats.total_field_officers || 0;
+		const desc =
+			total > 0
+				? __("Field supervisors: {0} · {1} field officers report to them ({2} with SMEs)", [
+						total,
+						officers,
+						smeSup,
+					])
+				: __("No field supervisors found. Set Field Supervisor on each Field Officer record.");
+		this.supervisor.df.description = desc;
+		this.supervisor.refresh();
 	}
 
 	make_filter(df) {
@@ -196,15 +259,26 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 		this._timer = setTimeout(() => this.load_data(), 350);
 	}
 
+	get_drilldown_staff() {
+		const empId = this.employee.get_value() || "";
+		if (!empId) return "";
+		const rows = (this.data && this.data.rows) || [];
+		const row = rows.find((r) => r.employee === empId);
+		if (row) return row.employee_name || row.user_id || empId;
+		return empId;
+	}
+
 	get_filters() {
 		const month = this.get_current_month_range();
+		const employee = this.employee.get_value() || "";
 		return {
 			from_date: this.from_date.get_value() || month.from_date,
 			to_date: this.to_date.get_value() || month.to_date,
 			working_days: this.working_days.get_value() || "",
 			region: this.region.get_value() || "karachi",
-			employee: this.employee.get_value() || "",
-			staff: this.employee.get_value() || "",
+			supervisor: (this.supervisor.get_value() || "").trim(),
+			employee,
+			staff: this.get_drilldown_staff() || employee,
 			submitted_only: 1,
 		};
 	}
@@ -226,6 +300,7 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 					return;
 				}
 				this.data = r.message;
+				this.update_supervisor_hint(r.message);
 				this.render(r.message);
 			},
 			error: () => {
@@ -250,9 +325,16 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 		return `${this.fmt_score(n)}%`;
 	}
 
-	click_td(n, metric, staff) {
+	me_visits(row) {
+		if (!row) return 0;
+		if (row.me != null && row.me !== "") return row.me;
+		return cint(row.active) + cint(row.inactive);
+	}
+
+	click_td(n, metric, staff, extraClass = "") {
 		const staffAttr = staff ? ` data-visit-staff="${frappe.utils.escape_html(staff)}"` : "";
-		return `<td class="num sme-click" data-visit-metric="${metric}"${staffAttr} title="${__("Click to see Field Visits")}">${this.fmt(n)}</td>`;
+		const cls = extraClass ? ` ${extraClass}` : "";
+		return `<td class="num sme-click${cls}" data-visit-metric="${metric}"${staffAttr} title="${__("Click to see Field Visits")}">${this.fmt(n)}</td>`;
 	}
 
 	points_td(value, kind, row, html) {
@@ -287,6 +369,7 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 					{ label: __("Followup & Other Visits"), value: this.fmt(k.followup), style: "followup", metric: "followup" },
 					{ label: __("New"), value: this.fmt(k.new), style: "new", metric: "new" },
 					{ label: __("Meetings"), value: this.fmt(k.meetings), style: "meeting", metric: "meeting" },
+					{ label: __("M&E Visits"), value: this.fmt(k.me), style: "me", metric: "me" },
 					{ label: __("M&E Active"), value: this.fmt(k.active), style: "active", metric: "me_active" },
 					{ label: __("M&E Inactive"), value: this.fmt(k.inactive), style: "inactive", metric: "me_inactive" },
 					{
@@ -377,6 +460,13 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 						pointsKind: "pct",
 					},
 					{ label: __("SMEs in Report"), value: this.fmt(k.sme_count), style: "sme", cardKind: "sme_count" },
+					{
+						label: __("Field Supervisors"),
+						value: this.fmt(k.supervisor_count),
+						style: "supervisor",
+						cardKind: "supervisor_list",
+						hint: __("Field Officers who manage other Field Officers"),
+					},
 				],
 			},
 		];
@@ -388,7 +478,7 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 		if (card.pointsKind) attrs.push(`data-points-kind="${frappe.utils.escape_html(card.pointsKind)}"`);
 		if (card.cardKind) attrs.push(`data-card-kind="${frappe.utils.escape_html(card.cardKind)}"`);
 		const clickable = card.metric || card.pointsKind || card.cardKind;
-		const hint = clickable ? __("Click to see details") : __("Period total");
+		const hint = card.hint || (clickable ? __("Click to see details") : __("Period total"));
 		return `
 			<div class="sme-sum-kpi sme-sum-kpi--${card.style}" ${attrs.join(" ")} title="${clickable ? __("Click to see details") : ""}">
 				<div class="sme-sum-kpi__label">${card.label}</div>
@@ -418,7 +508,7 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 		);
 		const t = data.totals || {};
 		const kpiCols = this.kpi_columns(data);
-		const colCount = 14 + kpiCols.length;
+		const colCount = 13 + kpiCols.length;
 
 		const kpi_tds = (src, staff) =>
 			kpiCols
@@ -437,8 +527,7 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 					${this.click_td(r.followup, "followup", staff)}
 					${this.click_td(r.new, "new", staff)}
 					${this.click_td(r.meetings, "meeting", staff)}
-					${this.click_td(r.active, "me_active", staff)}
-					${this.click_td(r.inactive, "me_inactive", staff)}
+					${this.click_td(this.me_visits(r), "me", staff, "me-col")}
 					${this.click_td(r.schools, "schools", staff)}
 					${this.click_td(r.participants, "participants", staff)}
 					<td class="num">${this.fmt_cur(r.expenses)}</td>
@@ -466,6 +555,11 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 				${__("Visit Date")}: <strong>${fromLabel} – ${toLabel}</strong>
 				&nbsp;|&nbsp;
 				${__("Working Days")}: <strong>${data.working_days}</strong>
+				${
+					data.supervisor_label
+						? `&nbsp;|&nbsp; ${__("Supervisor")}: <strong>${frappe.utils.escape_html(data.supervisor_label)}</strong>`
+						: ""
+				}
 				&nbsp;|&nbsp;
 				${__("Daily points by Type / Division")}:
 				<strong>${__("Karachi")} 6</strong>,
@@ -481,7 +575,7 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 							<th rowspan="2">${__("Type / Division")}</th>
 							<th colspan="2" class="group">${__("Marketing Visits")}</th>
 							<th colspan="1" class="group">${__("Meetings")}</th>
-							<th colspan="2" class="group">${__("M&E Visits")}</th>
+							<th colspan="1" class="group">${__("M&E Visits")}</th>
 							<th colspan="2" class="group">${__("Training Sessions")}</th>
 							<th colspan="2" class="group">${__("Total")}</th>
 							<th colspan="${kpiCols.length}" class="kpi-group">${__("KPI Activities")}</th>
@@ -491,8 +585,7 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 							<th>${__("Followup & Other Visits")}</th>
 							<th>${__("New")}</th>
 							<th>${__("Meetings")}</th>
-							<th>${__("Active")}</th>
-							<th>${__("Inactive")}</th>
+							<th class="me-col">${__("M&E Visits")}</th>
 							<th>${__("No. of Schools Attended")}</th>
 							<th>${__("No. of participants")}</th>
 							<th>${__("Expenses")}</th>
@@ -511,8 +604,7 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 							${this.click_td(t.followup, "followup", "")}
 							${this.click_td(t.new, "new", "")}
 							${this.click_td(t.meetings, "meeting", "")}
-							${this.click_td(t.active, "me_active", "")}
-							${this.click_td(t.inactive, "me_inactive", "")}
+							${this.click_td(this.me_visits(t), "me", "", "me-col")}
 							${this.click_td(t.schools, "schools", "")}
 							${this.click_td(t.participants, "participants", "")}
 							<th class="num">${this.fmt_cur(t.expenses)}</th>
@@ -571,7 +663,72 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 			const kind = $(this).attr("data-card-kind");
 			if (kind === "expenses") me.show_expense_detail();
 			else if (kind === "sme_count") me.show_sme_list();
+			else if (kind === "supervisor_list") me.show_supervisor_list();
 		});
+	}
+
+	show_supervisor_list() {
+		const data = this.data || {};
+		const stats = data.supervisor_stats || {};
+		const rows = [...(data.supervisors || [])];
+		const body = rows.length
+			? rows
+					.map(
+						(r) => `<tr>
+				<td>${frappe.utils.escape_html(r.label || r.employee_name || "")}</td>
+				<td>${frappe.utils.escape_html(r.division || "—")}</td>
+				<td>${frappe.utils.escape_html(r.designation || "—")}</td>
+				<td class="num">${this.fmt(r.field_officer_count)}</td>
+				<td class="num">${this.fmt(r.sme_count)}</td>
+			</tr>`,
+					)
+					.join("")
+			: `<tr><td colspan="5" class="text-muted text-center">${__("No field supervisors found")}</td></tr>`;
+
+		const d = new frappe.ui.Dialog({
+			title: __("Field Supervisors"),
+			size: "large",
+			fields: [{ fieldtype: "HTML", fieldname: "html" }],
+			primary_action_label: __("Close"),
+			primary_action: () => d.hide(),
+		});
+		d.fields_dict.html.$wrapper.html(`
+			<p class="text-muted" style="font-size:12px;margin-bottom:10px;">
+				${__(
+					"Field supervisors are Field Officers who manage other Field Officers (Field Supervisor link on Field Officer). Example: Hammad Saleem → Field Supervisor: M. Adnan Munir."
+				)}
+				<br>
+				${__("Supervisors")}: <strong>${this.fmt(stats.total || rows.length)}</strong>
+				&nbsp;·&nbsp;
+				${__("Field officers under them")}: <strong>${this.fmt(stats.total_field_officers || 0)}</strong>
+				&nbsp;·&nbsp;
+				${__("SMEs under them")}: <strong>${this.fmt(stats.total_smes || 0)}</strong>
+			</p>
+			<div class="table-responsive" style="max-height:420px;overflow:auto;">
+				<table class="table table-bordered table-hover" style="font-size:12px;margin:0;">
+					<thead>
+						<tr>
+							<th>${__("Supervisor")}</th>
+							<th>${__("Type / Division")}</th>
+							<th>${__("Designation")}</th>
+							<th class="text-right">${__("Field Officers")}</th>
+							<th class="text-right">${__("SMEs")}</th>
+						</tr>
+					</thead>
+					<tbody>${body}</tbody>
+					<tfoot>
+						<tr>
+							<th>${__("Total")}</th>
+							<th></th>
+							<th></th>
+							<th class="text-right">${this.fmt(stats.total_field_officers || 0)}</th>
+							<th class="text-right">${this.fmt(stats.total_smes || 0)}</th>
+						</tr>
+					</tfoot>
+				</table>
+			</div>
+		`);
+		d.show();
 	}
 
 	show_sme_list() {
@@ -848,8 +1005,7 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 			"Followup & Other Visits",
 			"New",
 			"Meetings",
-			"Active",
-			"Inactive",
+			"M&E Visits",
 			"Schools Attended",
 			"Participants",
 			"Expenses",
@@ -872,8 +1028,7 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 					r.followup || 0,
 					r.new || 0,
 					r.meetings || 0,
-					r.active || 0,
-					r.inactive || 0,
+					this.me_visits(r),
 					r.schools || 0,
 					r.participants || 0,
 					r.expenses || 0,
@@ -897,5 +1052,10 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 
 function flt(v) {
 	const n = parseFloat(v);
+	return isNaN(n) ? 0 : n;
+}
+
+function cint(v) {
+	const n = parseInt(v, 10);
 	return isNaN(n) ? 0 : n;
 }

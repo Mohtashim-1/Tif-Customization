@@ -189,47 +189,39 @@ def get_report_data(filters=None):
 	}
 
 
+def _supervisor_option_description(row):
+	label = row.get("employee_name") or row.get("employee") or ""
+	count = cint(row.get("field_officer_count"))
+	division = (row.get("division") or "").strip()
+	if division:
+		return f"{label} ({count} field officers, {division})"
+	return f"{label} ({count} field officers)"
+
+
 @frappe.whitelist()
 def get_supervisor_options(txt=""):
 	txt = (txt or "").strip()
-	params = {}
-	txt_filter = ""
-	if txt:
-		txt_filter = """
-			AND (
-				sup.employee_name LIKE %(txt)s
-				OR sup.name LIKE %(txt)s
-				OR sup.user_id LIKE %(txt)s
-			)
-		"""
-		params["txt"] = f"%{txt}%"
-
-	rows = frappe.db.sql(
-		f"""
-		SELECT
-			sup.name AS employee,
-			sup.employee_name,
-			sup.user_id,
-			COUNT(staff.name) AS field_staff_count
-		FROM `tabEmployee` sup
-		INNER JOIN `tabEmployee` staff
-			ON staff.reports_to = sup.name
-			AND staff.status = 'Active'
-		WHERE sup.status = 'Active'
-		{txt_filter}
-		GROUP BY sup.name, sup.employee_name, sup.user_id
-		ORDER BY sup.employee_name
-		LIMIT 50
-		""",
-		params,
-		as_dict=True,
+	from tif_customization.tif_customization.doctype.field_officer.field_officer import (
+		list_field_supervisors,
 	)
+
+	rows = list_field_supervisors()
+	if txt:
+		needle = txt.lower()
+		rows = [
+			r
+			for r in rows
+			if needle in (r.get("employee_name") or "").lower()
+			or needle in (r.get("employee") or "").lower()
+			or needle in (r.get("user_id") or "").lower()
+			or needle in (r.get("division") or "").lower()
+		]
 	return [
 		{
-			"value": row.user_id or row.employee_name or row.employee,
-			"description": f"{row.employee_name or row.employee} ({cint(row.field_staff_count)} field staff)",
+			"value": row.get("user_id") or row.get("employee_name") or row.get("employee"),
+			"description": _supervisor_option_description(row),
 		}
-		for row in rows
+		for row in rows[:50]
 	]
 
 
@@ -294,18 +286,57 @@ def _get_supervisor_info(supervisor):
 
 
 def _get_supervisor_field_staff(supervisor_info):
-	employee = supervisor_info.get("employee")
-	if not employee:
-		return []
+	from tif_customization.tif_customization.doctype.field_officer.field_officer import (
+		get_field_supervisor_subordinate_employees,
+		resolve_supervisor_field_officer,
+	)
+
+	supervisor = (
+		supervisor_info.get("employee")
+		or supervisor_info.get("user_id")
+		or supervisor_info.get("label")
+		or supervisor_info.get("value")
+	)
+	emp_ids = get_field_supervisor_subordinate_employees(supervisor)
+	if not emp_ids:
+		# Fallback until Field Supervisor is populated on all officers
+		employee = supervisor_info.get("employee")
+		if not employee:
+			return []
+		rows = frappe.get_all(
+			"Employee",
+			filters={"status": "Active", "reports_to": employee},
+			fields=["name", "employee_name", "user_id", "department", "designation"],
+			order_by="employee_name asc",
+			limit_page_length=500,
+		)
+		return rows
 
 	rows = frappe.get_all(
 		"Employee",
-		filters={"status": "Active", "reports_to": employee},
+		filters={"status": "Active", "name": ["in", emp_ids]},
 		fields=["name", "employee_name", "user_id", "department", "designation"],
 		order_by="employee_name asc",
 		limit_page_length=500,
 	)
-	return rows
+	if rows:
+		return rows
+
+	# Field Supervisor link exists but employee rows missing — resolve via FO records
+	sup_fo = resolve_supervisor_field_officer(supervisor)
+	if not sup_fo:
+		return []
+	return frappe.db.sql(
+		"""
+		SELECT e.name, e.employee_name, e.user_id, e.department, e.designation
+		FROM `tabField Officer` fo
+		INNER JOIN `tabEmployee` e ON e.name = fo.employee AND e.status = 'Active'
+		WHERE fo.status = 'Active' AND fo.parent_field_officer = %(sup)s
+		ORDER BY e.employee_name
+		""",
+		{"sup": sup_fo},
+		as_dict=True,
+	)
 
 
 def _supervisor_condition(supervisor_info, user_expr):

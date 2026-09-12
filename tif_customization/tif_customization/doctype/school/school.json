@@ -8,6 +8,9 @@
  "field_order": [
   "school_as",
   "naming_series",
+  "customer",
+  "approved_by",
+  "approved_on",
   "school_name",
   "territory",
   "school_type",
@@ -374,10 +377,43 @@
    "fieldname": "area",
    "fieldtype": "Data",
    "label": "Area"
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "ERP Customer",
+   "no_copy": 1,
+   "options": "Customer",
+   "read_only": 1
+  },
+  {
+   "fieldname": "approved_by",
+   "fieldtype": "Link",
+   "label": "Approved By",
+   "no_copy": 1,
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "approved_on",
+   "fieldtype": "Datetime",
+   "label": "Approved On",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "School",
+   "print_hide": 1,
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
+ "is_submittable": 1,
  "links": [],
  "modified": "2026-06-26 21:34:34.723912",
  "modified_by": "Administrator",
@@ -387,6 +423,7 @@
  "owner": "Administrator",
  "permissions": [
   {
+   "cancel": 1,
    "create": 1,
    "delete": 1,
    "email": 1,
@@ -396,6 +433,20 @@
    "report": 1,
    "role": "System Manager",
    "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "cancel": 1,
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "School Approval",
+   "share": 1,
+   "submit": 1,
    "write": 1
   },
   {

@@ -1,0 +1,527 @@
+/**
+ * School Opening Form SC-1.2 — Word/PDF layout
+ * Scoped to #school-opening-portal to beat website.bundle / Bootstrap.
+ */
+
+/* ---- Page shell ---- */
+#school-opening-portal.school-opening-portal {
+	--soa-ink: #1a1a1a;
+	--soa-border: #4a4a4a;
+	--soa-box-border: #333333;
+	--soa-fill: #ebebeb;
+	--soa-fill-focus: #ffffff;
+	--soa-page: #c8c8c8;
+	--soa-sheet: #ffffff;
+	--soa-font: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+	--soa-font-doc: Georgia, "Times New Roman", Times, serif;
+
+	box-sizing: border-box;
+	background: var(--soa-page) !important;
+	padding: 20px 16px 48px !important;
+	margin: 0 !important;
+	min-height: 60vh;
+	font-family: var(--soa-font) !important;
+	font-size: 14px;
+	color: var(--soa-ink) !important;
+	line-height: 1.45;
+}
+
+#school-opening-portal *,
+#school-opening-portal *::before,
+#school-opening-portal *::after {
+	box-sizing: border-box;
+}
+
+/* Undo ERP website container padding around our form */
+#page-school-opening .page-content-wrapper,
+#page-school-opening main.container,
+#page-school-opening .page_content {
+	max-width: none !important;
+	width: 100% !important;
+	padding-left: 0 !important;
+	padding-right: 0 !important;
+	margin-top: 0 !important;
+}
+
+#page-school-opening .page-breadcrumbs,
+#page-school-opening .page-header-wrapper {
+	display: none !important;
+}
+
+#school-opening-portal .soa-sheet {
+	max-width: 820px;
+	margin: 0 auto;
+	background: var(--soa-sheet);
+	padding: 28px 32px 36px;
+	border: 1px solid var(--soa-border);
+	box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+}
+
+/* ---- Letterhead (PDF) ---- */
+#school-opening-portal .soa-letterhead {
+	text-align: center;
+	font-family: var(--soa-font-doc);
+	border-bottom: 2px solid var(--soa-ink);
+	padding-bottom: 10px;
+	margin-bottom: 10px;
+}
+
+#school-opening-portal .soa-letterhead .org {
+	font-size: 17px;
+	font-weight: 700;
+	color: var(--soa-ink);
+}
+
+#school-opening-portal .soa-letterhead .addr {
+	font-size: 11px;
+	margin-top: 4px;
+	color: #444;
+}
+
+#school-opening-portal .soa-letterhead .erp-note {
+	font-size: 10px;
+	font-style: italic;
+	margin-top: 2px;
+	color: #555;
+}
+
+/* ---- Title row ---- */
+#school-opening-portal .soa-title-row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-end;
+	justify-content: space-between;
+	gap: 12px;
+	margin-bottom: 16px;
+	padding-bottom: 8px;
+	border-bottom: 1px solid #ccc;
+}
+
+#school-opening-portal .soa-title-row h1 {
+	flex: 1 1 280px;
+	margin: 0;
+	font-family: var(--soa-font-doc);
+	font-size: 14px;
+	font-weight: 700;
+	text-transform: uppercase;
+	text-decoration: underline;
+	text-underline-offset: 3px;
+	color: var(--soa-ink);
+	line-height: 1.3;
+}
+
+#school-opening-portal .soa-meta-inline {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px 14px;
+	font-size: 13px;
+	white-space: nowrap;
+}
+
+#school-opening-portal .soa-form-no strong {
+	font-weight: 700;
+}
+
+#school-opening-portal .soa-date-inline {
+	margin: 0;
+	font-weight: 600;
+	font-size: 13px;
+}
+
+/* ---- Custom date picker (replaces native input[type=date]) ---- */
+#school-opening-portal .soa-date-picker {
+	position: relative;
+	display: inline-block;
+	vertical-align: middle;
+}
+
+#school-opening-portal .soa-date-picker-input-wrap {
+	display: flex;
+	align-items: stretch;
+	width: 168px;
+	max-width: 100%;
+	border: 1px solid #a8a8a8;
+	border-radius: 2px;
+	background: #ebebeb;
+	overflow: hidden;
+}
+
+#school-opening-portal .soa-date-display {
+	flex: 1;
+	min-width: 0;
+	min-height: 38px !important;
+	border: none !important;
+	background: transparent !important;
+	padding: 8px 10px !important;
+	cursor: pointer;
+	font-weight: 600;
+	letter-spacing: 0.02em;
+}
+
+#school-opening-portal .soa-date-picker-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 40px;
+	flex-shrink: 0;
+	border: none;
+	border-left: 1px solid #a8a8a8;
+	background: #dcdcdc;
+	color: #1e3a5f;
+	cursor: pointer;
+	padding: 0;
+}
+
+#school-opening-portal .soa-date-picker-btn:hover {
+	background: #c8c8c8;
+}
+
+#school-opening-portal .soa-date-picker.soa-date-open .soa-date-picker-input-wrap {
+	border-color: #2563eb;
+	box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25);
+	background: #fff;
+}
+
+#school-opening-portal .soa-date-popup {
+	position: absolute;
+	top: calc(100% + 6px);
+	right: 0;
+	z-index: 1000;
+	width: 280px;
+	padding: 10px;
+	background: #fff;
+	border: 1px solid #666;
+	border-radius: 6px;
+	box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+}
+
+#school-opening-portal .soa-date-popup-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 8px;
+}
+
+#school-opening-portal .soa-date-month-label {
+	font-weight: 700;
+	font-size: 13px;
+	color: #1a1a1a;
+}
+
+#school-opening-portal .soa-date-nav {
+	width: 32px;
+	height: 32px;
+	border: 1px solid #ccc;
+	background: #f5f5f5;
+	border-radius: 4px;
+	cursor: pointer;
+	font-size: 18px;
+	line-height: 1;
+	color: #333;
+}
+
+#school-opening-portal .soa-date-nav:hover {
+	background: #e8e8e8;
+}
+
+#school-opening-portal .soa-date-weekdays {
+	display: grid;
+	grid-template-columns: repeat(7, 1fr);
+	gap: 2px;
+	margin-bottom: 4px;
+	font-size: 10px;
+	font-weight: 700;
+	text-align: center;
+	color: #666;
+}
+
+#school-opening-portal .soa-date-grid {
+	display: grid;
+	grid-template-columns: repeat(7, 1fr);
+	gap: 2px;
+}
+
+#school-opening-portal .soa-date-day {
+	min-height: 32px;
+	border: none;
+	background: #f8f8f8;
+	border-radius: 4px;
+	font-size: 12px;
+	cursor: pointer;
+	color: #222;
+}
+
+#school-opening-portal .soa-date-day:hover {
+	background: #dbeafe;
+}
+
+#school-opening-portal .soa-date-day--selected {
+	background: #1e3a5f !important;
+	color: #fff !important;
+	font-weight: 700;
+}
+
+#school-opening-portal .soa-date-day--today {
+	outline: 1px solid #1e3a5f;
+}
+
+#school-opening-portal .soa-date-day--empty {
+	background: transparent;
+	cursor: default;
+}
+
+#school-opening-portal .soa-date-today {
+	display: block;
+	width: 100%;
+	margin-top: 8px;
+	padding: 6px;
+	border: 1px solid #ccc;
+	background: #f5f5f5;
+	border-radius: 4px;
+	font-size: 12px;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+#school-opening-portal .soa-date-today:hover {
+	background: #ebebeb;
+}
+
+/* ---- Sections (plain PDF style, no colored bars) ---- */
+#school-opening-portal .soa-section {
+	margin-top: 18px;
+}
+
+#school-opening-portal .soa-section-title {
+	font-size: 12px;
+	font-weight: 700;
+	text-transform: uppercase;
+	margin: 0 0 10px;
+	color: var(--soa-ink);
+	letter-spacing: 0.02em;
+	background: none !important;
+	padding: 0 !important;
+	border-radius: 0 !important;
+}
+
+#school-opening-portal .soa-block {
+	border: 1px solid var(--soa-box-border);
+	padding: 12px 14px;
+	margin-bottom: 12px;
+	background: #fafafa;
+}
+
+#school-opening-portal .soa-label {
+	font-size: 11px;
+	font-weight: 700;
+	margin-bottom: 8px;
+	color: var(--soa-ink);
+}
+
+/* ---- All text inputs (override Bootstrap / website) ---- */
+#school-opening-portal .soa-control,
+#school-opening-portal .soa-field input[type="text"],
+#school-opening-portal .soa-field input[type="email"],
+#school-opening-portal .soa-field input[type="number"],
+#school-opening-portal .soa-field input[type="url"],
+#school-opening-portal .soa-field input[type="date"],
+#school-opening-portal .soa-field textarea,
+#school-opening-portal .soa-contacts-table input[type="text"] {
+	display: block;
+	width: 100%;
+	min-height: 38px;
+	margin: 0;
+	padding: 8px 10px !important;
+	font-family: var(--soa-font) !important;
+	font-size: 14px !important;
+	line-height: 1.35 !important;
+	color: var(--soa-ink) !important;
+	background-color: var(--soa-fill) !important;
+	background-image: none !important;
+	border: 1px solid #a8a8a8 !important;
+	border-radius: 2px !important;
+	box-shadow: none !important;
+	-webkit-appearance: none;
+	appearance: none;
+	transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+#school-opening-portal .soa-field textarea {
+	min-height: 72px;
+	resize: vertical;
+}
+
+#school-opening-portal .soa-control:focus,
+#school-opening-portal .soa-field input:focus,
+#school-opening-portal .soa-field textarea:focus,
+#school-opening-portal .soa-contacts-table input:focus {
+	outline: none !important;
+	background-color: var(--soa-fill-focus) !important;
+	border-color: #2563eb !important;
+	box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25) !important;
+}
+
+#school-opening-portal .soa-field label {
+	display: block;
+	font-size: 11px;
+	font-weight: 700;
+	margin-bottom: 4px;
+	color: #333;
+}
+
+#school-opening-portal .soa-row-2 {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 14px;
+	margin-bottom: 12px;
+}
+
+#school-opening-portal .soa-row-3 {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 14px;
+	margin-bottom: 12px;
+}
+
+/* ---- Checkboxes / radios ---- */
+#school-opening-portal .soa-check-grid {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 6px 10px;
+	font-size: 12px;
+}
+
+#school-opening-portal .soa-check-grid label {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin: 0;
+	padding: 4px 2px;
+	font-weight: 400;
+	cursor: pointer;
+	background: transparent !important;
+	border: none !important;
+}
+
+#school-opening-portal .soa-check-grid input[type="checkbox"],
+#school-opening-portal .soa-check-grid input[type="radio"] {
+	width: 15px;
+	height: 15px;
+	margin: 0;
+	flex-shrink: 0;
+	accent-color: #1e3a5f;
+	cursor: pointer;
+}
+
+/* ---- Contacts table ---- */
+#school-opening-portal .soa-contacts-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 12px;
+	border: 1px solid var(--soa-box-border);
+}
+
+#school-opening-portal .soa-contacts-table th,
+#school-opening-portal .soa-contacts-table td {
+	border: 1px solid #888;
+	padding: 0;
+	vertical-align: middle;
+}
+
+#school-opening-portal .soa-contacts-table th {
+	background: #e0e0e0;
+	font-weight: 700;
+	padding: 8px 10px;
+	text-align: left;
+	font-size: 11px;
+}
+
+#school-opening-portal .soa-contacts-table td:first-child {
+	font-weight: 600;
+	width: 32%;
+	padding: 8px 10px;
+	background: #f5f5f5;
+}
+
+#school-opening-portal .soa-contacts-table td:not(:first-child) {
+	padding: 4px;
+}
+
+#school-opening-portal .soa-contacts-table input[type="text"] {
+	border: none !important;
+	background: var(--soa-fill) !important;
+	min-height: 34px;
+}
+
+#school-opening-portal .soa-contacts-table input[type="text"]:focus {
+	border: 1px solid #2563eb !important;
+}
+
+/* ---- File inputs ---- */
+#school-opening-portal .soa-field input[type="file"] {
+	display: block;
+	width: 100%;
+	font-size: 12px;
+	padding: 8px;
+	background: var(--soa-fill) !important;
+	border: 1px dashed #888 !important;
+	border-radius: 2px !important;
+	cursor: pointer;
+}
+
+/* ---- Submit ---- */
+#school-opening-portal .soa-submit-bar {
+	text-align: center;
+	margin-top: 24px;
+	padding-top: 16px;
+	border-top: 2px solid var(--soa-ink);
+}
+
+#school-opening-portal .soa-submit-bar .btn-submit {
+	background: #1e3a5f;
+	color: #fff;
+	border: none;
+	padding: 12px 28px;
+	font-size: 14px;
+	font-weight: 700;
+	cursor: pointer;
+	border-radius: 4px;
+	font-family: var(--soa-font);
+}
+
+#school-opening-portal .soa-submit-bar .btn-submit:hover:not(:disabled) {
+	background: #152a45;
+}
+
+#school-opening-portal .soa-ho-note {
+	font-size: 10px;
+	color: #555;
+	margin-top: 20px;
+	padding: 10px;
+	border: 1px dashed #999;
+	background: #f9f9f9;
+}
+
+#school-opening-portal .soa-success h2 {
+	font-family: var(--soa-font-doc);
+}
+
+@media (max-width: 720px) {
+	#school-opening-portal .soa-check-grid {
+		grid-template-columns: 1fr 1fr;
+	}
+	#school-opening-portal .soa-row-2,
+	#school-opening-portal .soa-row-3 {
+		grid-template-columns: 1fr;
+	}
+	#school-opening-portal .soa-sheet {
+		padding: 16px;
+	}
+	#school-opening-portal .soa-meta-inline {
+		width: 100%;
+	}
+	#school-opening-portal .soa-date-picker-input-wrap {
+		width: 100%;
+	}
+}

@@ -12,7 +12,28 @@
  "page_name": "smes-target-base---k",
  "roles": [
   {
+   "role": "System Manager"
+  },
+  {
+   "role": "HR Manager"
+  },
+  {
+   "role": "Field Staff Manager"
+  },
+  {
+   "role": "Supervisor Field Staff"
+  },
+  {
+   "role": "Field Staff"
+  },
+  {
    "role": "SME Manager"
+  },
+  {
+   "role": "HOD"
+  },
+  {
+   "role": "COO"
   }
  ],
  "script": null,

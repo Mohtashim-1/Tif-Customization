@@ -12,7 +12,31 @@
  "page_name": "supervisor-target-ba",
  "roles": [
   {
+   "role": "System Manager"
+  },
+  {
+   "role": "HR Manager"
+  },
+  {
+   "role": "HR User"
+  },
+  {
+   "role": "Field Staff Manager"
+  },
+  {
+   "role": "Supervisor Field Staff"
+  },
+  {
+   "role": "HOD"
+  },
+  {
+   "role": "COO"
+  },
+  {
    "role": "SME Manager"
+  },
+  {
+   "role": "Staff Reporting Manager"
   }
  ],
  "script": null,

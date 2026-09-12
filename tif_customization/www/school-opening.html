@@ -1,0 +1,418 @@
+{% extends "templates/web.html" %}
+
+{% block breadcrumbs %}{% endblock %}
+{% block header %}{% endblock %}
+
+{% block head_include %}
+<link rel="stylesheet" href="/assets/tif_customization/css/school_opening_form.css?v=20260912c">
+<style>
+	/* Fallback if asset cache is stale — must match school_opening_form.css */
+	#school-opening-portal .soa-field input:not([type=checkbox]):not([type=radio]):not([type=file]),
+	#school-opening-portal .soa-field textarea,
+	#school-opening-portal .soa-control {
+		background: #ebebeb !important;
+		border: 1px solid #a8a8a8 !important;
+		min-height: 38px;
+		padding: 8px 10px !important;
+		border-radius: 2px !important;
+		box-shadow: none !important;
+	}
+	#school-opening-portal .soa-section-title {
+		background: none !important;
+		color: #1a1a1a !important;
+		padding: 0 !important;
+	}
+</style>
+<script src="/assets/tif_customization/js/school_opening_date.js?v=20260912c"></script>
+{% endblock %}
+
+{% block page_content %}
+<div id="school-opening-portal" class="school-opening-portal">
+	<div id="soa-success" class="soa-sheet soa-success d-none">
+		<h2>Thank You</h2>
+		<p id="soa-success-msg" class="lead"></p>
+		<p class="text-muted">The ILm Foundation will review your submission and contact you after approval.</p>
+	</div>
+
+	<form id="soa-form" class="soa-sheet" enctype="multipart/form-data">
+		<div class="soa-letterhead">
+			<div class="org">THE ILM FOUNDATION</div>
+			<div class="addr">245-1/I, Block-6, PECHS Society, Karachi-75400, Pakistan • Tel: 021-34304450-51 • info@tif.edu.pk</div>
+			<div class="erp-note">For ERP School-Opening Use</div>
+		</div>
+
+		<div class="soa-title-row">
+			<h1>School Opening — Need Analysis Form</h1>
+			<div class="soa-meta-inline">
+				<span class="soa-form-no">Form No.: <strong>{{ form_no or "SC-1.2" }}</strong></span>
+				<label class="soa-date-inline" for="form_date_display">Date:</label>
+				<div class="soa-date-picker" id="soa-form-date-picker">
+					<div class="soa-date-picker-input-wrap">
+						<input type="text" id="form_date_display" class="soa-control soa-date-display" placeholder="DD / MM / YYYY" autocomplete="off" readonly required aria-label="Form date">
+						<input type="hidden" name="form_date" id="form_date" required>
+						<button type="button" class="soa-date-picker-btn" id="form_date_btn" aria-label="Open calendar" title="Choose date">
+							<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+						</button>
+					</div>
+					<div class="soa-date-popup" hidden>
+						<div class="soa-date-popup-head">
+							<button type="button" class="soa-date-nav soa-date-prev" aria-label="Previous month">&#8249;</button>
+							<span class="soa-date-month-label"></span>
+							<button type="button" class="soa-date-nav soa-date-next" aria-label="Next month">&#8250;</button>
+						</div>
+						<div class="soa-date-weekdays">
+							<span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span>
+						</div>
+						<div class="soa-date-grid"></div>
+						<button type="button" class="soa-date-today">Today</button>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<section class="soa-section">
+			<div class="soa-section-title">1 Institution Profile</div>
+			<div class="soa-block">
+				<div class="soa-label">Type of Institution</div>
+				<div class="soa-check-grid" data-group="institution_types">
+					<label><input type="checkbox" value="School"> School</label>
+					<label><input type="checkbox" value="College"> College</label>
+					<label><input type="checkbox" value="University"> University</label>
+					<label><input type="checkbox" value="Madaris"> Madaris</label>
+					<label><input type="checkbox" value="Library"> Library</label>
+					<label><input type="checkbox" value="Special School"> Special School</label>
+				</div>
+			</div>
+			<div class="soa-row-2">
+				<div class="soa-field"><label>Name of School *</label><input type="text" name="school_name" required></div>
+				<div class="soa-field"><label>TIF Representative</label><input type="text" name="tif_representative"></div>
+			</div>
+			<div class="soa-block">
+				<div class="soa-label">Category</div>
+				<div class="soa-check-grid" data-group="institution_category" data-single="1">
+					<label><input type="radio" name="institution_category" value="Provincial Govt."> Provincial Govt.</label>
+					<label><input type="radio" name="institution_category" value="Private"> Private</label>
+				</div>
+			</div>
+			<div class="soa-block">
+				<div class="soa-label">Educational System</div>
+				<div class="soa-check-grid" data-group="educational_system">
+					<label><input type="checkbox" value="Pre-Primary"> Pre-Primary</label>
+					<label><input type="checkbox" value="Primary"> Primary</label>
+					<label><input type="checkbox" value="Matric"> Matric</label>
+					<label><input type="checkbox" value="Intermediate"> Intermediate</label>
+					<label><input type="checkbox" value="Hifz-o-Nazra"> Hifz-o-Nazra</label>
+					<label><input type="checkbox" value="Cambridge"> Cambridge</label>
+					<label><input type="checkbox" value="O / A Levels"> O / A Levels</label>
+				</div>
+			</div>
+			<div class="soa-row-3">
+				<div class="soa-field"><label>Type of School</label><input type="text" name="type_of_school"></div>
+				<div class="soa-field"><label>No. of Campuses</label><input type="number" name="no_of_campuses" min="0"></div>
+				<div class="soa-field"><label>No. of Students</label><input type="number" name="no_of_students" min="0"></div>
+			</div>
+			<div class="soa-row-2">
+				<div class="soa-block">
+					<div class="soa-label">Structure</div>
+					<div class="soa-check-grid" data-group="structure" data-single="1">
+						<label><input type="radio" name="structure" value="Single Campus"> Single Campus</label>
+						<label><input type="radio" name="structure" value="Chain"> Chain</label>
+					</div>
+				</div>
+				<div class="soa-block">
+					<div class="soa-label">Academic Session — Shift</div>
+					<div class="soa-check-grid" data-group="academic_shift" data-single="1">
+						<label><input type="radio" name="academic_shift" value="Morning"> Morning</label>
+						<label><input type="radio" name="academic_shift" value="Evening"> Evening</label>
+						<label><input type="radio" name="academic_shift" value="Both"> Both</label>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<section class="soa-section">
+			<div class="soa-section-title">2 Services of Interest</div>
+			<div class="soa-block">
+				<div class="soa-label">Teacher Training Services</div>
+				<div class="soa-check-grid" data-group="teacher_training_services">
+					<label><input type="checkbox" value="ELP"> ELP</label>
+					<label><input type="checkbox" value="One Day Workshop (Intro of Tajweed)"> One Day Workshop (Intro of Tajweed)</label>
+					<label><input type="checkbox" value="TECC Professional"> TECC Professional</label>
+					<label><input type="checkbox" value="TECC Foundation"> TECC Foundation</label>
+					<label><input type="checkbox" value="V-Campers"> V-Campers</label>
+					<label><input type="checkbox" value="Effective Teaching of the Holy Qur'an Workshop"> Effective Teaching of the Holy Qur'an Workshop</label>
+					<label><input type="checkbox" value="PEF Pakistan"> PEF Pakistan</label>
+					<label><input type="checkbox" value="Intro to Tajweed — One Day Workshop"> Intro to Tajweed — One Day Workshop</label>
+					<label><input type="checkbox" value="Tajweed Training Course"> Tajweed Training Course</label>
+				</div>
+			</div>
+			<div class="soa-block">
+				<div class="soa-label">Tilawat Program for School Services — Workshops &amp; Trainings</div>
+				<div class="soa-check-grid" data-group="tilawat_services">
+					<label><input type="checkbox" value="Noorani Qaida — NQ Teachers Guide"> Noorani Qaida — NQ Teachers Guide</label>
+					<label><input type="checkbox" value="Tajweed Workshop for Kids"> Tajweed Workshop for Kids</label>
+					<label><input type="checkbox" value="Teachers Training (Online)"> Teachers Training (Online)</label>
+					<label><input type="checkbox" value="Teachers Training (On-site)"> Teachers Training (On-site)</label>
+					<label><input type="checkbox" value="Noorani Qaida — NQ Workbook"> Noorani Qaida — NQ Workbook</label>
+				</div>
+			</div>
+			<div class="soa-block">
+				<div class="soa-label">Quran Program for Student Services</div>
+				<div class="soa-check-grid" data-group="quran_program_services">
+					<label><input type="checkbox" value="MQH Part-1 + Part-1 (Sample)"> MQH Part-1 + Part-1 (Sample)</label>
+					<label><input type="checkbox" value="MQH Part-1 (MQH T.G Part-1)"> MQH Part-1 (MQH T.G Part-1)</label>
+					<label><input type="checkbox" value="MQH Part-2 (MQH T.G Part-2)"> MQH Part-2 (MQH T.G Part-2)</label>
+					<label><input type="checkbox" value="MQH Part-3 (MQH T.G Part-3)"> MQH Part-3 (MQH T.G Part-3)</label>
+					<label><input type="checkbox" value="MQH Part-4 (MQH T.G Part-4)"> MQH Part-4 (MQH T.G Part-4)</label>
+					<label><input type="checkbox" value="MQH Part-5 (MQH T.G Part-5)"> MQH Part-5 (MQH T.G Part-5)</label>
+					<label><input type="checkbox" value="MQH Part-6"> MQH Part-6</label>
+					<label><input type="checkbox" value="MQH Part-7"> MQH Part-7</label>
+					<label><input type="checkbox" value="MQH Part-1 — English Version"> MQH Part-1 — English Version</label>
+					<label><input type="checkbox" value="MQH Part-2 — English Version"> MQH Part-2 — English Version</label>
+					<label><input type="checkbox" value="MQH Part-1 — Sindhi Version"> MQH Part-1 — Sindhi Version</label>
+					<label><input type="checkbox" value="MQH Part-2 — Sindhi Version"> MQH Part-2 — Sindhi Version</label>
+					<label><input type="checkbox" value="MQH Part-3 — Sindhi Version"> MQH Part-3 — Sindhi Version</label>
+					<label><input type="checkbox" value="Intro Workshops"> Intro Workshops</label>
+				</div>
+			</div>
+		</section>
+
+		<section class="soa-section">
+			<div class="soa-section-title">3 Current Engagement with TIF</div>
+			<div class="soa-block">
+				<div class="soa-label">School Already Running TIF Services</div>
+				<div class="soa-check-grid" data-group="running_tif_services">
+					<label><input type="checkbox" value="Quran Program for Student"> Quran Program for Student</label>
+					<label><input type="checkbox" value="Tilawat Program for School"> Tilawat Program for School</label>
+					<label><input type="checkbox" value="Teacher Training"> Teacher Training</label>
+				</div>
+			</div>
+			<div class="soa-block">
+				<div class="soa-label">Curriculum Currently in Use</div>
+				<div class="soa-check-grid" data-group="curriculum_in_use">
+					<label><input type="checkbox" value="Oral Nazra"> Oral Nazra</label>
+					<label><input type="checkbox" value="Qaida"> Qaida</label>
+					<label><input type="checkbox" value="Afaq"> Afaq</label>
+					<label><input type="checkbox" value="National Book Foundation"> National Book Foundation</label>
+					<label><input type="checkbox" value="Noorani Qaida (Not TPS)"> Noorani Qaida (Not TPS)</label>
+					<label><input type="checkbox" value="Iqra Qaida"> Iqra Qaida</label>
+					<label><input type="checkbox" value="Spectrum"> Spectrum</label>
+					<label><input type="checkbox" value="Rehmani Qaida"> Rehmani Qaida</label>
+					<label><input type="checkbox" value="Madni Qaida"> Madni Qaida</label>
+					<label><input type="checkbox" value="Gaba"> Gaba</label>
+					<label><input type="checkbox" value="Jamiat Qaida"> Jamiat Qaida</label>
+					<label><input type="checkbox" value="Qurani Qaida"> Qurani Qaida</label>
+					<label><input type="checkbox" value="Moonlight"> Moonlight</label>
+					<label><input type="checkbox" value="Islamic Values"> Islamic Values</label>
+					<label><input type="checkbox" value="CEF"> CEF</label>
+					<label><input type="checkbox" value="Zia ul Quran"> Zia ul Quran</label>
+				</div>
+				<div class="soa-field mt-2"><label>Others</label><input type="text" name="curriculum_others"></div>
+			</div>
+		</section>
+
+		<section class="soa-section">
+			<div class="soa-section-title">4 Attachments</div>
+			<div class="soa-row-3">
+				<div class="soa-field"><label>Visiting Card</label><input type="file" name="visiting_card" accept="image/*,.pdf" class="soa-file"></div>
+				<div class="soa-field"><label>School Picture</label><input type="file" name="school_picture" accept="image/*" class="soa-file"></div>
+				<div class="soa-field"><label>Meeting Picture</label><input type="file" name="meeting_picture" accept="image/*" class="soa-file"></div>
+			</div>
+			<div class="soa-block">
+				<div class="soa-label">Fee Structure</div>
+				<div class="soa-check-grid" data-group="fee_structure" data-single="1">
+					<label><input type="radio" name="fee_structure" value="Above 15K"> Above 15K</label>
+					<label><input type="radio" name="fee_structure" value="Between 5K – 15K"> Between 5K – 15K</label>
+					<label><input type="radio" name="fee_structure" value="Below 5K"> Below 5K</label>
+				</div>
+			</div>
+		</section>
+
+		<section class="soa-section">
+			<div class="soa-section-title">5 Online Presence</div>
+			<div class="soa-row-2">
+				<div class="soa-field"><label>Website</label><input type="url" name="website"></div>
+				<div class="soa-field"><label>Facebook</label><input type="text" name="facebook"></div>
+				<div class="soa-field"><label>Instagram</label><input type="text" name="instagram"></div>
+				<div class="soa-field"><label>LinkedIn</label><input type="text" name="linkedin"></div>
+			</div>
+			<div class="soa-field"><label>Other Links</label><textarea name="other_links" rows="2"></textarea></div>
+		</section>
+
+		<section class="soa-section">
+			<div class="soa-section-title">6 Location</div>
+			<div class="soa-field"><label>Address</label><textarea name="address" rows="2"></textarea></div>
+			<div class="soa-row-2">
+				<div class="soa-field"><label>Area</label><input type="text" name="area"></div>
+				<div class="soa-field"><label>City</label><input type="text" name="city"></div>
+			</div>
+			<div class="soa-block">
+				<div class="soa-label">Province</div>
+				<div class="soa-check-grid" data-group="province" data-single="1">
+					<label><input type="radio" name="province" value="Sindh"> Sindh</label>
+					<label><input type="radio" name="province" value="Punjab"> Punjab</label>
+					<label><input type="radio" name="province" value="KPK"> KPK</label>
+					<label><input type="radio" name="province" value="Balochistan"> Balochistan</label>
+					<label><input type="radio" name="province" value="Gilgit-Baltistan"> Gilgit-Baltistan</label>
+					<label><input type="radio" name="province" value="Azad Jammu & Kashmir"> Azad Jammu &amp; Kashmir</label>
+				</div>
+			</div>
+			<div class="soa-row-2">
+				<div class="soa-field"><label>Country</label><input type="text" name="country" value="Pakistan"></div>
+				<div class="soa-block">
+					<div class="soa-label">Marketing Sample Provided</div>
+					<div class="soa-check-grid" data-group="marketing_sample_provided" data-single="1">
+						<label><input type="radio" name="marketing_sample_provided" value="Yes"> Yes</label>
+						<label><input type="radio" name="marketing_sample_provided" value="No"> No</label>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<section class="soa-section">
+			<div class="soa-section-title">7 Key Contacts</div>
+			<table class="soa-contacts-table">
+				<thead><tr><th>Role</th><th>Name</th><th>Cell No.</th></tr></thead>
+				<tbody>
+					{% for role in ["Director", "Administrator", "Principal", "Vice Principal", "Academic Manager", "Academic Coordinator", "Admin Person", "Receptionist", "Coordinator"] %}
+					<tr>
+						<td>{{ role }}</td>
+						<td><input type="text" data-contact-role="{{ role }}" data-contact-field="name"></td>
+						<td><input type="text" data-contact-role="{{ role }}" data-contact-field="cell"></td>
+					</tr>
+					{% endfor %}
+				</tbody>
+			</table>
+		</section>
+
+		<section class="soa-section">
+			<div class="soa-section-title">8 School Communication Channels</div>
+			<div class="soa-row-2">
+				<div class="soa-field"><label>School PTCL</label><input type="text" name="school_ptcl"></div>
+				<div class="soa-field"><label>School Mobile</label><input type="text" name="school_mobile"></div>
+				<div class="soa-field"><label>School WhatsApp</label><input type="text" name="school_whatsapp"></div>
+				<div class="soa-field"><label>School Email</label><input type="email" name="school_email"></div>
+			</div>
+		</section>
+
+		<p class="soa-ho-note">Head Office verification and ERP school code assignment are completed internally after you submit this form.</p>
+
+		<div class="soa-submit-bar">
+			<button type="submit" class="btn-submit" id="soa-submit-btn">Submit School Opening Form</button>
+		</div>
+	</form>
+</div>
+
+<script>
+(function () {
+	const form = document.getElementById("soa-form");
+	const successEl = document.getElementById("soa-success");
+	const successMsg = document.getElementById("soa-success-msg");
+	const submitBtn = document.getElementById("soa-submit-btn");
+	function checkedValues(groupName) {
+		const grid = document.querySelector('[data-group="' + groupName + '"]');
+		if (!grid) return [];
+		const single = grid.dataset.single === "1";
+		if (single) {
+			const picked = grid.querySelector("input:checked");
+			return picked ? picked.value : "";
+		}
+		return Array.from(grid.querySelectorAll('input[type="checkbox"]:checked')).map((el) => el.value);
+	}
+
+	function collectContacts() {
+		const out = {};
+		document.querySelectorAll("[data-contact-role]").forEach((el) => {
+			const role = el.dataset.contactRole;
+			const field = el.dataset.contactField;
+			if (!out[role]) out[role] = {};
+			out[role][field] = el.value.trim();
+		});
+		return out;
+	}
+
+	function buildPayload() {
+		const fd = new FormData(form);
+		return {
+			form_date: fd.get("form_date"),
+			school_name: fd.get("school_name"),
+			tif_representative: fd.get("tif_representative"),
+			institution_types: checkedValues("institution_types"),
+			institution_category: checkedValues("institution_category"),
+			educational_system: checkedValues("educational_system"),
+			type_of_school: fd.get("type_of_school"),
+			no_of_campuses: fd.get("no_of_campuses"),
+			no_of_students: fd.get("no_of_students"),
+			structure: checkedValues("structure"),
+			academic_shift: checkedValues("academic_shift"),
+			teacher_training_services: checkedValues("teacher_training_services"),
+			tilawat_services: checkedValues("tilawat_services"),
+			quran_program_services: checkedValues("quran_program_services"),
+			running_tif_services: checkedValues("running_tif_services"),
+			curriculum_in_use: checkedValues("curriculum_in_use"),
+			curriculum_others: fd.get("curriculum_others"),
+			fee_structure: checkedValues("fee_structure"),
+			website: fd.get("website"),
+			facebook: fd.get("facebook"),
+			instagram: fd.get("instagram"),
+			linkedin: fd.get("linkedin"),
+			other_links: fd.get("other_links"),
+			address: fd.get("address"),
+			area: fd.get("area"),
+			province: checkedValues("province"),
+			city: fd.get("city"),
+			country: fd.get("country"),
+			marketing_sample_provided: checkedValues("marketing_sample_provided"),
+			school_ptcl: fd.get("school_ptcl"),
+			school_mobile: fd.get("school_mobile"),
+			school_whatsapp: fd.get("school_whatsapp"),
+			school_email: fd.get("school_email"),
+			key_contacts: collectContacts(),
+		};
+	}
+
+	form.addEventListener("submit", async (e) => {
+		e.preventDefault();
+		submitBtn.disabled = true;
+		submitBtn.textContent = "Submitting…";
+
+		const body = new FormData();
+		body.append("payload", JSON.stringify(buildPayload()));
+		["visiting_card", "school_picture", "meeting_picture"].forEach((name) => {
+			const fileInput = form.querySelector('input[type="file"][name="' + name + '"]');
+			if (fileInput && fileInput.files && fileInput.files[0]) {
+				body.append(name, fileInput.files[0]);
+			}
+		});
+
+		try {
+			const res = await fetch("/api/method/tif_customization.tif_customization.api.school_opening_form.submit_school_opening_application", {
+				method: "POST",
+				body,
+				credentials: "same-origin",
+				headers: { "X-Frappe-CSRF-Token": frappe?.csrf_token || "" },
+			});
+			const json = await res.json();
+			if (json.exc) {
+				let errText = "Submission failed";
+				try {
+					const msgs = JSON.parse(json._server_messages || "[]");
+					if (msgs[0]) errText = JSON.parse(msgs[0]).message || errText;
+				} catch (e) { /* ignore */ }
+				throw new Error(errText);
+			}
+			const result = json.message || {};
+			const msg = result.message || result.name || "Submitted successfully.";
+			form.classList.add("d-none");
+			successMsg.textContent = typeof msg === "string" ? msg : JSON.stringify(msg);
+			successEl.classList.remove("d-none");
+			window.scrollTo(0, 0);
+		} catch (err) {
+			submitBtn.disabled = false;
+			submitBtn.textContent = "Submit School Opening Form";
+			alert(err.message || "Could not submit. Please try again.");
+		}
+	});
+})();
+</script>
+{% endblock %}

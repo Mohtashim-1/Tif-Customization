@@ -30,7 +30,7 @@
  "show_attachments": 0,
  "show_list": 0,
  "show_sidebar": 1,
- "success_message": "School registration submitted successfully! We will contact you soon.",
+ "success_message": "Thank you! Your school opening form was received and is pending approval. Our team will contact you after review.",
  "success_url": "/school-registration-success",
  "title": "School Registration Form",
  "web_form_fields": [

@@ -1,0 +1,46 @@
+{% extends "templates/web.html" %}
+
+{% block breadcrumbs %}{% endblock %}
+{% block header %}{% endblock %}
+
+{% block head_include %}
+<link rel="stylesheet" href="/assets/tif_customization/css/school_opening_form.css?v=20260912f">
+<link rel="stylesheet" href="/assets/tif_customization/css/school_opening_print.css?v=20260912f">
+<style>
+	#school-opening-portal .soa-field input:not([type=checkbox]):not([type=radio]),
+	#school-opening-portal .soa-field textarea,
+	#school-opening-portal .soa-control {
+		background: #ebebeb !important;
+		border: 1px solid #a8a8a8 !important;
+		min-height: 38px;
+		padding: 8px 10px !important;
+		border-radius: 2px !important;
+		box-shadow: none !important;
+	}
+	#school-opening-portal .soa-section-title {
+		background: none !important;
+		color: #1a1a1a !important;
+		padding: 0 !important;
+	}
+</style>
+{% endblock %}
+
+{% block page_content %}
+{% if missing_customer %}
+<div class="container py-5 text-center">
+	<h3>{{ _("School Opening Print") }}</h3>
+	<p class="text-muted">{{ _("Select a school from the registry to open the SC-1.2 form.") }}</p>
+	<p>
+		<a class="btn btn-primary" href="/app/school-opening-registry">{{ _("Open School Opening Registry") }}</a>
+	</p>
+</div>
+{% elif form_print_body %}
+{{ form_print_body | safe }}
+{% else %}
+<div class="container py-5 text-center text-muted">{{ _("Could not load form data.") }}</div>
+{% endif %}
+{% endblock %}
+
+{% block script %}
+<script src="/assets/tif_customization/js/school_opening_pdf_download.js?v=20260912g"></script>
+{% endblock %}

@@ -1,0 +1,392 @@
+{
+ "actions": [],
+ "autoname": "naming_series:",
+ "creation": "2026-09-12 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "form_date",
+  "section_profile",
+  "institution_types",
+  "school_name",
+  "tif_representative",
+  "institution_category",
+  "educational_system",
+  "type_of_school",
+  "no_of_campuses",
+  "no_of_students",
+  "structure",
+  "academic_shift",
+  "section_services",
+  "teacher_training_services",
+  "tilawat_services",
+  "quran_program_services",
+  "section_engagement",
+  "running_tif_services",
+  "curriculum_in_use",
+  "curriculum_others",
+  "section_attachments",
+  "visiting_card",
+  "school_picture",
+  "meeting_picture",
+  "fee_structure",
+  "section_online",
+  "website",
+  "facebook",
+  "instagram",
+  "linkedin",
+  "other_links",
+  "section_location",
+  "address",
+  "area",
+  "province",
+  "city",
+  "country",
+  "marketing_sample_provided",
+  "section_channels",
+  "school_ptcl",
+  "school_mobile",
+  "school_whatsapp",
+  "school_email",
+  "section_contacts",
+  "key_contacts",
+  "section_approval",
+  "customer",
+  "erp_school_code",
+  "approved_by",
+  "approved_on",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "default": "SOA-.YYYY.-",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Series",
+   "options": "SOA-.YYYY.-"
+  },
+  {
+   "default": "Today",
+   "fieldname": "form_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Form Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_profile",
+   "fieldtype": "Section Break",
+   "label": "1 Institution Profile"
+  },
+  {
+   "fieldname": "institution_types",
+   "fieldtype": "Small Text",
+   "label": "Type of Institution"
+  },
+  {
+   "fieldname": "school_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Name of School",
+   "reqd": 1
+  },
+  {
+   "fieldname": "tif_representative",
+   "fieldtype": "Data",
+   "label": "TIF Representative"
+  },
+  {
+   "fieldname": "institution_category",
+   "fieldtype": "Select",
+   "label": "Category",
+   "options": "\nProvincial Govt.\nPrivate"
+  },
+  {
+   "fieldname": "educational_system",
+   "fieldtype": "Small Text",
+   "label": "Educational System"
+  },
+  {
+   "fieldname": "type_of_school",
+   "fieldtype": "Data",
+   "label": "Type of School"
+  },
+  {
+   "fieldname": "no_of_campuses",
+   "fieldtype": "Int",
+   "label": "No. of Campuses"
+  },
+  {
+   "fieldname": "no_of_students",
+   "fieldtype": "Int",
+   "label": "No. of Students"
+  },
+  {
+   "fieldname": "structure",
+   "fieldtype": "Select",
+   "label": "Structure",
+   "options": "\nSingle Campus\nChain"
+  },
+  {
+   "fieldname": "academic_shift",
+   "fieldtype": "Select",
+   "label": "Academic Session — Shift",
+   "options": "\nMorning\nEvening\nBoth"
+  },
+  {
+   "fieldname": "section_services",
+   "fieldtype": "Section Break",
+   "label": "2 Services of Interest"
+  },
+  {
+   "fieldname": "teacher_training_services",
+   "fieldtype": "Small Text",
+   "label": "Teacher Training Services"
+  },
+  {
+   "fieldname": "tilawat_services",
+   "fieldtype": "Small Text",
+   "label": "Tilawat Program Services"
+  },
+  {
+   "fieldname": "quran_program_services",
+   "fieldtype": "Small Text",
+   "label": "Quran Program for Student Services"
+  },
+  {
+   "fieldname": "section_engagement",
+   "fieldtype": "Section Break",
+   "label": "3 Current Engagement with TIF"
+  },
+  {
+   "fieldname": "running_tif_services",
+   "fieldtype": "Small Text",
+   "label": "School Already Running TIF Services"
+  },
+  {
+   "fieldname": "curriculum_in_use",
+   "fieldtype": "Small Text",
+   "label": "Curriculum Currently in Use"
+  },
+  {
+   "fieldname": "curriculum_others",
+   "fieldtype": "Data",
+   "label": "Curriculum — Others"
+  },
+  {
+   "fieldname": "section_attachments",
+   "fieldtype": "Section Break",
+   "label": "4 Attachments"
+  },
+  {
+   "fieldname": "visiting_card",
+   "fieldtype": "Attach",
+   "label": "Visiting Card"
+  },
+  {
+   "fieldname": "school_picture",
+   "fieldtype": "Attach",
+   "label": "School Picture"
+  },
+  {
+   "fieldname": "meeting_picture",
+   "fieldtype": "Attach",
+   "label": "Meeting Picture"
+  },
+  {
+   "fieldname": "fee_structure",
+   "fieldtype": "Select",
+   "label": "Fee Structure",
+   "options": "\nAbove 15K\nBetween 5K – 15K\nBelow 5K"
+  },
+  {
+   "fieldname": "section_online",
+   "fieldtype": "Section Break",
+   "label": "5 Online Presence"
+  },
+  {
+   "fieldname": "website",
+   "fieldtype": "Data",
+   "label": "Website"
+  },
+  {
+   "fieldname": "facebook",
+   "fieldtype": "Data",
+   "label": "Facebook"
+  },
+  {
+   "fieldname": "instagram",
+   "fieldtype": "Data",
+   "label": "Instagram"
+  },
+  {
+   "fieldname": "linkedin",
+   "fieldtype": "Data",
+   "label": "LinkedIn"
+  },
+  {
+   "fieldname": "other_links",
+   "fieldtype": "Small Text",
+   "label": "Other Links"
+  },
+  {
+   "fieldname": "section_location",
+   "fieldtype": "Section Break",
+   "label": "6 Location"
+  },
+  {
+   "fieldname": "address",
+   "fieldtype": "Small Text",
+   "label": "Address"
+  },
+  {
+   "fieldname": "area",
+   "fieldtype": "Data",
+   "label": "Area"
+  },
+  {
+   "fieldname": "province",
+   "fieldtype": "Select",
+   "label": "Province",
+   "options": "\nSindh\nPunjab\nKPK\nBalochistan\nGilgit-Baltistan\nAzad Jammu & Kashmir"
+  },
+  {
+   "fieldname": "city",
+   "fieldtype": "Data",
+   "label": "City"
+  },
+  {
+   "fieldname": "country",
+   "fieldtype": "Data",
+   "label": "Country"
+  },
+  {
+   "fieldname": "marketing_sample_provided",
+   "fieldtype": "Select",
+   "label": "Marketing Sample Provided",
+   "options": "\nYes\nNo"
+  },
+  {
+   "fieldname": "section_channels",
+   "fieldtype": "Section Break",
+   "label": "8 School Communication Channels"
+  },
+  {
+   "fieldname": "school_ptcl",
+   "fieldtype": "Data",
+   "label": "School PTCL"
+  },
+  {
+   "fieldname": "school_mobile",
+   "fieldtype": "Data",
+   "label": "School Mobile"
+  },
+  {
+   "fieldname": "school_whatsapp",
+   "fieldtype": "Data",
+   "label": "School WhatsApp"
+  },
+  {
+   "fieldname": "school_email",
+   "fieldtype": "Data",
+   "label": "School Email"
+  },
+  {
+   "fieldname": "section_contacts",
+   "fieldtype": "Section Break",
+   "label": "7 Key Contacts"
+  },
+  {
+   "fieldname": "key_contacts",
+   "fieldtype": "Table",
+   "label": "Key Contacts",
+   "options": "School Opening Contact"
+  },
+  {
+   "fieldname": "section_approval",
+   "fieldtype": "Section Break",
+   "label": "Head Office / ERP"
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "ERP Customer",
+   "no_copy": 1,
+   "options": "Customer",
+   "read_only": 1
+  },
+  {
+   "fieldname": "erp_school_code",
+   "fieldtype": "Data",
+   "label": "ERP School Code Assigned",
+   "read_only": 1
+  },
+  {
+   "fieldname": "approved_by",
+   "fieldtype": "Link",
+   "label": "Approved By",
+   "no_copy": 1,
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "approved_on",
+   "fieldtype": "Datetime",
+   "label": "Approved On",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "School Opening Application",
+   "print_hide": 1,
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-09-12 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Tif Customization",
+ "name": "School Opening Application",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "cancel": 1,
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "School Approval",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

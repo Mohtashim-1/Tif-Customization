@@ -18,7 +18,22 @@
    "role": "System Manager"
   },
   {
+   "role": "HR Manager"
+  },
+  {
+   "role": "Field Staff Manager"
+  },
+  {
+   "role": "Supervisor Field Staff"
+  },
+  {
+   "role": "Field Staff"
+  },
+  {
    "role": "HOD"
+  },
+  {
+   "role": "COO"
   }
  ],
  "script": null,

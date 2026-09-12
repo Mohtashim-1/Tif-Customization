@@ -50,6 +50,83 @@ KPI_COLUMNS = (
 KPI_KEYS = tuple(c["key"] for c in KPI_COLUMNS)
 
 
+def _supervisor_subordinate_ids(supervisor: str) -> set[str]:
+	"""Active Field Officers (and roster SMEs) reporting to the selected field supervisor."""
+	supervisor = (supervisor or "").strip()
+	if not supervisor:
+		return set()
+	from tif_customization.tif_customization.doctype.field_officer.field_officer import (
+		get_field_supervisor_subordinate_employees,
+	)
+
+	return set(get_field_supervisor_subordinate_employees(supervisor))
+
+
+def _supervisor_label(supervisor: str) -> str:
+	supervisor = (supervisor or "").strip()
+	if not supervisor:
+		return ""
+	from tif_customization.tif_customization.page.supervisor_target_ba.supervisor_target_ba import (
+		_get_supervisor_info,
+	)
+
+	return (_get_supervisor_info(supervisor).get("label") or supervisor).strip()
+
+
+def _list_field_supervisors() -> list[dict]:
+	"""Field Officer supervisors (typically 3 regional leads with FO teams)."""
+	from tif_customization.tif_customization.doctype.field_officer.field_officer import (
+		list_field_supervisors,
+	)
+
+	return list_field_supervisors(SME_DESIGNATION)
+
+
+def _supervisor_stats(supervisors: list[dict] | None = None) -> dict:
+	supervisors = supervisors if supervisors is not None else _list_field_supervisors()
+	sme_supervisors = [s for s in supervisors if cint(s.get("sme_count") or 0) > 0]
+	return {
+		"total": len(supervisors),
+		"sme_supervisors": len(sme_supervisors),
+		"total_field_staff": sum(cint(s.get("team_size") or 0) for s in supervisors),
+		"total_field_officers": sum(cint(s.get("field_officer_count") or 0) for s in supervisors),
+		"total_smes": sum(cint(s.get("sme_count") or 0) for s in supervisors),
+	}
+
+
+@frappe.whitelist()
+@frappe.validate_and_sanitize_search_inputs
+def get_sme_employee_query(doctype, txt, searchfield, start, page_len, filters):
+	"""Link query for SME filter — optionally limited to a supervisor's subordinates."""
+	filters = filters if isinstance(filters, dict) else {}
+	supervisor = (filters.get("supervisor") or "").strip()
+	conditions = ["status = 'Active'", "designation = %s"]
+	values = [SME_DESIGNATION]
+
+	if supervisor:
+		sub_ids = _supervisor_subordinate_ids(supervisor)
+		if not sub_ids:
+			return []
+		placeholders = ", ".join(["%s"] * len(sub_ids))
+		conditions.append(f"name IN ({placeholders})")
+		values.extend(sorted(sub_ids))
+
+	if txt:
+		conditions.append("(employee_name LIKE %s OR name LIKE %s)")
+		values.extend([f"%{txt}%", f"%{txt}%"])
+
+	return frappe.db.sql(
+		f"""
+		SELECT name, employee_name, designation
+		FROM `tabEmployee`
+		WHERE {" AND ".join(conditions)}
+		ORDER BY employee_name
+		LIMIT %s OFFSET %s
+		""",
+		tuple(values) + (page_len, start),
+	)
+
+
 @frappe.whitelist()
 def get_expense_drilldown(filters=None):
 	"""Return submitted Expense Claims for SMEs in the report period."""
@@ -124,6 +201,9 @@ def get_report_data(filters=None):
 	if region not in REGION_KEYS:
 		region = "karachi"
 
+	supervisor = (filters.get("supervisor") or "").strip()
+	supervisors = _list_field_supervisors()
+	supervisor_stats = _supervisor_stats(supervisors)
 	staff_rows = _get_sme_staff(filters)
 	visit_stats = _load_visit_stats(from_date, to_date, staff_rows)
 	expenses = _load_expenses(from_date, to_date, staff_rows)
@@ -143,11 +223,12 @@ def get_report_data(filters=None):
 		meetings = cint(stats.get("meetings") or 0)
 		active = cint(stats.get("active") or 0)
 		inactive = cint(stats.get("inactive") or 0)
+		me = cint(stats.get("me") or 0)
 		schools = cint(stats.get("schools") or 0)
 		participants = cint(stats.get("participants") or 0)
 		visited_days = cint(stats.get("visited_days") or 0)
-		# Grand Total from ERP = sum of visit activity columns (not training schools/participants)
-		grand_total = followup + new + meetings + active + inactive
+		# Grand Total = Marketing + Meetings + all M&E visits (not training schools/participants)
+		grand_total = followup + new + meetings + me
 		expense_amt = flt(expenses.get(key) or 0)
 		difference = visited_days - working_days
 
@@ -172,6 +253,7 @@ def get_report_data(filters=None):
 			"meetings": meetings,
 			"active": active,
 			"inactive": inactive,
+			"me": me,
 			"schools": schools,
 			"participants": participants,
 			"grand_total": grand_total,
@@ -197,6 +279,7 @@ def get_report_data(filters=None):
 			"meetings",
 			"active",
 			"inactive",
+			"me",
 			"schools",
 			"participants",
 			"grand_total",
@@ -234,6 +317,10 @@ def get_report_data(filters=None):
 		"from_date": str(from_date),
 		"to_date": str(to_date),
 		"working_days": working_days,
+		"supervisor": supervisor,
+		"supervisor_label": _supervisor_label(supervisor) if supervisor else "",
+		"supervisors": supervisors,
+		"supervisor_stats": supervisor_stats,
 		"region": region,
 		"region_label": REGION_LABELS.get(region, region),
 		"expected_points": flt(default_expected, 2),
@@ -254,6 +341,7 @@ def get_report_data(filters=None):
 			"meetings": cint(totals.get("meetings") or 0),
 			"active": cint(totals.get("active") or 0),
 			"inactive": cint(totals.get("inactive") or 0),
+			"me": cint(totals.get("me") or 0),
 			"schools": cint(totals.get("schools") or 0),
 			"participants": cint(totals.get("participants") or 0),
 			"expenses": flt(totals.get("expenses") or 0, 2),
@@ -268,17 +356,18 @@ def get_report_data(filters=None):
 			"academic_task": cint(totals.get("academic_task") or 0),
 			"co_curricular": cint(totals.get("co_curricular") or 0),
 			"marketing": cint(totals.get("followup") or 0) + cint(totals.get("new") or 0),
-			"me": cint(totals.get("active") or 0) + cint(totals.get("inactive") or 0),
+			"me": cint(totals.get("me") or 0),
 			"training": cint(totals.get("half_day_workshop") or 0)
 			+ cint(totals.get("full_day_session") or 0),
 			"school_visits": cint(totals.get("followup") or 0)
 			+ cint(totals.get("new") or 0)
-			+ cint(totals.get("active") or 0)
-			+ cint(totals.get("inactive") or 0),
+			+ cint(totals.get("me") or 0),
 			"total_points": flt(totals.get("total_points") or 0, 2),
 			"earned_points": flt(totals.get("earned_points") or 0, 2),
 			"percentage": totals_out["percentage"],
 			"sme_count": len(rows),
+			"supervisor_count": cint(supervisor_stats.get("total") or 0),
+			"sme_supervisor_count": cint(supervisor_stats.get("sme_supervisors") or 0),
 		},
 		"regions": [{"key": rk, "label": REGION_LABELS[rk]} for rk in REGION_KEYS],
 	}
@@ -367,6 +456,11 @@ def _get_sme_staff(filters):
 			or (r.user_id and r.user_id.lower() in team_vals)
 			or (r.employee_name and r.employee_name.lower() in team_vals)
 		]
+
+	supervisor_filter = (filters.get("supervisor") or "").strip()
+	if supervisor_filter:
+		subordinate_ids = _supervisor_subordinate_ids(supervisor_filter)
+		rows = [r for r in rows if r.name in subordinate_ids]
 
 	if employee_filter:
 		rows = [r for r in rows if r.name == employee_filter]
@@ -498,6 +592,7 @@ def _load_visit_stats(from_date, to_date, staff_rows):
 			"meetings": 0,
 			"active": 0,
 			"inactive": 0,
+			"me": 0,
 			"schools": 0,
 			"participants": 0,
 			"trainings": 0,
@@ -527,12 +622,12 @@ def _load_visit_stats(from_date, to_date, staff_rows):
 		elif vtype == "Meeting":
 			bucket["meetings"] += 1
 		elif vtype == "M&E":
+			bucket["me"] += 1
 			status = _norm_me_status(row.get("me_activity_status"))
 			if status == "active":
 				bucket["active"] += 1
 			elif status == "inactive":
 				bucket["inactive"] += 1
-			# blank / unknown M&E status: do not invent Active/Inactive
 		elif vtype == "Training":
 			bucket["schools"] += cint(row.get("schools") or 0)
 			bucket["participants"] += cint(row.get("participants") or 0)
@@ -564,7 +659,7 @@ def _resolve_staff_key(row, index):
 	if vtype == "Marketing":
 		candidates.extend([row.get("visit_by"), row.get("owner")])
 	elif vtype == "M&E":
-		candidates.extend([row.get("me_visit_by"), row.get("owner")])
+		candidates.extend([row.get("me_visit_by"), row.get("visit_by"), row.get("owner")])
 	elif vtype == "Meeting":
 		candidates.extend([row.get("mt_visit_by"), row.get("owner")])
 	elif vtype == "Training":

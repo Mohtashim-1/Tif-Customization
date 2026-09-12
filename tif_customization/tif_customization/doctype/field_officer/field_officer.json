@@ -5,7 +5,7 @@
  "creation": "2026-03-28 21:20:05.884379",
  "doctype": "DocType",
  "engine": "InnoDB",
- "field_order": [
+  "field_order": [
   "name1",
   "division",
   "status",
@@ -13,13 +13,15 @@
   "employee",
   "user",
   "branch",
+  "section_break_team",
+  "parent_field_officer",
+  "column_break_team",
+  "is_group",
   "section_break_help",
   "help_html",
   "lft",
   "rgt",
-  "is_group",
-  "old_parent",
-  "parent_field_officer"
+  "old_parent"
  ],
  "fields": [
   {
@@ -80,6 +82,32 @@
    "read_only": 1
   },
   {
+   "fieldname": "section_break_team",
+   "fieldtype": "Section Break",
+   "label": "Field Team"
+  },
+  {
+   "description": "Operational line manager for field KPI / visit reports. This is separate from HR Employee \u2192 Reports To (department head).",
+   "fieldname": "parent_field_officer",
+   "fieldtype": "Link",
+   "ignore_user_permissions": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Field Supervisor",
+   "options": "Field Officer"
+  },
+  {
+   "fieldname": "column_break_team",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "description": "Check for regional leads who manage other Field Officers (e.g. Adnan, Asad, Jalaluddin).",
+   "fieldname": "is_group",
+   "fieldtype": "Check",
+   "label": "Is Field Supervisor"
+  },
+  {
    "fieldname": "section_break_help",
    "fieldtype": "Section Break",
    "label": "KPI Target Notes"
@@ -87,7 +115,7 @@
   {
    "fieldname": "help_html",
    "fieldtype": "HTML",
-   "options": "<p class=\"text-muted\">Type / Division controls which SME Target Base KPI sheet applies:<br><b>Karachi</b> (6 pts/day) \u00b7 <b>Urban Areas</b> (5 pts/day) \u00b7 <b>Rural Areas</b> (4 pts/day) \u00b7 <b>Punjab</b> (5 pts/day).<br>Link the User so Field Visits and KPI reports resolve to this officer.</p>"
+   "options": "<p class=\"text-muted\">Type / Division controls which SME Target Base KPI sheet applies:<br><b>Karachi</b> (6 pts/day) \u00b7 <b>Urban Areas</b> (5 pts/day) \u00b7 <b>Rural Areas</b> (4 pts/day) \u00b7 <b>Punjab</b> (5 pts/day).<br>Link the User so Field Visits and KPI reports resolve to this officer.<br><b>Field Supervisor</b> is the line manager for SME / field reports — not the same as HR <b>Reports To</b>.</p>"
   },
   {
    "fieldname": "lft",
@@ -106,22 +134,12 @@
    "read_only": 1
   },
   {
-   "fieldname": "is_group",
-   "fieldtype": "Check",
-   "label": "Is Group"
-  },
-  {
    "fieldname": "old_parent",
    "fieldtype": "Link",
    "label": "Old Parent",
-   "options": "Field Officer"
-  },
-  {
-   "fieldname": "parent_field_officer",
-   "fieldtype": "Link",
-   "ignore_user_permissions": 1,
-   "label": "Parent Field Officer",
-   "options": "Field Officer"
+   "options": "Field Officer",
+   "hidden": 1,
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
@@ -167,12 +185,39 @@
    "report": 1,
    "role": "Accounts Manager",
    "share": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Field Staff"
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Supervisor Field Staff"
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Field Staff Manager",
+   "share": 1,
+   "write": 1
   }
  ],
  "quick_entry": 1,
  "row_format": "Dynamic",
  "rows_threshold_for_grid_search": 20,
- "search_fields": "name1,division,user,employee,branch",
+ "search_fields": "name1,division,user,employee,branch,parent_field_officer",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],

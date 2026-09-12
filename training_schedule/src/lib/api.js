@@ -12,9 +12,28 @@ function raiseIfFailed(json) {
 		if (json._server_messages) {
 			try {
 				const parsed = JSON.parse(json._server_messages);
-				msg = parsed.map((m) => (typeof m === "string" ? JSON.parse(m).message || m : m)).join(" ");
+				msg = parsed
+					.map((m) => {
+						if (typeof m !== "string") return String(m);
+						try {
+							const inner = JSON.parse(m);
+							return inner.message || inner.title || m;
+						} catch {
+							return m;
+						}
+					})
+					.filter(Boolean)
+					.join(" ");
 			} catch {
 				msg = json._server_messages;
+			}
+		}
+		if (!msg && json.exc) {
+			try {
+				const exc = JSON.parse(json.exc);
+				msg = Array.isArray(exc) ? exc[exc.length - 1] : String(exc);
+			} catch {
+				msg = String(json.exc);
 			}
 		}
 		throw new Error(typeof msg === "string" && msg ? msg : "Request failed");
@@ -42,6 +61,24 @@ export async function apiPost(method, args = {}) {
 			"X-Frappe-CSRF-Token": csrfToken(),
 		},
 		body: JSON.stringify(args),
+	});
+	return raiseIfFailed(await res.json());
+}
+
+export async function apiUpload(method, args = {}, file) {
+	const fd = new FormData();
+	for (const [key, value] of Object.entries(args)) {
+		if (value != null && value !== "") fd.append(key, String(value));
+	}
+	fd.append("file", file);
+	const res = await fetch(`/api/method/${method}`, {
+		method: "POST",
+		credentials: "include",
+		headers: {
+			Accept: "application/json",
+			"X-Frappe-CSRF-Token": csrfToken(),
+		},
+		body: fd,
 	});
 	return raiseIfFailed(await res.json());
 }

@@ -2,7 +2,24 @@
 // For license information, please see license.txt
 
 frappe.ui.form.on("Field Officer", {
+	setup(frm) {
+		frm.set_query("parent_field_officer", () => ({
+			filters: {
+				status: "Active",
+				name: ["!=", frm.doc.name || ""],
+			},
+		}));
+	},
+
 	refresh(frm) {
+		if (frm.doc.parent_field_officer) {
+			frm.set_intro(
+				__(
+					"Field Supervisor is the line manager for SME / field KPI reports. HR Employee → Reports To may be a different (department) head."
+				),
+				"blue",
+			);
+		}
 		if (!frm.is_new() && frm.doc.user) {
 			frm.add_custom_button(__("Open SME KPI Sheet"), () => {
 				frappe.set_route("sme-kpi-sheet", {

@@ -65,8 +65,43 @@ def get_employee_for_user(user: str | None = None) -> dict | None:
 	)
 
 
+def _append_employee_rows(rows: list[dict], seen: set[str], employee_ids: list[str]):
+	for emp_id in employee_ids:
+		if not emp_id or emp_id in seen:
+			continue
+		row = frappe.db.get_value(
+			"Employee",
+			emp_id,
+			["name", "employee_name", "user_id"],
+			as_dict=True,
+		)
+		if row:
+			seen.add(row.name)
+			rows.append(row)
+
+
+def _field_supervisor_subordinate_employees(user: str) -> list[str]:
+	"""Active employees under this user's Field Officer record (Field Supervisor link)."""
+	if not frappe.db.exists("DocType", "Field Officer"):
+		return []
+
+	supervisor_fo = frappe.db.get_value(
+		"Field Officer",
+		{"user": user, "status": "Active"},
+		"name",
+	)
+	if not supervisor_fo:
+		return []
+
+	return frappe.get_all(
+		"Field Officer",
+		filters={"parent_field_officer": supervisor_fo, "status": "Active"},
+		pluck="employee",
+	) or []
+
+
 def get_team_employee_rows(user: str | None = None, include_self: bool = True) -> list[dict]:
-	"""Employees in scope: self + direct reports (active + inactive for history)."""
+	"""Employees in scope: self + field team (Field Supervisor) or HR direct reports."""
 	user = user or frappe.session.user
 	me = get_employee_for_user(user)
 	if not me:
@@ -77,6 +112,24 @@ def get_team_employee_rows(user: str | None = None, include_self: bool = True) -
 	if include_self:
 		rows.append(me)
 		seen.add(me.name)
+
+	field_team = _field_supervisor_subordinate_employees(user)
+	if field_team:
+		_append_employee_rows(rows, seen, field_team)
+		# Inactive subordinates for historical visit visibility
+		supervisor_fo = frappe.db.get_value(
+			"Field Officer",
+			{"user": user, "status": "Active"},
+			"name",
+		)
+		if supervisor_fo:
+			inactive = frappe.get_all(
+				"Field Officer",
+				filters={"parent_field_officer": supervisor_fo, "status": ("!=", "Active")},
+				pluck="employee",
+			)
+			_append_employee_rows(rows, seen, inactive)
+		return rows
 
 	for status_filter in (
 		{"reports_to": me.name, "status": "Active"},
@@ -158,6 +211,13 @@ def expand_staff_tokens(staff: str) -> list[str]:
 		emp = frappe.db.get_value(
 			"Employee",
 			{"user_id": staff},
+			["name", "employee_name", "user_id"],
+			as_dict=True,
+		)
+	if not emp and frappe.db.exists("Employee", staff):
+		emp = frappe.db.get_value(
+			"Employee",
+			staff,
 			["name", "employee_name", "user_id"],
 			as_dict=True,
 		)

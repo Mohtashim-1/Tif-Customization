@@ -3,6 +3,19 @@
 
 frappe.ui.form.on('School', {
 	refresh: function(frm) {
+		if (frm.doc.docstatus === 1 && frm.doc.customer) {
+			frm.add_custom_button(__('Open Customer'), () => {
+				frappe.set_route('Form', 'Customer', frm.doc.customer);
+			});
+		}
+
+		if (frm.doc.docstatus === 0 && frm.doc.status === 'In Process') {
+			frm.dashboard.set_headline_alert(
+				__('Guest submissions stay in Process until a School Approval user submits this record to create the Customer.'),
+				'blue'
+			);
+		}
+
 		// Add custom buttons
 		frm.add_custom_button(__('Send Welcome Email'), function() {
 			frm.call({

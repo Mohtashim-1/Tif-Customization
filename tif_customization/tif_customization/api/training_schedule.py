@@ -34,6 +34,7 @@ FIELDS = (
 	"tag_school",
 	"zoom_id",
 	"zoom_link",
+	"zoom_attendance_file",
 	"modified",
 )
 
@@ -267,8 +268,14 @@ def _truthy_flag(value) -> int:
 	return 1 if text in ("1", "yes", "y", "true", "t") else 0
 
 
+def _as_row_dict(row) -> frappe._dict:
+	if hasattr(row, "as_dict"):
+		return frappe._dict(row.as_dict())
+	return frappe._dict(row)
+
+
 def _attendance_row_dict(row) -> dict:
-	row = frappe._dict(row)
+	row = _as_row_dict(row)
 	return {
 		"name": row.name or "",
 		"participant_name": row.participant_name or "",
@@ -287,8 +294,28 @@ def _attendance_row_dict(row) -> dict:
 	}
 
 
+def _duration_to_minutes(value) -> int:
+	text = str(value or "").strip()
+	if not text:
+		return 0
+	if ":" in text:
+		parts = [p.strip() for p in text.split(":")]
+		try:
+			if len(parts) == 3:
+				h, m, s = int(parts[0]), int(parts[1]), int(parts[2])
+				return h * 60 + m + (1 if s >= 30 else 0)
+			if len(parts) == 2:
+				return int(parts[0]) * 60 + int(parts[1])
+		except ValueError:
+			pass
+	try:
+		return cint(float(text.replace(",", "")))
+	except Exception:
+		return cint(text)
+
+
 def _attendance_append_values(row) -> dict | None:
-	row = frappe._dict(row)
+	row = _as_row_dict(row)
 	name = (row.get("participant_name") or "").strip()
 	if not name:
 		return None
@@ -297,7 +324,7 @@ def _attendance_append_values(row) -> dict | None:
 		"email": (row.email or "").strip() or None,
 		"join_time": (row.join_time or "").strip() or None,
 		"leave_time": (row.leave_time or "").strip() or None,
-		"duration_minutes": cint(row.duration_minutes) or None,
+		"duration_minutes": _duration_to_minutes(row.duration_minutes) or None,
 		"is_guest": _truthy_flag(row.is_guest),
 		"recording_disclaimer_response": (row.recording_disclaimer_response or "").strip() or None,
 		"in_waiting_room": _truthy_flag(row.in_waiting_room),
@@ -336,6 +363,22 @@ ZOOM_HEADER_MAP = {
 	"status": "attendance_status",
 	"remarks": "remarks",
 }
+
+
+def _attach_csv_to_training(doc, filename: str, content: str) -> str | None:
+	"""Store Zoom CSV on the training record (Attach field + File)."""
+	if not content or not frappe.get_meta(DOCTYPE).has_field("zoom_attendance_file"):
+		return None
+	from frappe.utils.file_manager import save_file
+
+	safe_name = (filename or "zoom_attendance.csv").strip() or "zoom_attendance.csv"
+	if not safe_name.lower().endswith(".csv"):
+		safe_name = f"{safe_name}.csv"
+	file_doc = save_file(safe_name, content, doc.doctype, doc.name, is_private=0, df="zoom_attendance_file")
+	file_url = file_doc.file_url if file_doc else None
+	if file_url:
+		doc.zoom_attendance_file = file_url
+	return file_url
 
 
 def _parse_zoom_attendance_csv(content: str) -> list[dict]:
@@ -385,7 +428,10 @@ def _parse_zoom_attendance_csv(content: str) -> list[dict]:
 	for raw_row in reader:
 		mapped = {}
 		for raw_key, field in field_map.items():
-			mapped[field] = (raw_row.get(raw_key) or "").strip()
+			val = (raw_row.get(raw_key) or "").strip()
+			if field == "duration_minutes":
+				val = _duration_to_minutes(val)
+			mapped[field] = val
 		payload = _attendance_append_values(
 			{
 				**mapped,
@@ -1039,6 +1085,8 @@ def get_session(name):
 		"schedule_status": getattr(doc, "schedule_status", None) or "",
 		"zoom_id": getattr(doc, "zoom_id", None) or "",
 		"zoom_link": getattr(doc, "zoom_link", None) or "",
+		"zoom_attendance_file": getattr(doc, "zoom_attendance_file", None) or "",
+		"attachments": _list_training_files(doc.name),
 		"attendance": attendance,
 		"attendance_present": present,
 		"attendance_total": len(attendance),
@@ -1128,6 +1176,7 @@ def save_session(values=None):
 		"schedule_status",
 		"zoom_id",
 		"zoom_link",
+		"zoom_attendance_file",
 	):
 		if field in values and frappe.get_meta(DOCTYPE).has_field(field):
 			doc.set(field, values.get(field) or None)
@@ -1232,7 +1281,7 @@ def parse_attendance_csv(content=None):
 
 
 @frappe.whitelist()
-def import_attendance(name=None, content=None, mode="replace"):
+def import_attendance(name=None, content=None, mode="replace", filename=None):
 	"""Bulk-import Zoom attendance CSV onto an Upcoming Training (tagged via Zoom ID on the doc)."""
 	_require_login()
 	if not name:
@@ -1265,6 +1314,8 @@ def import_attendance(name=None, content=None, mode="replace"):
 		existing_keys.add(key)
 		added += 1
 
+	file_url = _attach_csv_to_training(doc, filename or "zoom_attendance.csv", content or "")
+
 	doc.save(ignore_permissions=False)
 	frappe.db.commit()
 	attendance = [_attendance_row_dict(r) for r in doc.attendance or []]
@@ -1272,12 +1323,122 @@ def import_attendance(name=None, content=None, mode="replace"):
 		"ok": 1,
 		"name": doc.name,
 		"zoom_id": doc.zoom_id or "",
+		"zoom_attendance_file": file_url or getattr(doc, "zoom_attendance_file", None) or "",
+		"attachments": _list_training_files(doc.name),
 		"added": added,
 		"attendance": attendance,
 		"attendance_present": sum(1 for a in attendance if a["attendance_status"] == "Present"),
 		"attendance_total": len(attendance),
 		"message": _("Imported {0} attendance row(s) for {1}.").format(added, doc.name),
 	}
+
+def _file_row(file_doc) -> dict:
+	return {
+		"name": file_doc.name,
+		"file_name": file_doc.file_name,
+		"file_url": file_doc.file_url,
+		"file_size": file_doc.file_size or 0,
+		"creation": str(file_doc.creation) if file_doc.creation else "",
+	}
+
+
+def _list_training_files(name: str) -> list[dict]:
+	rows = frappe.get_all(
+		"File",
+		filters={"attached_to_doctype": DOCTYPE, "attached_to_name": name},
+		fields=["name", "file_name", "file_url", "file_size", "creation"],
+		order_by="creation desc",
+		limit_page_length=100,
+	)
+	seen_urls = set()
+	files = []
+	for row in rows:
+		url = row.file_url or ""
+		if url in seen_urls:
+			continue
+		seen_urls.add(url)
+		files.append(row)
+
+	zoom_file = frappe.db.get_value(DOCTYPE, name, "zoom_attendance_file")
+	if zoom_file and zoom_file not in seen_urls:
+		files.insert(
+			0,
+			{
+				"name": "",
+				"file_name": zoom_file.rsplit("/", 1)[-1],
+				"file_url": zoom_file,
+				"file_size": 0,
+				"creation": "",
+				"is_zoom_csv": 1,
+			},
+		)
+	return files
+
+
+@frappe.whitelist()
+def list_attachments(name=None):
+	"""List files attached to an Upcoming Training."""
+	_require_login()
+	if not name:
+		return {"files": []}
+	if not frappe.has_permission(DOCTYPE, "read"):
+		frappe.throw(_("You are not permitted to view Upcoming Training."), frappe.PermissionError)
+	return {"files": _list_training_files(name)}
+
+
+@frappe.whitelist()
+def upload_attachment(name=None):
+	"""Upload a file attachment to an Upcoming Training."""
+	_require_login()
+	name = (name or "").strip()
+	if not name:
+		frappe.throw(_("Save the training first, then upload attachments."))
+	if not frappe.db.exists(DOCTYPE, name):
+		frappe.throw(_("Upcoming Training {0} not found.").format(name))
+	if not frappe.has_permission(DOCTYPE, "write"):
+		frappe.throw(_("You are not permitted to update Upcoming Training."), frappe.PermissionError)
+
+	upload = frappe.request.files.get("file") if frappe.request else None
+	if not upload:
+		frappe.throw(_("No file selected for upload."))
+
+	from frappe.utils.file_manager import save_file
+
+	filename = (upload.filename or "attachment").strip()
+	content = upload.stream.read()
+	if not content:
+		frappe.throw(_("Uploaded file is empty."))
+
+	file_doc = save_file(filename, content, DOCTYPE, name, is_private=0)
+	frappe.db.commit()
+	return {
+		"ok": 1,
+		"file": _file_row(file_doc),
+		"files": _list_training_files(name),
+		"message": _("Attached {0}.").format(filename),
+	}
+
+
+@frappe.whitelist()
+def delete_attachment(file_id=None, name=None):
+	"""Remove an attached file from Upcoming Training."""
+	_require_login()
+	file_id = (file_id or "").strip()
+	name = (name or "").strip()
+	if not file_id:
+		frappe.throw(_("File id is required."))
+	if not frappe.has_permission(DOCTYPE, "write"):
+		frappe.throw(_("You are not permitted to update Upcoming Training."), frappe.PermissionError)
+
+	file_doc = frappe.get_doc("File", file_id)
+	if file_doc.attached_to_doctype != DOCTYPE or (name and file_doc.attached_to_name != name):
+		frappe.throw(_("This file is not attached to the selected training."))
+
+	frappe.delete_doc("File", file_id, ignore_permissions=False)
+	frappe.db.commit()
+	files = _list_training_files(name or file_doc.attached_to_name)
+	return {"ok": 1, "files": files, "message": _("Attachment removed.")}
+
 
 @frappe.whitelist()
 def delete_session(name):
