@@ -127,7 +127,7 @@ def resolve_supervisor_field_officer(supervisor: str) -> str | None:
 
 
 def list_field_supervisors(sme_designation: str | None = "School Marketing Executive") -> list[dict]:
-	"""Field supervisors = Field Officers who have other Field Officers under them (Field Supervisor link)."""
+	"""Regional field leads (Is Field Supervisor) and their active Field Officer teams."""
 	if not frappe.db.exists("DocType", "Field Officer"):
 		return []
 
@@ -142,20 +142,25 @@ def list_field_supervisors(sme_designation: str | None = "School Marketing Execu
 			sup.user_id,
 			sup.designation,
 			COUNT(DISTINCT fo.name) AS field_officer_count,
-			SUM(CASE WHEN staff.designation = %(sme)s THEN 1 ELSE 0 END) AS sme_count
+			SUM(
+				CASE
+					WHEN fo.name IS NOT NULL AND staff.designation = %(sme)s THEN 1
+					ELSE 0
+				END
+			) AS sme_count
 		FROM `tabField Officer` sup_fo
 		INNER JOIN `tabEmployee` sup
 			ON sup.name = sup_fo.employee
 			AND sup.status = 'Active'
-		INNER JOIN `tabField Officer` fo
+		LEFT JOIN `tabField Officer` fo
 			ON fo.parent_field_officer = sup_fo.name
 			AND fo.status = 'Active'
-		INNER JOIN `tabEmployee` staff
+		LEFT JOIN `tabEmployee` staff
 			ON staff.name = fo.employee
 			AND staff.status = 'Active'
 		WHERE sup_fo.status = 'Active'
+			AND sup_fo.is_group = 1
 		GROUP BY sup_fo.name, sup_fo.name1, sup_fo.division, sup.name, sup.employee_name, sup.user_id, sup.designation
-		HAVING field_officer_count > 0
 		ORDER BY field_officer_count DESC, sup.employee_name
 		""",
 		{"sme": sme_designation or "School Marketing Executive"},
