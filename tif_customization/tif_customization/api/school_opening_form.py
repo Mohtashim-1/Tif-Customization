@@ -20,7 +20,6 @@ CONTACT_ROLES = [
 ]
 
 
-
 def _list_to_csv(value):
 	if value is None:
 		return ""

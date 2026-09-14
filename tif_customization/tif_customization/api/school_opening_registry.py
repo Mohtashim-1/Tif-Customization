@@ -175,26 +175,117 @@ def _ensure_customer_access(customer):
 	return customer
 
 
-@frappe.whitelist()
-def list_school_customers(search=None, limit=200):
-	"""Customers for School Opening registry (School type + school customer group)."""
-	limit = min(int(limit or 200), 500)
+_SCHOOL_CUSTOMER_BASE_CONDITION = """(
+	c.customer_type = 'School'
+	OR IFNULL(c.custom_type_of_customer, '') = 'School'
+	OR IFNULL(c.customer_group, '') = 'School'
+)"""
+
+_SCHOOL_OPENING_APP_JOIN = """
+LEFT JOIN (
+	SELECT DISTINCT customer
+	FROM `tabSchool Opening Application`
+	WHERE docstatus = 1 AND IFNULL(customer, '') != ''
+) soa ON soa.customer = c.name
+"""
+
+
+def _school_registry_filter_clause(
+	search=None,
+	govt_private=None,
+	status=None,
+	territory=None,
+	form_data=None,
+):
+	conditions = [_SCHOOL_CUSTOMER_BASE_CONDITION]
+	values = {}
+
 	search = (search or "").strip()
-
-	conditions = [
-		"""(
-			c.customer_type = 'School'
-			OR IFNULL(c.custom_type_of_customer, '') = 'School'
-			OR IFNULL(c.customer_group, '') = 'School'
-		)"""
-	]
-	values = {"limit": limit}
-
 	if search:
 		conditions.append("(c.name LIKE %(search)s OR c.customer_name LIKE %(search)s)")
 		values["search"] = f"%{search}%"
 
-	where = " AND ".join(conditions)
+	govt_private = (govt_private or "").strip()
+	if govt_private:
+		conditions.append("IFNULL(c.custom_govt_private, '') = %(govt_private)s")
+		values["govt_private"] = govt_private
+
+	status = (status or "").strip()
+	if status:
+		conditions.append("IFNULL(c.custom_status, '') = %(status)s")
+		values["status"] = status
+
+	territory = (territory or "").strip()
+	if territory:
+		conditions.append("IFNULL(c.territory, '') = %(territory)s")
+		values["territory"] = territory
+
+	form_data = (form_data or "").strip().lower()
+	if form_data == "full":
+		conditions.append("soa.customer IS NOT NULL")
+	elif form_data in ("customer_only", "customer-only", "customer"):
+		conditions.append("soa.customer IS NULL")
+
+	return " AND ".join(conditions), values
+
+
+@frappe.whitelist()
+def get_school_registry_filter_options():
+	"""Distinct filter values for school customers (registry toolbar)."""
+	base = f"WHERE {_SCHOOL_CUSTOMER_BASE_CONDITION}"
+
+	def distinct(field):
+		return [
+			row[0]
+			for row in frappe.db.sql(
+				f"""
+				SELECT DISTINCT IFNULL(c.{field}, '') AS v
+				FROM `tabCustomer` c
+				{base}
+				HAVING v != ''
+				ORDER BY v
+				"""
+			)
+		]
+
+	return {
+		"govt_private": distinct("custom_govt_private"),
+		"status": distinct("custom_status"),
+	}
+
+
+@frappe.whitelist()
+def list_school_customers(
+	search=None,
+	limit=50,
+	start=0,
+	govt_private=None,
+	status=None,
+	territory=None,
+	form_data=None,
+):
+	"""Paginated school customers for the registry (single query + count)."""
+	limit = min(max(int(limit or 50), 1), 200)
+	start = max(int(start or 0), 0)
+
+	where, filter_values = _school_registry_filter_clause(
+		search=search,
+		govt_private=govt_private,
+		status=status,
+		territory=territory,
+		form_data=form_data,
+	)
+	values = {"limit": limit, "start": start, **filter_values}
+
+	total = frappe.db.sql(
+		f"""
+		SELECT COUNT(*)
+		FROM `tabCustomer` c
+		{_SCHOOL_OPENING_APP_JOIN}
+		WHERE {where}
+		""",
+		values,
+	)[0][0]
 
 	rows = frappe.db.sql(
 		f"""
@@ -206,22 +297,22 @@ def list_school_customers(search=None, limit=200):
 			c.custom_status AS status,
 			c.custom_registration_date AS registration_date,
 			c.territory,
-			c.modified
+			c.modified,
+			IF(soa.customer IS NOT NULL, 1, 0) AS has_application
 		FROM `tabCustomer` c
+		{_SCHOOL_OPENING_APP_JOIN}
 		WHERE {where}
 		ORDER BY c.customer_name
-		LIMIT %(limit)s
+		LIMIT %(limit)s OFFSET %(start)s
 		""",
 		values,
 		as_dict=True,
 	)
 
 	for row in rows:
-		row.has_application = bool(
-			frappe.db.exists("School Opening Application", {"customer": row.customer, "docstatus": 1})
-		)
+		row.has_application = bool(row.pop("has_application", 0))
 
-	return rows
+	return {"rows": rows, "total": total, "start": start, "page_length": limit}
 
 
 @frappe.whitelist()
