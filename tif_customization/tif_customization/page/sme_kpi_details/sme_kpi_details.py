@@ -10,7 +10,10 @@ import frappe
 from frappe import _
 from frappe.utils import add_days, cint, flt, get_first_day, get_last_day, getdate, today
 
-from tif_customization.tif_customization.api.field_visit_drilldown import get_visit_type_breakdown
+from tif_customization.tif_customization.api.field_visit_drilldown import (
+	_metric_condition,
+	get_visit_type_breakdown,
+)
 from tif_customization.tif_customization.doctype.reporting.reporting import (
 	_gazetted_holiday_dates,
 	_leave_dates_by_employee,
@@ -62,7 +65,6 @@ OUTCOME_TARGETS = (
 )
 
 ACTIVITY_KEYS = {
-	"visits",
 	"half_day_workshop",
 	"full_day_session",
 	"meeting_ulama",
@@ -71,6 +73,13 @@ ACTIVITY_KEYS = {
 	"academic_task",
 	"other_official",
 }
+
+VISIT_DETAIL_PARTS = (
+	{"key": "visit_marketing", "label": _("Marketing"), "metric": "new", "count_key": "new"},
+	{"key": "visit_monitoring", "label": _("Monitoring"), "metric": "monitoring", "count_key": "monitoring"},
+	{"key": "visit_followup", "label": _("Follow up"), "metric": "followup", "count_key": "followup"},
+	{"key": "visit_other", "label": _("Other"), "metric": "meeting", "count_key": "meeting"},
+)
 
 NEW_SCHOOL_SQL = """
 	fv.type IN ('Marketing', 'M&E', 'Joint Visit with SME')
@@ -205,7 +214,7 @@ def _staff_detail(staff, from_date, to_date, ytd_from, filters, officer_row=None
 
 	meta = SHEET_META[sheet]
 	rows, monthly_total, _yearly_total = _build_rows(sheet, period_actuals)
-	activity_rows = [r for r in rows if r.get("key") in ACTIVITY_KEYS]
+	activity_rows = _activity_rows_for_detail(rows, from_date, to_date, tokens)
 
 	activity_target = working_days * meta["per_day_points"]
 	activity_actual = flt(monthly_total, 2)
@@ -288,6 +297,51 @@ def _staff_detail(staff, from_date, to_date, ytd_from, filters, officer_row=None
 		"visit_breakdown": visit_bd.get("breakdown") or [],
 		"footnotes": _footnotes(),
 	}
+
+
+def _visit_type_counts(from_date, to_date, tokens):
+	"""Marketing (New), Monitoring (M&E), Follow up, Other (Meetings) — same as SME Summary (Copy)."""
+	counts = {}
+	for part in VISIT_DETAIL_PARTS:
+		metric = part["metric"]
+		counts[part["count_key"]] = _visit_count(
+			from_date, to_date, tokens, _metric_condition(metric, "fv")
+		)
+	return counts
+
+
+def _activity_rows_for_detail(rows, from_date, to_date, tokens):
+	visits_row = next((r for r in rows if r.get("key") == "visits"), None)
+	rest = [r for r in rows if r.get("key") in ACTIVITY_KEYS]
+	if not visits_row:
+		return rest
+
+	counts = _visit_type_counts(from_date, to_date, tokens)
+	category = visits_row.get("category") or _("Core Responsibility")
+	visit_rows = []
+	for part in VISIT_DETAIL_PARTS:
+		visit_rows.append(
+			{
+				"key": part["key"],
+				"label": part["label"],
+				"category": category,
+				"per_day_target": "",
+				"points": "",
+				"actual": cint(counts.get(part["count_key"]) or 0),
+				"monthly_points": None,
+				"metric": part["metric"],
+				"visit_detail": 1,
+			}
+		)
+	visit_rows.append(
+		{
+			**visits_row,
+			"label": _("Visits (total)"),
+			"metric": "visits",
+			"visit_total": 1,
+		}
+	)
+	return visit_rows + rest
 
 
 def _enriched_actuals(from_date, to_date, staff, tokens):

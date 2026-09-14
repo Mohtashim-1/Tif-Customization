@@ -56,6 +56,9 @@ frappe.tif_customization.SmeKpiDetails = class SmeKpiDetails {
 					.skd-table .skd-click{cursor:pointer;text-decoration:underline;color:#0f766e}
 					.skd-table .skd-click:hover{background:#bbf7d0}
 					.skd-table .sum{background:#0f766e;color:#fff;font-weight:800}
+					.skd-table .skd-visit-detail-row .skd-visit-detail{padding-left:18px;color:#334155;font-size:11px}
+					.skd-table .skd-visit-total-row .skd-visit-total{font-weight:700}
+					.skd-table .skd-visit-total-row td{background:#f0fdf4}
 					.skd-low{background:#fef2f2}
 					.skd-ok{background:#ecfdf5}
 					.skd-green{background:#c6efce;font-weight:700}
@@ -313,12 +316,16 @@ frappe.tif_customization.SmeKpiDetails = class SmeKpiDetails {
 		const activityRows = (data.activity_rows || [])
 			.map((r) => {
 				const pts = r.monthly_points != null ? this.fmt(r.monthly_points, 2) : "";
-				return `<tr>
-					<td class="left">${this.esc(r.label)}</td>
+				const metric = r.metric || r.key;
+				const labelCls = r.visit_detail ? "left skd-visit-detail" : r.visit_total ? "left skd-visit-total" : "left";
+				const rowCls = r.visit_total ? "skd-visit-total-row" : r.visit_detail ? "skd-visit-detail-row" : "";
+				const label = r.visit_detail ? `↳ ${r.label}` : r.label;
+				return `<tr class="${rowCls}">
+					<td class="${labelCls}">${this.esc(label)}</td>
 					<td class="left">${this.esc(r.category)}</td>
 					<td>${this.esc(r.per_day_target)}</td>
 					<td>${this.esc(r.points)}</td>
-					<td class="actual skd-click" data-visit-metric="${this.esc(r.key)}" data-staff="${this.esc(
+					<td class="actual skd-click" data-visit-metric="${this.esc(metric)}" data-staff="${this.esc(
 					data.staff
 				)}">${this.fmt(r.actual)}</td>
 					<td class="actual">${pts}</td>

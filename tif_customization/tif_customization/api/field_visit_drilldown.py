@@ -22,6 +22,7 @@ METRIC_LABELS = {
 	"all": _("Total Field Visits"),
 	"total": _("Total Field Visits"),
 	"marketing": _("Marketing Visits"),
+	"monitoring": _("Monitoring (M&E) Visits"),
 	"me": _("M&E Visits"),
 	"meeting": _("Meetings"),
 	"training": _("Training Visits"),
@@ -84,7 +85,7 @@ def _metric_condition(metric: str, alias: str = "fv") -> str:
 		return f"{a}.type IN ('Marketing', 'M&E')"
 	if m == "marketing":
 		return f"{a}.type = 'Marketing'"
-	if m == "me":
+	if m in ("me", "monitoring"):
 		return f"{a}.type = 'M&E'"
 	if m == "meeting":
 		return f"{a}.type = 'Meeting'"
