@@ -42,8 +42,10 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						position:relative;
 					}
 					/* collapse breaks position:sticky on th in Chrome — scroll inside .sme-sum-table-wrap */
-					.sme-sum-table{width:100%;border-collapse:separate;border-spacing:0;font-size:12px;min-width:2400px}
+					.sme-sum-table{width:100%;border-collapse:separate;border-spacing:0;font-size:12px;min-width:2800px}
 					.sme-sum-table thead tr:nth-child(2) th.activity-col{font-size:10px;line-height:1.2;max-width:120px;white-space:normal}
+					.sme-sum-table thead tr:first-child th.outcome-group{background:#fef3c7}
+					.sme-sum-table thead tr:nth-child(2) th.outcome-col{background:#fffbeb;font-size:10px;line-height:1.2;max-width:100px;white-space:normal}
 					.sme-sum-table th,.sme-sum-table td{padding:7px 8px;border:1px solid var(--border-color,#e5e7eb);vertical-align:middle}
 					.sme-sum-table thead th{
 						position:sticky;
@@ -109,6 +111,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					.sme-sum-kpi--pct{border-top-color:#059669}
 					.sme-sum-kpi--sme{border-top-color:#475569}
 					.sme-sum-kpi--supervisor{border-top-color:#7c2d12}
+					.sme-sum-kpi--outcome{border-top-color:#ca8a04}
 					@media print{
 						@page{size:A4 landscape;margin:8mm}
 						html,body{width:100%!important;height:auto!important;overflow:visible!important;background:#fff!important}
@@ -366,10 +369,48 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		];
 	}
 
-	click_td(n, metric, staff, extraClass = "") {
+	click_td(n, metric, staff, extraClass = "", opts = {}) {
 		const staffAttr = staff ? ` data-visit-staff="${frappe.utils.escape_html(staff)}"` : "";
 		const cls = extraClass ? ` ${extraClass}` : "";
-		return `<td class="num sme-click${cls}" data-visit-metric="${metric}"${staffAttr} title="${__("Click to see Field Visits")}">${this.fmt(n)}</td>`;
+		const ytdAttr = opts.useYtd ? ` data-use-ytd="1"` : "";
+		return `<td class="num sme-click${cls}" data-visit-metric="${metric}"${staffAttr}${ytdAttr} title="${__("Click to see Field Visits")}">${this.fmt(n)}</td>`;
+	}
+
+	outcome_columns(data) {
+		return (
+			(data && data.outcome_columns) || [
+				{ key: "outcome_enrolment", label: __("Enrolment of participants"), metric: "enrolment" },
+				{ key: "outcome_co_curricular", label: __("Quiz / co-curricular activities"), metric: "co_curricular" },
+				{
+					key: "outcome_new_schools",
+					label: __("New schools (distinct, from school / field visits)"),
+					metric: "new_schools",
+				},
+				{ key: "outcome_workshop_registration", label: __("Workshop participants"), metric: "workshop_registration" },
+				{ key: "outcome_volunteers", label: __("Volunteers enrolled"), metric: "volunteers" },
+				{ key: "outcome_model_school_a", label: __("Model School A"), metric: "model_school_a" },
+				{ key: "outcome_model_school_b", label: __("Model School B"), metric: "model_school_b" },
+			]
+		);
+	}
+
+	outcome_subcolumns(data) {
+		return this.outcome_columns(data).map((col) => {
+			const short = (col.label || "").split("(")[0].trim().slice(0, 22);
+			return {
+				...col,
+				header: `${col.label} (${__("YTD")})`,
+				shortHeader: `${short} ${__("YTD")}`,
+			};
+		});
+	}
+
+	outcome_tds(src, staff, data) {
+		return this.outcome_subcolumns(data)
+			.map((col) =>
+				this.click_td(src[col.key], col.metric, staff, "outcome-col", { useYtd: true })
+			)
+			.join("");
 	}
 
 	points_td(value, kind, row, html) {
@@ -448,6 +489,16 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				cards: activityCards,
 			},
 			{
+				title: __("Outcomes (YTD vs yearly mins)"),
+				cards: this.outcome_columns(data).map((col) => ({
+					label: col.label,
+					value: this.fmt((data.totals || {})[col.key]),
+					style: "outcome",
+					metric: col.metric,
+					useYtd: true,
+				})),
+			},
+			{
 				title: __("Summary"),
 				cards: [
 					{ label: __("Expenses"), value: this.fmt_cur(k.expenses), style: "expenses", cardKind: "expenses" },
@@ -473,6 +524,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 	render_kpi_card(card) {
 		const attrs = [];
 		if (card.metric) attrs.push(`data-visit-metric="${frappe.utils.escape_html(card.metric)}"`);
+		if (card.useYtd) attrs.push(`data-use-ytd="1"`);
 		if (card.pointsKind) attrs.push(`data-points-kind="${frappe.utils.escape_html(card.pointsKind)}"`);
 		if (card.cardKind) attrs.push(`data-card-kind="${frappe.utils.escape_html(card.cardKind)}"`);
 		const clickable = card.metric || card.pointsKind || card.cardKind;
@@ -506,7 +558,8 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		);
 		const t = data.totals || {};
 		const activityCols = this.activity_table_columns(data);
-		const colCount = 2 + activityCols.length + 2 + 3;
+		const outcomeCols = this.outcome_subcolumns(data);
+		const colCount = 2 + activityCols.length + outcomeCols.length + 2 + 3;
 
 		const tail_tds = (src, staff) => `
 					<td class="num">${this.fmt_cur(src.expenses)}</td>
@@ -522,6 +575,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					<td class="left">${frappe.utils.escape_html(r.label || "")}</td>
 					<td>${frappe.utils.escape_html(r.division || r.region_label || "—")}</td>
 					${this.activity_tds(r, staff, data)}
+					${this.outcome_tds(r, staff, data)}
 					${tail_tds(r, staff)}
 					${this.points_td(r.total_points, "total", r, this.fmt_score(r.total_points))}
 					${this.points_td(r.earned_points, "earned", r, this.fmt_score(r.earned_points))}
@@ -554,6 +608,11 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				<strong>${__("Urban / Punjab")} 5</strong>,
 				<strong>${__("Rural")} 4</strong>
 				${__("× working days")}
+				&nbsp;|&nbsp;
+				${__("Outcomes YTD")}: <strong>${frappe.utils.escape_html(
+					frappe.datetime.str_to_user(data.ytd_from || data.from_date)
+				)} – ${toLabel}</strong>
+				${data.fiscal_year_label ? `&nbsp;|&nbsp; ${__("FY")}: <strong>${frappe.utils.escape_html(data.fiscal_year_label)}</strong>` : ""}
 			</div>
 			<p class="text-muted small" style="margin:0 0 6px;">${__(
 				"Scroll inside the table box below — column headers stay fixed while you move through rows."
@@ -565,6 +624,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 							<th rowspan="2" class="left">${__("Name")}</th>
 							<th rowspan="2">${__("Type / Division")}</th>
 							<th colspan="${activityCols.length}" class="group activity-group">${__("Activity (period)")}</th>
+							<th colspan="${outcomeCols.length}" class="group outcome-group">${__("Outcomes (YTD vs yearly mins)")}</th>
 							<th colspan="2" class="group">${__("Totals")}</th>
 							<th colspan="3" class="group">${__("KPI Points")}</th>
 						</tr>
@@ -575,6 +635,14 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 										`<th class="activity-col${c.cellClass ? ` ${c.cellClass}` : ""}" title="${frappe.utils.escape_html(
 											c.label
 										)}">${frappe.utils.escape_html(c.label)}</th>`
+								)
+								.join("")}
+							${outcomeCols
+								.map(
+									(c) =>
+										`<th class="outcome-col" title="${frappe.utils.escape_html(c.header || c.shortHeader)}">${frappe.utils.escape_html(
+											c.shortHeader
+										)}</th>`
 								)
 								.join("")}
 							<th>${__("Expenses")}</th>
@@ -590,6 +658,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 							<th class="left">${__("Total")}</th>
 							<th></th>
 							${this.activity_tds(t, "", data)}
+							${this.outcome_tds(t, "", data)}
 							${tail_tds(t, "")}
 							${this.points_td(t.total_points, "total", t, this.fmt_score(t.total_points))}
 							${this.points_td(t.earned_points, "earned", t, this.fmt_score(t.earned_points))}
@@ -640,8 +709,11 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				frappe.msgprint(__("Drill-down module is still loading. Please refresh the page."));
 				return;
 			}
+			const useYtd = $(this).attr("data-use-ytd");
+			const from_date =
+				useYtd && me.data && me.data.ytd_from ? me.data.ytd_from : ctx.from_date;
 			frappe.tif_customization.open_visit_drilldown({
-				from_date: ctx.from_date,
+				from_date,
 				to_date: ctx.to_date,
 				staff: staff || ctx.staff || ctx.employee || "",
 				metric,
@@ -1001,6 +1073,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			"Name",
 			"Type / Division",
 			...this.activity_table_columns(this.data).map((c) => c.label),
+			...this.outcome_subcolumns(this.data).map((c) => c.header || c.shortHeader),
 			"Expenses",
 			"Visited Days",
 			"Total Points",
@@ -1019,6 +1092,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					...this.activity_table_columns(this.data).map((c) =>
 						c.value ? c.value(r) : r[c.key] || 0
 					),
+					...this.outcome_subcolumns(this.data).map((c) => r[c.key] || 0),
 					r.expenses || 0,
 					r.visited_days || 0,
 					r.total_points || 0,

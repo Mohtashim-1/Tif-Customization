@@ -26,8 +26,13 @@ from tif_customization.tif_customization.page.smes_target_base___k.smes_target_b
 	REGION_LABELS,
 	REGION_SUMMARY,
 )
+from tif_customization.tif_customization.page.sme_kpi_details.sme_kpi_details import (
+	OUTCOME_TARGETS,
+	_enriched_actuals,
+)
 from tif_customization.tif_customization.page.smes_target_base___k.smes_target_base___k import (
 	_count_actuals,
+	_fiscal_year_start,
 	_points_for_scoring,
 )
 
@@ -51,6 +56,17 @@ KPI_COLUMNS = (
 	{"key": "other_official", "label": "Other Official Tasks", "metric": "other_official"},
 )
 KPI_KEYS = tuple(c["key"] for c in KPI_COLUMNS)
+
+OUTCOME_COLUMNS = tuple(
+	{
+		"key": f"outcome_{cfg['key']}",
+		"label": cfg["label"],
+		"metric": cfg["metric"],
+		"yearly_min": cfg["target"],
+	}
+	for cfg in OUTCOME_TARGETS
+)
+OUTCOME_KEYS = tuple(c["key"] for c in OUTCOME_COLUMNS) + ("outcome_pct",)
 
 
 def _supervisor_subordinate_ids(supervisor: str) -> set[str]:
@@ -218,6 +234,11 @@ def get_report_data(filters=None):
 	visit_stats = _load_visit_stats(from_date, to_date, staff_rows)
 	expenses = _load_expenses(from_date, to_date, staff_rows)
 
+	fy_start_year = cint(_fiscal_year_start(to_date.year, to_date.month))
+	ytd_from = getdate(f"{fy_start_year}-07-01")
+	if ytd_from > to_date:
+		ytd_from = from_date
+
 	expected_points_by_region = {
 		rk: working_days * REGION_SUMMARY[rk]["per_day_target_points"] for rk in REGION_KEYS
 	}
@@ -282,6 +303,7 @@ def get_report_data(filters=None):
 		}
 		for col in KPI_COLUMNS:
 			row[col["key"]] = cint(actuals.get(col["key"]) or 0)
+		row.update(_outcome_row_fields(staff, ytd_from, to_date))
 		rows.append(row)
 		for k in (
 			"followup",
@@ -301,10 +323,15 @@ def get_report_data(filters=None):
 			"score",
 			"score_points",
 			*KPI_KEYS,
+			*OUTCOME_KEYS,
 		):
+			if k == "outcome_pct":
+				continue
 			totals[k] += flt(row.get(k) or 0)
 
 	rows.sort(key=lambda r: (-flt(r.get("percentage") or 0), (r.get("employee_name") or "").lower()))
+
+	outcome_pcts = [flt(r.get("outcome_pct") or 0) for r in rows if r.get("outcome_pct") is not None]
 
 	money_or_points = ("expenses", "score_points", "total_points", "earned_points")
 	totals_out = {
@@ -324,10 +351,16 @@ def get_report_data(filters=None):
 	totals_out["working_days"] = working_days
 	visited_days_max = max((cint(r.get("visited_days") or 0) for r in rows), default=0)
 	totals_out["visited_days"] = visited_days_max
+	totals_out["outcome_pct"] = flt(
+		sum(outcome_pcts) / len(outcome_pcts) if outcome_pcts else 0,
+		2,
+	)
 
 	return {
 		"from_date": str(from_date),
 		"to_date": str(to_date),
+		"ytd_from": str(ytd_from),
+		"fiscal_year_label": f"{fy_start_year}-{str(fy_start_year + 1)[-2:]}",
 		"working_days": working_days,
 		"supervisor": supervisor,
 		"supervisor_label": _supervisor_label(supervisor) if supervisor else "",
@@ -347,6 +380,7 @@ def get_report_data(filters=None):
 		"rows": rows,
 		"totals": totals_out,
 		"kpi_columns": list(KPI_COLUMNS),
+		"outcome_columns": list(OUTCOME_COLUMNS),
 		"kpis": {
 			"followup": cint(totals.get("followup") or 0),
 			"new": cint(totals.get("new") or 0),
@@ -384,6 +418,33 @@ def get_report_data(filters=None):
 		},
 		"regions": [{"key": rk, "label": REGION_LABELS[rk]} for rk in REGION_KEYS],
 	}
+
+
+def _outcome_row_fields(staff, ytd_from, to_date):
+	staff_token = (staff.get("user_id") or staff.get("employee_name") or staff.get("employee") or "").strip()
+	tokens = set(staff.get("match_values") or [])
+	if staff_token:
+		tokens.update(expand_staff_tokens(staff_token))
+	if staff.get("employee"):
+		tokens.update(expand_staff_tokens(staff["employee"]))
+	tokens = list(tokens)
+	ytd = (
+		_enriched_actuals(ytd_from, to_date, staff_token, tokens)
+		if (staff_token or tokens)
+		else {}
+	)
+	fields = {}
+	pcts = []
+	for cfg in OUTCOME_TARGETS:
+		key = cfg["key"]
+		actual = flt(ytd.get(key, 0))
+		target = flt(cfg["target"])
+		pct = min(100.0, actual / target * 100) if target else 0.0
+		fields[f"outcome_{key}"] = flt(actual, 2) if key == "workshop_registration" else cint(actual)
+		fields[f"outcome_{key}_pct"] = flt(pct, 2)
+		pcts.append(pct)
+	fields["outcome_pct"] = flt(sum(pcts) / len(pcts), 2) if pcts else 0.0
+	return fields
 
 
 def _parse_filters(filters):
