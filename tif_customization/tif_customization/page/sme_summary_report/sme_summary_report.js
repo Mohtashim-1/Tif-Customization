@@ -32,10 +32,32 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 			<div class="sme-sum" style="padding:16px;">
 				<style>
 					.sme-sum-note{font-size:12px;color:var(--text-muted,#6b7280);margin:0 0 12px}
-					.sme-sum-table-wrap{overflow:auto;border:1px solid var(--border-color,#e5e7eb);border-radius:8px;background:#fff}
-					.sme-sum-table{width:100%;border-collapse:collapse;font-size:12px;min-width:1880px}
+					.sme-sum-table-wrap{
+						overflow:auto;
+						overflow-anchor:none;
+						max-height:min(72vh,calc(100vh - 240px));
+						border:1px solid var(--border-color,#e5e7eb);
+						border-radius:8px;
+						background:#fff;
+						position:relative;
+					}
+					/* collapse breaks position:sticky on th in Chrome — scroll inside .sme-sum-table-wrap */
+					.sme-sum-table{width:100%;border-collapse:separate;border-spacing:0;font-size:12px;min-width:1880px}
 					.sme-sum-table th,.sme-sum-table td{padding:7px 8px;border:1px solid var(--border-color,#e5e7eb);vertical-align:middle}
-					.sme-sum-table thead th{background:#f3f4f6;text-align:center;font-weight:600;white-space:nowrap}
+					.sme-sum-table thead th{
+						position:sticky;
+						background:#f3f4f6;
+						text-align:center;
+						font-weight:600;
+						white-space:nowrap;
+						box-shadow:0 1px 0 #e5e7eb;
+					}
+					.sme-sum-table thead tr:first-child th{top:0;z-index:5}
+					.sme-sum-table thead tr:nth-child(2) th{top:var(--sme-sum-thead-row1,38px);z-index:4}
+					.sme-sum-table thead tr:first-child th[rowspan="2"]{z-index:6}
+					.sme-sum-table thead tr:first-child th.group,
+					.sme-sum-table thead tr:first-child th.kpi-group{background:#e5e7eb}
+					.sme-sum-table thead tr:nth-child(2) th.me-col{background:#f5f3ff}
 					.sme-sum-table .group{background:#e5e7eb}
 					.sme-sum-table .kpi-group{background:#dbeafe}
 					.sme-sum-table .left{text-align:left}
@@ -345,6 +367,18 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 		)}" title="${__("Click to see how this is calculated")}">${html}</td>`;
 	}
 
+	kpi_columns_without_visits(data) {
+		return this.kpi_columns(data).filter((c) => c.key !== "visits");
+	}
+
+	max_visited_days(data) {
+		let max = 0;
+		for (const r of (data && data.rows) || []) {
+			max = Math.max(max, cint(r.visited_days) || 0);
+		}
+		return max;
+	}
+
 	kpi_columns(data) {
 		return (
 			(data && data.kpi_columns) || [
@@ -362,6 +396,7 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 
 	kpi_card_groups(data) {
 		const k = data.kpis || {};
+		const visitedDaysMax = this.max_visited_days(data);
 		return [
 			{
 				title: __("Marketing & M&E"),
@@ -392,7 +427,13 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 					{ label: __("Schools Attended"), value: this.fmt(k.schools), style: "schools", metric: "schools" },
 					{ label: __("Participants"), value: this.fmt(k.participants), style: "participants", metric: "participants" },
 					{ label: __("Expenses"), value: this.fmt_cur(k.expenses), style: "expenses", cardKind: "expenses" },
-					{ label: __("Visited Days"), value: this.fmt(k.visited_days), style: "visited", metric: "visits" },
+					{
+						label: __("Visited Days"),
+						value: this.fmt(visitedDaysMax),
+						style: "visited",
+						metric: "visited_days",
+						hint: __("Highest value in the table Visited Days column"),
+					},
 				],
 			},
 			{
@@ -442,25 +483,6 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 				title: __("Score"),
 				cards: [
 					{
-						label: __("Total Points"),
-						value: this.fmt_score(k.total_points),
-						style: "points",
-						pointsKind: "total",
-					},
-					{
-						label: __("Total Earned Points"),
-						value: this.fmt_score(k.earned_points),
-						style: "earned",
-						pointsKind: "earned",
-					},
-					{
-						label: __("Percentage"),
-						value: this.fmt_pct(k.percentage),
-						style: "pct",
-						pointsKind: "pct",
-					},
-					{ label: __("SMEs in Report"), value: this.fmt(k.sme_count), style: "sme", cardKind: "sme_count" },
-					{
 						label: __("Field Supervisors"),
 						value: this.fmt(k.supervisor_count),
 						style: "supervisor",
@@ -508,12 +530,18 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 		);
 		const t = data.totals || {};
 		const kpiCols = this.kpi_columns(data);
+		const kpiColsMain = this.kpi_columns_without_visits(data);
 		const colCount = 13 + kpiCols.length;
 
-		const kpi_tds = (src, staff) =>
-			kpiCols
+		const kpi_tds = (src, staff, cols) =>
+			(cols || kpiColsMain)
 				.map((c) => this.click_td(src[c.key], c.metric || c.key, staff))
 				.join("");
+
+		const tail_tds = (src, staff) => `
+					<td class="num">${this.fmt_cur(src.expenses)}</td>
+					${this.click_td(src.visited_days, "visited_days", staff)}
+					${this.click_td(src.visits, "visits", staff)}`;
 
 		const body = rows.length
 			? rows
@@ -530,9 +558,8 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 					${this.click_td(this.me_visits(r), "me", staff, "me-col")}
 					${this.click_td(r.schools, "schools", staff)}
 					${this.click_td(r.participants, "participants", staff)}
-					<td class="num">${this.fmt_cur(r.expenses)}</td>
-					${this.click_td(r.visited_days, "visits", staff)}
 					${kpi_tds(r, staff)}
+					${tail_tds(r, staff)}
 					${this.points_td(r.total_points, "total", r, this.fmt_score(r.total_points))}
 					${this.points_td(r.earned_points, "earned", r, this.fmt_score(r.earned_points))}
 					${this.points_td(r.percentage, "pct", r, this.fmt_pct(r.percentage))}
@@ -567,6 +594,9 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 				<strong>${__("Rural")} 4</strong>
 				${__("× working days")}
 			</div>
+			<p class="text-muted small" style="margin:0 0 6px;">${__(
+				"Scroll inside the table box below — column headers stay fixed while you move through rows."
+			)}</p>
 			<div class="sme-sum-table-wrap">
 				<table class="sme-sum-table">
 					<thead>
@@ -577,8 +607,8 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 							<th colspan="1" class="group">${__("Meetings")}</th>
 							<th colspan="1" class="group">${__("M&E Visits")}</th>
 							<th colspan="2" class="group">${__("Training Sessions")}</th>
-							<th colspan="2" class="group">${__("Total")}</th>
-							<th colspan="${kpiCols.length}" class="kpi-group">${__("KPI Activities")}</th>
+							<th colspan="${kpiColsMain.length}" class="kpi-group">${__("KPI Activities")}</th>
+							<th colspan="3" class="group">${__("Totals")}</th>
 							<th colspan="3" class="group">${__("KPI Points")}</th>
 						</tr>
 						<tr>
@@ -588,9 +618,10 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 							<th class="me-col">${__("M&E Visits")}</th>
 							<th>${__("No. of Schools Attended")}</th>
 							<th>${__("No. of participants")}</th>
+							${kpiColsMain.map((c) => `<th>${__(c.label)}</th>`).join("")}
 							<th>${__("Expenses")}</th>
 							<th>${__("Visited Days")}</th>
-							${kpiCols.map((c) => `<th>${__(c.label)}</th>`).join("")}
+							<th>${__("Total Visits")}</th>
 							<th>${__("Total Points")}</th>
 							<th>${__("Total Earned Points")}</th>
 							<th>${__("Percentage")}</th>
@@ -607,9 +638,8 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 							${this.click_td(this.me_visits(t), "me", "", "me-col")}
 							${this.click_td(t.schools, "schools", "")}
 							${this.click_td(t.participants, "participants", "")}
-							<th class="num">${this.fmt_cur(t.expenses)}</th>
-							${this.click_td(t.visited_days, "visits", "")}
 							${kpi_tds(t, "")}
+							${tail_tds(t, "")}
 							${this.points_td(t.total_points, "total", t, this.fmt_score(t.total_points))}
 							${this.points_td(t.earned_points, "earned", t, this.fmt_score(t.earned_points))}
 							${this.points_td(t.percentage, "pct", t, this.fmt_pct(t.percentage))}
@@ -619,6 +649,23 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 			</div>
 		`);
 		this.bind_interactions();
+		this.sync_sticky_table_header();
+	}
+
+	sync_sticky_table_header() {
+		const wrap = document.querySelector(".sme-sum-table-wrap");
+		if (!wrap) return;
+		const row1 = wrap.querySelector("thead tr:first-child");
+		if (!row1) return;
+		const h = Math.ceil(row1.getBoundingClientRect().height);
+		if (h > 0) {
+			wrap.style.setProperty("--sme-sum-thead-row1", `${h}px`);
+		}
+		const resize = () => this.sync_sticky_table_header();
+		if (!this._stickyHeaderResizeBound) {
+			this._stickyHeaderResizeBound = true;
+			$(window).on("resize.smeSumSticky", resize);
+		}
 	}
 
 	bind_interactions() {
@@ -1008,9 +1055,10 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 			"M&E Visits",
 			"Schools Attended",
 			"Participants",
+			...this.kpi_columns_without_visits(this.data).map((c) => c.label),
 			"Expenses",
 			"Visited Days",
-			...this.kpi_columns(this.data).map((c) => c.label),
+			"Total Visits",
 			"Total Points",
 			"Total Earned Points",
 			"Percentage",
@@ -1031,9 +1079,10 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 					this.me_visits(r),
 					r.schools || 0,
 					r.participants || 0,
+					...this.kpi_columns_without_visits(this.data).map((c) => r[c.key] || 0),
 					r.expenses || 0,
 					r.visited_days || 0,
-					...kpiCols.map((c) => r[c.key] || 0),
+					r.visits || 0,
 					r.total_points || 0,
 					r.earned_points || 0,
 					r.percentage || 0,

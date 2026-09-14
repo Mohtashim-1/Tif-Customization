@@ -49,6 +49,7 @@ METRIC_LABELS = {
 	"participants": _("Training visits (participants)"),
 	"school_visits": _("School Visits"),
 	"school_visit": _("School Visits"),
+	"visited_days": _("Distinct visit days (Marketing / Meeting / M&E / Training)"),
 	"model_school_a": _("Model School A"),
 	"model_school_b": _("Model School B"),
 }
@@ -77,6 +78,8 @@ def _metric_condition(metric: str, alias: str = "fv") -> str:
 	m = (metric or "visits").strip().lower()
 	if m in ("visits", "all", "total"):
 		return "1=1"
+	if m == "visited_days":
+		return f"{a}.type IN ('Marketing', 'Meeting', 'M&E', 'Training')"
 	if m in ("school_visits", "school_visit"):
 		return f"{a}.type IN ('Marketing', 'M&E')"
 	if m == "marketing":

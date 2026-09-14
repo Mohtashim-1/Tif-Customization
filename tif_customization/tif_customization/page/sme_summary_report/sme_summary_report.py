@@ -51,15 +51,22 @@ KPI_KEYS = tuple(c["key"] for c in KPI_COLUMNS)
 
 
 def _supervisor_subordinate_ids(supervisor: str) -> set[str]:
-	"""Active Field Officers (and roster SMEs) reporting to the selected field supervisor."""
+	"""Team under a field supervisor, including the supervisor's own Employee row."""
 	supervisor = (supervisor or "").strip()
 	if not supervisor:
 		return set()
 	from tif_customization.tif_customization.doctype.field_officer.field_officer import (
 		get_field_supervisor_subordinate_employees,
+		resolve_supervisor_field_officer,
 	)
 
-	return set(get_field_supervisor_subordinate_employees(supervisor))
+	ids = set(get_field_supervisor_subordinate_employees(supervisor))
+	supervisor_fo = resolve_supervisor_field_officer(supervisor)
+	if supervisor_fo:
+		emp = frappe.db.get_value("Field Officer", supervisor_fo, "employee")
+		if emp:
+			ids.add(emp)
+	return ids
 
 
 def _supervisor_label(supervisor: str) -> str:
@@ -312,6 +319,8 @@ def get_report_data(filters=None):
 	totals_out["score"] = totals_out["percentage"]
 	totals_out["points_breakdown"] = _sum_points_breakdown(rows)
 	totals_out["working_days"] = working_days
+	visited_days_max = max((cint(r.get("visited_days") or 0) for r in rows), default=0)
+	totals_out["visited_days"] = visited_days_max
 
 	return {
 		"from_date": str(from_date),
@@ -345,7 +354,7 @@ def get_report_data(filters=None):
 			"schools": cint(totals.get("schools") or 0),
 			"participants": cint(totals.get("participants") or 0),
 			"expenses": flt(totals.get("expenses") or 0, 2),
-			"visited_days": cint(totals.get("visited_days") or 0),
+			"visited_days": visited_days_max,
 			"grand_total": cint(totals.get("grand_total") or 0),
 			"visits": cint(totals.get("visits") or 0),
 			"half_day_workshop": cint(totals.get("half_day_workshop") or 0),
