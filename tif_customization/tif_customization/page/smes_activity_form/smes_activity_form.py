@@ -7,6 +7,9 @@ import frappe
 from frappe import _
 from frappe.utils import get_url, getdate, today
 
+from tif_customization.tif_customization.field_visit_enrolment_access import (
+	can_manage_enrolment_participants_field_visit,
+)
 from tif_customization.tif_customization.field_visit_supervisor_only import (
 	FIELD_OFFICER_ALLOWED_OT_TASKS,
 	can_manage_supervisor_only_field_visits,
@@ -29,6 +32,13 @@ def _academic_task_type_options_for_user():
 	if can_manage_supervisor_only_field_visits():
 		return list(_ALL_ACADEMIC_TASK_TYPES)
 	return sorted(FIELD_OFFICER_ALLOWED_OT_TASKS)
+
+
+def _activity_type_labels_for_user():
+	labels = [k for k in ACTIVITY_TYPE_MAP if k not in ("Enrolment of participants", "Enrolment of Participants")]
+	if can_manage_enrolment_participants_field_visit():
+		labels.append("Enrolment of Participants")
+	return labels
 
 
 def _bulk_import_template_path():
@@ -224,6 +234,7 @@ def get_form_meta():
 		"staff_options": staff_list,
 		"staff_names": staff_names,
 		"can_manage_supervisor_only": can_manage_supervisor_only_field_visits(),
+		"can_manage_enrolment_participants": can_manage_enrolment_participants_field_visit(),
 		"bulk_import_template_url": get_bulk_import_template_url(),
 		"today": today(),
 		"cities": [c.name for c in cities],
@@ -242,7 +253,7 @@ def get_form_meta():
 			"November",
 			"December",
 		],
-		"activity_types": [k for k in ACTIVITY_TYPE_MAP if k != "Enrolment of participants"],
+		"activity_types": _activity_type_labels_for_user(),
 		"enrolment_courses": ENROLMENT_COURSE_OPTIONS,
 		"travel_modes": [
 			"Public Transport",

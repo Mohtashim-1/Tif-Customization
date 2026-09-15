@@ -8,9 +8,26 @@ import frappe
 from frappe import _
 from frappe.utils import cint
 
+from tif_customization.tif_customization.field_visit_enrolment_access import (
+	can_manage_enrolment_participants_field_visit,
+	is_enrolment_participants_visit,
+)
 from tif_customization.tif_customization.field_visit_permissions import can_view_all_field_visits
 
-# KPI: Academic Task, Other Official Tasks, Head / Regional / Out of station (Academic form)
+# Top-level Field Visit types — supervisors only (Field Officers use Follow up under combined type).
+HEADOFFICE_VISIT_TYPE = "Headoffice/ Regional Office/ Out of Station Visit"
+ACADEMIC_ACTIVITY_TYPE = "Academic"
+OTHER_OFFICIAL_ACTIVITY_TYPE = "Other Official Tasks"
+
+SUPERVISOR_ONLY_ACTIVITY_TYPES = frozenset(
+	{
+		HEADOFFICE_VISIT_TYPE,
+		ACADEMIC_ACTIVITY_TYPE,
+		OTHER_OFFICIAL_ACTIVITY_TYPE,
+	}
+)
+
+# KPI: Academic Task, Other Official Tasks, Head / Regional / Out of station (legacy combined type)
 SUPERVISOR_ONLY_OT_TASKS = frozenset(
 	{
 		"Academic Tasks",
@@ -75,6 +92,9 @@ def visit_requires_supervisor(doc) -> bool:
 	visit_type = (doc.get("type") if isinstance(doc, dict) else getattr(doc, "type", None)) or ""
 	visit_type = visit_type.strip()
 
+	if visit_type in SUPERVISOR_ONLY_ACTIVITY_TYPES:
+		return True
+
 	task = (doc.get("ot_type_of_task") if isinstance(doc, dict) else getattr(doc, "ot_type_of_task", None)) or ""
 	task = task.strip()
 
@@ -114,13 +134,18 @@ def validate_supervisor_only_field_visit(doc, user: str | None = None) -> None:
 @frappe.whitelist()
 def get_supervisor_field_visit_access(name: str | None = None):
 	doc_is_supervisor_only = False
+	doc_is_enrolment = False
 	if name and frappe.db.exists("Field Visit", name):
 		doc = frappe.get_doc("Field Visit", name)
 		if frappe.has_permission("Field Visit", "read", doc=doc):
 			doc_is_supervisor_only = visit_requires_supervisor(doc)
+			doc_is_enrolment = is_enrolment_participants_visit(doc)
 
 	return {
 		"can_manage_supervisor_only": can_manage_supervisor_only_field_visits(),
 		"doc_is_supervisor_only": doc_is_supervisor_only,
 		"field_officer_ot_tasks": sorted(FIELD_OFFICER_ALLOWED_OT_TASKS),
+		"supervisor_only_types": sorted(SUPERVISOR_ONLY_ACTIVITY_TYPES),
+		"can_manage_enrolment_participants": can_manage_enrolment_participants_field_visit(),
+		"doc_is_enrolment_participants": doc_is_enrolment,
 	}

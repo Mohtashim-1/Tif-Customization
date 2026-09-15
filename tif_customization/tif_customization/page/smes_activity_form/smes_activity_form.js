@@ -1,4 +1,4 @@
-const SMES_LS_META = "smes_activity_form_meta_v5";
+const SMES_LS_META = "smes_activity_form_meta_v6";
 const SMES_LS_DRAFT = "smes_activity_form_draft_v3";
 const SMES_LS_QUEUE = "smes_activity_form_queue_v1";
 

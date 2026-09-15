@@ -10,6 +10,9 @@ from frappe.model.naming import make_autoname
 from frappe.utils import getdate, nowdate, random_string
 
 from tif_customization.tif_customization.api.training_feedback_portal import build_feedback_link
+from tif_customization.tif_customization.field_visit_enrolment_access import (
+	validate_enrolment_participants_field_visit,
+)
 from tif_customization.tif_customization.field_visit_supervisor_only import (
 	validate_supervisor_only_field_visit,
 )
@@ -46,7 +49,14 @@ class FieldVisit(Document):
 			)
 		if t == "Meeting":
 			return self.mt_meeting_date or (getdate(self.mt_timestamp) if self.mt_timestamp else None)
-		if t in ("Academic / Other Official Tasks", "Other", "Co-curricular Activity"):
+		if t in (
+			"Academic / Other Official Tasks",
+			"Academic",
+			"Other Official Tasks",
+			"Headoffice/ Regional Office/ Out of Station Visit",
+			"Other",
+			"Co-curricular Activity",
+		):
 			return self.ot_date or self.visit_date
 		if t == "Joint Visit with SME":
 			return self.me_visit_date or self.visit_date
@@ -70,6 +80,7 @@ class FieldVisit(Document):
 
 	def validate(self):
 		validate_supervisor_only_field_visit(self)
+		validate_enrolment_participants_field_visit(self)
 		if self.type == "Training":
 			self._validate_training_attendees()
 			self._sync_training_attendee_defaults()

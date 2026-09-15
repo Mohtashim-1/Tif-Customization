@@ -32,10 +32,68 @@ function fetch_supervisor_field_visit_access(frm, callback) {
 	});
 }
 
+const ENROLMENT_PARTICIPANTS_TYPE = "Enrolment of Participants";
+const SUPERVISOR_ONLY_ACTIVITY_TYPES_DEFAULT = [
+	"Headoffice/ Regional Office/ Out of Station Visit",
+	"Academic",
+	"Other Official Tasks",
+];
+const ACADEMIC_LIKE_ACTIVITY_TYPES = [
+	"Academic / Other Official Tasks",
+	"Academic",
+	"Other Official Tasks",
+	"Headoffice/ Regional Office/ Out of Station Visit",
+];
+
+function supervisor_only_types(access) {
+	return access?.supervisor_only_types?.length
+		? access.supervisor_only_types
+		: SUPERVISOR_ONLY_ACTIVITY_TYPES_DEFAULT;
+}
+
 function apply_supervisor_field_visit_restrictions(frm) {
 	const access = _supervisor_field_visit_access || {};
 	const can = access.can_manage_supervisor_only;
 	const allowed = (access.field_officer_ot_tasks || ["Follow up Calls / Calls to Schools"]).join("\n");
+	const blockedTypes = new Set(supervisor_only_types(access));
+
+	if (access.doc_is_enrolment_participants && !access.can_manage_enrolment_participants) {
+		frm.set_read_only();
+		frappe.show_alert(
+			{
+				message: __(
+					"Enrolment of Participants visits can only be edited by Farhan Hussain.",
+				),
+				indicator: "orange",
+			},
+			10,
+		);
+		return;
+	}
+
+	if (frm.fields_dict.type && (!access.can_manage_enrolment_participants || !can)) {
+		const df = frm.fields_dict.type.df;
+		const full = (df.options || "")
+			.split("\n")
+			.map((o) => o.trim())
+			.filter(Boolean);
+		if (full.length) {
+			let filtered = full;
+			if (!access.can_manage_enrolment_participants) {
+				filtered = filtered.filter((o) => o !== ENROLMENT_PARTICIPANTS_TYPE);
+			}
+			if (!can) {
+				filtered = filtered.filter((o) => !blockedTypes.has(o));
+			}
+			frm.set_df_property("type", "options", filtered.join("\n"));
+		}
+		if (frm.doc.type === ENROLMENT_PARTICIPANTS_TYPE && !access.can_manage_enrolment_participants && !frm.is_new()) {
+			frm.set_df_property("type", "read_only", 1);
+		}
+		if (blockedTypes.has(frm.doc.type) && !can && !frm.is_new()) {
+			frm.set_df_property("type", "read_only", 1);
+		}
+	}
 
 	if (access.doc_is_supervisor_only && !can) {
 		frm.set_read_only();
@@ -366,7 +424,7 @@ function apply_field_visit_logic(frm) {
 		set_hidden(frm, meeting_fields, false);
 	}
 
-	if (type === "Academic / Other Official Tasks" || type === "Other") {
+	if (ACADEMIC_LIKE_ACTIVITY_TYPES.includes(type) || type === "Other") {
 		set_hidden(frm, academic_fields, false);
 	}
 
@@ -516,16 +574,21 @@ function apply_field_visit_logic(frm) {
 	set_hidden(frm, ["mt_external_meeting_with"], !is_external);
 
 	// Academic: task-specific fields
-	const is_academic_task = type === "Academic / Other Official Tasks" && task === "Academic Tasks";
+	const is_academic_task =
+		type === "Academic" || (type === "Academic / Other Official Tasks" && task === "Academic Tasks");
 	const is_calls = type === "Academic / Other Official Tasks" && task.includes("Follow up Calls");
-	const is_other_task = type === "Academic / Other Official Tasks" && task === "Other Official Tasks";
+	const is_other_task =
+		type === "Other Official Tasks" ||
+		(type === "Academic / Other Official Tasks" && task === "Other Official Tasks");
 	const is_visit_task =
-		type === "Academic / Other Official Tasks" &&
-		(task.includes("Head Office") ||
-			task.includes("Regional Office") ||
-			task.includes("Out of Station") ||
-			task.includes("Meeting of Regional Staff"));
+		type === "Headoffice/ Regional Office/ Out of Station Visit" ||
+		(type === "Academic / Other Official Tasks" &&
+			(task.includes("Head Office") ||
+				task.includes("Regional Office") ||
+				task.includes("Out of Station") ||
+				task.includes("Meeting of Regional Staff")));
 
+	set_hidden(frm, ["ot_type_of_task"], type !== "Academic / Other Official Tasks");
 	set_hidden(frm, ["ot_academic_task_types", "ot_no_of_pages"], !is_academic_task);
 	set_hidden(
 		frm,
@@ -933,7 +996,32 @@ frappe.ui.form.on("Field Visit", {
 		}
 	},
 
-	type: apply_field_visit_logic,
+	type(frm) {
+		apply_field_visit_logic(frm);
+		const access = _supervisor_field_visit_access || {};
+		if (frm.doc.type === ENROLMENT_PARTICIPANTS_TYPE && !access.can_manage_enrolment_participants) {
+			frappe.msgprint({
+				title: __("Enrolment of Participants"),
+				message: __("Only Farhan Hussain can use this activity type."),
+				indicator: "red",
+			});
+			frm.set_value("type", "");
+			return;
+		}
+		const blocked = new Set(supervisor_only_types(access));
+		if (frm.doc.type && blocked.has(frm.doc.type) && !access.can_manage_supervisor_only) {
+			frappe.msgprint({
+				title: __("Supervisor activity"),
+				message: __(
+					"Head office / Regional / Out of station, Academic, and Other Official Tasks can only be recorded by a Field Supervisor.",
+				),
+				indicator: "red",
+			});
+			frm.set_value("type", "");
+			return;
+		}
+		apply_supervisor_field_visit_restrictions(frm);
+	},
 	status: apply_field_visit_logic,
 	reason_not_agreed: apply_field_visit_logic,
 	qps_affiliated: apply_field_visit_logic,

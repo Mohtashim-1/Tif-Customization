@@ -91,8 +91,12 @@ def _metric_condition(metric: str, alias: str = "fv") -> str:
 		return f"{a}.type = 'Meeting'"
 	if m == "training":
 		return f"{a}.type = 'Training'"
-	if m in ("academic", "academic_task", "other_official"):
-		return f"{a}.type IN ('Academic / Other Official Tasks', 'Other')"
+	if m == "academic_task":
+		return f"{a}.type IN ('Academic', 'Academic / Other Official Tasks', 'Other')"
+	if m == "other_official":
+		return f"{a}.type IN ('Other Official Tasks', 'Academic / Other Official Tasks', 'Other')"
+	if m in ("academic",):
+		return f"{a}.type IN ('Academic', 'Other Official Tasks', 'Academic / Other Official Tasks', 'Other')"
 	if m == "other":
 		return f"{a}.type NOT IN ('Marketing', 'M&E', 'Training', 'Meeting')"
 	if m == "followup":
@@ -142,7 +146,8 @@ def _metric_condition(metric: str, alias: str = "fv") -> str:
 		return f"{a}.type = 'M&E' AND IFNULL({a}.me_teachers_training_session, 0) = 1"
 	if m == "headoffice_visit":
 		return f"""(
-			LOWER(IFNULL({a}.reference,'')) LIKE '%%head%%office%%'
+			{a}.type = 'Headoffice/ Regional Office/ Out of Station Visit'
+			OR LOWER(IFNULL({a}.reference,'')) LIKE '%%head%%office%%'
 			OR LOWER(IFNULL({a}.reference,'')) LIKE '%%regional office%%'
 			OR LOWER(IFNULL({a}.reference,'')) LIKE '%%out of station%%'
 			OR LOWER(IFNULL({a}.me_new_school_address,'')) LIKE '%%head%%office%%'

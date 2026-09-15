@@ -18,7 +18,13 @@ def visit_day_sql(alias: str = "fv") -> str:
 			WHEN {a}.type = 'M&E' THEN COALESCE({a}.me_visit_date, {a}.me_starting_date, DATE({a}.me_timestamp), DATE({a}.creation))
 			WHEN {a}.type = 'Training' THEN COALESCE({a}.training_date, DATE({a}.training_timestamp), DATE({a}.creation))
 			WHEN {a}.type = 'Meeting' THEN COALESCE({a}.mt_meeting_date, DATE({a}.mt_timestamp), DATE({a}.creation))
-			WHEN {a}.type IN ('Academic / Other Official Tasks', 'Other') THEN COALESCE({a}.ot_date, {a}.visit_date, DATE({a}.creation))
+			WHEN {a}.type IN (
+				'Academic / Other Official Tasks',
+				'Academic',
+				'Other Official Tasks',
+				'Headoffice/ Regional Office/ Out of Station Visit',
+				'Other'
+			) THEN COALESCE({a}.ot_date, {a}.visit_date, DATE({a}.creation))
 			WHEN {a}.type = 'Joint Visit with SME' THEN COALESCE({a}.me_visit_date, {a}.visit_date, DATE({a}.creation))
 			WHEN {a}.type = 'Co-curricular Activity' THEN COALESCE({a}.ot_date, {a}.visit_date, {a}.training_date, DATE({a}.creation))
 			WHEN {a}.type IN (
