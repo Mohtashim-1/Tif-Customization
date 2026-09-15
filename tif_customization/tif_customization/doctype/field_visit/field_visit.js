@@ -33,6 +33,14 @@ function fetch_supervisor_field_visit_access(frm, callback) {
 }
 
 const ENROLMENT_PARTICIPANTS_TYPE = "Enrolment of Participants";
+const WORKSHOP_ATTENDANCE_TYPE = "Attendance / Registration in One Day / Half day Workshop";
+
+function farhan_only_types(access) {
+	if (access?.farhan_only_types?.length) {
+		return access.farhan_only_types;
+	}
+	return [ENROLMENT_PARTICIPANTS_TYPE, WORKSHOP_ATTENDANCE_TYPE];
+}
 const SUPERVISOR_ONLY_ACTIVITY_TYPES_DEFAULT = [
 	"Headoffice/ Regional Office/ Out of Station Visit",
 	"Academic",
@@ -57,12 +65,15 @@ function apply_supervisor_field_visit_restrictions(frm) {
 	const allowed = (access.field_officer_ot_tasks || ["Follow up Calls / Calls to Schools"]).join("\n");
 	const blockedTypes = new Set(supervisor_only_types(access));
 
-	if (access.doc_is_enrolment_participants && !access.can_manage_enrolment_participants) {
+	const canFarhan = access.can_manage_farhan_only ?? access.can_manage_enrolment_participants;
+	const farhanBlocked = new Set(farhan_only_types(access));
+
+	if (access.doc_is_farhan_only && !canFarhan) {
 		frm.set_read_only();
 		frappe.show_alert(
 			{
 				message: __(
-					"Enrolment of Participants visits can only be edited by Farhan Hussain.",
+					"Enrolment of Participants and Half day Workshop attendance can only be edited by Farhan Hussain.",
 				),
 				indicator: "orange",
 			},
@@ -71,7 +82,7 @@ function apply_supervisor_field_visit_restrictions(frm) {
 		return;
 	}
 
-	if (frm.fields_dict.type && (!access.can_manage_enrolment_participants || !can)) {
+	if (frm.fields_dict.type && (!canFarhan || !can)) {
 		const df = frm.fields_dict.type.df;
 		const full = (df.options || "")
 			.split("\n")
@@ -79,15 +90,15 @@ function apply_supervisor_field_visit_restrictions(frm) {
 			.filter(Boolean);
 		if (full.length) {
 			let filtered = full;
-			if (!access.can_manage_enrolment_participants) {
-				filtered = filtered.filter((o) => o !== ENROLMENT_PARTICIPANTS_TYPE);
+			if (!canFarhan) {
+				filtered = filtered.filter((o) => !farhanBlocked.has(o));
 			}
 			if (!can) {
 				filtered = filtered.filter((o) => !blockedTypes.has(o));
 			}
 			frm.set_df_property("type", "options", filtered.join("\n"));
 		}
-		if (frm.doc.type === ENROLMENT_PARTICIPANTS_TYPE && !access.can_manage_enrolment_participants && !frm.is_new()) {
+		if (farhanBlocked.has(frm.doc.type) && !canFarhan && !frm.is_new()) {
 			frm.set_df_property("type", "read_only", 1);
 		}
 		if (blockedTypes.has(frm.doc.type) && !can && !frm.is_new()) {
@@ -999,9 +1010,11 @@ frappe.ui.form.on("Field Visit", {
 	type(frm) {
 		apply_field_visit_logic(frm);
 		const access = _supervisor_field_visit_access || {};
-		if (frm.doc.type === ENROLMENT_PARTICIPANTS_TYPE && !access.can_manage_enrolment_participants) {
+		const canFarhan = access.can_manage_farhan_only ?? access.can_manage_enrolment_participants;
+		const farhanBlocked = new Set(farhan_only_types(access));
+		if (frm.doc.type && farhanBlocked.has(frm.doc.type) && !canFarhan) {
 			frappe.msgprint({
-				title: __("Enrolment of Participants"),
+				title: __("Restricted activity"),
 				message: __("Only Farhan Hussain can use this activity type."),
 				indicator: "red",
 			});

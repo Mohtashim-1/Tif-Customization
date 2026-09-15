@@ -24,7 +24,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		this.page.add_action_item(__("Export CSV"), () => this.export_csv());
 		this.page.add_action_item(__("Print"), () => window.print());
 		this.bind_interactions();
-		this.load_data();
+		this.load_data();	
 	}
 
 	make_layout() {
@@ -369,7 +369,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			{ label: __("Marketing"), metric: "new", value: (r) => r.new },
 			{ label: __("Monitoring"), metric: "monitoring", value: (r) => this.me_visits(r), cellClass: "visit-mon-col" },
 			{ label: __("Follow up"), metric: "followup", value: (r) => r.followup },
-			{ label: __("Other"), metric: "meeting", value: (r) => r.meetings },
+			{ label: __("Meetings"), metric: "meeting", value: (r) => r.meetings },
 		];
 	}
 

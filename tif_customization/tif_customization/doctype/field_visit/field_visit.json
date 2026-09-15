@@ -241,7 +241,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Type of Activity",
-   "options": "\nMarketing\nM&E\nJoint Visit with SME\nTraining\nMeeting\nAcademic Task\nOther Official Tasks\nCo-curricular Activity\nEnrolment of Participants\nAttendance / Registration in One Day / Half day Workshop\nHeadoffice/ Regional Office/ Out of Station Visit\nOther",
+   "options": "\nMarketing\nM&E\nJoint Visit with SME\nTraining\nMeeting\nAcademic Task\nOther Official Tasks\nCo-curricular Activity\nEnrolment of Participants\nAttendance / Registration in One Day / Half day Workshop\nHeadoffice/ Regional Office/ Out of Station Visit",
    "reqd": 1
   },
   {
@@ -1638,7 +1638,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-09-15 17:46:34.897851",
+ "modified": "2026-09-15 18:01:21.934654",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Field Visit",

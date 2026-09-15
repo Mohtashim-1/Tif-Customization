@@ -9,8 +9,12 @@ from frappe import _
 from frappe.utils import cint
 
 from tif_customization.tif_customization.field_visit_enrolment_access import (
+	FARHAN_ONLY_FIELD_VISIT_TYPES,
 	can_manage_enrolment_participants_field_visit,
+	can_manage_farhan_only_field_visit,
 	is_enrolment_participants_visit,
+	is_farhan_only_field_visit,
+	is_workshop_attendance_visit,
 )
 from tif_customization.tif_customization.field_visit_permissions import can_view_all_field_visits
 
@@ -135,11 +139,15 @@ def validate_supervisor_only_field_visit(doc, user: str | None = None) -> None:
 def get_supervisor_field_visit_access(name: str | None = None):
 	doc_is_supervisor_only = False
 	doc_is_enrolment = False
+	doc_is_workshop_attendance = False
+	doc_is_farhan_only = False
 	if name and frappe.db.exists("Field Visit", name):
 		doc = frappe.get_doc("Field Visit", name)
 		if frappe.has_permission("Field Visit", "read", doc=doc):
 			doc_is_supervisor_only = visit_requires_supervisor(doc)
 			doc_is_enrolment = is_enrolment_participants_visit(doc)
+			doc_is_workshop_attendance = is_workshop_attendance_visit(doc)
+			doc_is_farhan_only = is_farhan_only_field_visit(doc)
 
 	return {
 		"can_manage_supervisor_only": can_manage_supervisor_only_field_visits(),
@@ -147,5 +155,9 @@ def get_supervisor_field_visit_access(name: str | None = None):
 		"field_officer_ot_tasks": sorted(FIELD_OFFICER_ALLOWED_OT_TASKS),
 		"supervisor_only_types": sorted(SUPERVISOR_ONLY_ACTIVITY_TYPES),
 		"can_manage_enrolment_participants": can_manage_enrolment_participants_field_visit(),
+		"can_manage_farhan_only": can_manage_farhan_only_field_visit(),
+		"farhan_only_types": sorted(FARHAN_ONLY_FIELD_VISIT_TYPES),
 		"doc_is_enrolment_participants": doc_is_enrolment,
+		"doc_is_workshop_attendance": doc_is_workshop_attendance,
+		"doc_is_farhan_only": doc_is_farhan_only,
 	}

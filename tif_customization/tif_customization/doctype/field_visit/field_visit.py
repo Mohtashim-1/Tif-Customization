@@ -11,7 +11,7 @@ from frappe.utils import getdate, nowdate, random_string
 
 from tif_customization.tif_customization.api.training_feedback_portal import build_feedback_link
 from tif_customization.tif_customization.field_visit_enrolment_access import (
-	validate_enrolment_participants_field_visit,
+	validate_farhan_only_field_visit,
 )
 from tif_customization.tif_customization.field_visit_supervisor_only import (
 	validate_supervisor_only_field_visit,
@@ -80,7 +80,7 @@ class FieldVisit(Document):
 
 	def validate(self):
 		validate_supervisor_only_field_visit(self)
-		validate_enrolment_participants_field_visit(self)
+		validate_farhan_only_field_visit(self)
 		if self.type == "Training":
 			self._validate_training_attendees()
 			self._sync_training_attendee_defaults()

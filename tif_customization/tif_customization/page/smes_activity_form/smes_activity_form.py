@@ -8,7 +8,9 @@ from frappe import _
 from frappe.utils import get_url, getdate, today
 
 from tif_customization.tif_customization.field_visit_enrolment_access import (
-	can_manage_enrolment_participants_field_visit,
+	FARHAN_ONLY_FIELD_VISIT_TYPES,
+	WORKSHOP_ATTENDANCE_TYPE,
+	can_manage_farhan_only_field_visit,
 )
 from tif_customization.tif_customization.field_visit_supervisor_only import (
 	FIELD_OFFICER_ALLOWED_OT_TASKS,
@@ -35,9 +37,12 @@ def _academic_task_type_options_for_user():
 
 
 def _activity_type_labels_for_user():
-	labels = [k for k in ACTIVITY_TYPE_MAP if k not in ("Enrolment of participants", "Enrolment of Participants")]
-	if can_manage_enrolment_participants_field_visit():
-		labels.append("Enrolment of Participants")
+	exclude = {WORKSHOP_ATTENDANCE_TYPE, "Enrolment of participants", "Enrolment of Participants"}
+	labels = [k for k in ACTIVITY_TYPE_MAP if k not in exclude]
+	if can_manage_farhan_only_field_visit():
+		for label, mapped in ACTIVITY_TYPE_MAP.items():
+			if mapped in FARHAN_ONLY_FIELD_VISIT_TYPES and label not in labels:
+				labels.append(label)
 	return labels
 
 
@@ -234,7 +239,8 @@ def get_form_meta():
 		"staff_options": staff_list,
 		"staff_names": staff_names,
 		"can_manage_supervisor_only": can_manage_supervisor_only_field_visits(),
-		"can_manage_enrolment_participants": can_manage_enrolment_participants_field_visit(),
+		"can_manage_enrolment_participants": can_manage_farhan_only_field_visit(),
+		"can_manage_farhan_only": can_manage_farhan_only_field_visit(),
 		"bulk_import_template_url": get_bulk_import_template_url(),
 		"today": today(),
 		"cities": [c.name for c in cities],
