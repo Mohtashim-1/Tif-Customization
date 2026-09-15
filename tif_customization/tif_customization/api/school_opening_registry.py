@@ -175,11 +175,8 @@ def _ensure_customer_access(customer):
 	return customer
 
 
-_SCHOOL_CUSTOMER_BASE_CONDITION = """(
-	c.customer_type = 'School'
-	OR IFNULL(c.custom_type_of_customer, '') = 'School'
-	OR IFNULL(c.customer_group, '') = 'School'
-)"""
+# Match the Customer list: all active customers (many schools are not tagged "School" on the form).
+_SCHOOL_CUSTOMER_BASE_CONDITION = "IFNULL(c.disabled, 0) = 0"
 
 _SCHOOL_OPENING_APP_JOIN = """
 LEFT JOIN (
@@ -196,9 +193,20 @@ def _school_registry_filter_clause(
 	status=None,
 	territory=None,
 	form_data=None,
+	city=None,
+	address_search=None,
+	customers=None,
 ):
 	conditions = [_SCHOOL_CUSTOMER_BASE_CONDITION]
 	values = {}
+
+	customer_list = frappe.parse_json(customers) if isinstance(customers, str) else customers
+	if customer_list:
+		customer_list = [cstr(c).strip() for c in customer_list if cstr(c).strip()]
+	if customer_list:
+		conditions.append("c.name IN %(registry_customers)s")
+		values["registry_customers"] = tuple(customer_list)
+		return " AND ".join(conditions), values
 
 	search = (search or "").strip()
 	if search:
@@ -226,6 +234,55 @@ def _school_registry_filter_clause(
 	elif form_data in ("customer_only", "customer-only", "customer"):
 		conditions.append("soa.customer IS NULL")
 
+	city = (city or "").strip()
+	if city:
+		conditions.append(
+			"""(
+			EXISTS (
+				SELECT 1 FROM `tabDynamic Link` dl
+				INNER JOIN `tabAddress` a ON a.name = dl.parent
+				WHERE dl.link_doctype = 'Customer' AND dl.link_name = c.name
+					AND IFNULL(a.disabled, 0) = 0
+					AND IFNULL(a.city, '') LIKE %(city)s
+			)
+			OR EXISTS (
+				SELECT 1 FROM `tabSchool Opening Application` app
+				WHERE app.customer = c.name AND IFNULL(app.city, '') LIKE %(city)s
+			)
+		)"""
+		)
+		values["city"] = f"%{city}%"
+
+	address_search = (address_search or "").strip()
+	if address_search:
+		conditions.append(
+			"""(
+			EXISTS (
+				SELECT 1 FROM `tabDynamic Link` dl
+				INNER JOIN `tabAddress` a ON a.name = dl.parent
+				WHERE dl.link_doctype = 'Customer' AND dl.link_name = c.name
+					AND IFNULL(a.disabled, 0) = 0
+					AND (
+						IFNULL(a.address_line1, '') LIKE %(addr_pat)s
+						OR IFNULL(a.address_line2, '') LIKE %(addr_pat)s
+						OR IFNULL(a.city, '') LIKE %(addr_pat)s
+						OR IFNULL(a.state, '') LIKE %(addr_pat)s
+					)
+			)
+			OR EXISTS (
+				SELECT 1 FROM `tabSchool Opening Application` app
+				WHERE app.customer = c.name
+					AND (
+						IFNULL(app.address, '') LIKE %(addr_pat)s
+						OR IFNULL(app.area, '') LIKE %(addr_pat)s
+						OR IFNULL(app.city, '') LIKE %(addr_pat)s
+						OR IFNULL(app.province, '') LIKE %(addr_pat)s
+					)
+			)
+		)"""
+		)
+		values["addr_pat"] = f"%{address_search}%"
+
 	return " AND ".join(conditions), values
 
 
@@ -248,9 +305,33 @@ def get_school_registry_filter_options():
 			)
 		]
 
+	cities = [
+		row[0]
+		for row in frappe.db.sql(
+			f"""
+			SELECT DISTINCT v FROM (
+				SELECT IFNULL(a.city, '') AS v
+				FROM `tabCustomer` c
+				INNER JOIN `tabDynamic Link` dl
+					ON dl.link_doctype = 'Customer' AND dl.link_name = c.name
+				INNER JOIN `tabAddress` a ON a.name = dl.parent AND IFNULL(a.disabled, 0) = 0
+				{base}
+				UNION
+				SELECT IFNULL(app.city, '') AS v
+				FROM `tabCustomer` c
+				INNER JOIN `tabSchool Opening Application` app ON app.customer = c.name
+				{base}
+			) cities
+			WHERE v != ''
+			ORDER BY v
+			"""
+		)
+	]
+
 	return {
 		"govt_private": distinct("custom_govt_private"),
 		"status": distinct("custom_status"),
+		"cities": cities,
 	}
 
 
@@ -263,6 +344,8 @@ def list_school_customers(
 	status=None,
 	territory=None,
 	form_data=None,
+	city=None,
+	address_search=None,
 ):
 	"""Paginated school customers for the registry (single query + count)."""
 	limit = min(max(int(limit or 50), 1), 200)
@@ -274,6 +357,8 @@ def list_school_customers(
 		status=status,
 		territory=territory,
 		form_data=form_data,
+		city=city,
+		address_search=address_search,
 	)
 	values = {"limit": limit, "start": start, **filter_values}
 
@@ -309,10 +394,105 @@ def list_school_customers(
 		as_dict=True,
 	)
 
+	customers = [row.customer for row in rows]
+	addr_map = _addresses_for_customers(customers)
 	for row in rows:
 		row.has_application = bool(row.pop("has_application", 0))
+		_apply_registry_location(row, addr_map.get(row.customer))
 
 	return {"rows": rows, "total": total, "start": start, "page_length": limit}
+
+
+_EXPORT_MAX_ROWS = 5000
+
+
+@frappe.whitelist()
+def export_school_registry(
+	search=None,
+	govt_private=None,
+	status=None,
+	territory=None,
+	form_data=None,
+	city=None,
+	address_search=None,
+	customers=None,
+):
+	"""Export filtered school registry rows for Excel (CSV), including address fields."""
+	if not frappe.has_permission("Customer", "read"):
+		frappe.throw(_("Not permitted to export customers."), frappe.PermissionError)
+
+	where, filter_values = _school_registry_filter_clause(
+		search=search,
+		govt_private=govt_private,
+		status=status,
+		territory=territory,
+		form_data=form_data,
+		city=city,
+		address_search=address_search,
+		customers=customers,
+	)
+	values = {**filter_values}
+
+	rows = frappe.db.sql(
+		f"""
+		SELECT
+			c.name AS customer,
+			c.customer_name,
+			c.custom_govt_private AS govt_private,
+			c.custom_status AS status,
+			c.territory,
+			c.email_id,
+			c.mobile_no,
+			IF(soa.customer IS NOT NULL, 1, 0) AS has_application
+		FROM `tabCustomer` c
+		{_SCHOOL_OPENING_APP_JOIN}
+		WHERE {where}
+		ORDER BY c.customer_name
+		LIMIT {_EXPORT_MAX_ROWS}
+		""",
+		values,
+		as_dict=True,
+	)
+
+	customer_names = [row.customer for row in rows]
+	addr_map = _addresses_for_customers(customer_names)
+	out = []
+	for row in rows:
+		has_app = bool(row.pop("has_application", 0))
+		addr = addr_map.get(row.customer) or {}
+		out.append(
+			{
+				"customer": row.customer,
+				"school_name": row.customer_name or "",
+				"govt_private": row.govt_private or "",
+				"status": row.status or "",
+				"territory": row.territory or "",
+				"form_data": _("Full SC-1.2") if has_app else _("Customer only"),
+				"address": (addr.get("address_line1") or "").strip(),
+				"area": (addr.get("address_line2") or "").strip(),
+				"city": (addr.get("city") or "").strip(),
+				"province": (addr.get("state") or "").strip(),
+				"country": (addr.get("country") or "").strip(),
+				"phone": (addr.get("phone") or row.mobile_no or "").strip(),
+				"email": (addr.get("email_id") or row.email_id or "").strip(),
+				"full_address": _format_address_lines(addr),
+			}
+		)
+
+	return {
+		"rows": out,
+		"count": len(out),
+		"truncated": len(rows) >= _EXPORT_MAX_ROWS,
+		"filters": {
+			"search": search or "",
+			"govt_private": govt_private or "",
+			"status": status or "",
+			"territory": territory or "",
+			"form_data": form_data or "",
+			"city": city or "",
+			"address_search": address_search or "",
+		},
+	}
 
 
 @frappe.whitelist()
@@ -338,9 +518,11 @@ def build_school_opening_view(customer):
 		)
 
 	if app_name:
-		return _view_from_application(frappe.get_doc("School Opening Application", app_name))
-
-	return _view_from_customer(frappe.get_doc("Customer", customer))
+		view = _view_from_application(frappe.get_doc("School Opening Application", app_name))
+	else:
+		view = _view_from_customer(frappe.get_doc("Customer", customer))
+	_enrich_location_from_customer(view, customer)
+	return view
 
 
 def _view_from_application(app):
@@ -459,7 +641,142 @@ def _view_from_customer(cust):
 	}
 
 
-def _primary_address(customer):
+def _addresses_for_customers(customers):
+	"""Best address per customer (primary flag, then latest)."""
+	customers = [c for c in (customers or []) if c]
+	if not customers:
+		return {}
+
+	out = {}
+	primary_by_customer = {}
+	for cust_row in frappe.get_all(
+		"Customer",
+		filters={"name": ("in", customers)},
+		fields=["name", "customer_primary_address"],
+	):
+		paddr = cust_row.get("customer_primary_address")
+		if paddr:
+			primary_by_customer[cust_row.name] = paddr
+
+	if primary_by_customer:
+		for addr in frappe.get_all(
+			"Address",
+			filters={"name": ("in", list(primary_by_customer.values())), "disabled": 0},
+			fields=["name", "address_line1", "address_line2", "city", "state", "country", "phone", "email_id"],
+		):
+			for cust, paddr in primary_by_customer.items():
+				if paddr == addr.name and cust not in out:
+					out[cust] = addr
+
+	missing = [c for c in customers if c not in out]
+	if missing:
+		linked = frappe.db.sql(
+		"""
+		SELECT
+			dl.link_name AS customer,
+			a.name,
+			a.address_line1,
+			a.address_line2,
+			a.city,
+			a.state,
+			a.country,
+			a.phone,
+			a.email_id,
+			a.is_primary_address,
+			a.modified
+		FROM `tabDynamic Link` dl
+		INNER JOIN `tabAddress` a ON a.name = dl.parent
+		WHERE dl.link_doctype = 'Customer'
+			AND dl.link_name IN %(customers)s
+			AND IFNULL(a.disabled, 0) = 0
+		ORDER BY dl.link_name, a.is_primary_address DESC, a.modified DESC
+		""",
+		{"customers": missing},
+		as_dict=True,
+		)
+		for row in linked:
+			cust = row.pop("customer")
+			if cust not in out:
+				out[cust] = row
+
+	app_map = _application_locations_for_customers(customers)
+	for cust in customers:
+		out[cust] = _merge_location_records(out.get(cust), app_map.get(cust))
+	return out
+
+
+def _application_locations_for_customers(customers):
+	customers = [c for c in (customers or []) if c]
+	if not customers:
+		return {}
+
+	rows = frappe.db.sql(
+		"""
+		SELECT customer, address, area, city, province, country, modified
+		FROM `tabSchool Opening Application`
+		WHERE customer IN %(customers)s
+		ORDER BY customer, modified DESC
+		""",
+		{"customers": customers},
+		as_dict=True,
+	)
+	out = {}
+	for row in rows:
+		cust = row.get("customer")
+		if cust and cust not in out:
+			out[cust] = row
+	return out
+
+
+def _merge_location_records(addr, app):
+	addr = dict(addr or {})
+	app = app or {}
+	if not (addr.get("address_line1") or "").strip():
+		addr["address_line1"] = (app.get("address") or "").strip()
+	if not (addr.get("address_line2") or "").strip():
+		addr["address_line2"] = (app.get("area") or "").strip()
+	if not (addr.get("city") or "").strip():
+		addr["city"] = (app.get("city") or "").strip()
+	if not (addr.get("state") or "").strip():
+		addr["state"] = (app.get("province") or "").strip()
+	if not (addr.get("country") or "").strip():
+		addr["country"] = (app.get("country") or "").strip()
+	return addr
+
+
+def _apply_registry_location(row, addr):
+	addr = addr or {}
+	row["address"] = (addr.get("address_line1") or "").strip()
+	row["area"] = (addr.get("address_line2") or "").strip()
+	row["city"] = (addr.get("city") or "").strip()
+	row["full_address"] = _format_address_lines(addr)
+
+
+def _format_address_lines(addr):
+	if not addr:
+		return ""
+	parts = [
+		(addr.get("address_line1") or "").strip(),
+		(addr.get("address_line2") or "").strip(),
+		(addr.get("city") or "").strip(),
+		(addr.get("state") or "").strip(),
+		(addr.get("country") or "").strip(),
+	]
+	return ", ".join(p for p in parts if p)
+
+
+def _resolve_customer_address(customer):
+	primary_name = frappe.db.get_value("Customer", customer, "customer_primary_address")
+	if primary_name and frappe.db.exists("Address", primary_name):
+		row = frappe.db.get_value(
+			"Address",
+			primary_name,
+			["address_line1", "address_line2", "city", "state", "country", "phone", "email_id"],
+			as_dict=True,
+		)
+		if row:
+			return row
+
 	rows = frappe.db.sql(
 		"""
 		SELECT a.address_line1, a.address_line2, a.city, a.state, a.country, a.phone, a.email_id
@@ -473,6 +790,31 @@ def _primary_address(customer):
 		as_dict=True,
 	)
 	return rows[0] if rows else {}
+
+
+def _primary_address(customer):
+	return _resolve_customer_address(customer)
+
+
+def _enrich_location_from_customer(view, customer):
+	"""Fill blank location fields from linked Customer Address (Application may omit address)."""
+	addr = _resolve_customer_address(customer)
+	if not addr:
+		return
+	if not (view.get("address") or "").strip():
+		view["address"] = (addr.get("address_line1") or "").strip() or _format_address_lines(addr)
+	if not (view.get("area") or "").strip():
+		view["area"] = (addr.get("address_line2") or "").strip()
+	if not (view.get("city") or "").strip():
+		view["city"] = (addr.get("city") or "").strip()
+	if not (view.get("province") or "").strip():
+		view["province"] = (addr.get("state") or "").strip()
+	if not (view.get("country") or "").strip():
+		view["country"] = (addr.get("country") or "").strip() or "Pakistan"
+	if not (view.get("school_ptcl") or "").strip():
+		view["school_ptcl"] = (addr.get("phone") or "").strip()
+	if not (view.get("school_email") or "").strip():
+		view["school_email"] = (addr.get("email_id") or "").strip()
 
 
 def _customer_contacts(customer):

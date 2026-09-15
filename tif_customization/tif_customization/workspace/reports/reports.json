@@ -529,16 +529,6 @@
    "is_query_report": 0,
    "label": "SME Summary Report (UAT)",
    "link_count": 0,
-   "link_to": "sme-summary-report",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "SME Summary Report (Copy)",
-   "link_count": 0,
    "link_to": "sme-summary-report-copy",
    "link_type": "Page",
    "onboard": 0,
@@ -565,7 +555,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-09-14 14:22:07.229961",
+ "modified": "2026-09-15 09:41:04.306113",
  "modified_by": "farhan.hussain@tif.edu.pk",
  "module": "Tif Customization",
  "name": "Reports",

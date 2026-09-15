@@ -10,6 +10,9 @@ from frappe.model.naming import make_autoname
 from frappe.utils import getdate, nowdate, random_string
 
 from tif_customization.tif_customization.api.training_feedback_portal import build_feedback_link
+from tif_customization.tif_customization.field_visit_supervisor_only import (
+	validate_supervisor_only_field_visit,
+)
 
 STANDARD_VISIT_NAME = re.compile(r"^FV-\d{2}-\d{2}-\d+$")
 
@@ -66,6 +69,7 @@ class FieldVisit(Document):
 			self.type = "Enrolment of Participants"
 
 	def validate(self):
+		validate_supervisor_only_field_visit(self)
 		if self.type == "Training":
 			self._validate_training_attendees()
 			self._sync_training_attendee_defaults()

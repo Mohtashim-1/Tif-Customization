@@ -17,6 +17,14 @@
 	cursor: default;
 }
 
+.soa-readonly-block {
+	min-height: 38px;
+	padding: 8px 10px;
+	line-height: 1.45;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
 .soa-readonly-form label:has(input:checked) {
 	background: rgba(255, 255, 255, 0.85);
 }

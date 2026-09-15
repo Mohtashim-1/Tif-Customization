@@ -43,7 +43,8 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					}
 					/* collapse breaks position:sticky on th in Chrome — scroll inside .sme-sum-table-wrap */
 					.sme-sum-table{width:100%;border-collapse:separate;border-spacing:0;font-size:12px;min-width:2800px}
-					.sme-sum-table thead tr:nth-child(2) th.activity-col{font-size:10px;line-height:1.2;max-width:120px;white-space:normal}
+					.sme-sum-table thead tr:nth-child(2) th.activity-col,
+					.sme-sum-table thead tr:nth-child(3) th.activity-col{font-size:10px;line-height:1.2;max-width:120px;white-space:normal}
 					.sme-sum-table thead tr:first-child th.outcome-group{background:#fef3c7}
 					.sme-sum-table thead tr:nth-child(2) th.outcome-col{background:#fffbeb;font-size:10px;line-height:1.2;max-width:100px;white-space:normal}
 					.sme-sum-table th,.sme-sum-table td{padding:7px 8px;border:1px solid var(--border-color,#e5e7eb);vertical-align:middle}
@@ -57,7 +58,9 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					}
 					.sme-sum-table thead tr:first-child th{top:0;z-index:5}
 					.sme-sum-table thead tr:nth-child(2) th{top:var(--sme-sum-thead-row1,38px);z-index:4}
-					.sme-sum-table thead tr:first-child th[rowspan="2"]{z-index:6}
+					.sme-sum-table thead tr:nth-child(3) th{top:var(--sme-sum-thead-row2,76px);z-index:3}
+					.sme-sum-table thead tr:first-child th[rowspan="3"],
+					.sme-sum-table thead tr:nth-child(2) th[rowspan="2"]{z-index:6}
 					.sme-sum-table thead tr:first-child th.group,
 					.sme-sum-table thead tr:first-child th.kpi-group{background:#e5e7eb}
 					.sme-sum-table thead tr:nth-child(2) th.me-col{background:#f5f3ff}
@@ -79,8 +82,9 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					.sme-sum-table .me-col,.sme-sum-table .visit-mon-col{background:#f5f3ff;font-weight:600;color:#5b21b6}
 					.sme-sum-table .me-col.sme-click,.sme-sum-table .visit-mon-col.sme-click{color:#6d28d9}
 					.sme-sum-table .me-col.sme-click:hover,.sme-sum-table .visit-mon-col.sme-click:hover{background:#ede9fe}
-					.sme-sum-table thead tr:first-child th.visit-group,.sme-sum-table thead tr:first-child th.activity-group{background:#ccfbf1}
-					.sme-sum-table thead tr:nth-child(2) th.visit-col,.sme-sum-table thead tr:nth-child(2) th.activity-col{background:#f0fdfa}
+					.sme-sum-table thead tr:first-child th.activity-group{background:#ccfbf1}
+					.sme-sum-table thead tr:nth-child(2) th.visit-group{background:#99f6e4}
+					.sme-sum-table thead tr:nth-child(3) th.visit-col,.sme-sum-table thead tr:nth-child(3) th.activity-col{background:#f0fdfa}
 					.sme-sum-title{text-align:center;font-size:18px;font-weight:700;margin:8px 0 14px}
 					.sme-sum-meta{text-align:center;font-size:12px;color:#6b7280;margin-bottom:12px}
 					.sme-sum-kpi-groups{display:flex;flex-direction:column;gap:12px;margin:0 0 14px}
@@ -557,7 +561,9 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			(a, b) => flt(b.percentage) - flt(a.percentage) || String(a.employee_name || "").localeCompare(String(b.employee_name || "")),
 		);
 		const t = data.totals || {};
-		const activityCols = this.activity_table_columns(data);
+		const visitCols = this.visit_columns();
+		const kpiCols = this.kpi_columns(data);
+		const activityCols = [...visitCols, ...kpiCols];
 		const outcomeCols = this.outcome_subcolumns(data);
 		const colCount = 2 + activityCols.length + outcomeCols.length + 2 + 3;
 
@@ -621,35 +627,46 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				<table class="sme-sum-table">
 					<thead>
 						<tr>
-							<th rowspan="2" class="left">${__("Name")}</th>
-							<th rowspan="2">${__("Type / Division")}</th>
+							<th rowspan="3" class="left">${__("Name")}</th>
+							<th rowspan="3">${__("Type / Division")}</th>
 							<th colspan="${activityCols.length}" class="group activity-group">${__("Activity (period)")}</th>
 							<th colspan="${outcomeCols.length}" class="group outcome-group">${__("Outcomes (YTD vs yearly mins)")}</th>
 							<th colspan="2" class="group">${__("Totals")}</th>
 							<th colspan="3" class="group">${__("KPI Points")}</th>
 						</tr>
 						<tr>
-							${activityCols
+							<th colspan="${visitCols.length}" class="group visit-group">${__("Visit")}</th>
+							${kpiCols
 								.map(
 									(c) =>
-										`<th class="activity-col${c.cellClass ? ` ${c.cellClass}` : ""}" title="${frappe.utils.escape_html(
+										`<th rowspan="2" class="activity-col" title="${frappe.utils.escape_html(c.label)}">${frappe.utils.escape_html(
 											c.label
-										)}">${frappe.utils.escape_html(c.label)}</th>`
+										)}</th>`
 								)
 								.join("")}
 							${outcomeCols
 								.map(
 									(c) =>
-										`<th class="outcome-col" title="${frappe.utils.escape_html(c.header || c.shortHeader)}">${frappe.utils.escape_html(
-											c.shortHeader
-										)}</th>`
+										`<th rowspan="2" class="outcome-col" title="${frappe.utils.escape_html(
+											c.header || c.shortHeader
+										)}">${frappe.utils.escape_html(c.shortHeader)}</th>`
 								)
 								.join("")}
-							<th>${__("Expenses")}</th>
-							<th>${__("Visited Days")}</th>
-							<th>${__("Total Points")}</th>
-							<th>${__("Total Earned Points")}</th>
-							<th>${__("Percentage")}</th>
+							<th rowspan="2">${__("Expenses")}</th>
+							<th rowspan="2">${__("Visited Days")}</th>
+							<th rowspan="2">${__("Total Points")}</th>
+							<th rowspan="2">${__("Total Earned Points")}</th>
+							<th rowspan="2">${__("Percentage")}</th>
+						</tr>
+						<tr>
+							${visitCols
+								.map(
+									(c) =>
+										`<th class="activity-col visit-col${c.cellClass ? ` ${c.cellClass}` : ""}" title="${frappe.utils.escape_html(
+											c.label
+										)}">${frappe.utils.escape_html(c.label)}</th>`
+								)
+								.join("")}
 						</tr>
 					</thead>
 					<tbody>${body}</tbody>
@@ -676,10 +693,15 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		const wrap = document.querySelector(".sme-sum-table-wrap");
 		if (!wrap) return;
 		const row1 = wrap.querySelector("thead tr:first-child");
+		const row2 = wrap.querySelector("thead tr:nth-child(2)");
 		if (!row1) return;
-		const h = Math.ceil(row1.getBoundingClientRect().height);
-		if (h > 0) {
-			wrap.style.setProperty("--sme-sum-thead-row1", `${h}px`);
+		const h1 = Math.ceil(row1.getBoundingClientRect().height);
+		const h2 = row2 ? Math.ceil(row2.getBoundingClientRect().height) : 0;
+		if (h1 > 0) {
+			wrap.style.setProperty("--sme-sum-thead-row1", `${h1}px`);
+		}
+		if (h1 > 0 && h2 > 0) {
+			wrap.style.setProperty("--sme-sum-thead-row2", `${h1 + h2}px`);
 		}
 		const resize = () => this.sync_sticky_table_header();
 		if (!this._stickyHeaderResizeBound) {

@@ -1,4 +1,4 @@
-/* School Opening Registry v20260913c */
+/* School Opening Registry v20260915 */
 frappe.pages["school-opening-registry"].on_page_load = function (wrapper) {
 	frappe.tif_customization.SchoolOpeningRegistry.clear_stuck_freeze();
 	const page = frappe.ui.make_app_page({
@@ -14,6 +14,7 @@ frappe.tif_customization = frappe.tif_customization || {};
 frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 	static PAGE_LENGTH_OPTIONS = [20, 50, 100, 200];
 	static PAGE_LENGTH_STORAGE_KEY = "soa_registry_page_length";
+	static TABLE_COLS = 10;
 
 	static clear_stuck_freeze() {
 		while (frappe.dom.freeze_count > 0) {
@@ -30,6 +31,7 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 		this.total = 0;
 		this._loading = false;
 		this.filter_fields = {};
+		this.selectedCustomers = new Set();
 	}
 
 	make() {
@@ -39,6 +41,8 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 		this.load_data(0);
 		this.page.set_primary_action(__("Refresh"), () => this.load_data(this.start), "refresh");
 		this.page.set_secondary_action(__("Clear filters"), () => this.clear_filters(), "close");
+		this.page.add_action_item(__("Export to Excel"), () => this.export_excel(false));
+		this.page.add_action_item(__("Export selected to Excel"), () => this.export_excel(true));
 	}
 
 	schedule_reload() {
@@ -46,44 +50,66 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 		this._filter_debounce = setTimeout(() => this.load_data(0), 350);
 	}
 
+	make_filter(df) {
+		const wrap = $('<div class="col-md-2 col-sm-4 col-xs-12" style="margin-bottom:8px;"></div>');
+		$("#soa-registry-filters").append(wrap);
+		const control = frappe.ui.form.make_control({
+			parent: wrap,
+			df: Object.assign({ change: () => this.schedule_reload() }, df),
+			render_input: true,
+		});
+		control.refresh();
+		return control;
+	}
+
 	make_filters() {
-		this.search_field = this.page.add_field({
+		this.search_field = this.make_filter({
 			label: __("Search"),
 			fieldtype: "Data",
 			fieldname: "search",
-			change: () => this.schedule_reload(),
+			placeholder: __("Customer or school name"),
 		});
 
-		this.filter_fields.govt_private = this.page.add_field({
+		this.filter_fields.govt_private = this.make_filter({
 			label: __("Govt / Private"),
 			fieldtype: "Select",
 			fieldname: "govt_private",
-			options: [""],
-			change: () => this.schedule_reload(),
+			options: "\n",
 		});
 
-		this.filter_fields.status = this.page.add_field({
+		this.filter_fields.status = this.make_filter({
 			label: __("Status"),
 			fieldtype: "Select",
 			fieldname: "status",
-			options: [""],
-			change: () => this.schedule_reload(),
+			options: "\n",
 		});
 
-		this.filter_fields.territory = this.page.add_field({
+		this.filter_fields.territory = this.make_filter({
 			label: __("Territory"),
 			fieldtype: "Link",
 			fieldname: "territory",
 			options: "Territory",
-			change: () => this.schedule_reload(),
 		});
 
-		this.filter_fields.form_data = this.page.add_field({
+		this.filter_fields.form_data = this.make_filter({
 			label: __("Form Data"),
 			fieldtype: "Select",
 			fieldname: "form_data",
 			options: ["", "full:Full SC-1.2", "customer_only:Customer only"].join("\n"),
-			change: () => this.schedule_reload(),
+		});
+
+		this.filter_fields.city = this.make_filter({
+			label: __("City"),
+			fieldtype: "Select",
+			fieldname: "city",
+			options: "\n",
+		});
+
+		this.filter_fields.address_search = this.make_filter({
+			label: __("Address"),
+			fieldtype: "Data",
+			fieldname: "address_search",
+			placeholder: __("Street, area, or city"),
 		});
 
 		frappe.call({
@@ -93,6 +119,7 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 				const opts = r.message || {};
 				this._set_select_options(this.filter_fields.govt_private, opts.govt_private || []);
 				this._set_select_options(this.filter_fields.status, opts.status || []);
+				this._set_select_options(this.filter_fields.city, opts.cities || []);
 			},
 		});
 	}
@@ -102,7 +129,7 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 			return;
 		}
 		const current = field.get_value() || "";
-		const options = [""].concat(values);
+		const options = ["", ...values];
 		field.df.options = options.join("\n");
 		field.refresh();
 		if (current && options.includes(current)) {
@@ -117,6 +144,8 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 			status: this.filter_fields.status?.get_value() || "",
 			territory: this.filter_fields.territory?.get_value() || "",
 			form_data: this.filter_fields.form_data?.get_value() || "",
+			city: this.filter_fields.city?.get_value() || "",
+			address_search: this.filter_fields.address_search?.get_value() || "",
 		};
 	}
 
@@ -126,12 +155,26 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 		this.filter_fields.status?.set_value("");
 		this.filter_fields.territory?.set_value("");
 		this.filter_fields.form_data?.set_value("");
+		this.filter_fields.city?.set_value("");
+		this.filter_fields.address_search?.set_value("");
+		this.selectedCustomers.clear();
 		this.load_data(0);
 	}
 
 	make_layout() {
+		const cols = SchoolOpeningRegistry.TABLE_COLS;
 		$(this.page.body).html(`
 			<div class="school-opening-registry" style="padding: 12px;">
+				<div class="soa-registry-filter-panel" style="background:#f8fafc;border:1px solid #d1d8dd;border-radius:8px;padding:12px 14px;margin-bottom:12px;">
+					<div style="font-weight:600;font-size:13px;margin-bottom:8px;">${__("Filters")}</div>
+					<div id="soa-registry-filters" class="row"></div>
+					<p class="text-muted small" style="margin:8px 0 0;">
+						<span id="soa-selection-hint"></span>
+						${__(
+							"Use row checkboxes to export selected schools, or Actions → Export to Excel for all rows matching filters."
+						)}
+					</p>
+				</div>
 				<p class="text-muted small">${__(
 					"Open a school customer to view the SC-1.2 form layout, print, or download PDF."
 				)}</p>
@@ -140,8 +183,13 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 					<table class="table table-bordered table-hover" style="margin:0;">
 						<thead>
 							<tr>
+								<th style="width:36px;">
+									<input type="checkbox" class="soa-select-all-page" title="${__("Select all on this page")}" />
+								</th>
 								<th>${__("Customer")}</th>
 								<th>${__("School Name")}</th>
+								<th>${__("Address")}</th>
+								<th>${__("City")}</th>
 								<th>${__("Govt / Private")}</th>
 								<th>${__("Status")}</th>
 								<th>${__("Territory")}</th>
@@ -150,7 +198,7 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 							</tr>
 						</thead>
 						<tbody id="soa-registry-rows">
-							<tr><td colspan="7" class="text-muted text-center">${__("Loading…")}</td></tr>
+							<tr><td colspan="${cols}" class="text-muted text-center">${__("Loading…")}</td></tr>
 						</tbody>
 					</table>
 				</div>
@@ -198,6 +246,59 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 			localStorage.setItem(SchoolOpeningRegistry.PAGE_LENGTH_STORAGE_KEY, String(val));
 			this.load_data(0);
 		});
+		$registry.on("change", ".soa-row-select", (e) => {
+			const customer = decodeURIComponent($(e.currentTarget).attr("data-customer") || "");
+			if (!customer) {
+				return;
+			}
+			if (e.currentTarget.checked) {
+				this.selectedCustomers.add(customer);
+			} else {
+				this.selectedCustomers.delete(customer);
+			}
+			this.update_selection_hint();
+		});
+		$registry.on("change", ".soa-select-all-page", (e) => {
+			const checked = e.currentTarget.checked;
+			$("#soa-registry-rows .soa-row-select").each((_, el) => {
+				el.checked = checked;
+				const customer = decodeURIComponent($(el).attr("data-customer") || "");
+				if (!customer) {
+					return;
+				}
+				if (checked) {
+					this.selectedCustomers.add(customer);
+				} else {
+					this.selectedCustomers.delete(customer);
+				}
+			});
+			this.update_selection_hint();
+		});
+	}
+
+	update_selection_hint() {
+		const n = this.selectedCustomers.size;
+		const $hint = $("#soa-selection-hint");
+		if (!$hint.length) {
+			return;
+		}
+		if (n) {
+			$hint.text(__("{0} selected. ", [n]));
+		} else {
+			$hint.text("");
+		}
+	}
+
+	sync_page_select_all() {
+		const $rows = $("#soa-registry-rows .soa-row-select");
+		const $all = $(".soa-select-all-page");
+		if (!$rows.length) {
+			$all.prop("checked", false).prop("indeterminate", false);
+			return;
+		}
+		const checkedCount = $rows.filter(":checked").length;
+		$all.prop("checked", checkedCount === $rows.length);
+		$all.prop("indeterminate", checkedCount > 0 && checkedCount < $rows.length);
 	}
 
 	ensure_pdf_download_script() {
@@ -205,7 +306,7 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 			return Promise.resolve();
 		}
 		return new Promise((resolve) => {
-			frappe.require("/assets/tif_customization/js/school_opening_pdf_download.js?v=20260913", resolve);
+			frappe.require("/assets/tif_customization/js/school_opening_pdf_download.js?v=20260914", resolve);
 		});
 	}
 
@@ -215,8 +316,9 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 		}
 		this._loading = true;
 		this.start = start || 0;
+		const cols = SchoolOpeningRegistry.TABLE_COLS;
 		const $body = $("#soa-registry-rows");
-		$body.html(`<tr><td colspan="7" class="text-muted text-center">${__("Loading…")}</td></tr>`);
+		$body.html(`<tr><td colspan="${cols}" class="text-muted text-center">${__("Loading…")}</td></tr>`);
 
 		frappe.call({
 			method: "tif_customization.tif_customization.api.school_opening_registry.list_school_customers",
@@ -242,10 +344,11 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 				}
 				this.render_rows(rows);
 				this.render_pager();
+				this.update_selection_hint();
 			},
 			error: () => {
 				$body.html(
-					`<tr><td colspan="7" class="text-danger text-center">${__(
+					`<tr><td colspan="${cols}" class="text-danger text-center">${__(
 						"Could not load schools. Please try Refresh."
 					)}</td></tr>`
 				);
@@ -290,10 +393,108 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 		`);
 	}
 
+	export_excel(onlySelected) {
+		const args = { ...this.get_filter_args() };
+		if (onlySelected) {
+			const selected = Array.from(this.selectedCustomers);
+			if (!selected.length) {
+				frappe.msgprint(__("Select one or more rows using the checkboxes, then export."));
+				return;
+			}
+			args.customers = JSON.stringify(selected);
+		}
+		frappe.call({
+			method: "tif_customization.tif_customization.api.school_opening_registry.export_school_registry",
+			args,
+			freeze: true,
+			freeze_message: __("Preparing export…"),
+			callback: (r) => {
+				const payload = r.message || {};
+				const rows = payload.rows || [];
+				if (!rows.length) {
+					frappe.msgprint(__("No rows match the current filters."));
+					return;
+				}
+				const headers = [
+					"Customer",
+					"School Name",
+					"Govt / Private",
+					"Status",
+					"Territory",
+					"Form Data",
+					"Address",
+					"Area",
+					"City",
+					"Province",
+					"Country",
+					"Full Address",
+					"Phone",
+					"Email",
+				];
+				const keys = [
+					"customer",
+					"school_name",
+					"govt_private",
+					"status",
+					"territory",
+					"form_data",
+					"address",
+					"area",
+					"city",
+					"province",
+					"country",
+					"full_address",
+					"phone",
+					"email",
+				];
+				const escape = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+				const lines = [headers.join(",")];
+				rows.forEach((row) => {
+					lines.push(keys.map((k) => escape(row[k])).join(","));
+				});
+				const blob = new Blob(["\ufeff" + lines.join("\n")], {
+					type: "text/csv;charset=utf-8;",
+				});
+				const url = URL.createObjectURL(blob);
+				const a = document.createElement("a");
+				a.href = url;
+				a.download = `school-opening-registry-${frappe.datetime.get_today()}.csv`;
+				a.click();
+				URL.revokeObjectURL(url);
+				if (payload.truncated) {
+					frappe.msgprint(
+						__("Export limited to {0} rows. Narrow filters to export the rest.", [5000])
+					);
+				}
+			},
+		});
+	}
+
+	format_address_cell(row) {
+		const line = (row.address || "").trim();
+		const area = (row.area || "").trim();
+		const text = line || area || (row.full_address || "").trim();
+		if (!text) {
+			return `<span class="text-muted">—</span>`;
+		}
+		const title = frappe.utils.escape_html((row.full_address || text).trim());
+		const short = text.length > 60 ? `${text.slice(0, 57)}…` : text;
+		return `<span title="${title}">${frappe.utils.escape_html(short)}</span>`;
+	}
+
+	format_city_cell(row) {
+		const city = (row.city || "").trim();
+		if (!city) {
+			return `<span class="text-muted">—</span>`;
+		}
+		return frappe.utils.escape_html(city);
+	}
+
 	render_rows(rows) {
+		const cols = SchoolOpeningRegistry.TABLE_COLS;
 		const $body = $("#soa-registry-rows");
 		if (!rows.length) {
-			$body.html(`<tr><td colspan="7" class="text-muted text-center">${__("No school customers found.")}</td></tr>`);
+			$body.html(`<tr><td colspan="${cols}" class="text-muted text-center">${__("No school customers found.")}</td></tr>`);
 			return;
 		}
 
@@ -304,9 +505,15 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 				const formBadge = row.has_application
 					? `<span class="indicator-pill green">${__("Full SC-1.2")}</span>`
 					: `<span class="indicator-pill orange">${__("Customer only")}</span>`;
+				const checked = this.selectedCustomers.has(row.customer) ? "checked" : "";
 				return `<tr>
+					<td>
+						<input type="checkbox" class="soa-row-select" data-customer="${custEnc}" ${checked} />
+					</td>
 					<td><a href="/app/customer/${custEnc}">${frappe.utils.escape_html(row.customer)}</a></td>
 					<td>${frappe.utils.escape_html(row.customer_name || "")}</td>
+					<td class="small">${this.format_address_cell(row)}</td>
+					<td class="small">${this.format_city_cell(row)}</td>
 					<td>${frappe.utils.escape_html(row.govt_private || "")}</td>
 					<td>${frappe.utils.escape_html(row.status || "")}</td>
 					<td>${frappe.utils.escape_html(row.territory || "")}</td>
@@ -322,5 +529,6 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 			})
 			.join("");
 		$body.html(html);
+		this.sync_page_select_all();
 	}
 };

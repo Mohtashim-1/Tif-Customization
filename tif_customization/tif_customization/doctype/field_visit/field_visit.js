@@ -16,6 +16,51 @@ function set_hidden(frm, fields, hidden) {
 	});
 }
 
+let _supervisor_field_visit_access = null;
+
+function fetch_supervisor_field_visit_access(frm, callback) {
+	frappe.call({
+		method:
+			"tif_customization.tif_customization.field_visit_supervisor_only.get_supervisor_field_visit_access",
+		args: { name: frm.doc.name || "" },
+		callback(r) {
+			_supervisor_field_visit_access = r.message || {};
+			if (callback) {
+				callback();
+			}
+		},
+	});
+}
+
+function apply_supervisor_field_visit_restrictions(frm) {
+	const access = _supervisor_field_visit_access || {};
+	const can = access.can_manage_supervisor_only;
+	const allowed = (access.field_officer_ot_tasks || ["Follow up Calls / Calls to Schools"]).join("\n");
+
+	if (access.doc_is_supervisor_only && !can) {
+		frm.set_read_only();
+		frappe.show_alert(
+			{
+				message: __(
+					"This visit is a supervisor-only activity (Head office / Academic / Other Official). You cannot edit it.",
+				),
+				indicator: "orange",
+			},
+			10,
+		);
+		return;
+	}
+
+	if (!can && frm.fields_dict.ot_type_of_task) {
+		frm.set_df_property("ot_type_of_task", "options", allowed);
+		const task = frm.doc.ot_type_of_task || "";
+		const fo_ok = (access.field_officer_ot_tasks || []).includes(task);
+		if (frm.doc.type === "Academic / Other Official Tasks" && task && !fo_ok) {
+			frm.set_df_property("ot_type_of_task", "read_only", 1);
+		}
+	}
+}
+
 function apply_field_visit_logic(frm) {
 	const type = frm.doc.type || "";
 	const status = frm.doc.status || "";
@@ -640,8 +685,16 @@ function add_multiple_child_rows(frm, table_field, child_doctype, count, apply_d
 }
 
 frappe.ui.form.on("Field Visit", {
+	onload(frm) {
+		fetch_supervisor_field_visit_access(frm, () => apply_supervisor_field_visit_restrictions(frm));
+	},
 	refresh(frm) {
 		apply_field_visit_logic(frm);
+		if (_supervisor_field_visit_access) {
+			apply_supervisor_field_visit_restrictions(frm);
+		} else {
+			fetch_supervisor_field_visit_access(frm, () => apply_supervisor_field_visit_restrictions(frm));
+		}
 
 		frm.add_custom_button(__("Open Easy Form"), () => {
 			frappe.set_route("smes-activity-form");
@@ -893,7 +946,10 @@ frappe.ui.form.on("Field Visit", {
 	me_took_assessment: apply_field_visit_logic,
 	me_changes_made: apply_field_visit_logic,
 	mt_meeting_type: apply_field_visit_logic,
-	ot_type_of_task: apply_field_visit_logic,
+	ot_type_of_task(frm) {
+		apply_field_visit_logic(frm);
+		apply_supervisor_field_visit_restrictions(frm);
+	},
 	training_conducted_by: apply_field_visit_logic,
 
 	volunteer_enrolments_add(frm, cdt, cdn) {

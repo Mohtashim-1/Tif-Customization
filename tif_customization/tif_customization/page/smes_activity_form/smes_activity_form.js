@@ -1,4 +1,4 @@
-const SMES_LS_META = "smes_activity_form_meta_v4";
+const SMES_LS_META = "smes_activity_form_meta_v5";
 const SMES_LS_DRAFT = "smes_activity_form_draft_v3";
 const SMES_LS_QUEUE = "smes_activity_form_queue_v1";
 
@@ -1127,8 +1127,15 @@ class SmesActivityForm {
 			task.includes("Regional Office") ||
 			task.includes("Out of Station") ||
 			task.includes("Meeting of Regional Staff");
+		const supervisor_note =
+			this.meta.can_manage_supervisor_only === false
+				? `<p class="text-muted small">${__(
+						"Head office / Regional / Out of station visits, Academic Tasks, and Other Official Tasks can only be recorded by your Field Supervisor.",
+					)}</p>`
+				: "";
 		return `
 			<h3>${__("Academic / Others Official Tasks")}</h3>
+			${supervisor_note}
 			${this.field("ot_type_of_task", __("Type of Task"), "radio", {
 				reqd: 1,
 				options: this.meta.academic_task_types || [],

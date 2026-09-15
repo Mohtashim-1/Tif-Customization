@@ -26,7 +26,7 @@
 {% macro ro_textarea(label, value) -%}
 <div class="soa-field">
 	<label>{{ label }}</label>
-	<textarea class="soa-control" rows="2" readonly>{{ value if value is not none else '' }}</textarea>
+	<div class="soa-control soa-readonly-block">{{ value if value is not none else '' }}</div>
 </div>
 {%- endmacro %}
 

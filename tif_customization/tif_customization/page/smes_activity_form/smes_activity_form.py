@@ -7,7 +7,28 @@ import frappe
 from frappe import _
 from frappe.utils import get_url, getdate, today
 
+from tif_customization.tif_customization.field_visit_supervisor_only import (
+	FIELD_OFFICER_ALLOWED_OT_TASKS,
+	can_manage_supervisor_only_field_visits,
+)
+
 BULK_IMPORT_TEMPLATE = "Field_Visit_Bulk_Import_Template.xlsx"
+
+_ALL_ACADEMIC_TASK_TYPES = [
+	"Academic Tasks",
+	"Head Office Visit",
+	"Regional Office Visit",
+	"Out of Station Visit",
+	"Meeting of Regional Staff (Supervisors) and SMEs",
+	"Follow up Calls / Calls to Schools",
+	"Other Official Tasks",
+]
+
+
+def _academic_task_type_options_for_user():
+	if can_manage_supervisor_only_field_visits():
+		return list(_ALL_ACADEMIC_TASK_TYPES)
+	return sorted(FIELD_OFFICER_ALLOWED_OT_TASKS)
 
 
 def _bulk_import_template_path():
@@ -202,6 +223,7 @@ def get_form_meta():
 		"staff_employee": staff_employee,
 		"staff_options": staff_list,
 		"staff_names": staff_names,
+		"can_manage_supervisor_only": can_manage_supervisor_only_field_visits(),
 		"bulk_import_template_url": get_bulk_import_template_url(),
 		"today": today(),
 		"cities": [c.name for c in cities],
@@ -309,15 +331,7 @@ def get_form_meta():
 			"Influential Personalities",
 			"Social Media Activist",
 		],
-		"academic_task_types": [
-			"Academic Tasks",
-			"Head Office Visit",
-			"Regional Office Visit",
-			"Out of Station Visit",
-			"Meeting of Regional Staff (Supervisors) and SMEs",
-			"Follow up Calls / Calls to Schools",
-			"Other Official Tasks",
-		],
+		"academic_task_types": _academic_task_type_options_for_user(),
 		"academic_work_types": [
 			"Typing",
 			"Proofreading",
