@@ -9,11 +9,11 @@ from frappe.utils import get_url, getdate, today
 
 from tif_customization.tif_customization.field_visit_enrolment_access import (
 	FARHAN_ONLY_FIELD_VISIT_TYPES,
-	WORKSHOP_ATTENDANCE_TYPE,
 	can_manage_farhan_only_field_visit,
 )
 from tif_customization.tif_customization.field_visit_supervisor_only import (
 	FIELD_OFFICER_ALLOWED_OT_TASKS,
+	SUPERVISOR_ONLY_ACTIVITY_TYPES,
 	can_manage_supervisor_only_field_visits,
 )
 from tif_customization.tif_customization.field_visit_travel_cost import sync_travel_cost
@@ -47,23 +47,55 @@ HIDDEN_ACTIVITY_TYPE_LABELS = {
 	"Attendance / Registration in One Day / Half day Workshop",
 }
 
+# Same order as Field Visit Type of Activity (Target Base sheet).
+SHEET_ACTIVITY_TYPES = [
+	"Visits",
+	"Workshop",
+	"Meeting with Ulama and Educationist",
+	"Teachers Training Meeting",
+	"Headoffice/ Regional Office/ Out of Station Visit",
+	"Academic Task",
+	"Other Official Tasks",
+	"Enrolment of Participants",
+	"Enrolment of Participant in ELP/ TECC/ TTC/ Online Tajweed",
+	"Quiz Arranged",
+	"Co-curricular Activity",
+	"Registration of New Schools",
+	"Registration of Participant in Workshops",
+	"Workshop Arranged",
+	"Books Demand (Quantity)",
+	"Enrolment of Volunteers",
+	"Model School A",
+	"Model School B",
+]
+
+HEADOFFICE_TASK_TYPES = [
+	"Head Office Visit",
+	"Regional Office Visit",
+	"Out of Station Visit",
+	"Meeting of Regional Staff (Supervisors) and SMEs",
+]
+
+OFFICIAL_TASK_DOC_TYPES = (
+	"Academic / Other Official Tasks",
+	"Academic",
+	"Academic Task",
+	"Other Official Tasks",
+	"Headoffice/ Regional Office/ Out of Station Visit",
+)
+
 
 def _activity_type_labels_for_user():
-	exclude = {
-		WORKSHOP_ATTENDANCE_TYPE,
-		"Enrolment of participants",
-		"Enrolment of Participants",
-		"Enrolment of Participant in ELP/ TECC/ TTC/ Online Tajweed",
-		"Registration of Participant in Workshops",
-		*HIDDEN_ACTIVITY_TYPE_LABELS,
-	}
-	labels = [k for k in ACTIVITY_TYPE_MAP if k not in exclude]
-	if can_manage_farhan_only_field_visit():
-		for label, mapped in ACTIVITY_TYPE_MAP.items():
-			if mapped in FARHAN_ONLY_FIELD_VISIT_TYPES and label not in labels:
-				if label in HIDDEN_ACTIVITY_TYPE_LABELS:
-					continue
-				labels.append(label)
+	can_farhan = can_manage_farhan_only_field_visit()
+	can_supervisor = can_manage_supervisor_only_field_visits()
+	labels = []
+	for label in SHEET_ACTIVITY_TYPES:
+		mapped = ACTIVITY_TYPE_MAP.get(label, label)
+		if mapped in FARHAN_ONLY_FIELD_VISIT_TYPES and not can_farhan:
+			continue
+		if mapped in SUPERVISOR_ONLY_ACTIVITY_TYPES and not can_supervisor:
+			continue
+		labels.append(label)
 	return labels
 
 
@@ -297,6 +329,7 @@ def get_form_meta():
 			"December",
 		],
 		"activity_types": _activity_type_labels_for_user(),
+		"headoffice_task_types": HEADOFFICE_TASK_TYPES,
 		"enrolment_courses": ENROLMENT_COURSE_OPTIONS,
 		"travel_modes": [
 			"Public Transport",
@@ -601,6 +634,33 @@ def download_bulk_import_template():
 	frappe.local.response.type = "download"
 
 
+def _apply_official_task_fields(doc, data):
+	doc.ot_date = doc.visit_date
+	doc.ot_start_time = doc.visiting_starting_time
+	doc.ot_end_time = doc.visit_ending_time
+	task = (data.get("ot_type_of_task") or "").strip()
+	if doc.type == "Academic Task":
+		task = "Academic Tasks"
+	elif doc.type == "Other Official Tasks":
+		task = "Other Official Tasks"
+	elif doc.type == "Academic":
+		task = task or "Academic Tasks"
+	elif doc.type == "Headoffice/ Regional Office/ Out of Station Visit":
+		task = task or "Head Office Visit"
+	doc.ot_type_of_task = task
+	academic_types = _as_list(data.get("ot_academic_task_types"))
+	doc.ot_academic_task_types = "\n".join(academic_types)
+	doc.ot_academic_task_other = data.get("ot_academic_task_other")
+	doc.ot_no_of_pages = data.get("ot_no_of_pages")
+	doc.ot_no_of_calls = data.get("ot_no_of_calls")
+	doc.ot_purpose_of_call = data.get("ot_purpose_of_call")
+	doc.ot_follow_up_calls_attach = data.get("ot_follow_up_calls_attach")
+	doc.ot_other_official_task_detail = data.get("ot_other_official_task_detail")
+	doc.ot_visit_meeting_detail = data.get("ot_visit_meeting_detail")
+	doc.ot_hours_spent = data.get("ot_hours_spent")
+	doc.ot_remarks = data.get("ot_visit_meeting_detail") or data.get("ot_other_official_task_detail")
+
+
 @frappe.whitelist()
 def submit_smes_activity(data):
 	"""Create a Field Visit from the easy SMEs Activity portal."""
@@ -778,22 +838,8 @@ def submit_smes_activity(data):
 		doc.mt_reference = doc.reference
 		doc.mt_visiting_card = data.get("visiting_card_attach")
 		doc.mt_meeting_picture = data.get("meeting_picture")
-	elif doc_type == "Academic / Other Official Tasks":
-		doc.ot_date = doc.visit_date
-		doc.ot_start_time = doc.visiting_starting_time
-		doc.ot_end_time = doc.visit_ending_time
-		doc.ot_type_of_task = data.get("ot_type_of_task")
-		academic_types = _as_list(data.get("ot_academic_task_types"))
-		doc.ot_academic_task_types = "\n".join(academic_types)
-		doc.ot_academic_task_other = data.get("ot_academic_task_other")
-		doc.ot_no_of_pages = data.get("ot_no_of_pages")
-		doc.ot_no_of_calls = data.get("ot_no_of_calls")
-		doc.ot_purpose_of_call = data.get("ot_purpose_of_call")
-		doc.ot_follow_up_calls_attach = data.get("ot_follow_up_calls_attach")
-		doc.ot_other_official_task_detail = data.get("ot_other_official_task_detail")
-		doc.ot_visit_meeting_detail = data.get("ot_visit_meeting_detail")
-		doc.ot_hours_spent = data.get("ot_hours_spent")
-		doc.ot_remarks = data.get("ot_visit_meeting_detail") or data.get("ot_other_official_task_detail")
+	elif doc_type in OFFICIAL_TASK_DOC_TYPES:
+		_apply_official_task_fields(doc, data)
 	elif doc_type in ("Co-curricular Activity", "Quiz Arranged"):
 		doc.cc_activity = data.get("cc_activity")
 		doc.cc_venue = data.get("cc_venue")

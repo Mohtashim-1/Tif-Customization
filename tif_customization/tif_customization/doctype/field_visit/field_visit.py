@@ -45,7 +45,7 @@ class FieldVisit(Document):
 			return self.me_visit_date or self.me_starting_date or (
 				getdate(self.me_timestamp) if self.me_timestamp else None
 			)
-		if t == "Training" or t in ("Workshop", "Teachers Training Meeting"):
+		if t == "Training" or t in ("Workshop", "Teachers Training Meeting", "Workshop Arranged"):
 			return self.training_date or (
 				getdate(self.training_timestamp) if self.training_timestamp else None
 			)
@@ -54,10 +54,12 @@ class FieldVisit(Document):
 		if t in (
 			"Academic / Other Official Tasks",
 			"Academic",
+			"Academic Task",
 			"Other Official Tasks",
 			"Headoffice/ Regional Office/ Out of Station Visit",
 			"Other",
 			"Co-curricular Activity",
+			"Quiz Arranged",
 		):
 			return self.ot_date or self.visit_date
 		if t == "Joint Visit with SME":

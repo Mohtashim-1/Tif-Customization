@@ -1001,36 +1001,36 @@
    "label": "Remarks"
   },
   {
-   "depends_on": "eval:doc.type=='Academic / Other Official Tasks'",
+   "depends_on": "eval:in_list(['Academic / Other Official Tasks', 'Academic', 'Academic Task', 'Other Official Tasks', 'Headoffice/ Regional Office/ Out of Station Visit'], doc.type)",
    "fieldname": "others_section",
    "fieldtype": "Section Break",
    "label": "Academic / Other Official Tasks"
   },
   {
-   "depends_on": "eval:doc.type=='Academic / Other Official Tasks'",
+   "depends_on": "eval:in_list(['Academic / Other Official Tasks', 'Academic', 'Academic Task', 'Other Official Tasks', 'Headoffice/ Regional Office/ Out of Station Visit'], doc.type)",
    "fieldname": "ot_remarks",
    "fieldtype": "Small Text",
    "label": "Remarks"
   },
   {
-   "depends_on": "eval:doc.type=='Academic / Other Official Tasks'",
+   "depends_on": "eval:in_list(['Academic / Other Official Tasks', 'Academic', 'Academic Task', 'Other Official Tasks', 'Headoffice/ Regional Office/ Out of Station Visit'], doc.type)",
    "fieldname": "column_break_toif",
    "fieldtype": "Column Break"
   },
   {
-   "depends_on": "eval:doc.type=='Academic / Other Official Tasks'",
+   "depends_on": "eval:in_list(['Academic / Other Official Tasks', 'Academic', 'Academic Task', 'Other Official Tasks', 'Headoffice/ Regional Office/ Out of Station Visit'], doc.type)",
    "fieldname": "ot_date",
    "fieldtype": "Date",
    "label": "Date"
   },
   {
-   "depends_on": "eval:doc.type=='Academic / Other Official Tasks'",
+   "depends_on": "eval:in_list(['Academic / Other Official Tasks', 'Academic', 'Academic Task', 'Other Official Tasks', 'Headoffice/ Regional Office/ Out of Station Visit'], doc.type)",
    "fieldname": "ot_start_time",
    "fieldtype": "Time",
    "label": "Start Time"
   },
   {
-   "depends_on": "eval:doc.type=='Academic / Other Official Tasks'",
+   "depends_on": "eval:in_list(['Academic / Other Official Tasks', 'Academic', 'Academic Task', 'Other Official Tasks', 'Headoffice/ Regional Office/ Out of Station Visit'], doc.type)",
    "fieldname": "ot_end_time",
    "fieldtype": "Time",
    "label": "End Time"
@@ -1463,26 +1463,26 @@
    "label": "Venue of Meeting"
   },
   {
-   "depends_on": "eval:doc.type=='Academic / Other Official Tasks'",
+   "depends_on": "eval:in_list(['Academic / Other Official Tasks', 'Academic', 'Academic Task', 'Other Official Tasks', 'Headoffice/ Regional Office/ Out of Station Visit'], doc.type)",
    "fieldname": "ot_type_of_task",
    "fieldtype": "Select",
    "label": "Type of Task",
    "options": "\nAcademic Tasks\nHead Office Visit\nRegional Office Visit\nOut of Station Visit\nMeeting of Regional Staff (Supervisors) and SMEs\nFollow up Calls / Calls to Schools\nOther Official Tasks"
   },
   {
-   "depends_on": "eval:doc.type=='Academic / Other Official Tasks' && doc.ot_type_of_task=='Academic Tasks'",
+   "depends_on": "eval:doc.type=='Academic Task' || (in_list(['Academic / Other Official Tasks', 'Academic'], doc.type) && doc.ot_type_of_task=='Academic Tasks')",
    "fieldname": "ot_academic_task_types",
    "fieldtype": "Small Text",
    "label": "Type of Academic Tasks"
   },
   {
-   "depends_on": "eval:doc.type=='Academic / Other Official Tasks' && doc.ot_type_of_task=='Academic Tasks'",
+   "depends_on": "eval:doc.type=='Academic Task' || (in_list(['Academic / Other Official Tasks', 'Academic'], doc.type) && doc.ot_type_of_task=='Academic Tasks')",
    "fieldname": "ot_academic_task_other",
    "fieldtype": "Data",
    "label": "Other Academic Task"
   },
   {
-   "depends_on": "eval:doc.type=='Academic / Other Official Tasks' && doc.ot_type_of_task=='Academic Tasks'",
+   "depends_on": "eval:doc.type=='Academic Task' || (in_list(['Academic / Other Official Tasks', 'Academic'], doc.type) && doc.ot_type_of_task=='Academic Tasks')",
    "fieldname": "ot_no_of_pages",
    "fieldtype": "Data",
    "label": "No of Pages (Regarding Above Academic Task)"
@@ -1506,19 +1506,19 @@
    "label": "Follow up Call Details Sheet"
   },
   {
-   "depends_on": "eval:doc.type=='Academic / Other Official Tasks' && doc.ot_type_of_task=='Other Official Tasks'",
+   "depends_on": "eval:doc.type=='Other Official Tasks' || (doc.type=='Academic / Other Official Tasks' && doc.ot_type_of_task=='Other Official Tasks')",
    "fieldname": "ot_other_official_task_detail",
    "fieldtype": "Small Text",
    "label": "Detail of other Official Task"
   },
   {
-   "depends_on": "eval:doc.type=='Academic / Other Official Tasks' && in_list(['Head Office Visit','Regional Office Visit','Out of Station Visit','Meeting of Regional Staff (Supervisors) and SMEs'], doc.ot_type_of_task)",
+   "depends_on": "eval:doc.type=='Headoffice/ Regional Office/ Out of Station Visit' || (doc.type=='Academic / Other Official Tasks' && in_list(['Head Office Visit','Regional Office Visit','Out of Station Visit','Meeting of Regional Staff (Supervisors) and SMEs'], doc.ot_type_of_task))",
    "fieldname": "ot_visit_meeting_detail",
    "fieldtype": "Small Text",
    "label": "Detail of Head Office / Regional / Out of Station Visit / Meeting"
   },
   {
-   "depends_on": "eval:doc.type=='Academic / Other Official Tasks'",
+   "depends_on": "eval:in_list(['Academic / Other Official Tasks', 'Academic', 'Academic Task', 'Other Official Tasks', 'Headoffice/ Regional Office/ Out of Station Visit'], doc.type)",
    "fieldname": "ot_hours_spent",
    "fieldtype": "Select",
    "label": "Hours Spent on Academic / Other Official Tasks / Visits / Meeting / Follow up Calls etc.",

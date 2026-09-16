@@ -142,6 +142,7 @@ const SUPERVISOR_ONLY_ACTIVITY_TYPES_DEFAULT = [
 const ACADEMIC_LIKE_ACTIVITY_TYPES = [
 	"Academic / Other Official Tasks",
 	"Academic",
+	"Academic Task",
 	"Other Official Tasks",
 	"Headoffice/ Regional Office/ Out of Station Visit",
 ];

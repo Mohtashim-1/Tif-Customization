@@ -1,4 +1,4 @@
-const SMES_LS_META = "smes_activity_form_meta_v7";
+const SMES_LS_META = "smes_activity_form_meta_v8";
 const SMES_LS_DRAFT = "smes_activity_form_draft_v3";
 const SMES_LS_QUEUE = "smes_activity_form_queue_v1";
 
@@ -443,16 +443,17 @@ class SmesActivityForm {
 	rebuild_steps() {
 		const steps = [{ key: "general", label: __("General") }];
 		const kind = this.activity_kind();
+		const type_label = this.data.activity_type || "";
 		const labels = {
-			marketing: __("Marketing Visit"),
-			me: __("M&E Visit"),
-			joint: __("Joint Visit"),
-			training: __("Trainings & Workshops"),
-			meeting: __("Meetings"),
-			academic: __("Academic / Other"),
-			cocurricular: __("Co-curricular"),
-			enrolment: __("Enrolment of Participants"),
-			workshop_attendance: __("Attendance / Registration"),
+			marketing: type_label || __("Visits"),
+			me: type_label || __("M&E Visit"),
+			joint: type_label || __("Joint Visit"),
+			training: type_label || __("Workshop"),
+			meeting: type_label || __("Meeting"),
+			academic: type_label || __("Academic Task"),
+			cocurricular: type_label || __("Co-curricular"),
+			enrolment: type_label || __("Enrolment of Participants"),
+			workshop_attendance: type_label || __("Registration of Participant in Workshops"),
 		};
 		if (kind) {
 			steps.push({ key: kind, label: labels[kind] });
@@ -855,6 +856,7 @@ class SmesActivityForm {
 			if (refresh_fields.has(field)) {
 				this.collect();
 				if (field === "activity_type") {
+					this.apply_activity_type_defaults();
 					this.rebuild_steps();
 					this.render();
 					return;
@@ -906,10 +908,35 @@ class SmesActivityForm {
 		`;
 	}
 
+	apply_activity_type_defaults() {
+		const t = this.data.activity_type || "";
+		if (t === "Workshop" && !this.data.training_session_category) {
+			this.data.training_session_category = "Half Day Workshop";
+		}
+		if (t === "Teachers Training Meeting" && !this.data.training_session_category) {
+			this.data.training_session_category = "Teachers Training Meeting (One to One)";
+		}
+		if (t.includes("Ulama")) {
+			this.data.mt_meeting_type =
+				this.data.mt_meeting_type || "External Meeting (Meeting with Others)";
+			this.data.mt_external_meeting_with = this.data.mt_external_meeting_with || "Ulma Karam";
+		}
+		if (t === "Academic Task") {
+			this.data.ot_type_of_task = "Academic Tasks";
+		}
+		if (t === "Other Official Tasks") {
+			this.data.ot_type_of_task = "Other Official Tasks";
+		}
+		if (t === "Quiz Arranged" && !this.data.cc_activity) {
+			this.data.cc_activity = "Arrange Quiz in School";
+		}
+	}
+
 	html_marketing() {
 		const status = this.data.status;
+		const heading = this.data.activity_type || __("Visits");
 		return `
-			<h3>${__("Marketing Visit")}</h3>
+			<h3>${frappe.utils.escape_html(heading)}</h3>
 			${this.field("frequency_of_visits", __("Frequency of Visits"), "radio", { reqd: 1, options: this.meta.frequencies || [] })}
 			${this.field("marketing_material_provided", __("Does Marketing Material Provided?"), "radio", { reqd: 1, options: ["Yes", "No"] })}
 			${this.field("status", __("Status"), "radio", { reqd: 1, options: this.meta.statuses || [] })}
@@ -1102,8 +1129,10 @@ class SmesActivityForm {
 	}
 
 	html_training() {
+		this.apply_activity_type_defaults();
+		const heading = this.data.activity_type || __("Workshop");
 		return `
-			<h3>${__("Trainings & Workshops")}</h3>
+			<h3>${frappe.utils.escape_html(heading)}</h3>
 			${this.field("training_arrange_by", __("Training Arrange By"), "checkboxes", {
 				reqd: 1,
 				options: this.meta.sme_name_options || [],
@@ -1139,15 +1168,22 @@ class SmesActivityForm {
 	}
 
 	html_meeting() {
+		this.apply_activity_type_defaults();
+		const is_ulama = (this.data.activity_type || "").includes("Ulama");
 		const t = this.data.mt_meeting_type || "";
 		const is_internal = t.includes("Internal Meeting");
 		const is_external = t.includes("External Meeting");
+		const heading = this.data.activity_type || __("Meeting");
 		return `
-			<h3>${__("Meetings")}</h3>
-			${this.field("mt_meeting_type", __("Meeting Type"), "radio", {
-				reqd: 1,
-				options: this.meta.meeting_types || [],
-			})}
+			<h3>${frappe.utils.escape_html(heading)}</h3>
+			${
+				is_ulama
+					? ""
+					: this.field("mt_meeting_type", __("Meeting Type"), "radio", {
+							reqd: 1,
+							options: this.meta.meeting_types || [],
+						})
+			}
 			${this.field("mt_meeting_mode", __("Meeting Mode"), "radio", {
 				reqd: 1,
 				options: this.meta.meeting_modes || [],
@@ -1161,7 +1197,7 @@ class SmesActivityForm {
 					: ""
 			}
 			${
-				is_external
+				is_external && !is_ulama
 					? this.field("mt_external_meeting_with", __("External Meeting with"), "radio", {
 							reqd: 1,
 							options: this.meta.external_meeting_with || [],
@@ -1176,28 +1212,39 @@ class SmesActivityForm {
 	}
 
 	html_academic() {
+		this.apply_activity_type_defaults();
+		const type = this.data.activity_type || "";
+		const heading = type || __("Academic Task");
 		const task = this.data.ot_type_of_task || "";
-		const is_academic = task === "Academic Tasks";
+		const is_academic = type === "Academic Task" || task === "Academic Tasks";
 		const is_calls = task.includes("Follow up Calls");
-		const is_other = task === "Other Official Tasks";
+		const is_other = type === "Other Official Tasks" || task === "Other Official Tasks";
+		const is_headoffice = type.includes("Headoffice");
 		const is_visit =
+			is_headoffice ||
 			task.includes("Head Office") ||
 			task.includes("Regional Office") ||
 			task.includes("Out of Station") ||
 			task.includes("Meeting of Regional Staff");
-		const supervisor_note =
-			this.meta.can_manage_supervisor_only === false
-				? `<p class="text-muted small">${__(
-						"Head office / Regional / Out of station visits, Academic Tasks, and Other Official Tasks can only be recorded by your Field Supervisor.",
-					)}</p>`
-				: "";
+		const show_task_picker = !is_academic && !is_other && !is_headoffice;
+		const task_options = is_headoffice
+			? this.meta.headoffice_task_types || []
+			: this.meta.academic_task_types || [];
 		return `
-			<h3>${__("Academic / Others Official Tasks")}</h3>
-			${supervisor_note}
-			${this.field("ot_type_of_task", __("Type of Task"), "radio", {
-				reqd: 1,
-				options: this.meta.academic_task_types || [],
-			})}
+			<h3>${frappe.utils.escape_html(heading)}</h3>
+			${
+				show_task_picker
+					? this.field("ot_type_of_task", __("Type of Task"), "radio", {
+							reqd: 1,
+							options: task_options,
+						})
+					: is_headoffice
+						? this.field("ot_type_of_task", __("Type of Visit"), "radio", {
+								reqd: 1,
+								options: task_options,
+							})
+						: ""
+			}
 			${
 				is_academic
 					? `
@@ -1249,8 +1296,10 @@ class SmesActivityForm {
 	}
 
 	html_cocurricular() {
+		this.apply_activity_type_defaults();
+		const heading = this.data.activity_type || __("Co-curricular Activity");
 		return `
-			<h3>${__("Co-curricular Activities Detail")}</h3>
+			<h3>${frappe.utils.escape_html(heading)}</h3>
 			${this.field("cc_activity", __("Co-curricular Activities"), "radio", {
 				reqd: 1,
 				options: this.meta.cocurricular_activities || [],
@@ -1269,7 +1318,7 @@ class SmesActivityForm {
 
 	html_school() {
 		if (!this.is_school_visit()) {
-			return `<h3>${__("School Related Detail")}</h3><p class="text-muted">${__("School section is for Marketing / M&E / Joint / Training visits. Click Next.")}</p>`;
+			return `<h3>${__("School Related Detail")}</h3><p class="text-muted">${__("School section is for school visits. Click Next.")}</p>`;
 		}
 		this.ensure_school_contacts();
 		const aff = this.meta.affiliation_options || [
@@ -1534,7 +1583,7 @@ class SmesActivityForm {
 			})
 			.join("");
 		return `
-			<h3>${__("Enrolment of Participants")}</h3>
+			<h3>${frappe.utils.escape_html(this.data.activity_type || __("Enrolment of Participants"))}</h3>
 			<p class="text-muted">${__("Add one or more teachers / participants. No school or volunteer details on this type.")}</p>
 			<div class="smes-multi-list">${rows}</div>
 			<div class="smes-multi-actions">
@@ -1580,7 +1629,7 @@ class SmesActivityForm {
 			})
 			.join("");
 		return `
-			<h3>${__("Attendance / Registration in One Day / Half day Workshop")}</h3>
+			<h3>${frappe.utils.escape_html(this.data.activity_type || __("Registration of Participant in Workshops"))}</h3>
 			<p class="text-muted">${__("Add multiple teachers. School / Venue / Date repeat on next row and stay editable.")}</p>
 			<div class="smes-multi-list">${rows}</div>
 			<div class="smes-multi-actions">
@@ -1933,7 +1982,7 @@ class SmesActivityForm {
 			if (
 				!this.need(
 					["frequency_of_visits", "marketing_material_provided", "status"],
-					__("Fill Marketing Visit required fields"),
+					__("Fill visit required fields"),
 				)
 			) {
 				return false;
@@ -2015,7 +2064,12 @@ class SmesActivityForm {
 			return true;
 		}
 		if (key === "meeting") {
-			if (!this.need(["mt_meeting_type", "mt_meeting_mode"], __("Fill Meetings required fields"))) {
+			this.apply_activity_type_defaults();
+			const is_ulama = (this.data.activity_type || "").includes("Ulama");
+			if (is_ulama) {
+				return this.need(["mt_meeting_mode"], __("Fill meeting required fields"));
+			}
+			if (!this.need(["mt_meeting_type", "mt_meeting_mode"], __("Fill meeting required fields"))) {
 				return false;
 			}
 			const t = this.data.mt_meeting_type || "";
@@ -2024,10 +2078,12 @@ class SmesActivityForm {
 			return true;
 		}
 		if (key === "academic") {
-			if (!this.need(["ot_type_of_task", "ot_hours_spent"], __("Fill Academic / Other required fields"))) {
+			this.apply_activity_type_defaults();
+			const type = this.data.activity_type || "";
+			if (!this.need(["ot_hours_spent"], __("Fill Academic / Other required fields"))) {
 				return false;
 			}
-			if (this.data.ot_type_of_task === "Academic Tasks") {
+			if (type === "Academic Task" || this.data.ot_type_of_task === "Academic Tasks") {
 				if (!this.need(["ot_academic_task_types"])) return false;
 				if (
 					this.as_list("ot_academic_task_types").includes("Other") &&
@@ -2035,6 +2091,17 @@ class SmesActivityForm {
 				) {
 					return false;
 				}
+			}
+			if (type.includes("Headoffice") && !this.need(["ot_type_of_task"])) {
+				return false;
+			}
+			if (
+				!type.includes("Headoffice") &&
+				type !== "Academic Task" &&
+				type !== "Other Official Tasks" &&
+				!this.need(["ot_type_of_task"])
+			) {
+				return false;
 			}
 			return true;
 		}
