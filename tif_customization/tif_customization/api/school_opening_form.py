@@ -59,8 +59,13 @@ def submit_school_opening_application():
 	if not school_name:
 		frappe.throw(_("Name of School is required."))
 
+	visit_type = (data.get("visit_type") or "").strip()
+	if visit_type not in ("Visit without enrollment", "Visit with enrollment"):
+		frappe.throw(_("Please select Visit without enrollment or Visit with enrollment."))
+
 	doc = frappe.new_doc("School Opening Application")
 	doc.form_date = data.get("form_date") or getdate()
+	doc.visit_type = visit_type
 	doc.school_name = school_name
 	doc.tif_representative = data.get("tif_representative")
 	doc.institution_types = _list_to_csv(data.get("institution_types"))

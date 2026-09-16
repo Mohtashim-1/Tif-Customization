@@ -16,6 +16,7 @@ from tif_customization.tif_customization.field_visit_permissions import (
 	staff_match_sql,
 	visit_day_sql,
 )
+from tif_customization.tif_customization.model_school import department_count_sql
 
 METRIC_LABELS = {
 	"visits": _("Total Field Visits"),
@@ -111,9 +112,9 @@ def _metric_condition(metric: str, alias: str = "fv") -> str:
 			OR {a}.cee_affiliated = 'Yes - Newly Registered'
 		)"""
 	if m == "model_school_a":
-		return f"{a}.model_school LIKE '%%Model School A%%'"
+		return f"{department_count_sql(a)} >= 2"
 	if m == "model_school_b":
-		return f"{a}.model_school LIKE '%%Model School B%%'"
+		return f"{department_count_sql(a)} = 1"
 	if m == "me_active":
 		return f"""{a}.type = 'M&E' AND LOWER(REPLACE(REPLACE(IFNULL({a}.me_activity_status,''),'-',' '),'  ',' ')) = 'active'"""
 	if m == "me_inactive":
@@ -212,6 +213,27 @@ def _school_sql(alias="fv"):
 	)"""
 
 
+def _me_activity_bucket(status: str | None) -> str:
+	"""M&E activity status → Active / In-Active (same rules as KPI me_active / me_inactive)."""
+	norm = (status or "").strip().lower().replace("-", " ")
+	norm = " ".join(norm.split())
+	if norm == "active":
+		return _("Active")
+	return _("In-Active")
+
+
+def _monitoring_category_breakdown(rows: list) -> list[dict]:
+	buckets: dict[str, int] = {}
+	for r in rows:
+		label = _me_activity_bucket(r.get("me_activity_status"))
+		buckets[label] = buckets.get(label, 0) + 1
+	order = {_("Active"): 0, _("In-Active"): 1}
+	return sorted(
+		[{"type": k, "count": v} for k, v in buckets.items()],
+		key=lambda x: (order.get(x["type"], 9), x["type"]),
+	)
+
+
 @frappe.whitelist()
 def get_visit_drilldown(filters=None, metric=None, staff=None):
 	"""Return Field Visit rows that make up a report number."""
@@ -282,6 +304,10 @@ def get_visit_drilldown(filters=None, metric=None, staff=None):
 			or r.owner
 			or ""
 		)
+		if vtype == "M&E":
+			category = _me_activity_bucket(r.me_activity_status)
+		else:
+			category = r.marketing_visit_category or r.me_activity_status or ""
 		out.append(
 			{
 				"name": r.name,
@@ -290,15 +316,18 @@ def get_visit_drilldown(filters=None, metric=None, staff=None):
 				"school": r.school or "",
 				"officer": officer,
 				"status": status_map.get(r.docstatus, r.docstatus),
-				"category": r.marketing_visit_category or r.me_activity_status or "",
+				"category": category,
 				"url": f"/app/field-visit/{r.name}",
 			}
 		)
 
-	breakdown = [{"type": k, "count": v} for k, v in sorted(by_type.items(), key=lambda x: (-x[1], x[0]))]
+	if metric in ("monitoring", "me"):
+		breakdown = _monitoring_category_breakdown(rows)
+	else:
+		breakdown = [{"type": k, "count": v} for k, v in sorted(by_type.items(), key=lambda x: (-x[1], x[0]))]
 	label = METRIC_LABELS.get(metric, metric.replace("_", " ").title())
 	parts = [f"{b['type']} {b['count']}" for b in breakdown]
-	subtitle = " + ".join(parts) if parts else _("No documents")
+	subtitle = " · ".join(parts) if parts else _("No documents")
 
 	return {
 		"metric": metric,

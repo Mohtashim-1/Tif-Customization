@@ -16,6 +16,7 @@ from tif_customization.tif_customization.field_visit_supervisor_only import (
 	FIELD_OFFICER_ALLOWED_OT_TASKS,
 	can_manage_supervisor_only_field_visits,
 )
+from tif_customization.tif_customization.field_visit_travel_cost import sync_travel_cost
 
 BULK_IMPORT_TEMPLATE = "Field_Visit_Bulk_Import_Template.xlsx"
 
@@ -324,8 +325,8 @@ def get_form_meta():
 			"No - Not Affiliated",
 		],
 		"model_school_options": [
-			"Yes - Model School A: (Affiliated atleast 1 Program of all 3 Department of TIF)",
-			"Yes - Model School B: (Affiliated atleast 1 Program of all 2 Department of TIF)",
+			"Yes - Model School A: (Affiliated with programmes from 2 or more TIF departments)",
+			"Yes - Model School B: (Affiliated with programmes from 1 TIF department)",
 			"No - This is not a Model School",
 		],
 		"meeting_types": [
@@ -791,6 +792,8 @@ def submit_smes_activity(data):
 		_append_workshop_rows(doc, data)
 		_apply_travel_fields(doc, data)
 
+	sync_travel_cost(doc)
+
 	doc.insert(ignore_permissions=False)
 	frappe.db.commit()
 
@@ -867,8 +870,11 @@ def _apply_travel_fields(doc, data):
 	doc.travel_from = data.get("travel_from")
 	doc.travel_to = data.get("travel_to")
 	doc.travel_distance_km = data.get("travel_distance_km")
-	doc.travel_cost = data.get("travel_cost")
 	doc.travel_remarks = data.get("travel_remarks")
+	if data.get("travel_per_km_rate") not in (None, ""):
+		doc.travel_per_km_rate = data.get("travel_per_km_rate")
+	if data.get("travel_cost") not in (None, ""):
+		doc.travel_cost = data.get("travel_cost")
 
 
 def _append_enrolment_rows(doc, data):

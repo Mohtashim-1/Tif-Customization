@@ -4,8 +4,42 @@
 const SCHOOL_TYPES = ["Marketing", "M&E", "Joint Visit with SME", "Training"];
 const AFFILIATED_YES = ["Yes - Already Affiliated", "Yes - Newly Registered", "Yes"];
 
+const MODEL_SCHOOL_A =
+	"Yes - Model School A: (Affiliated with programmes from 2 or more TIF departments)";
+const MODEL_SCHOOL_B =
+	"Yes - Model School B: (Affiliated with programmes from 1 TIF department)";
+const MODEL_SCHOOL_NO = "No - This is not a Model School";
+
 function is_affiliated_yes(value) {
 	return AFFILIATED_YES.includes(cstr(value)) || cstr(value).startsWith("Yes");
+}
+
+function sync_model_school_from_departments(frm) {
+	if (!SCHOOL_TYPES.includes(frm.doc.type || "")) {
+		return;
+	}
+	let deptCount = 0;
+	if (is_affiliated_yes(frm.doc.qps_affiliated)) {
+		deptCount += 1;
+	}
+	if (is_affiliated_yes(frm.doc.tps_affiliated)) {
+		deptCount += 1;
+	}
+	if (is_affiliated_yes(frm.doc.cee_affiliated)) {
+		deptCount += 1;
+	}
+	let modelSchool = MODEL_SCHOOL_NO;
+	if (deptCount >= 2) {
+		modelSchool = MODEL_SCHOOL_A;
+	} else if (deptCount === 1) {
+		modelSchool = MODEL_SCHOOL_B;
+	}
+	if (frm.doc.model_school !== modelSchool) {
+		frm.set_value("model_school", modelSchool);
+	}
+	if (frm.fields_dict.model_school) {
+		frm.set_df_property("model_school", "read_only", 1);
+	}
 }
 
 function set_hidden(frm, fields, hidden) {
@@ -34,6 +68,29 @@ function fetch_supervisor_field_visit_access(frm, callback) {
 
 const ENROLMENT_PARTICIPANTS_TYPE = "Enrolment of Participants";
 const WORKSHOP_ATTENDANCE_TYPE = "Attendance / Registration in One Day / Half day Workshop";
+
+function sync_field_visit_travel_cost(frm) {
+	if (!(frm.doc.type || "").trim()) {
+		return;
+	}
+	frappe.call({
+		method: "tif_customization.tif_customization.field_visit_travel_cost.compute_travel_cost",
+		args: {
+			visit_by: frm.doc.visit_by,
+			travel_mode: frm.doc.travel_mode,
+			travel_distance_km: frm.doc.travel_distance_km,
+		},
+		callback(r) {
+			const msg = r.message || {};
+			if (msg.travel_per_km_rate != null) {
+				frm.set_value("travel_per_km_rate", msg.travel_per_km_rate);
+			}
+			if (msg.auto_cost && msg.travel_cost != null) {
+				frm.set_value("travel_cost", msg.travel_cost);
+			}
+		},
+	});
+}
 
 function farhan_only_types(access) {
 	if (access?.farhan_only_types?.length) {
@@ -350,26 +407,20 @@ function apply_field_visit_logic(frm) {
 		"cc_participants_category",
 	];
 
-	const enrolment_fields = [
-		"section_break_enrolment",
-		"enrolment_participants",
-		"section_break_travel",
-		"travel_mode",
-		"travel_from",
-		"travel_to",
-		"travel_distance_km",
-		"travel_cost",
-		"travel_remarks",
-	];
+	const enrolment_fields = ["section_break_enrolment", "enrolment_participants"];
 
 	const workshop_attendance_fields = [
 		"section_break_workshop_attendance",
 		"workshop_attendees",
+	];
+
+	const travel_fields = [
 		"section_break_travel",
 		"travel_mode",
 		"travel_from",
 		"travel_to",
 		"travel_distance_km",
+		"travel_per_km_rate",
 		"travel_cost",
 		"travel_remarks",
 	];
@@ -386,6 +437,7 @@ function apply_field_visit_logic(frm) {
 		...cocurricular_fields,
 		...enrolment_fields,
 		...workshop_attendance_fields,
+		...travel_fields,
 	];
 
 	// Hide all type-specific fields first
@@ -509,6 +561,10 @@ function apply_field_visit_logic(frm) {
 	} else if (type) {
 		// Meetings / Academic / Co-curricular / Enrolment / Workshop still get attachments
 		set_hidden(frm, attachment_fields, false);
+	}
+
+	if (type) {
+		set_hidden(frm, travel_fields, false);
 	}
 
 	// --- Nested conditional logic ---
@@ -670,6 +726,8 @@ function apply_field_visit_logic(frm) {
 		],
 		true,
 	);
+
+	sync_model_school_from_departments(frm);
 }
 
 function _visit_location_defaults(frm, prev_row) {
@@ -764,6 +822,9 @@ frappe.ui.form.on("Field Visit", {
 	},
 	refresh(frm) {
 		apply_field_visit_logic(frm);
+		if ((frm.doc.type || "").trim()) {
+			sync_field_visit_travel_cost(frm);
+		}
 		if (_supervisor_field_visit_access) {
 			apply_supervisor_field_visit_restrictions(frm);
 		} else {
@@ -1052,6 +1113,16 @@ frappe.ui.form.on("Field Visit", {
 		apply_supervisor_field_visit_restrictions(frm);
 	},
 	training_conducted_by: apply_field_visit_logic,
+
+	travel_mode(frm) {
+		sync_field_visit_travel_cost(frm);
+	},
+	travel_distance_km(frm) {
+		sync_field_visit_travel_cost(frm);
+	},
+	visit_by(frm) {
+		sync_field_visit_travel_cost(frm);
+	},
 
 	volunteer_enrolments_add(frm, cdt, cdn) {
 		const row = locals[cdt][cdn];

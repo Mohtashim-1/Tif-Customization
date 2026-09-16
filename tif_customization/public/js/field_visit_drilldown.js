@@ -37,6 +37,12 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 	const breakdown = (data.breakdown || [])
 		.map((b) => `${frappe.utils.escape_html(b.type)} <strong>${b.count}</strong>`)
 		.join(" &nbsp;·&nbsp; ");
+	const categoryHint =
+		data.metric === "monitoring" || data.metric === "me"
+			? `<p class="text-muted" style="margin-bottom:8px;font-size:12px;">${__(
+					"M&E category breakdown (Active vs In-Active):"
+				)}</p>`
+			: "";
 	const body = rows.length
 		? rows
 				.map(
@@ -73,6 +79,7 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 			${__("This number is")} <strong>${data.count || 0}</strong>
 			${data.subtitle ? ` — ${frappe.utils.escape_html(data.subtitle)}` : ""}
 		</div>
+		${categoryHint}
 		${breakdown ? `<p class="text-muted" style="margin-bottom:10px;">${__("Detail")}: ${breakdown}</p>` : ""}
 		<p class="text-muted" style="font-size:12px;">${__("Click a Document No to open that Field Visit.")}</p>
 		<div class="table-responsive" style="max-height:420px;overflow:auto;">

@@ -73,6 +73,13 @@
 		<section class="soa-section">
 			<div class="soa-section-title">1 Institution Profile</div>
 			<div class="soa-block">
+				<div class="soa-label">Type *</div>
+				<div class="soa-check-grid" data-group="visit_type" data-single="1">
+					<label><input type="radio" name="visit_type" value="Visit without enrollment" required> Visit without enrollment</label>
+					<label><input type="radio" name="visit_type" value="Visit with enrollment" required checked> Visit with enrollment</label>
+				</div>
+			</div>
+			<div class="soa-block">
 				<div class="soa-label">Type of Institution</div>
 				<div class="soa-check-grid" data-group="institution_types">
 					<label><input type="checkbox" value="School"> School</label>
@@ -130,7 +137,7 @@
 			</div>
 		</section>
 
-		<section class="soa-section">
+		<section class="soa-section soa-section-enrollment-only" id="soa-section-services">
 			<div class="soa-section-title">2 Services of Interest</div>
 			<div class="soa-block">
 				<div class="soa-label">Teacher Training Services</div>
@@ -177,7 +184,7 @@
 			</div>
 		</section>
 
-		<section class="soa-section">
+		<section class="soa-section soa-section-enrollment-only" id="soa-section-engagement">
 			<div class="soa-section-title">3 Current Engagement with TIF</div>
 			<div class="soa-block">
 				<div class="soa-label">School Already Running TIF Services</div>
@@ -309,6 +316,16 @@
 	const successEl = document.getElementById("soa-success");
 	const successMsg = document.getElementById("soa-success-msg");
 	const submitBtn = document.getElementById("soa-submit-btn");
+	const VISIT_WITHOUT = "Visit without enrollment";
+
+	function syncVisitTypeSections() {
+		const visitType = checkedValues("visit_type");
+		const hideEnrollmentSections = visitType === VISIT_WITHOUT;
+		document.querySelectorAll(".soa-section-enrollment-only").forEach((el) => {
+			el.classList.toggle("d-none", hideEnrollmentSections);
+		});
+	}
+
 	function checkedValues(groupName) {
 		const grid = document.querySelector('[data-group="' + groupName + '"]');
 		if (!grid) return [];
@@ -335,6 +352,7 @@
 		const fd = new FormData(form);
 		return {
 			form_date: fd.get("form_date"),
+			visit_type: checkedValues("visit_type"),
 			school_name: fd.get("school_name"),
 			tif_representative: fd.get("tif_representative"),
 			institution_types: checkedValues("institution_types"),
@@ -370,6 +388,9 @@
 			key_contacts: collectContacts(),
 		};
 	}
+
+	document.querySelector('[data-group="visit_type"]')?.addEventListener("change", syncVisitTypeSections);
+	syncVisitTypeSections();
 
 	form.addEventListener("submit", async (e) => {
 		e.preventDefault();

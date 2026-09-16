@@ -2,10 +2,10 @@
  "actions": [],
  "allow_rename": 1,
  "autoname": "field:name1",
- "creation": "2026-03-28 21:20:05.884379",
+ "creation": "2026-09-11 22:29:39.757995",
  "doctype": "DocType",
  "engine": "InnoDB",
-  "field_order": [
+ "field_order": [
   "name1",
   "division",
   "status",
@@ -94,6 +94,7 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Field Supervisor",
+   "link_filters": "[[\"Field Officer\",\"is_group\",\"=\",1]]",
    "options": "Field Officer"
   },
   {
@@ -115,7 +116,7 @@
   {
    "fieldname": "help_html",
    "fieldtype": "HTML",
-   "options": "<p class=\"text-muted\">Type / Division controls which SME Target Base KPI sheet applies:<br><b>Karachi</b> (6 pts/day) \u00b7 <b>Urban Areas</b> (5 pts/day) \u00b7 <b>Rural Areas</b> (4 pts/day) \u00b7 <b>Punjab</b> (5 pts/day).<br>Link the User so Field Visits and KPI reports resolve to this officer.<br><b>Field Supervisor</b> is the line manager for SME / field reports — not the same as HR <b>Reports To</b>.</p>"
+   "options": "<p class=\"text-muted\">Type / Division controls which SME Target Base KPI sheet applies:<br><b>Karachi</b> (6 pts/day) \u00b7 <b>Urban Areas</b> (5 pts/day) \u00b7 <b>Rural Areas</b> (4 pts/day) \u00b7 <b>Punjab</b> (5 pts/day).<br>Link the User so Field Visits and KPI reports resolve to this officer.<br><b>Field Supervisor</b> is the line manager for SME / field reports \u2014 not the same as HR <b>Reports To</b>.</p>"
   },
   {
    "fieldname": "lft",
@@ -136,9 +137,9 @@
   {
    "fieldname": "old_parent",
    "fieldtype": "Link",
+   "hidden": 1,
    "label": "Old Parent",
    "options": "Field Officer",
-   "hidden": 1,
    "read_only": 1
   }
  ],
@@ -146,7 +147,7 @@
  "index_web_pages_for_search": 1,
  "is_tree": 1,
  "links": [],
- "modified": "2026-09-08 12:27:37.399083",
+ "modified": "2026-09-15 19:45:47.328802",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Field Officer",

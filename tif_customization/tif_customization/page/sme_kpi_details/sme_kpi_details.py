@@ -23,6 +23,7 @@ from tif_customization.tif_customization.field_visit_permissions import (
 	staff_match_sql,
 	visit_day_sql,
 )
+from tif_customization.tif_customization.model_school import department_count_sql
 from tif_customization.tif_customization.page.sme_kpi_sheet.sme_kpi_sheet import (
 	SHEET_META,
 	_build_rows,
@@ -358,12 +359,9 @@ def _enriched_actuals(from_date, to_date, staff, tokens):
 	actuals["co_curricular"] = _visit_count(from_date, to_date, tokens, CO_CURRICULAR_SQL)
 	actuals["new_schools"] = _distinct_schools(from_date, to_date, tokens, NEW_SCHOOL_SQL)
 	actuals["new_school_registration"] = actuals["new_schools"]
-	actuals["model_school_a"] = _distinct_schools(
-		from_date, to_date, tokens, "fv.model_school LIKE '%%Model School A%%'"
-	)
-	actuals["model_school_b"] = _distinct_schools(
-		from_date, to_date, tokens, "fv.model_school LIKE '%%Model School B%%'"
-	)
+	dept = department_count_sql("fv")
+	actuals["model_school_a"] = _distinct_schools(from_date, to_date, tokens, f"{dept} >= 2")
+	actuals["model_school_b"] = _distinct_schools(from_date, to_date, tokens, f"{dept} = 1")
 	sum_participants = _training_participants(from_date, to_date, tokens)
 	actuals["workshop_registration"] = max(workshop_children, sum_participants)
 	return actuals

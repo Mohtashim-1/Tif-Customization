@@ -539,6 +539,7 @@ def _view_from_application(app):
 		"form_no": "SC-1.2",
 		"form_date": form_date,
 		"form_date_display": formatdate(form_date, "dd/mm/yyyy"),
+		"visit_type": getattr(app, "visit_type", None) or "Visit with enrollment",
 		"school_name": app.school_name,
 		"tif_representative": app.tif_representative or "",
 		"institution_types": _csv_to_list(app.institution_types),

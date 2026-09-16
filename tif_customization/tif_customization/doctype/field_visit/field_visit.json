@@ -228,6 +228,7 @@
   "travel_to",
   "column_break_travel",
   "travel_distance_km",
+  "travel_per_km_rate",
   "travel_cost",
   "travel_remarks"
  ],
@@ -433,8 +434,9 @@
   {
    "depends_on": "eval:doc.type == 'M&E'",
    "fieldname": "me_school_name",
-   "fieldtype": "Data",
-   "label": "Name of School"
+   "fieldtype": "Link",
+   "label": "Name of School",
+   "options": "Customer"
   },
   {
    "depends_on": "eval:doc.type == 'M&E'",
@@ -752,8 +754,9 @@
   {
    "depends_on": "eval:in_list(['Marketing','Joint Visit with SME'], doc.type)",
    "fieldname": "school_name",
-   "fieldtype": "Data",
-   "label": "School Name"
+   "fieldtype": "Link",
+   "label": "School Name",
+   "options": "Customer"
   },
   {
    "depends_on": "eval:in_list(['Marketing','Joint Visit with SME'], doc.type)",
@@ -1587,26 +1590,26 @@
    "options": "Field Visit Workshop Attendee"
   },
   {
-   "depends_on": "eval:in_list(['Enrolment of Participants','Attendance / Registration in One Day / Half day Workshop'], doc.type)",
+   "depends_on": "eval:doc.type",
    "fieldname": "section_break_travel",
    "fieldtype": "Section Break",
    "label": "Travel"
   },
   {
-   "depends_on": "eval:in_list(['Enrolment of Participants','Attendance / Registration in One Day / Half day Workshop'], doc.type)",
+   "depends_on": "eval:doc.type",
    "fieldname": "travel_mode",
    "fieldtype": "Select",
    "label": "Mode of Travel",
    "options": "\nPublic Transport\nOwn Vehicle / Bike\nCompany Vehicle\nRide Hailing\nWalking\nOther"
   },
   {
-   "depends_on": "eval:in_list(['Enrolment of Participants','Attendance / Registration in One Day / Half day Workshop'], doc.type)",
+   "depends_on": "eval:doc.type",
    "fieldname": "travel_from",
    "fieldtype": "Data",
    "label": "Travel From"
   },
   {
-   "depends_on": "eval:in_list(['Enrolment of Participants','Attendance / Registration in One Day / Half day Workshop'], doc.type)",
+   "depends_on": "eval:doc.type",
    "fieldname": "travel_to",
    "fieldtype": "Data",
    "label": "Travel To"
@@ -1616,19 +1619,28 @@
    "fieldtype": "Column Break"
   },
   {
-   "depends_on": "eval:in_list(['Enrolment of Participants','Attendance / Registration in One Day / Half day Workshop'], doc.type)",
+   "depends_on": "eval:doc.type",
    "fieldname": "travel_distance_km",
    "fieldtype": "Float",
    "label": "Distance (KM)"
   },
   {
-   "depends_on": "eval:in_list(['Enrolment of Participants','Attendance / Registration in One Day / Half day Workshop'], doc.type)",
+   "depends_on": "eval:doc.type",
+   "description": "From Employee Per Km for Fuel, or Rs 18/km default",
+   "fieldname": "travel_per_km_rate",
+   "fieldtype": "Currency",
+   "label": "Per Km for Fuel",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.type",
+   "description": "Auto: Distance × Per Km for Own Vehicle / Bike and Company Vehicle",
    "fieldname": "travel_cost",
    "fieldtype": "Currency",
    "label": "Travel Cost"
   },
   {
-   "depends_on": "eval:in_list(['Enrolment of Participants','Attendance / Registration in One Day / Half day Workshop'], doc.type)",
+   "depends_on": "eval:doc.type",
    "fieldname": "travel_remarks",
    "fieldtype": "Small Text",
    "label": "Travel Remarks"
@@ -1638,7 +1650,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-09-15 18:01:21.934654",
+ "modified": "2026-09-15 20:16:34.822709",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Field Visit",

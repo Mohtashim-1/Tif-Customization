@@ -679,8 +679,8 @@
    "type": "Link"
   }
  ],
- "modified": "2026-08-21 16:47:38.833366",
- "modified_by": "Administrator",
+ "modified": "2026-09-15 20:39:54.293199",
+ "modified_by": "farhan.hussain@tif.edu.pk",
  "module": "Tif Customization",
  "name": "Forms",
  "number_cards": [],
@@ -706,6 +706,12 @@
   },
   {
    "role": "Training User"
+  },
+  {
+   "role": "Field Staff"
+  },
+  {
+   "role": "Supervisor Field Staff"
   }
  ],
  "sequence_id": 53.0,

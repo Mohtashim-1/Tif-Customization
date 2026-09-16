@@ -436,8 +436,14 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 	kpi_columns(data) {
 		return (
 			(data && data.kpi_columns) || [
-				{ key: "half_day_workshop", label: __("Half Day Workshop"), metric: "half_day_workshop" },
-				{ key: "full_day_session", label: __("Full Day Session"), metric: "full_day_session" },
+				{
+					key: "workshop",
+					label: __("Workshop"),
+					metric: "training",
+					value: (r) =>
+						cint(r.workshop) ||
+						cint(r.half_day_workshop) + cint(r.full_day_session),
+				},
 				{
 					key: "meeting_ulama",
 					label: __("Meeting with Ulama and Educationist"),
@@ -474,12 +480,13 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 
 	kpi_card_groups(data) {
 		const k = data.kpis || {};
+		const expenseTotal = flt((data.totals || {}).expenses ?? k.expenses ?? 0);
 		const visitedDaysMax = this.max_visited_days(data);
 		const activityCards = [
 			{ label: __("Marketing"), value: this.fmt(k.new), style: "new", metric: "new" },
 			{ label: __("Monitoring"), value: this.fmt(k.me), style: "me", metric: "monitoring" },
 			{ label: __("Follow up"), value: this.fmt(k.followup), style: "followup", metric: "followup" },
-			{ label: __("Other"), value: this.fmt(k.meetings), style: "meeting", metric: "meeting" },
+			{ label: __("Meetings"), value: this.fmt(k.meetings), style: "meeting", metric: "meeting" },
 			...this.kpi_columns(data).map((col) => ({
 				label: col.label,
 				value: this.fmt(k[col.key]),
@@ -505,7 +512,15 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			{
 				title: __("Summary"),
 				cards: [
-					{ label: __("Expenses"), value: this.fmt_cur(k.expenses), style: "expenses", cardKind: "expenses" },
+					{
+						label: __("Expenses"),
+						value: this.fmt_cur(expenseTotal),
+						style: "expenses",
+						cardKind: "expenses",
+						hint: __(
+							"Travel on Field Visit, or Rs 396/day estimated (22 km × Rs 18) when travel is blank"
+						),
+					},
 					{
 						label: __("Visited Days"),
 						value: this.fmt(visitedDaysMax),
@@ -596,7 +611,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			${this.render_kpi_cards(data)}
 			<div class="sme-sum-break">
 				<strong>${__("Activity counts are clickable.")}</strong>
-				${__("Same activities as SME KPI Details — Visits (Marketing, Monitoring, Follow up, Other) plus Target Base KPI rows.")}
+				${__("Same activities as SME KPI Details — Visits (Marketing, Monitoring, Follow up, Meetings) plus Target Base KPI rows.")}
 				${__("Click a number to open Field Visits. Click Total Points / Earned Points / Percentage for the points breakdown.")}
 			</div>
 			<div class="sme-sum-meta">
@@ -880,7 +895,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			return;
 		}
 		const d = new frappe.ui.Dialog({
-			title: __("Expense Claims"),
+			title: __("Expenses"),
 			size: "extra-large",
 			fields: [{ fieldtype: "HTML", fieldname: "html" }],
 			primary_action_label: __("Close"),
@@ -902,6 +917,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					? rows
 							.map(
 								(row) => `<tr>
+						<td>${frappe.utils.escape_html(row.source || "")}</td>
 						<td><a href="${frappe.utils.escape_html(row.url)}">${frappe.utils.escape_html(row.name)}</a></td>
 						<td>${frappe.utils.escape_html(row.posting_date || "")}</td>
 						<td>${frappe.utils.escape_html(row.employee_name || "")}</td>
@@ -910,7 +926,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					</tr>`,
 							)
 							.join("")
-					: `<tr><td colspan="5" class="text-muted text-center">${__("No expense claims in this period.")}</td></tr>`;
+					: `<tr><td colspan="6" class="text-muted text-center">${__("No expenses in this period.")}</td></tr>`;
 
 				d.fields_dict.html.$wrapper.html(`
 					<div class="mb-2">
@@ -922,11 +938,12 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						<table class="table table-bordered table-hover" style="font-size:12px;margin:0;">
 							<thead>
 								<tr>
-									<th>${__("Claim No")}</th>
-									<th>${__("Posting Date")}</th>
+									<th>${__("Source")}</th>
+									<th>${__("Reference")}</th>
+									<th>${__("Date")}</th>
 									<th>${__("Employee")}</th>
 									<th class="text-right">${__("Amount")}</th>
-									<th>${__("Status")}</th>
+									<th>${__("Status / Type")}</th>
 								</tr>
 							</thead>
 							<tbody>${body}</tbody>
@@ -936,7 +953,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			},
 			error: () => {
 				d.fields_dict.html.$wrapper.html(
-					`<p class="text-danger text-center">${__("Failed to load expense claims.")}</p>`,
+					`<p class="text-danger text-center">${__("Failed to load expenses.")}</p>`,
 				);
 			},
 		});

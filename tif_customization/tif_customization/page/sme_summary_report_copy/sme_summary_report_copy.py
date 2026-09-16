@@ -20,6 +20,13 @@ from tif_customization.tif_customization.field_visit_permissions import (
 	get_team_match_values,
 	visit_day_sql as _visit_day_sql,
 )
+from tif_customization.tif_customization.field_visit_travel_cost import (
+	DEFAULT_DAILY_TRAVEL_KM,
+	DEFAULT_PER_KM_FUEL,
+	aggregate_visit_expenses_by_staff,
+	daily_travel_allowance,
+	resolve_per_km_fuel,
+)
 from tif_customization.tif_customization.page.smes_target_base___k.smes_target_base_kpi_config import (
 	KPI_ACTIVITIES,
 	REGION_KEYS,
@@ -43,8 +50,7 @@ SUMMARY_TYPES = ("Marketing", "Meeting", "M&E", "Training")
 
 # Activity (period) columns — aligned with SME KPI Details / Target Base KPI sheet
 KPI_COLUMNS = (
-	{"key": "half_day_workshop", "label": "Half Day Workshop", "metric": "half_day_workshop"},
-	{"key": "full_day_session", "label": "Full Day Session", "metric": "full_day_session"},
+	{"key": "workshop", "label": "Workshop", "metric": "training"},
 	{"key": "meeting_ulama", "label": "Meeting with Ulama and Educationist", "metric": "meeting_ulama"},
 	{"key": "teachers_training_meeting", "label": "Teachers Training Meeting", "metric": "teachers_training_meeting"},
 	{
@@ -155,56 +161,84 @@ def get_sme_employee_query(doctype, txt, searchfield, start, page_len, filters):
 
 @frappe.whitelist()
 def get_expense_drilldown(filters=None):
-	"""Return submitted Expense Claims for SMEs in the report period."""
-	if not frappe.has_permission("Expense Claim", "read"):
-		frappe.throw(_("You are not permitted to view Expense Claim data."))
+	"""Expense Claims + Field Visit travel costs for SMEs in the report period."""
+	if not frappe.has_permission("Field Visit", "read") and not frappe.has_permission(
+		"Expense Claim", "read"
+	):
+		frappe.throw(_("You are not permitted to view expense data."))
 
 	filters = _parse_filters(filters)
 	from_date, to_date = _resolve_dates(filters)
 	staff_rows = _get_sme_staff(filters)
+	if not staff_rows:
+		return {"rows": [], "count": 0, "total": 0.0, "from_date": str(from_date), "to_date": str(to_date)}
+
+	key_to_name = {
+		s["key"]: s.get("employee_name") or s.get("user_id") or s.get("employee") for s in staff_rows
+	}
 	emp_ids = [s["employee"] for s in staff_rows if s.get("employee")]
-	if not emp_ids:
-		return {"rows": [], "count": 0, "total": 0.0, "from_date": str(from_date), "to_date": str(to_date)}
-
-	try:
-		claims = frappe.db.sql(
-			"""
-			SELECT
-				ec.name,
-				ec.employee,
-				ec.employee_name,
-				ec.posting_date,
-				COALESCE(ec.total_claimed_amount, ec.grand_total, 0) AS amount,
-				ec.approval_status
-			FROM `tabExpense Claim` ec
-			WHERE ec.employee IN %(emps)s
-			AND ec.docstatus = 1
-			AND ec.posting_date BETWEEN %(from_date)s AND %(to_date)s
-			ORDER BY ec.posting_date DESC, ec.name DESC
-			LIMIT 1000
-			""",
-			{"emps": tuple(emp_ids), "from_date": from_date, "to_date": to_date},
-			as_dict=True,
-		)
-	except Exception:
-		return {"rows": [], "count": 0, "total": 0.0, "from_date": str(from_date), "to_date": str(to_date)}
-
 	rows = []
 	total = 0.0
-	for c in claims:
-		amt = flt(c.amount)
-		total += amt
-		rows.append(
-			{
-				"name": c.name,
-				"employee": c.employee,
-				"employee_name": c.employee_name or c.employee,
-				"posting_date": str(c.posting_date) if c.posting_date else "",
-				"amount": flt(amt, 2),
-				"status": c.approval_status or "",
-				"url": f"/app/expense-claim/{c.name}",
-			}
-		)
+
+	if emp_ids and frappe.has_permission("Expense Claim", "read"):
+		try:
+			claims = frappe.db.sql(
+				"""
+				SELECT
+					ec.name,
+					ec.employee,
+					ec.employee_name,
+					ec.posting_date,
+					COALESCE(ec.total_claimed_amount, ec.grand_total, 0) AS amount,
+					ec.approval_status
+				FROM `tabExpense Claim` ec
+				WHERE ec.employee IN %(emps)s
+				AND ec.docstatus = 1
+				AND ec.posting_date BETWEEN %(from_date)s AND %(to_date)s
+				ORDER BY ec.posting_date DESC, ec.name DESC
+				LIMIT 1000
+				""",
+				{"emps": tuple(emp_ids), "from_date": from_date, "to_date": to_date},
+				as_dict=True,
+			)
+		except Exception:
+			claims = []
+		for c in claims:
+			amt = flt(c.amount)
+			total += amt
+			rows.append(
+				{
+					"source": _("Expense Claim"),
+					"name": c.name,
+					"employee": c.employee,
+					"employee_name": c.employee_name or c.employee,
+					"posting_date": str(c.posting_date) if c.posting_date else "",
+					"amount": flt(amt, 2),
+					"status": c.approval_status or "",
+					"url": f"/app/expense-claim/{c.name}",
+				}
+			)
+
+	if frappe.has_permission("Field Visit", "read"):
+		for fv in _field_visit_expense_rows(from_date, to_date, staff_rows):
+			amt = flt(fv.get("amount"))
+			total += amt
+			staff_key = fv.get("staff_key")
+			rows.append(
+				{
+					"source": fv.get("source") or _("Field Visit"),
+					"name": fv.get("name"),
+					"employee": staff_key or "",
+					"employee_name": fv.get("employee_name") or key_to_name.get(staff_key) or "",
+					"posting_date": fv.get("posting_date") or "",
+					"amount": flt(amt, 2),
+					"status": fv.get("status") or "",
+					"url": fv.get("url") or "",
+				}
+			)
+
+	rows.sort(key=lambda r: (r.get("posting_date") or "", r.get("name") or ""), reverse=True)
+	rows = rows[:1000]
 
 	return {
 		"rows": rows,
@@ -302,7 +336,12 @@ def get_report_data(filters=None):
 			"points_breakdown": breakdown,
 		}
 		for col in KPI_COLUMNS:
-			row[col["key"]] = cint(actuals.get(col["key"]) or 0)
+			if col["key"] == "workshop":
+				row["workshop"] = cint(actuals.get("half_day_workshop") or 0) + cint(
+					actuals.get("full_day_session") or 0
+				)
+			else:
+				row[col["key"]] = cint(actuals.get(col["key"]) or 0)
 		row.update(_outcome_row_fields(staff, ytd_from, to_date))
 		rows.append(row)
 		for k in (
@@ -355,6 +394,8 @@ def get_report_data(filters=None):
 		sum(outcome_pcts) / len(outcome_pcts) if outcome_pcts else 0,
 		2,
 	)
+	expense_total = flt(sum(flt(r.get("expenses") or 0) for r in rows), 2)
+	totals_out["expenses"] = expense_total
 
 	return {
 		"from_date": str(from_date),
@@ -390,12 +431,11 @@ def get_report_data(filters=None):
 			"me": cint(totals.get("me") or 0),
 			"schools": cint(totals.get("schools") or 0),
 			"participants": cint(totals.get("participants") or 0),
-			"expenses": flt(totals.get("expenses") or 0, 2),
+			"expenses": expense_total,
 			"visited_days": visited_days_max,
 			"grand_total": cint(totals.get("grand_total") or 0),
 			"visits": cint(totals.get("visits") or 0),
-			"half_day_workshop": cint(totals.get("half_day_workshop") or 0),
-			"full_day_session": cint(totals.get("full_day_session") or 0),
+			"workshop": cint(totals.get("workshop") or 0),
 			"meeting_ulama": cint(totals.get("meeting_ulama") or 0),
 			"teachers_training_meeting": cint(totals.get("teachers_training_meeting") or 0),
 			"headoffice_visit": cint(totals.get("headoffice_visit") or 0),
@@ -404,8 +444,7 @@ def get_report_data(filters=None):
 			"co_curricular": cint(totals.get("co_curricular") or 0),
 			"marketing": cint(totals.get("followup") or 0) + cint(totals.get("new") or 0),
 			"me": cint(totals.get("me") or 0),
-			"training": cint(totals.get("half_day_workshop") or 0)
-			+ cint(totals.get("full_day_session") or 0),
+			"training": cint(totals.get("workshop") or 0),
 			"school_visits": cint(totals.get("followup") or 0)
 			+ cint(totals.get("new") or 0)
 			+ cint(totals.get("me") or 0),
@@ -741,7 +780,15 @@ def _resolve_staff_key(row, index):
 			[row.get("training_entry_filled_by"), row.get("training_trainer_name"), row.get("owner")]
 		)
 	else:
-		candidates.append(row.get("owner"))
+		candidates.extend(
+			[
+				row.get("visit_by"),
+				row.get("me_visit_by"),
+				row.get("mt_visit_by"),
+				row.get("training_entry_filled_by"),
+				row.get("owner"),
+			]
+		)
 
 	for c in candidates:
 		if not c:
@@ -752,32 +799,138 @@ def _resolve_staff_key(row, index):
 	return None
 
 
-def _load_expenses(from_date, to_date, staff_rows):
-	"""Expense Claim totals by employee (claimed amount)."""
-	result = {s["key"]: 0.0 for s in staff_rows}
-	emp_ids = [s["employee"] for s in staff_rows if s.get("employee")]
-	if not emp_ids:
-		return result
+def _staff_key_index(staff_rows):
+	index = {}
+	for s in staff_rows:
+		for v in s.get("match_values") or []:
+			index[str(v).strip().lower()] = s["key"]
+	return index
+
+
+def _field_visit_expense_rows(from_date, to_date, staff_rows):
+	"""Field Visit expense lines (explicit travel or estimated daily travel)."""
+	if not staff_rows:
+		return []
+
+	index = _staff_key_index(staff_rows)
+	visit_day = _visit_day_sql("fv")
+	per_km_by_key = {
+		s["key"]: resolve_per_km_fuel(
+			visit_by=s.get("employee_name"),
+			owner=s.get("user_id"),
+			employee=s.get("employee"),
+		)
+		for s in staff_rows
+	}
+	key_to_name = {
+		s["key"]: s.get("employee_name") or s.get("user_id") or s.get("employee") for s in staff_rows
+	}
 
 	try:
-		claims = frappe.db.sql(
-			"""
-			SELECT employee,
-				COALESCE(total_claimed_amount, grand_total, 0) AS amount
-			FROM `tabExpense Claim`
-			WHERE employee IN %(emps)s
-			AND docstatus = 1
-			AND posting_date BETWEEN %(from_date)s AND %(to_date)s
+		rows = frappe.db.sql(
+			f"""
+			SELECT
+				fv.name,
+				fv.type,
+				fv.owner,
+				fv.visit_by,
+				fv.me_visit_by,
+				fv.mt_visit_by,
+				fv.training_entry_filled_by,
+				fv.training_trainer_name,
+				COALESCE(fv.travel_cost, 0) AS travel_cost,
+				{visit_day} AS visit_day
+			FROM `tabField Visit` fv
+			WHERE fv.docstatus = 1
+			AND {visit_day} IS NOT NULL
+			AND {visit_day} BETWEEN %(from_date)s AND %(to_date)s
+			ORDER BY {visit_day}, fv.name
 			""",
-			{"emps": tuple(emp_ids), "from_date": from_date, "to_date": to_date},
+			{"from_date": from_date, "to_date": to_date},
 			as_dict=True,
 		)
 	except Exception:
+		return []
+
+	day_totals: dict[tuple[str, str], float] = {}
+	day_sample: dict[tuple[str, str], dict] = {}
+	for row in rows:
+		staff_key = _resolve_staff_key(row, index)
+		if not staff_key or not row.get("visit_day"):
+			continue
+		day_key = (staff_key, str(row.visit_day))
+		day_totals[day_key] = day_totals.get(day_key, 0.0) + flt(row.get("travel_cost"))
+		day_sample.setdefault(day_key, row)
+
+	out = []
+	for day_key, explicit in day_totals.items():
+		staff_key, day = day_key
+		row = day_sample[day_key]
+		if explicit > 0:
+			amt = explicit
+			status = row.get("type") or ""
+			source = _("Field Visit")
+		else:
+			amt = daily_travel_allowance(per_km_by_key.get(staff_key))
+			status = _("Estimated ({0} km × Rs {1})").format(
+				int(DEFAULT_DAILY_TRAVEL_KM), int(per_km_by_key.get(staff_key) or DEFAULT_PER_KM_FUEL)
+			)
+			source = _("Field Visit (estimated)")
+
+		out.append(
+			{
+				"source": source,
+				"name": row.get("name"),
+				"staff_key": staff_key,
+				"employee_name": key_to_name.get(staff_key) or "",
+				"posting_date": day,
+				"amount": flt(amt, 2),
+				"status": status,
+				"url": f"/app/field-visit/{row.get('name')}",
+			}
+		)
+	return out
+
+
+def _load_expenses(from_date, to_date, staff_rows):
+	"""Expense Claims plus Field Visit travel (recorded or estimated per visit day)."""
+	result = {s["key"]: 0.0 for s in staff_rows}
+	if not staff_rows:
 		return result
 
-	for c in claims:
-		if c.employee in result:
-			result[c.employee] += flt(c.amount)
+	fv_totals = aggregate_visit_expenses_by_staff(
+		from_date,
+		to_date,
+		staff_rows,
+		visit_day_sql=_visit_day_sql("fv"),
+		resolve_staff_key=_resolve_staff_key,
+		staff_key_index=_staff_key_index,
+	)
+	for key, amt in fv_totals.items():
+		if key in result:
+			result[key] += flt(amt)
+
+	emp_ids = [s["employee"] for s in staff_rows if s.get("employee")]
+	if emp_ids:
+		try:
+			claims = frappe.db.sql(
+				"""
+				SELECT employee,
+					COALESCE(total_claimed_amount, grand_total, 0) AS amount
+				FROM `tabExpense Claim`
+				WHERE employee IN %(emps)s
+				AND docstatus = 1
+				AND posting_date BETWEEN %(from_date)s AND %(to_date)s
+				""",
+				{"emps": tuple(emp_ids), "from_date": from_date, "to_date": to_date},
+				as_dict=True,
+			)
+		except Exception:
+			claims = []
+		for c in claims:
+			if c.employee in result:
+				result[c.employee] += flt(c.amount)
+
 	return result
 
 

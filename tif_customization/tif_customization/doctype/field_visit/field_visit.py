@@ -13,9 +13,11 @@ from tif_customization.tif_customization.api.training_feedback_portal import bui
 from tif_customization.tif_customization.field_visit_enrolment_access import (
 	validate_farhan_only_field_visit,
 )
+from tif_customization.tif_customization.model_school import sync_model_school_field
 from tif_customization.tif_customization.field_visit_supervisor_only import (
 	validate_supervisor_only_field_visit,
 )
+from tif_customization.tif_customization.field_visit_travel_cost import sync_travel_cost
 
 STANDARD_VISIT_NAME = re.compile(r"^FV-\d{2}-\d{2}-\d+$")
 
@@ -79,6 +81,8 @@ class FieldVisit(Document):
 			self.type = "Enrolment of Participants"
 
 	def validate(self):
+		sync_model_school_field(self)
+		sync_travel_cost(self)
 		validate_supervisor_only_field_visit(self)
 		validate_farhan_only_field_visit(self)
 		if self.type == "Training":

@@ -163,6 +163,7 @@ class SmesActivityForm {
 			travel_from: "",
 			travel_to: "",
 			travel_distance_km: "",
+			travel_per_km_rate: "",
 			travel_cost: "",
 			travel_remarks: "",
 			// Attachments
@@ -607,9 +608,38 @@ class SmesActivityForm {
 				})
 				.join("")}</div>`;
 		} else {
-			control = `<input type="${type}" data-field="${name}" value="${frappe.utils.escape_html(this.val(name))}" autocomplete="on" />`;
+			const ro = opts.read_only ? "readonly" : "";
+			control = `<input type="${type}" data-field="${name}" value="${frappe.utils.escape_html(this.val(name))}" autocomplete="on" ${ro} />`;
 		}
 		return `<div class="smes-field" data-wrap="${name}"><label>${frappe.utils.escape_html(label)}${req}</label>${control}${hint}</div>`;
+	}
+
+	sync_travel_cost() {
+		if (!this.is_enrolment_or_workshop()) return;
+		frappe.call({
+			method: "tif_customization.tif_customization.field_visit_travel_cost.compute_travel_cost",
+			args: {
+				visit_by: this.data.visit_by,
+				staff_employee: this.data.staff_employee,
+				travel_mode: this.data.travel_mode,
+				travel_distance_km: this.data.travel_distance_km,
+			},
+			callback: (r) => {
+				const msg = r.message || {};
+				if (msg.travel_per_km_rate != null) {
+					this.data.travel_per_km_rate = msg.travel_per_km_rate;
+				}
+				if (msg.auto_cost && msg.travel_cost != null) {
+					this.data.travel_cost = msg.travel_cost;
+				}
+				if (this.steps[this.step]?.key === "travel") {
+					this.$root
+						.find('[data-field="travel_per_km_rate"]')
+						.val(this.data.travel_per_km_rate || "");
+					this.$root.find('[data-field="travel_cost"]').val(this.data.travel_cost || "");
+				}
+			},
+		});
 	}
 
 	normalize_input_value(name, type) {
@@ -797,6 +827,9 @@ class SmesActivityForm {
 				const match = (this.meta.staff_options || []).find((s) => s.employee_name === this.data.visit_by);
 				this.data.staff_employee = match ? match.employee : "";
 			}
+			if (["travel_mode", "travel_distance_km", "visit_by"].includes(field)) {
+				this.sync_travel_cost();
+			}
 			if (refresh_fields.has(field)) {
 				this.collect();
 				if (field === "activity_type") {
@@ -811,6 +844,9 @@ class SmesActivityForm {
 		this.mount_frappe_controls();
 		this.bind_uploads();
 		this.bind_multi_row_actions();
+		if (key === "travel") {
+			this.sync_travel_cost();
+		}
 	}
 
 	html_general() {
@@ -1544,7 +1580,15 @@ class SmesActivityForm {
 			</div>
 			<div class="smes-row-2">
 				${this.field("travel_distance_km", __("Distance (KM)"), "number")}
-				${this.field("travel_cost", __("Travel Cost"), "number")}
+				${this.field("travel_per_km_rate", __("Per Km for Fuel"), "number", {
+					read_only: true,
+					hint: __("Rs 18/km default, or Employee master rate"),
+				})}
+			</div>
+			<div class="smes-row-2">
+				${this.field("travel_cost", __("Travel Cost"), "number", {
+					hint: __("Auto for Own Vehicle / Bike: Distance × Per Km"),
+				})}
 			</div>
 			${this.field("travel_remarks", __("Travel Remarks"), "textarea")}
 		`;

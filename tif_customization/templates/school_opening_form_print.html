@@ -65,6 +65,10 @@
 		<section class="soa-section">
 			<div class="soa-section-title">1 Institution Profile</div>
 			<div class="soa-block">
+				<div class="soa-label">Type</div>
+				{{ rad(["Visit without enrollment", "Visit with enrollment"], data.visit_type, "visit_type") }}
+			</div>
+			<div class="soa-block">
 				<div class="soa-label">Type of Institution</div>
 				{{ chk(["School", "College", "University", "Madaris", "Library", "Special School"], data.institution_types) }}
 			</div>
@@ -97,6 +101,7 @@
 			</div>
 		</section>
 
+		{% if data.visit_type != 'Visit without enrollment' %}
 		<section class="soa-section">
 			<div class="soa-section-title">2 Services of Interest</div>
 			<div class="soa-block">
@@ -165,6 +170,7 @@
 				</div>
 			</div>
 		</section>
+		{% endif %}
 
 		<section class="soa-section">
 			<div class="soa-section-title">4 Attachments</div>
