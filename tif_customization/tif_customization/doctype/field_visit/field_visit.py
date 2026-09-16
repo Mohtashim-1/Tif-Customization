@@ -45,11 +45,11 @@ class FieldVisit(Document):
 			return self.me_visit_date or self.me_starting_date or (
 				getdate(self.me_timestamp) if self.me_timestamp else None
 			)
-		if t == "Training":
+		if t == "Training" or t in ("Workshop", "Teachers Training Meeting"):
 			return self.training_date or (
 				getdate(self.training_timestamp) if self.training_timestamp else None
 			)
-		if t == "Meeting":
+		if t in ("Meeting", "Meeting with Ulama and Educationist"):
 			return self.mt_meeting_date or (getdate(self.mt_timestamp) if self.mt_timestamp else None)
 		if t in (
 			"Academic / Other Official Tasks",
@@ -64,7 +64,9 @@ class FieldVisit(Document):
 			return self.me_visit_date or self.visit_date
 		if t in (
 			"Enrolment of Participants",
+			"Enrolment of Participant in ELP/ TECC/ TTC/ Online Tajweed",
 			"Attendance / Registration in One Day / Half day Workshop",
+			"Registration of Participant in Workshops",
 		):
 			return self.training_date or self.visit_date
 		return (
@@ -85,7 +87,7 @@ class FieldVisit(Document):
 		sync_travel_cost(self)
 		validate_supervisor_only_field_visit(self)
 		validate_farhan_only_field_visit(self)
-		if self.type == "Training":
+		if self.type in ("Training", "Workshop", "Teachers Training Meeting"):
 			self._validate_training_attendees()
 			self._sync_training_attendee_defaults()
 		self._validate_volunteer_enrolments()
@@ -94,11 +96,11 @@ class FieldVisit(Document):
 		self._sync_school_contacts()
 
 	def before_submit(self):
-		if self.type == "Training":
+		if self.type in ("Training", "Workshop", "Teachers Training Meeting"):
 			self._ensure_feedback_tokens()
 
 	def on_submit(self):
-		if self.type == "Training":
+		if self.type in ("Training", "Workshop", "Teachers Training Meeting"):
 			self.send_training_feedback_invitations()
 
 	def _validate_training_attendees(self):
@@ -138,7 +140,10 @@ class FieldVisit(Document):
 			names.add(key)
 
 	def _validate_enrolment_participants(self):
-		if self.type != "Enrolment of Participants":
+		if self.type not in (
+			"Enrolment of Participants",
+			"Enrolment of Participant in ELP/ TECC/ TTC/ Online Tajweed",
+		):
 			return
 		for row in self.enrolment_participants or []:
 			if not (row.participant_name or "").strip():
@@ -153,7 +158,10 @@ class FieldVisit(Document):
 				pass
 
 	def _validate_workshop_attendees(self):
-		if self.type != "Attendance / Registration in One Day / Half day Workshop":
+		if self.type not in (
+			"Attendance / Registration in One Day / Half day Workshop",
+			"Registration of Participant in Workshops",
+		):
 			return
 		emails = set()
 		for row in self.workshop_attendees or []:

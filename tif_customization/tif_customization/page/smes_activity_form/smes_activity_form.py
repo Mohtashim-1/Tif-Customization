@@ -37,12 +37,32 @@ def _academic_task_type_options_for_user():
 	return sorted(FIELD_OFFICER_ALLOWED_OT_TASKS)
 
 
+HIDDEN_ACTIVITY_TYPE_LABELS = {
+	"Marketing Visit",
+	"M&E Visit",
+	"Joint Visit with SME (Only for Supervisor)",
+	"Trainings & Workshops / Teachers Training Meeting",
+	"Meetings",
+	"Academic / Other Official Tasks / Calls",
+	"Attendance / Registration in One Day / Half day Workshop",
+}
+
+
 def _activity_type_labels_for_user():
-	exclude = {WORKSHOP_ATTENDANCE_TYPE, "Enrolment of participants", "Enrolment of Participants"}
+	exclude = {
+		WORKSHOP_ATTENDANCE_TYPE,
+		"Enrolment of participants",
+		"Enrolment of Participants",
+		"Enrolment of Participant in ELP/ TECC/ TTC/ Online Tajweed",
+		"Registration of Participant in Workshops",
+		*HIDDEN_ACTIVITY_TYPE_LABELS,
+	}
 	labels = [k for k in ACTIVITY_TYPE_MAP if k not in exclude]
 	if can_manage_farhan_only_field_visit():
 		for label, mapped in ACTIVITY_TYPE_MAP.items():
 			if mapped in FARHAN_ONLY_FIELD_VISIT_TYPES and label not in labels:
+				if label in HIDDEN_ACTIVITY_TYPE_LABELS:
+					continue
 				labels.append(label)
 	return labels
 
@@ -99,15 +119,31 @@ PROVINCE_MAP = {
 }
 
 ACTIVITY_TYPE_MAP = {
+	"Visits": "Visits",
+	"Workshop": "Workshop",
+	"Meeting with Ulama and Educationist": "Meeting with Ulama and Educationist",
+	"Teachers Training Meeting": "Teachers Training Meeting",
+	"Headoffice/ Regional Office/ Out of Station Visit": "Headoffice/ Regional Office/ Out of Station Visit",
+	"Academic Task": "Academic Task",
+	"Other Official Tasks": "Other Official Tasks",
+	"Enrolment of Participants": "Enrolment of Participants",
+	"Enrolment of participants": "Enrolment of Participants",
+	"Enrolment of Participant in ELP/ TECC/ TTC/ Online Tajweed": "Enrolment of Participant in ELP/ TECC/ TTC/ Online Tajweed",
+	"Quiz Arranged": "Quiz Arranged",
+	"Co-curricular Activity": "Co-curricular Activity",
+	"Registration of New Schools": "Registration of New Schools",
+	"Registration of Participant in Workshops": "Registration of Participant in Workshops",
+	"Workshop Arranged": "Workshop Arranged",
+	"Books Demand (Quantity)": "Books Demand (Quantity)",
+	"Enrolment of Volunteers": "Enrolment of Volunteers",
+	"Model School A": "Model School A",
+	"Model School B": "Model School B",
 	"Marketing Visit": "Marketing",
 	"M&E Visit": "M&E",
 	"Joint Visit with SME (Only for Supervisor)": "Joint Visit with SME",
 	"Trainings & Workshops / Teachers Training Meeting": "Training",
 	"Meetings": "Meeting",
 	"Academic / Other Official Tasks / Calls": "Academic / Other Official Tasks",
-	"Co-curricular Activity": "Co-curricular Activity",
-	"Enrolment of Participants": "Enrolment of Participants",
-	"Enrolment of participants": "Enrolment of Participants",
 	"Attendance / Registration in One Day / Half day Workshop": "Attendance / Registration in One Day / Half day Workshop",
 }
 
@@ -718,7 +754,7 @@ def submit_smes_activity(data):
 		# Marketing-style fields also collected on joint visits in Google Form
 		doc.frequency_of_visits = data.get("frequency_of_visits") or doc.frequency_of_visits
 		doc.status = data.get("status") or doc.status
-	elif doc_type == "Meeting":
+	elif doc_type == "Meeting" or doc_type == "Meeting with Ulama and Educationist":
 		doc.mt_visit_by = doc.visit_by
 		doc.mt_month = doc.month
 		doc.mt_meeting_date = doc.visit_date
@@ -730,6 +766,11 @@ def submit_smes_activity(data):
 		doc.mt_meeting_mode = data.get("mt_meeting_mode")
 		doc.mt_internal_meeting_with = data.get("mt_internal_meeting_with")
 		doc.mt_external_meeting_with = data.get("mt_external_meeting_with")
+		if doc_type == "Meeting with Ulama and Educationist":
+			doc.mt_meeting_type = (
+				doc.mt_meeting_type or "External Meeting (Meeting with Others)"
+			)
+			doc.mt_external_meeting_with = doc.mt_external_meeting_with or "Ulma Karam"
 		doc.mt_meeting_with_person_name = data.get("mt_person_name") or doc.meeting_with
 		doc.mt_contact_no = data.get("mt_contact_number") or doc.contact_number
 		doc.mt_venue = data.get("mt_venue")
@@ -753,7 +794,7 @@ def submit_smes_activity(data):
 		doc.ot_visit_meeting_detail = data.get("ot_visit_meeting_detail")
 		doc.ot_hours_spent = data.get("ot_hours_spent")
 		doc.ot_remarks = data.get("ot_visit_meeting_detail") or data.get("ot_other_official_task_detail")
-	elif doc_type == "Co-curricular Activity":
+	elif doc_type in ("Co-curricular Activity", "Quiz Arranged"):
 		doc.cc_activity = data.get("cc_activity")
 		doc.cc_venue = data.get("cc_venue")
 		doc.cc_no_of_schools = data.get("cc_no_of_schools")
@@ -765,7 +806,7 @@ def submit_smes_activity(data):
 		doc.ot_start_time = doc.visiting_starting_time
 		doc.ot_end_time = doc.visit_ending_time
 		doc.ot_remarks = data.get("school_additional_remarks") or data.get("ot_remarks")
-	elif doc_type == "Training":
+	elif doc_type in ("Training", "Workshop", "Teachers Training Meeting", "Workshop Arranged"):
 		doc.training_month = doc.month
 		doc.training_date = doc.visit_date
 		doc.training_trainer_name = doc.visit_by
@@ -773,6 +814,10 @@ def submit_smes_activity(data):
 		doc.training_city = doc.city
 		doc.training_province = doc.province
 		doc.training_session_category = data.get("training_session_category")
+		if not doc.training_session_category and doc_type == "Workshop":
+			doc.training_session_category = "Half Day Workshop"
+		if not doc.training_session_category and doc_type == "Teachers Training Meeting":
+			doc.training_session_category = "Teachers Training Meeting (One to One)"
 		doc.training_workshop_topic = data.get("training_workshop_topic")
 		doc.training_mode = data.get("training_mode")
 		doc.training_venue_name = data.get("training_venue_name") or doc.school_name
@@ -785,10 +830,16 @@ def submit_smes_activity(data):
 			conducted = cstr(data.get("training_conducted_by_other")).strip() or "Other"
 		doc.training_conducted_by = conducted
 		doc.training_conducted_by_other = data.get("training_conducted_by_other")
-	elif doc_type == "Enrolment of Participants":
+	elif doc_type in (
+		"Enrolment of Participants",
+		"Enrolment of Participant in ELP/ TECC/ TTC/ Online Tajweed",
+	):
 		_append_enrolment_rows(doc, data)
 		_apply_travel_fields(doc, data)
-	elif doc_type == "Attendance / Registration in One Day / Half day Workshop":
+	elif doc_type in (
+		"Attendance / Registration in One Day / Half day Workshop",
+		"Registration of Participant in Workshops",
+	):
 		_append_workshop_rows(doc, data)
 		_apply_travel_fields(doc, data)
 

@@ -44,7 +44,15 @@ from tif_customization.tif_customization.page.smes_target_base___k.smes_target_b
 SME_DESIGNATION = "School Marketing Executive"
 
 # Activity types that roll into the summary columns / visited days
-SUMMARY_TYPES = ("Marketing", "Meeting", "M&E", "Training")
+SUMMARY_TYPES = (
+	"Marketing",
+	"Meeting",
+	"M&E",
+	"Training",
+	"Workshop",
+	"Meeting with Ulama and Educationist",
+	"Teachers Training Meeting",
+)
 
 # Activity (period) columns — aligned with SME KPI Details / Target Base KPI sheet
 KPI_COLUMNS = (
@@ -779,7 +787,7 @@ def _load_visit_stats(from_date, to_date, staff_rows):
 				bucket["followup"] += 1
 			else:
 				bucket["followup"] += 1
-		elif vtype == "Meeting":
+		elif vtype in ("Meeting", "Meeting with Ulama and Educationist"):
 			bucket["meetings"] += 1
 		elif vtype == "M&E":
 			bucket["me"] += 1
@@ -788,7 +796,7 @@ def _load_visit_stats(from_date, to_date, staff_rows):
 				bucket["active"] += 1
 			elif status == "inactive":
 				bucket["inactive"] += 1
-		elif vtype == "Training":
+		elif vtype in ("Training", "Workshop", "Teachers Training Meeting"):
 			bucket["schools"] += cint(row.get("schools") or 0)
 			bucket["participants"] += cint(row.get("participants") or 0)
 			bucket["trainings"] += 1

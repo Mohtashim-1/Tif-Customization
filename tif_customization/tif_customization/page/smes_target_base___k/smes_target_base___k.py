@@ -401,9 +401,11 @@ def _count_actuals(from_date, to_date, staff, staff_tokens=None, submitted_only=
 	counts["half_day_workshop"] = _scalar_count(
 		f"""
 		SELECT COUNT(*) FROM `tabField Visit`
-		WHERE {ds} AND type = 'Training'
+		WHERE {ds} AND (
+			(type = 'Training' AND LOWER(COALESCE(training_session_category, '')) LIKE '%%half%%')
+			OR (type = 'Workshop' AND LOWER(COALESCE(training_session_category, '')) LIKE '%%half%%')
+		)
 		AND {_visit_date_expr('Training')} BETWEEN %(from_date)s AND %(to_date)s
-		AND LOWER(COALESCE(training_session_category, '')) LIKE '%%half%%'
 		{staff_sql}
 		""",
 		staff_params,
@@ -412,9 +414,11 @@ def _count_actuals(from_date, to_date, staff, staff_tokens=None, submitted_only=
 	counts["full_day_session"] = _scalar_count(
 		f"""
 		SELECT COUNT(*) FROM `tabField Visit`
-		WHERE {ds} AND type = 'Training'
+		WHERE {ds} AND (
+			(type = 'Training' AND LOWER(COALESCE(training_session_category, '')) NOT LIKE '%%half%%')
+			OR (type = 'Workshop' AND LOWER(COALESCE(training_session_category, '')) NOT LIKE '%%half%%')
+		)
 		AND {_visit_date_expr('Training')} BETWEEN %(from_date)s AND %(to_date)s
-		AND LOWER(COALESCE(training_session_category, '')) NOT LIKE '%%half%%'
 		{staff_sql}
 		""",
 		staff_params,
@@ -422,45 +426,52 @@ def _count_actuals(from_date, to_date, staff, staff_tokens=None, submitted_only=
 
 	counts["meeting_ulama"] = _scalar_count(
 		f"""
-		SELECT COUNT(*) FROM `tabField Visit`
-		WHERE {ds} AND type = 'Marketing'
-		AND {_visit_date_expr('Marketing')} BETWEEN %(from_date)s AND %(to_date)s
+		SELECT COUNT(*) FROM `tabField Visit` fv
+		WHERE {ds_fv}
+		AND {visit_day} BETWEEN %(from_date)s AND %(to_date)s
 		AND (
-			LOWER(COALESCE(meeting_with, '')) LIKE '%%ulama%%'
-			OR LOWER(COALESCE(meeting_with, '')) LIKE '%%educationist%%'
-			OR LOWER(COALESCE(designation, '')) LIKE '%%ulama%%'
+			fv.type = 'Meeting with Ulama and Educationist'
+			OR (
+				fv.type = 'Marketing'
+				AND (
+					LOWER(COALESCE(fv.meeting_with, '')) LIKE '%%ulama%%'
+					OR LOWER(COALESCE(fv.meeting_with, '')) LIKE '%%educationist%%'
+					OR LOWER(COALESCE(fv.designation, '')) LIKE '%%ulama%%'
+				)
+			)
 		)
-		{staff_sql}
+		{"AND " + staff_match if staff else ""}
 		""",
 		staff_params,
 	)
 
 	counts["teachers_training_meeting"] = _scalar_count(
 		f"""
-		SELECT COUNT(*) FROM `tabField Visit`
-		WHERE {ds} AND type = 'M&E'
-		AND {_visit_date_expr('M&E')} BETWEEN %(from_date)s AND %(to_date)s
-		AND COALESCE(me_teachers_training_session, 0) = 1
-		{staff_sql}
+		SELECT COUNT(*) FROM `tabField Visit` fv
+		WHERE {ds_fv}
+		AND {visit_day} BETWEEN %(from_date)s AND %(to_date)s
+		AND (
+			fv.type = 'Teachers Training Meeting'
+			OR (fv.type = 'M&E' AND COALESCE(fv.me_teachers_training_session, 0) = 1)
+		)
+		{"AND " + staff_match if staff else ""}
 		""",
 		staff_params,
 	)
 
 	counts["headoffice_visit"] = _scalar_count(
 		f"""
-		SELECT COUNT(*) FROM `tabField Visit`
-		WHERE {ds}
+		SELECT COUNT(*) FROM `tabField Visit` fv
+		WHERE {ds_fv}
+		AND {visit_day} BETWEEN %(from_date)s AND %(to_date)s
 		AND (
-			(type = 'Marketing' AND {_visit_date_expr('Marketing')} BETWEEN %(from_date)s AND %(to_date)s)
-			OR (type = 'M&E' AND {_visit_date_expr('M&E')} BETWEEN %(from_date)s AND %(to_date)s)
+			fv.type = 'Headoffice/ Regional Office/ Out of Station Visit'
+			OR LOWER(COALESCE(fv.reference, '')) LIKE '%%head%%office%%'
+			OR LOWER(COALESCE(fv.reference, '')) LIKE '%%regional office%%'
+			OR LOWER(COALESCE(fv.reference, '')) LIKE '%%out of station%%'
+			OR LOWER(COALESCE(fv.me_new_school_address, '')) LIKE '%%head%%office%%'
 		)
-		AND (
-			LOWER(COALESCE(reference, '')) LIKE '%%head%%office%%'
-			OR LOWER(COALESCE(reference, '')) LIKE '%%regional office%%'
-			OR LOWER(COALESCE(reference, '')) LIKE '%%out of station%%'
-			OR LOWER(COALESCE(me_new_school_address, '')) LIKE '%%head%%office%%'
-		)
-		{staff_sql}
+		{"AND " + staff_match if staff else ""}
 		""",
 		staff_params,
 	)

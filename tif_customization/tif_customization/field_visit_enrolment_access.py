@@ -14,6 +14,8 @@ FARHAN_ONLY_FIELD_VISIT_TYPES = frozenset(
 	{
 		ENROLMENT_PARTICIPANTS_TYPE,
 		WORKSHOP_ATTENDANCE_TYPE,
+		"Enrolment of Participant in ELP/ TECC/ TTC/ Online Tajweed",
+		"Registration of Participant in Workshops",
 	}
 )
 

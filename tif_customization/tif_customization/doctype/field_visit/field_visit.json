@@ -242,118 +242,118 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Type of Activity",
-   "options": "\nMarketing\nM&E\nJoint Visit with SME\nTraining\nMeeting\nAcademic Task\nOther Official Tasks\nCo-curricular Activity\nEnrolment of Participants\nAttendance / Registration in One Day / Half day Workshop\nHeadoffice/ Regional Office/ Out of Station Visit",
+   "options": "\nVisits\nWorkshop\nMeeting with Ulama and Educationist\nTeachers Training Meeting\nHeadoffice/ Regional Office/ Out of Station Visit\nAcademic Task\nOther Official Tasks\nEnrolment of Participants\nEnrolment of Participant in ELP/ TECC/ TTC/ Online Tajweed\nQuiz Arranged\nCo-curricular Activity\nRegistration of New Schools\nRegistration of Participant in Workshops\nWorkshop Arranged\nBooks Demand (Quantity)\nEnrolment of Volunteers\nModel School A\nModel School B",
    "reqd": 1
   },
   {
-   "depends_on": "eval:doc.type == 'Training'",
+   "depends_on": "eval:in_list(['Training', 'Workshop', 'Teachers Training Meeting', 'Workshop Arranged'], doc.type)",
    "fieldname": "section_break_training",
    "fieldtype": "Section Break",
    "label": "Training"
   },
   {
-   "depends_on": "eval:doc.type == 'Training'",
+   "depends_on": "eval:in_list(['Training', 'Workshop', 'Teachers Training Meeting', 'Workshop Arranged'], doc.type)",
    "fieldname": "training_timestamp",
    "fieldtype": "Datetime",
    "label": "Timestamp"
   },
   {
-   "depends_on": "eval:doc.type == 'Training'",
+   "depends_on": "eval:in_list(['Training', 'Workshop', 'Teachers Training Meeting', 'Workshop Arranged'], doc.type)",
    "fieldname": "training_month",
    "fieldtype": "Select",
    "label": "Month",
    "options": "\nJanuary\nFebruary\nMarch\nApril\nMay\nJune\nJuly\nAugust\nSeptember\nOctober\nNovember\nDecember"
   },
   {
-   "depends_on": "eval:doc.type == 'Training'",
+   "depends_on": "eval:in_list(['Training', 'Workshop', 'Teachers Training Meeting', 'Workshop Arranged'], doc.type)",
    "fieldname": "training_quarter",
    "fieldtype": "Select",
    "label": "Quarter",
    "options": "\nQ1\nQ2\nQ3\nQ4"
   },
   {
-   "depends_on": "eval:doc.type == 'Training'",
+   "depends_on": "eval:in_list(['Training', 'Workshop', 'Teachers Training Meeting', 'Workshop Arranged'], doc.type)",
    "fieldname": "training_session_category",
    "fieldtype": "Select",
    "label": "Training Category",
    "options": "\nFull Day Session\nHalf Day Workshop\nTeachers Training Meeting (One to One)"
   },
   {
-   "depends_on": "eval:doc.type == 'Training'",
+   "depends_on": "eval:in_list(['Training', 'Workshop', 'Teachers Training Meeting', 'Workshop Arranged'], doc.type)",
    "fieldname": "training_workshop_topic",
    "fieldtype": "Small Text",
    "label": "Training and Workshop Topics"
   },
   {
-   "depends_on": "eval:doc.type == 'Training'",
+   "depends_on": "eval:in_list(['Training', 'Workshop', 'Teachers Training Meeting', 'Workshop Arranged'], doc.type)",
    "fieldname": "training_mode",
    "fieldtype": "Small Text",
    "label": "Training Mode"
   },
   {
-   "depends_on": "eval:doc.type == 'Training'",
+   "depends_on": "eval:in_list(['Training', 'Workshop', 'Teachers Training Meeting', 'Workshop Arranged'], doc.type)",
    "fieldname": "training_school_category",
    "fieldtype": "Data",
    "label": "School Category"
   },
   {
-   "depends_on": "eval:doc.type == 'Training'",
+   "depends_on": "eval:in_list(['Training', 'Workshop', 'Teachers Training Meeting', 'Workshop Arranged'], doc.type)",
    "fieldname": "training_date",
    "fieldtype": "Date",
    "label": "Date"
   },
   {
-   "depends_on": "eval:doc.type == 'Training'",
+   "depends_on": "eval:in_list(['Training', 'Workshop', 'Teachers Training Meeting', 'Workshop Arranged'], doc.type)",
    "fieldname": "training_trainer_name",
    "fieldtype": "Data",
    "label": "Name of Trainer"
   },
   {
-   "depends_on": "eval:doc.type == 'Training'",
+   "depends_on": "eval:in_list(['Training', 'Workshop', 'Teachers Training Meeting', 'Workshop Arranged'], doc.type)",
    "fieldname": "training_entry_filled_by",
    "fieldtype": "Data",
    "label": "Entry Filled up by"
   },
   {
-   "depends_on": "eval:doc.type == 'Training'",
+   "depends_on": "eval:in_list(['Training', 'Workshop', 'Teachers Training Meeting', 'Workshop Arranged'], doc.type)",
    "fieldname": "training_city",
    "fieldtype": "Link",
    "label": "City",
    "options": "City"
   },
   {
-   "depends_on": "eval:doc.type == 'Training'",
+   "depends_on": "eval:in_list(['Training', 'Workshop', 'Teachers Training Meeting', 'Workshop Arranged'], doc.type)",
    "fieldname": "training_province",
    "fieldtype": "Select",
    "label": "Province",
    "options": "Punjab\nSindh\nKhyber Pakhtunkhwa\nBalochistan\nAzad Jammu & Kashmir\nGilgit-Baltistan\nIslamabad Capital Territory"
   },
   {
-   "depends_on": "eval:doc.type == 'Training'",
+   "depends_on": "eval:in_list(['Training', 'Workshop', 'Teachers Training Meeting', 'Workshop Arranged'], doc.type)",
    "fieldname": "training_venue_name",
    "fieldtype": "Data",
    "label": "Venue Name"
   },
   {
-   "depends_on": "eval:doc.type == 'Training'",
+   "depends_on": "eval:in_list(['Training', 'Workshop', 'Teachers Training Meeting', 'Workshop Arranged'], doc.type)",
    "fieldname": "training_no_of_participants",
    "fieldtype": "Int",
    "label": "No. of participants"
   },
   {
-   "depends_on": "eval:doc.type == 'Training'",
+   "depends_on": "eval:in_list(['Training', 'Workshop', 'Teachers Training Meeting', 'Workshop Arranged'], doc.type)",
    "fieldname": "training_no_of_schools_attended",
    "fieldtype": "Int",
    "label": "No. of Schools Attended"
   },
   {
-   "depends_on": "eval:doc.type == 'Training'",
+   "depends_on": "eval:in_list(['Training', 'Workshop', 'Teachers Training Meeting', 'Workshop Arranged'], doc.type)",
    "fieldname": "section_break_attendees",
    "fieldtype": "Section Break",
    "label": "Attendance / Feedback Form"
   },
   {
-   "depends_on": "eval:doc.type == 'Training'",
+   "depends_on": "eval:in_list(['Training', 'Workshop', 'Teachers Training Meeting', 'Workshop Arranged'], doc.type)",
    "description": "Add multiple teachers. School / Organization, Training Venue and Training Date repeat from previous row (editable). Email is optional.",
    "fieldname": "training_attendees",
    "fieldtype": "Table",
@@ -660,7 +660,7 @@
    "label": "School Closed"
   },
   {
-   "depends_on": "eval:doc.type=='Marketing'",
+   "depends_on": "eval:in_list(['Marketing', 'Visits', 'Registration of New Schools', 'Enrolment of Volunteers', 'Model School A', 'Model School B', 'Books Demand (Quantity)'], doc.type)",
    "fieldname": "section_break_marketing",
    "fieldtype": "Section Break",
    "label": "Marketing"
@@ -692,14 +692,14 @@
    "label": "Name of Staff"
   },
   {
-   "depends_on": "eval:doc.type=='Marketing'",
+   "depends_on": "eval:in_list(['Marketing', 'Visits', 'Registration of New Schools', 'Enrolment of Volunteers', 'Model School A', 'Model School B', 'Books Demand (Quantity)'], doc.type)",
    "fieldname": "marketing_visit_category",
    "fieldtype": "Select",
    "label": "Marketing Visit Category",
    "options": "\nNew\nFollowup & Other Visits\nTPS Visits"
   },
   {
-   "depends_on": "eval:doc.type=='Marketing'",
+   "depends_on": "eval:in_list(['Marketing', 'Visits', 'Registration of New Schools', 'Enrolment of Volunteers', 'Model School A', 'Model School B', 'Books Demand (Quantity)'], doc.type)",
    "fieldname": "frequency_of_visits",
    "fieldtype": "Select",
    "label": "Frequency of Visits",
@@ -793,7 +793,7 @@
   },
   {
    "default": "0",
-   "depends_on": "eval:doc.type=='Marketing'",
+   "depends_on": "eval:in_list(['Marketing', 'Visits', 'Registration of New Schools', 'Enrolment of Volunteers', 'Model School A', 'Model School B', 'Books Demand (Quantity)'], doc.type)",
    "fieldname": "marketing_material_provided",
    "fieldtype": "Check",
    "label": "Does Marketing Material Provided"
@@ -805,14 +805,14 @@
    "label": "Reference"
   },
   {
-   "depends_on": "eval:doc.type=='Marketing'",
+   "depends_on": "eval:in_list(['Marketing', 'Visits', 'Registration of New Schools', 'Enrolment of Volunteers', 'Model School A', 'Model School B', 'Books Demand (Quantity)'], doc.type)",
    "fieldname": "status",
    "fieldtype": "Select",
    "label": "Status",
    "options": "\nAgree\nNot Agree\nNeed follow up visit\nWill Discuss with Higher Management\nOther"
   },
   {
-   "depends_on": "eval:doc.type=='Marketing' && in_list(['Not Agree','Other'], doc.status)",
+   "depends_on": "eval:in_list(['Marketing', 'Visits', 'Registration of New Schools', 'Enrolment of Volunteers', 'Model School A', 'Model School B', 'Books Demand (Quantity)'], doc.type) && in_list(['Not Agree','Other'], doc.status)",
    "fieldname": "reasons_if_not_agreed",
    "fieldtype": "Small Text",
    "label": "Reasons If Not Agreed (details)"
@@ -866,136 +866,136 @@
    "fieldtype": "Column Break"
   },
   {
-   "depends_on": "eval:doc.type == 'Meeting'",
+   "depends_on": "eval:in_list(['Meeting', 'Meeting with Ulama and Educationist'], doc.type)",
    "fieldname": "section_break_meeting",
    "fieldtype": "Section Break",
    "label": "Meeting"
   },
   {
-   "depends_on": "eval:doc.type == 'Meeting'",
+   "depends_on": "eval:in_list(['Meeting', 'Meeting with Ulama and Educationist'], doc.type)",
    "fieldname": "mt_timestamp",
    "fieldtype": "Datetime",
    "label": "Timestamp"
   },
   {
-   "depends_on": "eval:doc.type == 'Meeting'",
+   "depends_on": "eval:in_list(['Meeting', 'Meeting with Ulama and Educationist'], doc.type)",
    "fieldname": "mt_month",
    "fieldtype": "Select",
    "label": "Month",
    "options": "\nJanuary\nFebruary\nMarch\nApril\nMay\nJune\nJuly\nAugust\nSeptember\nOctober\nNovember\nDecember"
   },
   {
-   "depends_on": "eval:doc.type == 'Meeting'",
+   "depends_on": "eval:in_list(['Meeting', 'Meeting with Ulama and Educationist'], doc.type)",
    "fieldname": "mt_quarter",
    "fieldtype": "Select",
    "label": "Quarter",
    "options": "\nQ1\nQ2\nQ3\nQ4"
   },
   {
-   "depends_on": "eval:doc.type == 'Meeting'",
+   "depends_on": "eval:in_list(['Meeting', 'Meeting with Ulama and Educationist'], doc.type)",
    "fieldname": "mt_visit_by",
    "fieldtype": "Data",
    "label": "Visit By"
   },
   {
-   "depends_on": "eval:doc.type == 'Meeting'",
+   "depends_on": "eval:in_list(['Meeting', 'Meeting with Ulama and Educationist'], doc.type)",
    "fieldname": "mt_agenda",
    "fieldtype": "Small Text",
    "label": "Agenda"
   },
   {
-   "depends_on": "eval:doc.type == 'Meeting'",
+   "depends_on": "eval:in_list(['Meeting', 'Meeting with Ulama and Educationist'], doc.type)",
    "fieldname": "column_break_mt1",
    "fieldtype": "Column Break"
   },
   {
-   "depends_on": "eval:doc.type == 'Meeting'",
+   "depends_on": "eval:in_list(['Meeting', 'Meeting with Ulama and Educationist'], doc.type)",
    "fieldname": "mt_meeting_with_person_name",
    "fieldtype": "Data",
    "label": "Meeting With (Person Name)"
   },
   {
-   "depends_on": "eval:doc.type == 'Meeting'",
+   "depends_on": "eval:in_list(['Meeting', 'Meeting with Ulama and Educationist'], doc.type)",
    "fieldname": "mt_contact_no",
    "fieldtype": "Data",
    "label": "Contact No."
   },
   {
-   "depends_on": "eval:doc.type == 'Meeting'",
+   "depends_on": "eval:in_list(['Meeting', 'Meeting with Ulama and Educationist'], doc.type)",
    "fieldname": "mt_designation",
    "fieldtype": "Data",
    "label": "Designation"
   },
   {
-   "depends_on": "eval:doc.type == 'Meeting'",
+   "depends_on": "eval:in_list(['Meeting', 'Meeting with Ulama and Educationist'], doc.type)",
    "fieldname": "mt_institute_or_organization_name",
    "fieldtype": "Data",
    "label": "Institute or Organization Name"
   },
   {
-   "depends_on": "eval:doc.type == 'Meeting'",
+   "depends_on": "eval:in_list(['Meeting', 'Meeting with Ulama and Educationist'], doc.type)",
    "fieldname": "mt_meeting_date",
    "fieldtype": "Date",
    "label": "Meeting Date"
   },
   {
-   "depends_on": "eval:doc.type == 'Meeting'",
+   "depends_on": "eval:in_list(['Meeting', 'Meeting with Ulama and Educationist'], doc.type)",
    "fieldname": "mt_city",
    "fieldtype": "Link",
    "label": "City",
    "options": "City"
   },
   {
-   "depends_on": "eval:doc.type == 'Meeting'",
+   "depends_on": "eval:in_list(['Meeting', 'Meeting with Ulama and Educationist'], doc.type)",
    "fieldname": "mt_area",
    "fieldtype": "Link",
    "label": "Area",
    "options": "Area"
   },
   {
-   "depends_on": "eval:doc.type == 'Meeting'",
+   "depends_on": "eval:in_list(['Meeting', 'Meeting with Ulama and Educationist'], doc.type)",
    "fieldname": "column_break_mt2",
    "fieldtype": "Column Break"
   },
   {
-   "depends_on": "eval:doc.type == 'Meeting'",
+   "depends_on": "eval:in_list(['Meeting', 'Meeting with Ulama and Educationist'], doc.type)",
    "fieldname": "mt_meeting_starting_time",
    "fieldtype": "Time",
    "label": "Meeting Starting Time"
   },
   {
-   "depends_on": "eval:doc.type == 'Meeting'",
+   "depends_on": "eval:in_list(['Meeting', 'Meeting with Ulama and Educationist'], doc.type)",
    "fieldname": "mt_meeting_ending_time",
    "fieldtype": "Time",
    "label": "Meeting Ending Time"
   },
   {
    "default": "0",
-   "depends_on": "eval:doc.type == 'Meeting'",
+   "depends_on": "eval:in_list(['Meeting', 'Meeting with Ulama and Educationist'], doc.type)",
    "fieldname": "mt_mqh_sample_provided",
    "fieldtype": "Check",
    "label": "Mutalae Qur'an Sample Provided"
   },
   {
-   "depends_on": "eval:doc.type == 'Meeting'",
+   "depends_on": "eval:in_list(['Meeting', 'Meeting with Ulama and Educationist'], doc.type)",
    "fieldname": "mt_reference",
    "fieldtype": "Data",
    "label": "Reference"
   },
   {
-   "depends_on": "eval:doc.type == 'Meeting'",
+   "depends_on": "eval:in_list(['Meeting', 'Meeting with Ulama and Educationist'], doc.type)",
    "fieldname": "mt_visiting_card",
    "fieldtype": "Attach Image",
    "label": "Visiting Card"
   },
   {
-   "depends_on": "eval:doc.type == 'Meeting'",
+   "depends_on": "eval:in_list(['Meeting', 'Meeting with Ulama and Educationist'], doc.type)",
    "fieldname": "mt_meeting_picture",
    "fieldtype": "Attach Image",
    "label": "Meeting Picture"
   },
   {
-   "depends_on": "eval:doc.type == 'Meeting'",
+   "depends_on": "eval:in_list(['Meeting', 'Meeting with Ulama and Educationist'], doc.type)",
    "fieldname": "mt_remarks",
    "fieldtype": "Small Text",
    "label": "Remarks"
@@ -1036,13 +1036,13 @@
    "label": "End Time"
   },
   {
-   "depends_on": "eval:doc.type=='Marketing' && doc.status=='Need follow up visit'",
+   "depends_on": "eval:in_list(['Marketing', 'Visits', 'Registration of New Schools', 'Enrolment of Volunteers', 'Model School A', 'Model School B', 'Books Demand (Quantity)'], doc.type) && doc.status=='Need follow up visit'",
    "fieldname": "school_remarks_follow_up",
    "fieldtype": "Small Text",
    "label": "School Remarks (If Need Follow up visit)"
   },
   {
-   "depends_on": "eval:doc.type=='Marketing' && in_list(['Not Agree','Other'], doc.status) && (doc.reason_not_agreed=='Other' || doc.reasons_if_not_agreed=='Other')",
+   "depends_on": "eval:in_list(['Marketing', 'Visits', 'Registration of New Schools', 'Enrolment of Volunteers', 'Model School A', 'Model School B', 'Books Demand (Quantity)'], doc.type) && in_list(['Not Agree','Other'], doc.status) && (doc.reason_not_agreed=='Other' || doc.reasons_if_not_agreed=='Other')",
    "fieldname": "reasons_if_not_agreed_other",
    "fieldtype": "Small Text",
    "label": "Other Reason (if not Agreed)"
@@ -1353,7 +1353,7 @@
    "label": "MS Excel of Attendance Sheet"
   },
   {
-   "depends_on": "eval:doc.type=='Marketing' && in_list(['Not Agree','Other'], doc.status)",
+   "depends_on": "eval:in_list(['Marketing', 'Visits', 'Registration of New Schools', 'Enrolment of Volunteers', 'Model School A', 'Model School B', 'Books Demand (Quantity)'], doc.type) && in_list(['Not Agree','Other'], doc.status)",
    "fieldname": "reason_not_agreed",
    "fieldtype": "Select",
    "label": "Reasons if not Agreed",
@@ -1411,53 +1411,53 @@
    "options": "\nExcellent - Highly skilled and professional\nGood - Meets expectations\nAverage - Needs some improvement\nPoor - Requires immediate training/support"
   },
   {
-   "depends_on": "eval:doc.type=='Training'",
+   "depends_on": "eval:in_list(['Training', 'Workshop', 'Teachers Training Meeting', 'Workshop Arranged'], doc.type)",
    "fieldname": "training_arrange_by",
    "fieldtype": "Small Text",
    "label": "Training Arrange By"
   },
   {
-   "depends_on": "eval:doc.type=='Training'",
+   "depends_on": "eval:in_list(['Training', 'Workshop', 'Teachers Training Meeting', 'Workshop Arranged'], doc.type)",
    "fieldname": "training_conducted_by",
    "fieldtype": "Data",
    "label": "Training Conducted By"
   },
   {
-   "depends_on": "eval:doc.type=='Training' && doc.training_conducted_by=='Other'",
+   "depends_on": "eval:in_list(['Training', 'Workshop', 'Teachers Training Meeting', 'Workshop Arranged'], doc.type) && doc.training_conducted_by=='Other'",
    "fieldname": "training_conducted_by_other",
    "fieldtype": "Small Text",
    "label": "Trainer Name (Other)"
   },
   {
-   "depends_on": "eval:doc.type=='Meeting'",
+   "depends_on": "eval:in_list(['Meeting', 'Meeting with Ulama and Educationist'], doc.type)",
    "fieldname": "mt_meeting_type",
    "fieldtype": "Select",
    "label": "Meeting Type",
    "options": "\nInternal Meeting (Meeting with TIF Staff)\nExternal Meeting (Meeting with Others)\nInvitation of Personalities to the Head Office\nInvitation of Personalities to the Regional Office"
   },
   {
-   "depends_on": "eval:doc.type=='Meeting'",
+   "depends_on": "eval:in_list(['Meeting', 'Meeting with Ulama and Educationist'], doc.type)",
    "fieldname": "mt_meeting_mode",
    "fieldtype": "Select",
    "label": "Meeting Mode",
    "options": "\nOnline\nOnsite / In Person"
   },
   {
-   "depends_on": "eval:doc.type=='Meeting' && doc.mt_meeting_type=='Internal Meeting (Meeting with TIF Staff)'",
+   "depends_on": "eval:in_list(['Meeting', 'Meeting with Ulama and Educationist'], doc.type) && doc.mt_meeting_type=='Internal Meeting (Meeting with TIF Staff)'",
    "fieldname": "mt_internal_meeting_with",
    "fieldtype": "Select",
    "label": "Internal Meeting with",
    "options": "\nRegional Office Staff / Supervisors\nMeeting with SMEs\nHead Office Staff"
   },
   {
-   "depends_on": "eval:doc.type=='Meeting' && doc.mt_meeting_type=='External Meeting (Meeting with Others)'",
+   "depends_on": "eval:in_list(['Meeting', 'Meeting with Ulama and Educationist'], doc.type) && doc.mt_meeting_type=='External Meeting (Meeting with Others)'",
    "fieldname": "mt_external_meeting_with",
    "fieldtype": "Select",
    "label": "External Meeting with",
    "options": "\nUlma Karam\nEducationalist\nOwner / Director of Chain of School\nGovt officials\nInfluential Personalities\nSocial Media Activist"
   },
   {
-   "depends_on": "eval:doc.type=='Meeting'",
+   "depends_on": "eval:in_list(['Meeting', 'Meeting with Ulama and Educationist'], doc.type)",
    "fieldname": "mt_venue",
    "fieldtype": "Data",
    "label": "Venue of Meeting"
@@ -1525,50 +1525,50 @@
    "options": "\n1 Hour\n2 Hours\n3 Hours\n4 Hours\n5 Hours\n6 Hours\n7 Hours\n8 Hours\nFull Day"
   },
   {
-   "depends_on": "eval:doc.type=='Co-curricular Activity'",
+   "depends_on": "eval:in_list(['Co-curricular Activity', 'Quiz Arranged'], doc.type)",
    "fieldname": "section_break_cocurricular",
    "fieldtype": "Section Break",
    "label": "Co-curricular Activities Detail"
   },
   {
-   "depends_on": "eval:doc.type=='Co-curricular Activity'",
+   "depends_on": "eval:in_list(['Co-curricular Activity', 'Quiz Arranged'], doc.type)",
    "fieldname": "cc_activity",
    "fieldtype": "Select",
    "label": "Co-curricular Activities",
    "options": "\nArrange Quiz in School\nInter School Quiz Competition\nConduct / Arrange Demo Class\nIntroduce TIF in School Functions\nIntroduce TIF in Exhibition"
   },
   {
-   "depends_on": "eval:doc.type=='Co-curricular Activity'",
+   "depends_on": "eval:in_list(['Co-curricular Activity', 'Quiz Arranged'], doc.type)",
    "fieldname": "cc_venue",
    "fieldtype": "Data",
    "label": "Venue of Co-curricular Activities"
   },
   {
-   "depends_on": "eval:doc.type=='Co-curricular Activity'",
+   "depends_on": "eval:in_list(['Co-curricular Activity', 'Quiz Arranged'], doc.type)",
    "fieldname": "cc_no_of_schools",
    "fieldtype": "Data",
    "label": "No of Schools regarding Co-curricular Activities"
   },
   {
-   "depends_on": "eval:doc.type=='Co-curricular Activity'",
+   "depends_on": "eval:in_list(['Co-curricular Activity', 'Quiz Arranged'], doc.type)",
    "fieldname": "cc_no_of_participants",
    "fieldtype": "Data",
    "label": "No of Participants regarding Co-curricular Activities"
   },
   {
-   "depends_on": "eval:doc.type=='Co-curricular Activity'",
+   "depends_on": "eval:in_list(['Co-curricular Activity', 'Quiz Arranged'], doc.type)",
    "fieldname": "cc_participants_category",
    "fieldtype": "Small Text",
    "label": "Participants Category who participated in Co-curricular Activities"
   },
   {
-   "depends_on": "eval:doc.type=='Enrolment of Participants'",
+   "depends_on": "eval:in_list(['Enrolment of Participants', 'Enrolment of Participant in ELP/ TECC/ TTC/ Online Tajweed'], doc.type)",
    "fieldname": "section_break_enrolment",
    "fieldtype": "Section Break",
    "label": "Enrolment of Participants"
   },
   {
-   "depends_on": "eval:doc.type=='Enrolment of Participants'",
+   "depends_on": "eval:in_list(['Enrolment of Participants', 'Enrolment of Participant in ELP/ TECC/ TTC/ Online Tajweed'], doc.type)",
    "description": "Add multiple teachers / participants. Course and date can be edited per row.",
    "fieldname": "enrolment_participants",
    "fieldtype": "Table",
@@ -1576,13 +1576,13 @@
    "options": "Field Visit Enrolment Participant"
   },
   {
-   "depends_on": "eval:doc.type=='Attendance / Registration in One Day / Half day Workshop'",
+   "depends_on": "eval:in_list(['Attendance / Registration in One Day / Half day Workshop', 'Registration of Participant in Workshops'], doc.type)",
    "fieldname": "section_break_workshop_attendance",
    "fieldtype": "Section Break",
    "label": "Attendance / Registration in One Day / Half day Workshop"
   },
   {
-   "depends_on": "eval:doc.type=='Attendance / Registration in One Day / Half day Workshop'",
+   "depends_on": "eval:in_list(['Attendance / Registration in One Day / Half day Workshop', 'Registration of Participant in Workshops'], doc.type)",
    "description": "Add multiple teachers. School / Organization, Training Venue and Training Date repeat from previous row (editable).",
    "fieldname": "workshop_attendees",
    "fieldtype": "Table",

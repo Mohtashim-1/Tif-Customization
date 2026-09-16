@@ -381,17 +381,39 @@ class SmesActivityForm {
 
 	activity_kind() {
 		const t = this.data.activity_type || "";
-		if (t.includes("Enrolment of Participants") || t.includes("Enrolment of participants")) {
+		if (
+			t.includes("Enrolment of Participants") ||
+			t.includes("Enrolment of participants") ||
+			t.includes("ELP/ TECC")
+		) {
 			return "enrolment";
 		}
-		if (t.includes("Attendance / Registration")) return "workshop_attendance";
+		if (t.includes("Attendance / Registration") || t === "Registration of Participant in Workshops") {
+			return "workshop_attendance";
+		}
+		if (t === "Visits" || t === "Registration of New Schools" || t === "Enrolment of Volunteers") {
+			return "marketing";
+		}
+		if (t === "Model School A" || t === "Model School B" || t === "Books Demand (Quantity)") {
+			return "marketing";
+		}
 		if (t.includes("Marketing")) return "marketing";
 		if (t.includes("M&E")) return "me";
 		if (t.includes("Joint Visit")) return "joint";
-		if (t.includes("Training")) return "training";
+		if (
+			t === "Workshop" ||
+			t === "Workshop Arranged" ||
+			t.includes("Teachers Training Meeting") ||
+			t.includes("Training")
+		) {
+			return "training";
+		}
+		if (t.includes("Ulama") || t.includes("Educationist")) return "meeting";
 		if (t.includes("Meetings") || t === "Meeting") return "meeting";
-		if (t.includes("Academic")) return "academic";
-		if (t.includes("Co-curricular")) return "cocurricular";
+		if (t.includes("Academic") || t === "Other Official Tasks" || t.includes("Headoffice")) {
+			return "academic";
+		}
+		if (t.includes("Co-curricular") || t === "Quiz Arranged") return "cocurricular";
 		return "";
 	}
 

@@ -1,7 +1,43 @@
 // Copyright (c) 2026, mohtashim and contributors
 // For license information, please see license.txt
 
-const SCHOOL_TYPES = ["Marketing", "M&E", "Joint Visit with SME", "Training"];
+const SCHOOL_TYPES = [
+	"Marketing",
+	"M&E",
+	"Joint Visit with SME",
+	"Training",
+	"Workshop",
+	"Teachers Training Meeting",
+	"Workshop Arranged",
+	"Visits",
+	"Registration of New Schools",
+	"Enrolment of Volunteers",
+	"Model School A",
+	"Model School B",
+	"Books Demand (Quantity)",
+];
+const TRAINING_TYPES = ["Training", "Workshop", "Teachers Training Meeting", "Workshop Arranged"];
+const MEETING_TYPES = ["Meeting", "Meeting with Ulama and Educationist"];
+const COCURRICULAR_TYPES = ["Co-curricular Activity", "Quiz Arranged"];
+const ENROLMENT_TYPES = [
+	"Enrolment of Participants",
+	"Enrolment of Participant in ELP/ TECC/ TTC/ Online Tajweed",
+];
+const WORKSHOP_ATTENDANCE_TYPES = [
+	"Attendance / Registration in One Day / Half day Workshop",
+	"Registration of Participant in Workshops",
+];
+const HIDDEN_TYPE_OPTIONS = [
+	"Marketing",
+	"M&E",
+	"Joint Visit with SME",
+	"Training",
+	"Meeting",
+	"Attendance / Registration in One Day / Half day Workshop",
+	"Academic / Other Official Tasks",
+	"Academic",
+	"Other",
+];
 const AFFILIATED_YES = ["Yes - Already Affiliated", "Yes - Newly Registered", "Yes"];
 
 const MODEL_SCHOOL_A =
@@ -116,6 +152,21 @@ function supervisor_only_types(access) {
 		: SUPERVISOR_ONLY_ACTIVITY_TYPES_DEFAULT;
 }
 
+function apply_visible_type_options(frm) {
+	if (!frm.fields_dict.type) return;
+	const meta = frappe.meta.get_docfield("Field Visit", "type");
+	let opts = String(meta?.options || frm.fields_dict.type.df.options || "")
+		.split("\n")
+		.map((o) => o.trim())
+		.filter(Boolean)
+		.filter((o) => !HIDDEN_TYPE_OPTIONS.includes(o));
+	const current = (frm.doc.type || "").trim();
+	if (current && !opts.includes(current)) {
+		opts = [current, ...opts];
+	}
+	frm.set_df_property("type", "options", opts.join("\n"));
+}
+
 function apply_supervisor_field_visit_restrictions(frm) {
 	const access = _supervisor_field_visit_access || {};
 	const can = access.can_manage_supervisor_only;
@@ -152,6 +203,10 @@ function apply_supervisor_field_visit_restrictions(frm) {
 			}
 			if (!can) {
 				filtered = filtered.filter((o) => !blockedTypes.has(o));
+			}
+			const current = (frm.doc.type || "").trim();
+			if (current && !filtered.includes(current)) {
+				filtered = [current, ...filtered];
 			}
 			frm.set_df_property("type", "options", filtered.join("\n"));
 		}
@@ -479,11 +534,11 @@ function apply_field_visit_logic(frm) {
 		set_hidden(frm, me_fields, false);
 	}
 
-	if (type === "Training") {
+	if (TRAINING_TYPES.includes(type)) {
 		set_hidden(frm, training_fields, false);
 	}
 
-	if (type === "Meeting") {
+	if (MEETING_TYPES.includes(type)) {
 		set_hidden(frm, meeting_fields, false);
 	}
 
@@ -491,15 +546,15 @@ function apply_field_visit_logic(frm) {
 		set_hidden(frm, academic_fields, false);
 	}
 
-	if (type === "Co-curricular Activity") {
+	if (type === "Co-curricular Activity" || COCURRICULAR_TYPES.includes(type)) {
 		set_hidden(frm, cocurricular_fields, false);
 	}
 
-	if (type === "Enrolment of Participants") {
+	if (ENROLMENT_TYPES.includes(type)) {
 		set_hidden(frm, enrolment_fields, false);
 	}
 
-	if (type === "Attendance / Registration in One Day / Half day Workshop") {
+	if (WORKSHOP_ATTENDANCE_TYPES.includes(type)) {
 		set_hidden(frm, workshop_attendance_fields, false);
 	}
 
@@ -507,7 +562,7 @@ function apply_field_visit_logic(frm) {
 	if (SCHOOL_TYPES.includes(type)) {
 		set_hidden(frm, school_fields, false);
 		set_hidden(frm, attachment_fields, false);
-		if (type === "Training") {
+		if (TRAINING_TYPES.includes(type)) {
 			set_hidden(
 				frm,
 				[
@@ -601,7 +656,7 @@ function apply_field_visit_logic(frm) {
 	set_hidden(
 		frm,
 		["training_conducted_by_other"],
-		!(type === "Training" && frm.doc.training_conducted_by === "Other"),
+		!(TRAINING_TYPES.includes(type) && frm.doc.training_conducted_by === "Other"),
 	);
 
 	// M&E: assessment from
@@ -635,8 +690,10 @@ function apply_field_visit_logic(frm) {
 	set_hidden(frm, ["me_new_person_email"], !(type === "M&E" && changes.includes("email")));
 
 	// Meetings: internal / external with
-	const is_internal = type === "Meeting" && meeting_type.includes("Internal Meeting");
-	const is_external = type === "Meeting" && meeting_type.includes("External Meeting");
+	const is_internal = MEETING_TYPES.includes(type) && meeting_type.includes("Internal Meeting");
+	const is_external =
+		type === "Meeting with Ulama and Educationist" ||
+		(MEETING_TYPES.includes(type) && meeting_type.includes("External Meeting"));
 	set_hidden(frm, ["mt_internal_meeting_with"], !is_internal);
 	set_hidden(frm, ["mt_external_meeting_with"], !is_external);
 
@@ -671,7 +728,7 @@ function apply_field_visit_logic(frm) {
 	set_hidden(frm, ["ot_visit_meeting_detail"], !is_visit_task);
 
 	// School affiliation service matrices
-	const show_school = SCHOOL_TYPES.includes(type) && type !== "Training";
+	const show_school = SCHOOL_TYPES.includes(type) && !TRAINING_TYPES.includes(type);
 	const show_qps = show_school && is_affiliated_yes(frm.doc.qps_affiliated);
 	const show_tps = show_school && is_affiliated_yes(frm.doc.tps_affiliated);
 	const show_cee = show_school && is_affiliated_yes(frm.doc.cee_affiliated);
@@ -738,7 +795,7 @@ function _visit_location_defaults(frm, prev_row) {
 			city: (prev_row && prev_row.city) || frm.doc.me_city || "",
 		};
 	}
-	if (type === "Training") {
+	if (TRAINING_TYPES.includes(type)) {
 		return {
 			province: (prev_row && prev_row.province) || frm.doc.training_province || "",
 			city: (prev_row && prev_row.city) || frm.doc.training_city || "",
@@ -818,9 +875,11 @@ function add_multiple_child_rows(frm, table_field, child_doctype, count, apply_d
 
 frappe.ui.form.on("Field Visit", {
 	onload(frm) {
+		apply_visible_type_options(frm);
 		fetch_supervisor_field_visit_access(frm, () => apply_supervisor_field_visit_restrictions(frm));
 	},
 	refresh(frm) {
+		apply_visible_type_options(frm);
 		apply_field_visit_logic(frm);
 		if ((frm.doc.type || "").trim()) {
 			sync_field_visit_travel_cost(frm);
@@ -835,7 +894,7 @@ frappe.ui.form.on("Field Visit", {
 			frappe.set_route("smes-activity-form");
 		});
 
-		if (frm.doc.type === "Training") {
+		if (TRAINING_TYPES.includes(frm.doc.type)) {
 			frm.add_custom_button(
 				__("Add Multiple Attendees"),
 				() => {
@@ -965,7 +1024,7 @@ frappe.ui.form.on("Field Visit", {
 			}
 		}
 
-		if (["Marketing", "M&E", "Joint Visit with SME", "Training"].includes(frm.doc.type)) {
+		if (["Marketing", "M&E", "Joint Visit with SME", ...TRAINING_TYPES].includes(frm.doc.type)) {
 			frm.add_custom_button(
 				__("Add Multiple Volunteers"),
 				() => {
@@ -1001,7 +1060,7 @@ frappe.ui.form.on("Field Visit", {
 			);
 		}
 
-		if (frm.doc.type === "Enrolment of Participants") {
+		if (ENROLMENT_TYPES.includes(frm.doc.type)) {
 			frm.add_custom_button(
 				__("Add Multiple Teachers"),
 				() => {
@@ -1034,7 +1093,7 @@ frappe.ui.form.on("Field Visit", {
 			);
 		}
 
-		if (frm.doc.type === "Attendance / Registration in One Day / Half day Workshop") {
+		if (WORKSHOP_ATTENDANCE_TYPES.includes(frm.doc.type)) {
 			frm.add_custom_button(
 				__("Add Multiple Teachers"),
 				() => {

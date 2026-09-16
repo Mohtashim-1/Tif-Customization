@@ -89,9 +89,13 @@ def _metric_condition(metric: str, alias: str = "fv") -> str:
 	if m in ("me", "monitoring"):
 		return f"{a}.type = 'M&E'"
 	if m == "meeting":
-		return f"{a}.type = 'Meeting'"
+		return f"{a}.type IN ('Meeting', 'Meeting with Ulama and Educationist')"
 	if m == "training":
-		return f"{a}.type = 'Training'"
+		return f"{a}.type IN ('Training', 'Workshop')"
+	if m == "half_day_workshop":
+		return f"""{a}.type IN ('Training', 'Workshop') AND LOWER(IFNULL({a}.training_session_category,'')) LIKE '%%half%%'"""
+	if m == "full_day_session":
+		return f"""{a}.type IN ('Training', 'Workshop') AND LOWER(IFNULL({a}.training_session_category,'')) NOT LIKE '%%half%%'"""
 	if m == "academic_task":
 		return f"{a}.type IN ('Academic', 'Academic / Other Official Tasks', 'Other')"
 	if m == "other_official":
@@ -121,12 +125,8 @@ def _metric_condition(metric: str, alias: str = "fv") -> str:
 		return f"""{a}.type = 'M&E' AND LOWER(REPLACE(REPLACE(IFNULL({a}.me_activity_status,''),'-',' '),'  ',' ')) IN ('inactive', 'in active')"""
 	if m == "grand_total":
 		return f"{a}.type IN ('Marketing', 'Meeting', 'M&E')"
-	if m == "half_day_workshop":
-		return f"{a}.type = 'Training' AND LOWER(IFNULL({a}.training_session_category,'')) LIKE '%%half%%'"
-	if m == "full_day_session":
-		return f"{a}.type = 'Training' AND LOWER(IFNULL({a}.training_session_category,'')) NOT LIKE '%%half%%'"
 	if m in ("workshop_registration", "schools", "participants"):
-		return f"{a}.type = 'Training'"
+		return f"{a}.type IN ('Training', 'Workshop', 'Teachers Training Meeting')"
 	if m == "enrolment":
 		return f"""EXISTS (
 			SELECT 1 FROM `tabField Visit Enrolment Participant` ep
@@ -138,13 +138,19 @@ def _metric_condition(metric: str, alias: str = "fv") -> str:
 			WHERE vv.parent = {a}.name
 		)"""
 	if m == "meeting_ulama":
-		return f"""{a}.type = 'Marketing' AND (
-			LOWER(IFNULL({a}.meeting_with,'')) LIKE '%%ulama%%'
-			OR LOWER(IFNULL({a}.meeting_with,'')) LIKE '%%educationist%%'
-			OR LOWER(IFNULL({a}.designation,'')) LIKE '%%ulama%%'
+		return f"""(
+			{a}.type = 'Meeting with Ulama and Educationist'
+			OR ({a}.type = 'Marketing' AND (
+				LOWER(IFNULL({a}.meeting_with,'')) LIKE '%%ulama%%'
+				OR LOWER(IFNULL({a}.meeting_with,'')) LIKE '%%educationist%%'
+				OR LOWER(IFNULL({a}.designation,'')) LIKE '%%ulama%%'
+			))
 		)"""
 	if m == "teachers_training_meeting":
-		return f"{a}.type = 'M&E' AND IFNULL({a}.me_teachers_training_session, 0) = 1"
+		return f"""(
+			{a}.type = 'Teachers Training Meeting'
+			OR ({a}.type = 'M&E' AND IFNULL({a}.me_teachers_training_session, 0) = 1)
+		)"""
 	if m == "headoffice_visit":
 		return f"""(
 			{a}.type = 'Headoffice/ Regional Office/ Out of Station Visit'
