@@ -1,0 +1,41 @@
+{
+ "content": null,
+ "creation": "2026-09-16 12:00:00.000000",
+ "docstatus": 0,
+ "doctype": "Page",
+ "idx": 0,
+ "modified": "2026-09-16 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Tif Customization",
+ "name": "user-system-usage-report",
+ "owner": "Administrator",
+ "page_name": "user-system-usage-report",
+ "roles": [
+  {
+   "role": "System Manager"
+  },
+  {
+   "role": "HR Manager"
+  },
+  {
+   "role": "HR User"
+  },
+  {
+   "role": "HOD"
+  },
+  {
+   "role": "COO"
+  },
+  {
+   "role": "Field Staff Manager"
+  },
+  {
+   "role": "SME Manager"
+  }
+ ],
+ "script": null,
+ "standard": "Yes",
+ "style": null,
+ "system_page": 0,
+ "title": "User System Usage Report"
+}

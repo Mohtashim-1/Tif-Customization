@@ -75,6 +75,7 @@ page_js = {
 	"procurement-expense" : "tif_customization/page/procurement_expense/procurement_expense.js",
 	"funds-dashboard" : "tif_customization/page/funds_dashboard/funds_dashboard.js",
 	"school-opening-registry": "tif_customization/page/school_opening_registry/school_opening_registry.js",
+	"user-system-usage-report": "tif_customization/page/user_system_usage_report/user_system_usage_report.js",
 }
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 doctype_list_js = {

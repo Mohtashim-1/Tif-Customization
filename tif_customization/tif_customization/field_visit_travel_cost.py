@@ -8,7 +8,7 @@ import frappe
 from frappe.utils import flt
 
 DEFAULT_PER_KM_FUEL = 18.0
-# When a visit day has no Travel Cost on Field Visit, SME reports estimate this distance.
+# Unused unless estimate_if_blank=True on report aggregations.
 DEFAULT_DAILY_TRAVEL_KM = 22.0
 
 TRAVEL_ACTIVITY_TYPES = (
@@ -101,19 +101,21 @@ def aggregate_visit_expenses_by_staff(
 	visit_day_sql: str,
 	resolve_staff_key,
 	staff_key_index,
+	estimate_if_blank: bool = True,
 ) -> dict[str, float]:
-	"""Explicit travel_cost per visit day, else estimated daily travel (22 km × per km)."""
+	"""Sum recorded travel_cost. If estimate_if_blank, empty days use 22 km × per km."""
 	if not staff_rows:
 		return {}
 
 	index = staff_key_index(staff_rows)
 	per_km_by_key = {}
-	for s in staff_rows:
-		per_km_by_key[s["key"]] = resolve_per_km_fuel(
-			visit_by=s.get("employee_name"),
-			owner=s.get("user_id"),
-			employee=s.get("employee"),
-		)
+	if estimate_if_blank:
+		for s in staff_rows:
+			per_km_by_key[s["key"]] = resolve_per_km_fuel(
+				visit_by=s.get("employee_name"),
+				owner=s.get("user_id"),
+				employee=s.get("employee"),
+			)
 
 	try:
 		visit_rows = frappe.db.sql(
@@ -152,7 +154,7 @@ def aggregate_visit_expenses_by_staff(
 	for (staff_key, _day), explicit in day_totals.items():
 		if explicit > 0:
 			out[staff_key] = out.get(staff_key, 0.0) + explicit
-		else:
+		elif estimate_if_blank:
 			out[staff_key] = out.get(staff_key, 0.0) + daily_travel_allowance(
 				per_km_by_key.get(staff_key)
 			)

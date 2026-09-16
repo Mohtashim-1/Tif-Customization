@@ -116,6 +116,8 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					.sme-sum-kpi--sme{border-top-color:#475569}
 					.sme-sum-kpi--supervisor{border-top-color:#7c2d12}
 					.sme-sum-kpi--outcome{border-top-color:#ca8a04}
+					.sme-sum-kpi--model-a{border-top-color:#b45309}
+					.sme-sum-kpi--model-b{border-top-color:#c2410c}
 					@media print{
 						@page{size:A4 landscape;margin:8mm}
 						html,body{width:100%!important;height:auto!important;overflow:visible!important;background:#fff!important}
@@ -148,6 +150,9 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					<strong>KPI Activities</strong> are the Target Base counts that make up earned points
 					(Total Visits, workshops, Ulama meetings, academic, etc.).
 					Workshop score uses session count, not participant heads.
+					<strong>Expenses</strong> are recorded Field Visit travel cost plus submitted Expense Claims only.
+					If KM / travel cost was not entered, that visit adds Rs 0 — nothing is estimated.
+					Click an Expenses amount in the table to see the recorded KM, rate, and formula.
 				</p>
 				<div id="sme-sum-filters" class="sme-sum-filters row" style="margin-bottom:12px;"></div>
 				<div id="sme-sum-body"></div>
@@ -380,6 +385,13 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		return `<td class="num sme-click${cls}" data-visit-metric="${metric}"${staffAttr}${ytdAttr} title="${__("Click to see Field Visits")}">${this.fmt(n)}</td>`;
 	}
 
+	expense_td(src, staff) {
+		const staffAttr = staff ? ` data-expense-staff="${frappe.utils.escape_html(staff)}"` : "";
+		return `<td class="num sme-click" data-expense-detail="1"${staffAttr} title="${__(
+			"Click to see KM, rate, and how this expense is computed"
+		)}">${this.fmt_cur(src.expenses)}</td>`;
+	}
+
 	outcome_columns(data) {
 		return (
 			(data && data.outcome_columns) || [
@@ -482,6 +494,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		const k = data.kpis || {};
 		const expenseTotal = flt((data.totals || {}).expenses ?? k.expenses ?? 0);
 		const visitedDaysMax = this.max_visited_days(data);
+		const t = data.totals || {};
 		const activityCards = [
 			{ label: __("Marketing"), value: this.fmt(k.new), style: "new", metric: "new" },
 			{ label: __("Monitoring"), value: this.fmt(k.me), style: "me", metric: "monitoring" },
@@ -495,6 +508,55 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			})),
 		];
 		return [
+			{
+				title: __("Overview"),
+				cards: [
+					{
+						label: __("Total SMEs"),
+						value: this.fmt(k.sme_count),
+						style: "sme",
+						cardKind: "sme_count",
+						hint: __("SMEs in this report"),
+					},
+					{
+						label: __("Total School Visits"),
+						value: this.fmt(k.school_visits),
+						style: "school",
+						metric: "school_visits",
+						hint: __("Marketing + Monitoring in the visit period"),
+					},
+					{
+						label: __("SME School New"),
+						value: this.fmt(k.new),
+						style: "new",
+						metric: "new",
+						hint: __("Marketing visits marked New"),
+					},
+					{
+						label: __("SME School Visit"),
+						value: this.fmt(k.followup),
+						style: "followup",
+						metric: "followup",
+						hint: __("Marketing follow-up / existing school visits"),
+					},
+					{
+						label: __("New School Model A"),
+						value: this.fmt(k.model_school_a ?? t.outcome_model_school_a),
+						style: "model-a",
+						metric: "model_school_a",
+						useYtd: true,
+						hint: __("YTD distinct Model A schools"),
+					},
+					{
+						label: __("New School Model B"),
+						value: this.fmt(k.model_school_b ?? t.outcome_model_school_b),
+						style: "model-b",
+						metric: "model_school_b",
+						useYtd: true,
+						hint: __("YTD distinct Model B schools"),
+					},
+				],
+			},
 			{
 				title: __("Activity (period)"),
 				cards: activityCards,
@@ -517,9 +579,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						value: this.fmt_cur(expenseTotal),
 						style: "expenses",
 						cardKind: "expenses",
-						hint: __(
-							"Travel on Field Visit, or Rs 396/day estimated (22 km × Rs 18) when travel is blank"
-						),
+						hint: __("Recorded Field Visit travel cost plus Expense Claims. Blank KM is not estimated."),
 					},
 					{
 						label: __("Visited Days"),
@@ -582,14 +642,15 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		const outcomeCols = this.outcome_subcolumns(data);
 		const colCount = 2 + activityCols.length + outcomeCols.length + 2 + 3;
 
-		const tail_tds = (src, staff) => `
-					<td class="num">${this.fmt_cur(src.expenses)}</td>
-					${this.click_td(src.visited_days, "visited_days", staff)}`;
+		const tail_tds = (src, visitStaff, expenseStaff) => `
+					${this.expense_td(src, expenseStaff)}
+					${this.click_td(src.visited_days, "visited_days", visitStaff)}`;
 
 		const body = rows.length
 			? rows
 					.map((r) => {
 						const staff = r.employee_name || r.user_id || "";
+						const expenseStaff = r.employee || r.employee_name || r.user_id || "";
 						const low = flt(r.percentage) < 50;
 						return `
 				<tr class="${low ? "sme-low" : ""}">
@@ -597,7 +658,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					<td>${frappe.utils.escape_html(r.division || r.region_label || "—")}</td>
 					${this.activity_tds(r, staff, data)}
 					${this.outcome_tds(r, staff, data)}
-					${tail_tds(r, staff)}
+					${tail_tds(r, staff, expenseStaff)}
 					${this.points_td(r.total_points, "total", r, this.fmt_score(r.total_points))}
 					${this.points_td(r.earned_points, "earned", r, this.fmt_score(r.earned_points))}
 					${this.points_td(r.percentage, "pct", r, this.fmt_pct(r.percentage))}
@@ -612,7 +673,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			<div class="sme-sum-break">
 				<strong>${__("Activity counts are clickable.")}</strong>
 				${__("Same activities as SME KPI Details — Visits (Marketing, Monitoring, Follow up, Meetings) plus Target Base KPI rows.")}
-				${__("Click a number to open Field Visits. Click Total Points / Earned Points / Percentage for the points breakdown.")}
+				${__("Click a number to open Field Visits. Click Expenses to see recorded KM, rate, and how the amount is computed. Blank KM is not estimated. Click Total Points / Earned Points / Percentage for the points breakdown.")}
 			</div>
 			<div class="sme-sum-meta">
 				${__("Visit Date")}: <strong>${fromLabel} – ${toLabel}</strong>
@@ -667,7 +728,9 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 										)}">${frappe.utils.escape_html(c.shortHeader)}</th>`
 								)
 								.join("")}
-							<th rowspan="2">${__("Expenses")}</th>
+							<th rowspan="2" title="${frappe.utils.escape_html(
+								__("Click an amount to see KM, rate, and how travel expense is computed")
+							)}">${__("Expenses")}</th>
 							<th rowspan="2">${__("Visited Days")}</th>
 							<th rowspan="2">${__("Total Points")}</th>
 							<th rowspan="2">${__("Total Earned Points")}</th>
@@ -691,7 +754,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 							<th></th>
 							${this.activity_tds(t, "", data)}
 							${this.outcome_tds(t, "", data)}
-							${tail_tds(t, "")}
+							${tail_tds(t, "", "")}
 							${this.points_td(t.total_points, "total", t, this.fmt_score(t.total_points))}
 							${this.points_td(t.earned_points, "earned", t, this.fmt_score(t.earned_points))}
 							${this.points_td(t.percentage, "pct", t, this.fmt_pct(t.percentage))}
@@ -729,7 +792,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		const $root = $(".sme-sum");
 		const me = this;
 
-		$root.off("click.smeSumVisit click.smeSumPoints click.smeSumCard");
+		$root.off("click.smeSumVisit click.smeSumPoints click.smeSumCard click.smeSumExpense");
 
 		$root.on("click.smeSumVisit", "[data-visit-metric]", function (e) {
 			e.preventDefault();
@@ -771,6 +834,12 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			if (kind === "expenses") me.show_expense_detail();
 			else if (kind === "sme_count") me.show_sme_list();
 			else if (kind === "supervisor_list") me.show_supervisor_list();
+		});
+
+		$root.on("click.smeSumExpense", "[data-expense-detail]", function (e) {
+			e.preventDefault();
+			e.stopPropagation();
+			me.show_expense_detail($(this).attr("data-expense-staff") || "");
 		});
 	}
 
@@ -888,14 +957,19 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		d.show();
 	}
 
-	show_expense_detail() {
+	show_expense_detail(staff) {
 		const filters = this.get_filters();
 		if (!filters.from_date || !filters.to_date) {
 			frappe.msgprint(__("Please select Visit From Date and Visit To Date."));
 			return;
 		}
+		if (staff) {
+			filters.staff = staff;
+			const isEmpId = ((this.data && this.data.rows) || []).some((r) => r.employee === staff);
+			filters.employee = isEmpId ? staff : "";
+		}
 		const d = new frappe.ui.Dialog({
-			title: __("Expenses"),
+			title: staff ? __("Expenses — {0}", [staff]) : __("Expenses"),
 			size: "extra-large",
 			fields: [{ fieldtype: "HTML", fieldname: "html" }],
 			primary_action_label: __("Close"),
@@ -913,24 +987,63 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			callback: (r) => {
 				const payload = r.message || {};
 				const rows = payload.rows || [];
+				const colCount = 10;
+				const fmtKm = (v) => (v == null || v === "" ? "—" : `${this.fmt_plain(v, 1)} km`);
+				const fmtRate = (v) =>
+					v == null || v === ""
+						? "—"
+						: frappe.format(v, { fieldtype: "Currency" }) + __("/km");
+				const refLinks = (row) => {
+					const names = (row.names && row.names.length ? row.names : row.name ? [row.name] : []).filter(
+						Boolean,
+					);
+					if (!names.length) return "—";
+					return names
+						.map((n, i) => {
+							const href =
+								i === 0 && row.url
+									? row.url
+									: String(row.source || "").indexOf("Expense Claim") >= 0
+										? `/app/expense-claim/${encodeURIComponent(n)}`
+										: `/app/field-visit/${encodeURIComponent(n)}`;
+							return `<a href="${frappe.utils.escape_html(href)}">${frappe.utils.escape_html(n)}</a>`;
+						})
+						.join(", ");
+				};
 				const body = rows.length
 					? rows
 							.map(
 								(row) => `<tr>
 						<td>${frappe.utils.escape_html(row.source || "")}</td>
-						<td><a href="${frappe.utils.escape_html(row.url)}">${frappe.utils.escape_html(row.name)}</a></td>
+						<td>${refLinks(row)}</td>
 						<td>${frappe.utils.escape_html(row.posting_date || "")}</td>
 						<td>${frappe.utils.escape_html(row.employee_name || "")}</td>
+						<td class="text-right">${fmtKm(row.km_on_docs)}</td>
+						<td class="text-right">${fmtKm(row.km)}</td>
+						<td>${frappe.utils.escape_html(row.km_source || "—")}</td>
+						<td class="text-right">${fmtRate(row.rate)}</td>
 						<td class="text-right">${frappe.format(row.amount || 0, { fieldtype: "Currency" })}</td>
-						<td>${frappe.utils.escape_html(row.status || "")}</td>
+						<td>${frappe.utils.escape_html(row.computation || row.status || "")}</td>
 					</tr>`,
 							)
 							.join("")
-					: `<tr><td colspan="6" class="text-muted text-center">${__("No expenses in this period.")}</td></tr>`;
+					: `<tr><td colspan="${colCount}" class="text-muted text-center">${__("No recorded travel cost or expense claims in this period.")}</td></tr>`;
 
 				d.fields_dict.html.$wrapper.html(`
+					<div class="sme-sum-break" style="margin-bottom:10px;">
+						<strong>${__("How this amount is computed")}</strong>
+						<ul style="margin:6px 0 0;padding-left:18px;">
+							<li>${__(
+								"If Distance (KM) is entered on the Field Visit (Own Vehicle / Bike or Company Vehicle), amount = KM × Per Km for Fuel."
+							)}</li>
+							<li>${__(
+								"If KM and Travel Cost are blank, that visit is not included in Expenses. Nothing is estimated."
+							)}</li>
+							<li>${__("Submitted Expense Claims in the same period are included at claimed amount.")}</li>
+						</ul>
+					</div>
 					<div class="mb-2">
-						${__("Total")}: <strong>${payload.count || 0}</strong>
+						${__("Lines")}: <strong>${payload.count || 0}</strong>
 						&nbsp;·&nbsp;
 						${__("Amount")}: <strong>${frappe.format(payload.total || 0, { fieldtype: "Currency" })}</strong>
 					</div>
@@ -942,8 +1055,12 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 									<th>${__("Reference")}</th>
 									<th>${__("Date")}</th>
 									<th>${__("Employee")}</th>
+									<th class="text-right">${__("KM on document")}</th>
+									<th class="text-right">${__("KM used")}</th>
+									<th>${__("KM source")}</th>
+									<th class="text-right">${__("Rate")}</th>
 									<th class="text-right">${__("Amount")}</th>
-									<th>${__("Status / Type")}</th>
+									<th>${__("How computed")}</th>
 								</tr>
 							</thead>
 							<tbody>${body}</tbody>

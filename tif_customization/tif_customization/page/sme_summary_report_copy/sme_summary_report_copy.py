@@ -21,10 +21,8 @@ from tif_customization.tif_customization.field_visit_permissions import (
 	visit_day_sql as _visit_day_sql,
 )
 from tif_customization.tif_customization.field_visit_travel_cost import (
-	DEFAULT_DAILY_TRAVEL_KM,
 	DEFAULT_PER_KM_FUEL,
 	aggregate_visit_expenses_by_staff,
-	daily_travel_allowance,
 	resolve_per_km_fuel,
 )
 from tif_customization.tif_customization.page.smes_target_base___k.smes_target_base_kpi_config import (
@@ -170,8 +168,39 @@ def get_expense_drilldown(filters=None):
 	filters = _parse_filters(filters)
 	from_date, to_date = _resolve_dates(filters)
 	staff_rows = _get_sme_staff(filters)
+	staff_q = (filters.get("staff") or filters.get("employee") or "").strip()
+	if staff_q and staff_rows:
+		exact = [
+			s
+			for s in staff_rows
+			if staff_q in {s.get("employee"), s.get("key"), s.get("user_id")}
+		]
+		if exact:
+			staff_rows = exact
+		else:
+			ql = staff_q.lower()
+			staff_rows = [
+				s
+				for s in staff_rows
+				if ql
+				in " ".join(
+					[
+						str(s.get("key") or ""),
+						str(s.get("employee") or ""),
+						str(s.get("employee_name") or ""),
+						str(s.get("user_id") or ""),
+					]
+				).lower()
+			]
 	if not staff_rows:
-		return {"rows": [], "count": 0, "total": 0.0, "from_date": str(from_date), "to_date": str(to_date)}
+		return {
+			"rows": [],
+			"count": 0,
+			"total": 0.0,
+			"from_date": str(from_date),
+			"to_date": str(to_date),
+			"default_rate": DEFAULT_PER_KM_FUEL,
+		}
 
 	key_to_name = {
 		s["key"]: s.get("employee_name") or s.get("user_id") or s.get("employee") for s in staff_rows
@@ -210,10 +239,17 @@ def get_expense_drilldown(filters=None):
 				{
 					"source": _("Expense Claim"),
 					"name": c.name,
+					"names": [c.name],
 					"employee": c.employee,
 					"employee_name": c.employee_name or c.employee,
 					"posting_date": str(c.posting_date) if c.posting_date else "",
 					"amount": flt(amt, 2),
+					"km": None,
+					"km_on_docs": None,
+					"km_source": "—",
+					"rate": None,
+					"travel_mode": "—",
+					"computation": _("Expense Claim total claimed amount"),
 					"status": c.approval_status or "",
 					"url": f"/app/expense-claim/{c.name}",
 				}
@@ -228,10 +264,17 @@ def get_expense_drilldown(filters=None):
 				{
 					"source": fv.get("source") or _("Field Visit"),
 					"name": fv.get("name"),
+					"names": fv.get("names") or ([fv.get("name")] if fv.get("name") else []),
 					"employee": staff_key or "",
 					"employee_name": fv.get("employee_name") or key_to_name.get(staff_key) or "",
 					"posting_date": fv.get("posting_date") or "",
 					"amount": flt(amt, 2),
+					"km": fv.get("km"),
+					"km_on_docs": fv.get("km_on_docs"),
+					"km_source": fv.get("km_source") or "",
+					"rate": fv.get("rate"),
+					"travel_mode": fv.get("travel_mode") or "—",
+					"computation": fv.get("computation") or "",
 					"status": fv.get("status") or "",
 					"url": fv.get("url") or "",
 				}
@@ -246,6 +289,7 @@ def get_expense_drilldown(filters=None):
 		"total": flt(total, 2),
 		"from_date": str(from_date),
 		"to_date": str(to_date),
+		"default_rate": DEFAULT_PER_KM_FUEL,
 	}
 
 
@@ -454,6 +498,9 @@ def get_report_data(filters=None):
 			"sme_count": len(rows),
 			"supervisor_count": cint(supervisor_stats.get("total") or 0),
 			"sme_supervisor_count": cint(supervisor_stats.get("sme_supervisors") or 0),
+			"model_school_a": cint(totals.get("outcome_model_school_a") or 0),
+			"model_school_b": cint(totals.get("outcome_model_school_b") or 0),
+			"new_schools": cint(totals.get("outcome_new_schools") or 0),
 		},
 		"regions": [{"key": rk, "label": REGION_LABELS[rk]} for rk in REGION_KEYS],
 	}
@@ -808,7 +855,7 @@ def _staff_key_index(staff_rows):
 
 
 def _field_visit_expense_rows(from_date, to_date, staff_rows):
-	"""Field Visit expense lines (explicit travel or estimated daily travel)."""
+	"""One row per staff visit-day that has recorded travel_cost. Blank KM is not estimated."""
 	if not staff_rows:
 		return []
 
@@ -839,6 +886,9 @@ def _field_visit_expense_rows(from_date, to_date, staff_rows):
 				fv.training_entry_filled_by,
 				fv.training_trainer_name,
 				COALESCE(fv.travel_cost, 0) AS travel_cost,
+				COALESCE(fv.travel_distance_km, 0) AS travel_distance_km,
+				COALESCE(fv.travel_per_km_rate, 0) AS travel_per_km_rate,
+				fv.travel_mode,
 				{visit_day} AS visit_day
 			FROM `tabField Visit` fv
 			WHERE fv.docstatus = 1
@@ -852,48 +902,63 @@ def _field_visit_expense_rows(from_date, to_date, staff_rows):
 	except Exception:
 		return []
 
-	day_totals: dict[tuple[str, str], float] = {}
-	day_sample: dict[tuple[str, str], dict] = {}
+	grouped: dict[tuple[str, str], list] = defaultdict(list)
 	for row in rows:
 		staff_key = _resolve_staff_key(row, index)
 		if not staff_key or not row.get("visit_day"):
 			continue
-		day_key = (staff_key, str(row.visit_day))
-		day_totals[day_key] = day_totals.get(day_key, 0.0) + flt(row.get("travel_cost"))
-		day_sample.setdefault(day_key, row)
+		grouped[(staff_key, str(row.visit_day))].append(row)
 
 	out = []
-	for day_key, explicit in day_totals.items():
-		staff_key, day = day_key
-		row = day_sample[day_key]
-		if explicit > 0:
-			amt = explicit
-			status = row.get("type") or ""
-			source = _("Field Visit")
-		else:
-			amt = daily_travel_allowance(per_km_by_key.get(staff_key))
-			status = _("Estimated ({0} km × Rs {1})").format(
-				int(DEFAULT_DAILY_TRAVEL_KM), int(per_km_by_key.get(staff_key) or DEFAULT_PER_KM_FUEL)
-			)
-			source = _("Field Visit (estimated)")
+	for (staff_key, day), visits in grouped.items():
+		per_km = flt(per_km_by_key.get(staff_key) or DEFAULT_PER_KM_FUEL)
+		explicit = sum(flt(v.get("travel_cost")) for v in visits)
+		if explicit <= 0:
+			continue
+		km_on_docs = sum(flt(v.get("travel_distance_km")) for v in visits)
+		names = [v.get("name") for v in visits if v.get("name") and flt(v.get("travel_cost")) > 0]
+		if not names:
+			names = [v.get("name") for v in visits if v.get("name")]
+		modes = sorted(
+			{(v.get("travel_mode") or "").strip() for v in visits if (v.get("travel_mode") or "").strip()}
+		)
+		bits = []
+		for v in visits:
+			km = flt(v.get("travel_distance_km"))
+			cost = flt(v.get("travel_cost"))
+			if cost <= 0:
+				continue
+			rate = flt(v.get("travel_per_km_rate")) or per_km
+			label = v.get("name") or ""
+			if km > 0:
+				bits.append(_("{0}: {1} km × Rs {2}/km = Rs {3}").format(label, km, rate, cost))
+			else:
+				bits.append(_("{0}: travel cost Rs {1} (KM blank on document)").format(label, cost))
 
 		out.append(
 			{
-				"source": source,
-				"name": row.get("name"),
+				"source": _("Field Visit"),
+				"name": names[0] if names else "",
+				"names": names,
 				"staff_key": staff_key,
 				"employee_name": key_to_name.get(staff_key) or "",
 				"posting_date": day,
-				"amount": flt(amt, 2),
-				"status": status,
-				"url": f"/app/field-visit/{row.get('name')}",
+				"amount": flt(explicit, 2),
+				"km": km_on_docs if km_on_docs > 0 else None,
+				"km_on_docs": km_on_docs if km_on_docs else None,
+				"km_source": _("On Field Visit") if km_on_docs > 0 else _("Not entered on document"),
+				"rate": per_km,
+				"travel_mode": ", ".join(modes) or "—",
+				"computation": "; ".join(bits) or _("Recorded travel cost"),
+				"status": visits[0].get("type") if len(visits) == 1 else _("{0} visits").format(len(visits)),
+				"url": f"/app/field-visit/{names[0]}" if names else "",
 			}
 		)
 	return out
 
 
 def _load_expenses(from_date, to_date, staff_rows):
-	"""Expense Claims plus Field Visit travel (recorded or estimated per visit day)."""
+	"""Expense Claims plus recorded Field Visit travel_cost only (no KM estimate)."""
 	result = {s["key"]: 0.0 for s in staff_rows}
 	if not staff_rows:
 		return result
@@ -905,6 +970,7 @@ def _load_expenses(from_date, to_date, staff_rows):
 		visit_day_sql=_visit_day_sql("fv"),
 		resolve_staff_key=_resolve_staff_key,
 		staff_key_index=_staff_key_index,
+		estimate_if_blank=False,
 	)
 	for key, amt in fv_totals.items():
 		if key in result:
