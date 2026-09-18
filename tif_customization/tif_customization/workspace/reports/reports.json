@@ -38,6 +38,16 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "ERP Usage Report",
+   "link_count": 0,
+   "link_to": "user-system-usage-report",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "Program",
    "link_count": 0,
    "onboard": 0,
@@ -555,7 +565,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-09-15 20:39:11.073134",
+ "modified": "2026-09-18 14:36:50.358223",
  "modified_by": "farhan.hussain@tif.edu.pk",
  "module": "Tif Customization",
  "name": "Reports",

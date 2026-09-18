@@ -68,6 +68,7 @@ const meeting = reactive({
 	contactNo: "",
 	designation: "",
 	institute: "",
+	instituteLabel: "",
 	meetingDate: todayISO(),
 	city: "",
 	area: "",
@@ -309,6 +310,21 @@ watch(
 	},
 );
 
+watch(
+	() => meeting.institute,
+	async (name) => {
+		if (!name) return;
+		try {
+			const row = await apiGet(`${METHOD}.get_school_customer`, { name });
+			if (!row || !row.value) return;
+			meeting.instituteLabel = row.label || meeting.instituteLabel || name;
+			if (row.city && cityOptions.value.includes(row.city) && !meeting.city) meeting.city = row.city;
+		} catch {
+			/* ignore */
+		}
+	},
+);
+
 async function refreshTravelCost() {
 	if (!travel.needed) {
 		travel.cost = "";
@@ -469,7 +485,8 @@ function buildPayload(submitDoc) {
 	if (card?.group === "meeting") {
 		payload.mt_person_name = meeting.meetingWith;
 		payload.mt_contact_number = meeting.contactNo;
-		payload.mt_venue = meeting.institute;
+		payload.mt_venue = meeting.instituteLabel || meeting.institute;
+		payload.school_name = meeting.institute;
 		payload.mt_meeting_detail = [meeting.agenda, meeting.remarks].filter(Boolean).join("\n");
 		payload.mt_meeting_type = "External Meeting (Meeting with Others)";
 		payload.mt_external_meeting_with = "Ulma Karam";
@@ -616,6 +633,8 @@ function resetForm() {
 	visit.services = {};
 	meeting.meetingWith = "";
 	meeting.contactNo = "";
+	meeting.institute = "";
+	meeting.instituteLabel = "";
 	meeting.agenda = "";
 	meeting.remarks = "";
 	travel.distance = "";
@@ -914,7 +933,16 @@ const steps = [
 							<FieldInput :mode="lang" label-en="Meeting With (Person Name) *" label-ur="ملاقات کس سے (شخص کا نام)" placeholder="e.g. Mufti Sahib / مفتی صاحب" v-model="meeting.meetingWith" />
 							<FieldInput :mode="lang" label-en="Contact No." label-ur="رابطہ نمبر" placeholder="03XX-XXXXXXX" v-model="meeting.contactNo" />
 							<FieldInput :mode="lang" label-en="Designation" label-ur="عہدہ" placeholder="Mohtamim, Principal / مہتمم، پرنسپل" v-model="meeting.designation" />
-							<FieldInput :mode="lang" label-en="Institute / School Name" label-ur="ادارہ / اسکول کا نام" placeholder="Institute name" v-model="meeting.institute" />
+							<FieldLink
+								:mode="lang"
+								label-en="Institute / School Name"
+								label-ur="ادارہ / اسکول کا نام"
+								placeholder="Select customer"
+								:options="customerOptions"
+								:search="searchSchools"
+								v-model="meeting.institute"
+								v-model:label="meeting.instituteLabel"
+							/>
 							<FieldDate :mode="lang" label-en="Date *" label-ur="تاریخ" v-model="meeting.meetingDate" />
 							<FieldSelect :mode="lang" label-en="City" label-ur="شہر" :options="cityOptions" placeholder-en="Select city" placeholder-ur="شہر منتخب کریں" v-model="meeting.city" />
 							<FieldInput :mode="lang" label-en="Area" label-ur="علاقہ" placeholder="Johar Town" v-model="meeting.area" />
