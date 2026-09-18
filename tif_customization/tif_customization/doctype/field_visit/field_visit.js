@@ -546,6 +546,12 @@ function apply_field_visit_logic(frm) {
 
 	if (TRAINING_TYPES.includes(type)) {
 		set_hidden(frm, training_fields, false);
+		if (type === "Teachers Training Meeting") {
+			set_hidden(frm, ["training_no_of_schools_attended"], true);
+			if (cint(frm.doc.training_no_of_schools_attended) !== 1) {
+				frm.set_value("training_no_of_schools_attended", 1);
+			}
+		}
 	}
 
 	if (MEETING_TYPES.includes(type)) {
@@ -718,9 +724,11 @@ function apply_field_visit_logic(frm) {
 	// Academic: task-specific fields
 	const is_academic_task =
 		type === "Academic" ||
-		type === "Academic Task" ||
+		(type === "Academic Task" && (!task || task === "Academic Tasks")) ||
 		(type === "Academic / Other Official Tasks" && task === "Academic Tasks");
-	const is_calls = type === "Academic / Other Official Tasks" && task.includes("Follow up Calls");
+	const is_calls =
+		task.includes("Follow up Calls") &&
+		["Academic / Other Official Tasks", "Academic", "Academic Task"].includes(type);
 	const is_other_task =
 		type === "Other Official Tasks" ||
 		(type === "Academic / Other Official Tasks" && task === "Other Official Tasks");
@@ -893,13 +901,46 @@ function add_multiple_child_rows(frm, table_field, child_doctype, count, apply_d
 	frm.refresh_field(table_field);
 }
 
+function setup_city_area_school_queries(frm) {
+	const link_opts = { ignore_user_permissions: 1 };
+	["city", "me_city", "mt_city", "training_city"].forEach((field) => {
+		if (!frm.fields_dict[field]) return;
+		frm.set_query(field, () => link_opts);
+	});
+	const area_city = {
+		area: "city",
+		me_area: "me_city",
+		mt_area: "mt_city",
+	};
+	Object.entries(area_city).forEach(([area_field, city_field]) => {
+		if (!frm.fields_dict[area_field]) return;
+		frm.set_query(area_field, () => {
+			const filters = {};
+			if (frm.doc[city_field]) filters.city = frm.doc[city_field];
+			return { filters, ignore_user_permissions: 1 };
+		});
+	});
+	["school_name", "me_school_name"].forEach((field) => {
+		if (!frm.fields_dict[field]) return;
+		frm.set_query(field, () => ({ ignore_user_permissions: 1 }));
+	});
+}
+
+function clear_area_if_city_changed(frm, area_field) {
+	if (frm.doc[area_field]) {
+		frm.set_value(area_field, "");
+	}
+}
+
 frappe.ui.form.on("Field Visit", {
 	onload(frm) {
 		apply_visible_type_options(frm);
+		setup_city_area_school_queries(frm);
 		fetch_supervisor_field_visit_access(frm, () => apply_supervisor_field_visit_restrictions(frm));
 	},
 	refresh(frm) {
 		apply_visible_type_options(frm);
+		setup_city_area_school_queries(frm);
 		apply_field_visit_logic(frm);
 		if ((frm.doc.type || "").trim()) {
 			sync_field_visit_travel_cost(frm);
@@ -1176,6 +1217,15 @@ frappe.ui.form.on("Field Visit", {
 		apply_supervisor_field_visit_restrictions(frm);
 	},
 	status: apply_field_visit_logic,
+	city(frm) {
+		clear_area_if_city_changed(frm, "area");
+	},
+	me_city(frm) {
+		clear_area_if_city_changed(frm, "me_area");
+	},
+	mt_city(frm) {
+		clear_area_if_city_changed(frm, "mt_area");
+	},
 	reason_not_agreed: apply_field_visit_logic,
 	qps_affiliated: apply_field_visit_logic,
 	tps_affiliated: apply_field_visit_logic,

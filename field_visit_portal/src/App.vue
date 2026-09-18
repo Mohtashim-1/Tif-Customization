@@ -47,6 +47,8 @@ const meta = ref({
 	provinces: [],
 	province_options_full: [],
 	academic_task_types: [],
+	academic_work_types: [],
+	hours_spent_options: [],
 	book_titles: [],
 	today: todayISO(),
 	can_manage_farhan_only: false,
@@ -114,6 +116,19 @@ const visit = reactive({
 const schoolContacts = ref([
 	{ id: "1", person_name: "", contact_number: "", designation: "", designation_other: "" },
 ]);
+function emptyFollowUpCall() {
+	return {
+		id: String(Date.now()),
+		school_name: "",
+		school_name_label: "",
+		person_name: "",
+		contact_number: "",
+		designation: "",
+		designation_other: "",
+		purpose: "",
+	};
+}
+const followUpCalls = ref([{ ...emptyFollowUpCall(), id: "1" }]);
 
 const training = reactive({
 	month: currentMonthName(),
@@ -131,6 +146,16 @@ const training = reactive({
 	topics: "",
 	mode: "Onsite / In Person",
 	otType: "Academic Tasks",
+	academicWorkTypes: [],
+	academicWorkOther: "",
+	academicPages: "",
+	academicHours: "",
+	academicWorkDetail: "",
+	academicNoOfCalls: "",
+	academicPurposeOfCall: "",
+	officialTaskKind: "",
+	taskAssignedBy: "",
+	taskAssignedByOther: "",
 });
 
 const participants = ref([]);
@@ -171,6 +196,14 @@ const selected = computed(() => ACTIVITY_CARDS.find((c) => c.id === selectedId.v
 const visibleCards = computed(() => cardsForUser(meta.value.activity_types || []));
 const customerOptions = computed(() => meta.value.customers || []);
 const cityOptions = computed(() => meta.value.cities || []);
+const cityLinkOptions = computed(() =>
+	(meta.value.cities || [])
+		.map((c) => {
+			const name = typeof c === "object" ? c.value || c.name || c.label : c;
+			return { value: String(name || ""), label: String(name || "") };
+		})
+		.filter((c) => c.value)
+);
 const provinceOptions = computed(() => meta.value.province_options_full || meta.value.provinces || []);
 const courseOptions = computed(() => meta.value.enrolment_courses || []);
 const travelModes = computed(() => meta.value.travel_modes || Object.keys(TRAVEL_MODE_UR));
@@ -198,6 +231,46 @@ const staffName = computed(() => visit.visitBy || meta.value.staff_name || boot.
 function nonempty(list, fallback) {
 	return Array.isArray(list) && list.length ? list : fallback;
 }
+const academicWorkOptions = computed(() =>
+	nonempty(meta.value.academic_work_types, [
+		"Typing",
+		"Proofreading",
+		"Review",
+		"Matching",
+		"Correction",
+		"Formatting",
+		"Designing",
+		"Translation",
+		"Other",
+	])
+);
+const hoursSpentOptions = computed(() =>
+	nonempty(meta.value.hours_spent_options, ["1 Hour", "2 Hours", "3 Hours", "4 Hours", "5 Hours", "6 Hours", "7 Hours", "8 Hours", "Full Day"])
+);
+const isAcademicWorkTask = computed(
+	() => selected.value?.group === "academic" && (training.otType || "Academic Tasks") === "Academic Tasks"
+);
+const isOtherOfficialTask = computed(
+	() => selected.value?.group === "academic" && training.otType === "Other Official Tasks"
+);
+const isFollowUpCallsTask = computed(
+	() => selected.value?.group === "academic" && String(training.otType || "").includes("Follow up")
+);
+const isStaffMeetingTask = computed(
+	() =>
+		selected.value?.group === "academic" &&
+		(String(training.otType || "").includes("Meeting of Regional") ||
+			String(training.otType || "").includes("Staff (Supervisors)"))
+);
+const isOfficialVisitTask = computed(() => {
+	const t = training.otType || "";
+	return (
+		selected.value?.group === "academic" &&
+		!isStaffMeetingTask.value &&
+		(t.includes("Head Office") || t.includes("Regional Office") || t.includes("Out of Station"))
+	);
+});
+const assignedByOptions = ["Head Office", "Regional Office", "Supervisor", "Out of Station", "Other"];
 const marketingCategories = computed(() =>
 	nonempty(meta.value.marketing_visit_categories, ["New", "Followup & Other Visits", "TPS Visits"])
 );
@@ -296,6 +369,15 @@ function pickCard(card) {
 async function searchSchools(txt) {
 	const rows = await apiGet(`${METHOD}.search_school_customers`, {
 		txt: txt || "",
+		city: visit.city || meeting.city || training.city || "",
+		limit: 80,
+	});
+	return Array.isArray(rows) ? rows : [];
+}
+
+async function searchCities(txt) {
+	const rows = await apiGet(`${METHOD}.search_cities`, {
+		txt: txt || "",
 		limit: 80,
 	});
 	return Array.isArray(rows) ? rows : [];
@@ -304,7 +386,7 @@ async function searchSchools(txt) {
 async function searchAreas(txt) {
 	const rows = await apiGet(`${METHOD}.search_areas`, {
 		txt: txt || "",
-		city: visit.city || meeting.city || "",
+		city: visit.city || meeting.city || training.city || "",
 		limit: 80,
 	});
 	return Array.isArray(rows) ? rows : [];
@@ -339,6 +421,19 @@ watch(
 		} catch {
 			/* ignore */
 		}
+	},
+);
+
+watch(
+	() => visit.city,
+	(city, prev) => {
+		if (prev && city !== prev) visit.area = "";
+	},
+);
+watch(
+	() => meeting.city,
+	(city, prev) => {
+		if (prev && city !== prev) meeting.area = "";
 	},
 );
 
@@ -422,6 +517,33 @@ function removeSchoolContact(id) {
 	if (!schoolContacts.value.length) addSchoolContact();
 }
 
+function addFollowUpCall() {
+	followUpCalls.value.push(emptyFollowUpCall());
+}
+
+function removeFollowUpCall(id) {
+	followUpCalls.value = followUpCalls.value.filter((r) => r.id !== id);
+	if (!followUpCalls.value.length) addFollowUpCall();
+}
+
+function officialTaskDetailText() {
+	const assigned =
+		training.taskAssignedBy === "Other" ? training.taskAssignedByOther : training.taskAssignedBy;
+	return [
+		training.officialTaskKind ? `Type of official task: ${training.officialTaskKind}` : "",
+		assigned ? `Assigned by: ${assigned}` : "",
+		training.academicWorkDetail ? `Details: ${training.academicWorkDetail}` : "",
+	]
+		.filter(Boolean)
+		.join("\n");
+}
+
+function filledFollowUpCalls() {
+	return followUpCalls.value.filter(
+		(r) => r.school_name || r.person_name || r.contact_number || r.designation || r.purpose
+	);
+}
+
 function setService(field, value) {
 	visit.services = { ...visit.services, [field]: value };
 }
@@ -435,26 +557,27 @@ function attachField(card) {
 function buildPayload(submitDoc) {
 	const card = selected.value;
 	const activityType = resolveActivityType(card, training.otType, meta.value.activity_types || []);
-	const visitDate = card?.group === "visits" ? visit.visitDate : meeting.meetingDate || training.date || todayISO();
-	const city = card?.group === "visits" ? visit.city : meeting.city || training.city;
+	const schoolForm = card?.group === "visits" || card?.group === "books";
+	const visitDate = schoolForm ? visit.visitDate : meeting.meetingDate || training.date || todayISO();
+	const city = schoolForm ? visit.city : meeting.city || training.city;
 	const payload = {
 		activity_type: activityType,
 		visit_by: staffName.value,
 		staff_employee: meta.value.staff_employee,
-		month: (card?.group === "visits" ? visit.month : training.month) || currentMonthName(),
-		quarter: card?.group === "visits" ? visit.quarter : training.quarter,
+		month: (schoolForm ? visit.month : training.month) || currentMonthName(),
+		quarter: schoolForm ? visit.quarter : training.quarter,
 		visit_date: visitDate,
 		starting_time: card?.group === "visits" ? visit.startTime : meeting.startTime,
 		ending_time: card?.group === "visits" ? visit.endTime : meeting.endTime,
 		city,
-		area: card?.group === "visits" ? visit.area : meeting.area,
-		province: card?.group === "visits" ? visit.province : training.province,
-		school_name: card?.group === "visits" ? visit.schoolName : meeting.institute || training.venueName,
-		contact_person_name: card?.group === "visits" ? visit.meetingWith : meeting.meetingWith,
-		contact_number: card?.group === "visits" ? visit.contactNumber : meeting.contactNo,
-		designation: card?.group === "visits" ? visit.designation : meeting.designation,
+		area: schoolForm ? visit.area : meeting.area,
+		province: schoolForm ? visit.province : training.province,
+		school_name: schoolForm ? visit.schoolName : meeting.institute || training.venueName,
+		contact_person_name: schoolForm ? visit.meetingWith : meeting.meetingWith,
+		contact_number: schoolForm ? visit.contactNumber : meeting.contactNo,
+		designation: schoolForm ? visit.designation : meeting.designation,
 		designation_other: card?.group === "visits" ? visit.designationOther : "",
-		school_additional_remarks: card?.group === "visits" ? visit.schoolAdditionalRemarks : meeting.remarks,
+		school_additional_remarks: schoolForm ? visit.schoolAdditionalRemarks : meeting.remarks,
 		frequency_of_visits: card?.group === "visits" ? visit.frequency : meeting.frequency,
 		status: card?.group === "visits" ? visit.status : meeting.status,
 		mutalae_sample: meeting.mutalaeSample,
@@ -520,7 +643,10 @@ function buildPayload(submitDoc) {
 		payload.training_entry_filled_by = training.entryFilledBy || staffName.value;
 		payload.training_venue_name = training.venueName;
 		payload.training_no_of_participants = training.noOfParticipants;
-		payload.training_no_of_schools = training.noOfSchools;
+		payload.training_no_of_schools =
+			card?.id === "training" || String(training.trainingCategory || "").includes("Teachers Training")
+				? 1
+				: training.noOfSchools;
 		payload.city = training.city || city;
 		payload.province = training.province;
 		payload.visit_date = training.date || visitDate;
@@ -528,12 +654,59 @@ function buildPayload(submitDoc) {
 	}
 
 	if (card?.group === "academic") {
-		payload.ot_type_of_task = training.otType;
-		payload.ot_visit_meeting_detail = training.topics || meeting.agenda;
-		payload.ot_other_official_task_detail = meeting.remarks;
+		payload.ot_type_of_task = training.otType || "Academic Tasks";
+		payload.ot_hours_spent = training.academicHours;
+		payload.ot_academic_work_detail = training.academicWorkDetail;
+		payload.ot_remarks = training.academicWorkDetail;
 		payload.city = training.city || city;
 		payload.province = training.province;
 		payload.visit_date = training.date || visitDate;
+		if ((training.otType || "Academic Tasks") === "Academic Tasks") {
+			payload.ot_academic_task_types = training.academicWorkTypes;
+			payload.ot_academic_task_other = training.academicWorkOther;
+			payload.ot_no_of_pages = training.academicPages;
+		} else if (training.otType === "Other Official Tasks") {
+			const assigned =
+				training.taskAssignedBy === "Other" ? training.taskAssignedByOther : training.taskAssignedBy;
+			payload.ot_official_task_kind = training.officialTaskKind;
+			payload.ot_task_assigned_by = assigned;
+			payload.ot_other_official_task_detail = officialTaskDetailText();
+			payload.ot_remarks = officialTaskDetailText();
+		} else if (String(training.otType || "").includes("Follow up")) {
+			const calls = filledFollowUpCalls().map((r) => ({
+				school_name: r.school_name,
+				school_name_label: r.school_name_label || r.school_name,
+				person_name: r.person_name,
+				contact_number: r.contact_number,
+				designation: r.designation,
+				designation_other: r.designation_other,
+				purpose: r.purpose,
+			}));
+			payload.follow_up_calls = calls;
+			payload.ot_no_of_calls = training.academicNoOfCalls || (calls.length ? String(calls.length) : "");
+			payload.ot_purpose_of_call = training.academicPurposeOfCall || calls[0]?.purpose || "";
+			payload.school_contacts = calls.map((r) => ({
+				person_name: r.person_name,
+				contact_number: r.contact_number,
+				designation: r.designation,
+				designation_other: r.designation_other,
+			}));
+			const first = calls[0];
+			if (first) {
+				payload.school_name = first.school_name;
+				payload.contact_person_name = first.person_name;
+				payload.contact_number = first.contact_number;
+				payload.designation = first.designation;
+				payload.designation_other = first.designation_other;
+			}
+		} else if (
+			String(training.otType || "").includes("Meeting of Regional") ||
+			String(training.otType || "").includes("Head Office") ||
+			String(training.otType || "").includes("Regional Office") ||
+			String(training.otType || "").includes("Out of Station")
+		) {
+			payload.ot_visit_meeting_detail = training.academicWorkDetail;
+		}
 	}
 
 	if (card?.id === "enrolment") {
@@ -560,12 +733,14 @@ function buildPayload(submitDoc) {
 	}
 
 	if (card?.group === "books") {
+		const schoolLabel = visit.schoolNameLabel || visit.schoolName || "";
+		payload.school_address = visit.schoolAddress;
+		payload.school_type = visit.schoolType;
 		payload.books_demand = books.value.map((b) => ({
 			book_name: b.bookName,
 			qty: b.qty,
-			school: b.school,
+			school: schoolLabel,
 		}));
-		if (books.value[0]?.school) payload.school_name = books.value[0].school;
 	}
 
 	return payload;
@@ -641,6 +816,7 @@ function resetForm() {
 	attachments.training_awareness_pictures = null;
 	attachments.attendance_sheet_excel = null;
 	schoolContacts.value = [{ id: "1", person_name: "", contact_number: "", designation: "", designation_other: "" }];
+	followUpCalls.value = [{ ...emptyFollowUpCall(), id: "1" }];
 	visit.schoolName = "";
 	visit.schoolNameLabel = "";
 	visit.meetingWith = "";
@@ -654,6 +830,16 @@ function resetForm() {
 	meeting.instituteLabel = "";
 	meeting.agenda = "";
 	meeting.remarks = "";
+	training.academicWorkTypes = [];
+	training.academicWorkOther = "";
+	training.academicPages = "";
+	training.academicHours = "";
+	training.academicWorkDetail = "";
+	training.academicNoOfCalls = "";
+	training.academicPurposeOfCall = "";
+	training.officialTaskKind = "";
+	training.taskAssignedBy = "";
+	training.taskAssignedByOther = "";
 	travel.distance = "";
 	travel.cost = "";
 	savedName.value = "";
@@ -823,7 +1009,16 @@ const steps = [
 							<FieldDate :mode="lang" label-en="Visit Date" label-ur="وزٹ کی تاریخ" v-model="visit.visitDate" />
 							<FieldTime :mode="lang" label-en="Visiting Starting Time" label-ur="آغاز کا وقت" v-model="visit.startTime" />
 							<FieldTime :mode="lang" label-en="Visit Ending Time" label-ur="اختتام کا وقت" v-model="visit.endTime" />
-							<FieldSelect :mode="lang" label-en="City" label-ur="شہر" :options="cityOptions" placeholder-en="Begin typing for results" placeholder-ur="شہر منتخب کریں" v-model="visit.city" />
+							<FieldLink
+								:mode="lang"
+								label-en="City"
+								label-ur="شہر"
+								placeholder="Type to search city"
+								empty-text="No cities found"
+								:options="cityLinkOptions"
+								:search="searchCities"
+								v-model="visit.city"
+							/>
 							<FieldLink
 								:mode="lang"
 								label-en="Area"
@@ -973,7 +1168,16 @@ const steps = [
 								v-model:label="meeting.instituteLabel"
 							/>
 							<FieldDate :mode="lang" label-en="Date *" label-ur="تاریخ" v-model="meeting.meetingDate" />
-							<FieldSelect :mode="lang" label-en="City" label-ur="شہر" :options="cityOptions" placeholder-en="Select city" placeholder-ur="شہر منتخب کریں" v-model="meeting.city" />
+							<FieldLink
+								:mode="lang"
+								label-en="City"
+								label-ur="شہر"
+								placeholder="Type to search city"
+								empty-text="No cities found"
+								:options="cityLinkOptions"
+								:search="searchCities"
+								v-model="meeting.city"
+							/>
 							<FieldLink
 								:mode="lang"
 								label-en="Area"
@@ -1022,12 +1226,21 @@ const steps = [
 							<FieldSelect :mode="lang" label-en="Month" label-ur="مہینہ" :options="meta.months" v-model="training.month" />
 							<FieldSelect :mode="lang" label-en="Quarter" label-ur="سہ ماہی" :options="QUARTER_OPTIONS" v-model="training.quarter" />
 							<FieldInput v-if="selected.group !== 'academic'" :mode="lang" label-en="School Category" label-ur="اسکول کی کیٹیگری" v-model="training.schoolCategory" />
-							<FieldSelect :mode="lang" label-en="City" label-ur="شہر" :options="cityOptions" v-model="training.city" />
+							<FieldLink
+								:mode="lang"
+								label-en="City"
+								label-ur="شہر"
+								placeholder="Type to search city"
+								empty-text="No cities found"
+								:options="cityLinkOptions"
+								:search="searchCities"
+								v-model="training.city"
+							/>
 							<FieldSelect :mode="lang" label-en="Province" label-ur="صوبہ" :options="provinceOptions" v-model="training.province" />
-							<FieldInput v-if="selected.group !== 'academic'" :mode="lang" label-en="No. of Schools" label-ur="اسکولوں کی تعداد" v-model="training.noOfSchools" />
+							<FieldInput v-if="selected.group !== 'academic' && selected.id !== 'training'" :mode="lang" label-en="No. of Schools" label-ur="اسکولوں کی تعداد" v-model="training.noOfSchools" />
 							<FieldDate :mode="lang" label-en="Date" label-ur="تاریخ" v-model="training.date" />
-							<FieldInput :mode="lang" label-en="Name of Trainer / Staff" label-ur="ٹرینر / سٹاف کا نام" v-model="training.trainerName" />
-							<FieldInput :mode="lang" label-en="Venue Name" label-ur="مقام کا نام" v-model="training.venueName" />
+							<FieldInput :mode="lang" :label-en="selected.group === 'academic' ? 'Name of Staff' : 'Name of Trainer / Staff'" :label-ur="selected.group === 'academic' ? 'سٹاف کا نام' : 'ٹرینر / سٹاف کا نام'" v-model="training.trainerName" />
+							<FieldInput v-if="selected.group !== 'academic'" :mode="lang" label-en="Venue Name" label-ur="مقام کا نام" v-model="training.venueName" />
 							<FieldInput :mode="lang" label-en="Entry Filled By" label-ur="اندراج کنندہ" v-model="training.entryFilledBy" />
 							<FieldInput v-if="selected.group !== 'academic'" :mode="lang" label-en="No. of Participants" label-ur="شرکاء کی تعداد" v-model="training.noOfParticipants" />
 							<FieldSelect
@@ -1039,9 +1252,149 @@ const steps = [
 								v-model="training.trainingCategory"
 							/>
 						</div>
-						<div class="grid-2" style="margin-top: 16px">
+						<div v-if="selected.group !== 'academic'" class="grid-2" style="margin-top: 16px">
 							<FieldInput :mode="lang" label-en="Topics / Detail" label-ur="موضوعات / تفصیل" v-model="training.topics" />
 							<FieldSelect :mode="lang" label-en="Mode" label-ur="طریقہ" :options="['Onsite / In Person', 'Online', 'Hybrid']" v-model="training.mode" />
+						</div>
+						<div v-else-if="isAcademicWorkTask" class="academic-work" style="margin-top: 16px">
+							<div class="field">
+								<label>
+									<span class="en">Type of Academic Tasks</span>
+									<span v-if="lang !== 'en'" class="ur urdu">تعلیمی کام کی قسم</span>
+								</label>
+								<div class="work-types">
+									<label v-for="t in academicWorkOptions" :key="t" class="work-chip">
+										<input type="checkbox" :value="t" v-model="training.academicWorkTypes" />
+										<span>{{ t }}</span>
+									</label>
+								</div>
+							</div>
+							<FieldInput
+								v-if="training.academicWorkTypes.includes('Other')"
+								:mode="lang"
+								label-en="Other Academic Task"
+								label-ur="دیگر تعلیمی کام"
+								v-model="training.academicWorkOther"
+							/>
+							<div class="grid-2" style="margin-top: 0">
+								<FieldInput :mode="lang" label-en="No of Pages" label-ur="صفحات کی تعداد" v-model="training.academicPages" />
+								<FieldSelect :mode="lang" label-en="Hours Spent" label-ur="صرف شدہ گھنٹے" :options="hoursSpentOptions" v-model="training.academicHours" />
+							</div>
+							<FieldTextarea
+								:mode="lang"
+								label-en="Details of Academic work"
+								label-ur="تعلیمی کام کی تفصیل"
+								placeholder="Describe the academic work / تعلیمی کام کی تفصیل لکھیں"
+								v-model="training.academicWorkDetail"
+							/>
+						</div>
+						<div v-else-if="isFollowUpCallsTask" class="academic-work" style="margin-top: 16px">
+							<div class="table-head">
+								<div>
+									<div style="font-weight: 600; font-size: 13px">
+										<Bi :mode="lang" en="Follow up Call Details" ur="فالو اپ کالز کی تفصیل" />
+									</div>
+									<div style="font-size: 11px; color: #71717a">
+										School name, contact person, contact no and designation for each call.
+									</div>
+								</div>
+								<button class="btn btn-green" type="button" @click="addFollowUpCall">+ Add call</button>
+							</div>
+							<div v-for="(row, idx) in followUpCalls" :key="row.id" class="call-card">
+								<div class="call-card-head">
+									<span>Call {{ idx + 1 }} / کال {{ idx + 1 }}</span>
+									<button class="icon-btn" type="button" @click="removeFollowUpCall(row.id)">✕</button>
+								</div>
+								<div class="grid-2" style="margin-top: 12px">
+									<FieldLink
+										:mode="lang"
+										label-en="School Name"
+										label-ur="اسکول کا نام"
+										placeholder="Type to search school"
+										empty-text="No schools found"
+										allow-custom
+										:options="customerOptions"
+										:search="searchSchools"
+										v-model="row.school_name"
+										v-model:label="row.school_name_label"
+									/>
+									<FieldInput :mode="lang" label-en="Contact Person Name" label-ur="رابطہ شخص کا نام" v-model="row.person_name" />
+									<FieldInput :mode="lang" label-en="Contact No" label-ur="رابطہ نمبر" placeholder="03XX-" v-model="row.contact_number" />
+									<FieldSelect :mode="lang" label-en="Designation" label-ur="عہدہ" :options="designationOptions" v-model="row.designation" />
+									<FieldInput
+										v-if="row.designation === 'Other'"
+										:mode="lang"
+										label-en="Other Designation"
+										label-ur="دیگر عہدہ"
+										v-model="row.designation_other"
+									/>
+									<FieldInput :mode="lang" label-en="Purpose of Call" label-ur="کال کا مقصد" v-model="row.purpose" />
+								</div>
+							</div>
+							<div class="grid-2" style="margin-top: 0">
+								<FieldInput :mode="lang" label-en="No of Calls" label-ur="کالز کی تعداد" v-model="training.academicNoOfCalls" />
+								<FieldSelect :mode="lang" label-en="Hours Spent" label-ur="صرف شدہ گھنٹے" :options="hoursSpentOptions" v-model="training.academicHours" />
+							</div>
+							<FieldTextarea
+								:mode="lang"
+								label-en="Additional details of follow up calls"
+								label-ur="فالو اپ کالز کی اضافی تفصیل"
+								placeholder="Any extra notes / اضافی نوٹس"
+								v-model="training.academicWorkDetail"
+							/>
+						</div>
+						<div v-else-if="isOtherOfficialTask" class="academic-work" style="margin-top: 16px">
+							<div class="grid-2" style="margin-top: 0">
+								<FieldInput
+									:mode="lang"
+									label-en="Type of Official Task"
+									label-ur="آفیشل ٹاسک کی قسم"
+									placeholder="What type of task? / کس قسم کا کام؟"
+									v-model="training.officialTaskKind"
+								/>
+								<FieldSelect
+									:mode="lang"
+									label-en="Task Assigned By"
+									label-ur="ٹاسک کس نے دیا"
+									:options="assignedByOptions"
+									v-model="training.taskAssignedBy"
+								/>
+							</div>
+							<FieldInput
+								v-if="training.taskAssignedBy === 'Other'"
+								:mode="lang"
+								label-en="Assigned By (Other)"
+								label-ur="دیگر تفویض کنندہ"
+								v-model="training.taskAssignedByOther"
+							/>
+							<FieldTextarea
+								:mode="lang"
+								label-en="Details of Official Task"
+								label-ur="آفیشل ٹاسک کی تفصیل"
+								placeholder="Describe the official task / آفیشل ٹاسک کی تفصیل لکھیں"
+								v-model="training.academicWorkDetail"
+							/>
+							<FieldSelect :mode="lang" label-en="Hours Spent" label-ur="صرف شدہ گھنٹے" :options="hoursSpentOptions" v-model="training.academicHours" />
+						</div>
+						<div v-else-if="isStaffMeetingTask" class="academic-work" style="margin-top: 16px">
+							<FieldTextarea
+								:mode="lang"
+								label-en="Details of Staff Meeting"
+								label-ur="سٹاف میٹنگ کی تفصیل"
+								placeholder="Agenda, discussion and outcome of the staff meeting / سٹاف میٹنگ کی تفصیل لکھیں"
+								v-model="training.academicWorkDetail"
+							/>
+							<FieldSelect :mode="lang" label-en="Hours Spent" label-ur="صرف شدہ گھنٹے" :options="hoursSpentOptions" v-model="training.academicHours" />
+						</div>
+						<div v-else-if="isOfficialVisitTask" class="academic-work" style="margin-top: 16px">
+							<FieldTextarea
+								:mode="lang"
+								label-en="Details of Visit / Meeting"
+								label-ur="دورہ / میٹنگ کی تفصیل"
+								placeholder="Detail of Head Office / Regional / Out of Station visit"
+								v-model="training.academicWorkDetail"
+							/>
+							<FieldSelect :mode="lang" label-en="Hours Spent" label-ur="صرف شدہ گھنٹے" :options="hoursSpentOptions" v-model="training.academicHours" />
 						</div>
 						<div style="margin-top: 32px">
 							<div style="font-size: 13px; font-weight: 600">Attachments / منسلکات</div>
@@ -1090,8 +1443,50 @@ const steps = [
 					</div>
 
 					<div class="panel-body" v-else-if="selected.group === 'books'">
-						<div style="display: flex; justify-content: space-between; gap: 12px">
-							<SectionTitle :mode="lang" title-en="Books Demand" title-ur="کتب کی طلب" sub-en="Book demand in simple table" sub-ur="سادہ ٹیبل میں کتابوں کی طلب" />
+						<SectionTitle :mode="lang" title-en="School / Madrasa Details" title-ur="اسکول / مدرسہ کی تفصیلات" sub-en="Who requested the books" sub-ur="کتب کس ادارے نے مانگیں" />
+						<div class="grid-2">
+							<FieldLink
+								:mode="lang"
+								label-en="School / Madrasa Name"
+								label-ur="اسکول / مدرسہ کا نام"
+								placeholder="Select school"
+								empty-text="No customers found"
+								:options="customerOptions"
+								:search="searchSchools"
+								v-model="visit.schoolName"
+								v-model:label="visit.schoolNameLabel"
+							/>
+							<FieldSelect :mode="lang" label-en="School Type" label-ur="اسکول کی قسم" :options="schoolTypeOptions" placeholder-en="Select" placeholder-ur="منتخب کریں" v-model="visit.schoolType" />
+							<FieldLink
+								:mode="lang"
+								label-en="City"
+								label-ur="شہر"
+								placeholder="Type to search city"
+								empty-text="No cities found"
+								:options="cityLinkOptions"
+								:search="searchCities"
+								v-model="visit.city"
+							/>
+							<FieldLink
+								:mode="lang"
+								label-en="Area"
+								label-ur="علاقہ"
+								placeholder="Select area"
+								empty-text="No areas found"
+								:options="areaOptions"
+								:search="searchAreas"
+								v-model="visit.area"
+							/>
+							<FieldSelect :mode="lang" label-en="Province" label-ur="صوبہ" :options="provinceOptions" v-model="visit.province" />
+							<FieldDate :mode="lang" label-en="Date" label-ur="تاریخ" v-model="visit.visitDate" />
+							<FieldInput :mode="lang" label-en="Contact Person" label-ur="رابطہ شخص" v-model="visit.meetingWith" />
+							<FieldInput :mode="lang" label-en="Contact No." label-ur="رابطہ نمبر" placeholder="03XX-XXXXXXX" v-model="visit.contactNumber" />
+							<FieldTextarea :mode="lang" label-en="School / Madrasa Address" label-ur="اسکول / مدرسہ کا پتہ" v-model="visit.schoolAddress" />
+							<FieldTextarea :mode="lang" label-en="Remarks" label-ur="ریمارکس" v-model="visit.schoolAdditionalRemarks" />
+						</div>
+
+						<div style="display: flex; justify-content: space-between; gap: 12px; margin-top: 28px">
+							<SectionTitle :mode="lang" title-en="Books Demand" title-ur="کتب کی طلب" sub-en="Add each book and quantity" sub-ur="ہر کتاب اور تعداد شامل کریں" />
 							<button class="btn btn-green" type="button" @click="addBook">
 								<Bi :mode="lang" en="+ Add Book" ur="کتاب شامل کریں" />
 							</button>
@@ -1100,15 +1495,13 @@ const steps = [
 							<div class="book-head">
 								<div><Bi :mode="lang" en="Book Name" ur="کتاب کا نام" /></div>
 								<div><Bi :mode="lang" en="Qty" ur="تعداد" /></div>
-								<div><Bi :mode="lang" en="School" ur="اسکول" /></div>
 								<div></div>
 							</div>
 							<div v-for="b in books" :key="b.id" class="book-row">
 								<select v-model="b.bookName">
 									<option v-for="t in bookTitles" :key="t" :value="t">{{ t }}</option>
 								</select>
-								<input type="number" v-model.number="b.qty" />
-								<input v-model="b.school" placeholder="School name" />
+								<input type="number" min="1" v-model.number="b.qty" />
 								<button class="icon-btn" type="button" @click="books = books.filter((x) => x.id !== b.id)">✕</button>
 							</div>
 							<div v-if="!books.length" class="empty" style="margin: 0; border: 0">
@@ -1196,7 +1589,7 @@ const steps = [
 						</div>
 						<div class="summary-row">
 							<span style="opacity: 0.7">City / Province</span>
-							<span>{{ selected?.group === "visits" ? visit.city || "-" : meeting.city || training.city || "-" }} • {{ selected?.group === "visits" ? visit.province : training.province || "-" }}</span>
+							<span>{{ selected?.group === "visits" || selected?.group === "books" ? visit.city || "-" : meeting.city || training.city || "-" }} • {{ selected?.group === "visits" || selected?.group === "books" ? visit.province : training.province || "-" }}</span>
 						</div>
 						<div v-if="selected?.group === 'enrolment'" class="summary-row">
 							<span style="opacity: 0.7">Participants</span>
@@ -1208,7 +1601,7 @@ const steps = [
 						</div>
 						<div class="summary-row">
 							<span style="opacity: 0.7">Date</span>
-							<span>{{ selected?.group === "visits" ? visit.visitDate : meeting.meetingDate || training.date }}</span>
+							<span>{{ selected?.group === "visits" || selected?.group === "books" ? visit.visitDate : meeting.meetingDate || training.date }}</span>
 						</div>
 						<div v-if="travel.needed && travel.distance" class="summary-row">
 							<span style="opacity: 0.7">Travel</span>

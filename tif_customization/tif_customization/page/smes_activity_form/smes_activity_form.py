@@ -599,11 +599,12 @@ def get_form_meta():
 	}
 
 
-def _customer_link_options(txt="", limit=4000):
+def _customer_link_options(txt="", city="", limit=4000):
 	"""Customer rows for School Name (Field Visit Link → Customer)."""
 	if not frappe.db.exists("DocType", "Customer"):
 		return []
 	txt = (txt or "").strip()
+	city = (city or "").strip()
 	limit = max(1, min(cint(limit) or 4000, 5000))
 	meta = frappe.get_meta("Customer")
 	has_disabled = meta.has_field("disabled")
@@ -614,9 +615,14 @@ def _customer_link_options(txt="", limit=4000):
 	params = {}
 	if has_disabled:
 		where.append("IFNULL(disabled, 0) = 0")
-	if txt:
-		where.append("(c.name LIKE %(txt)s OR c.customer_name LIKE %(txt)s)")
-		params["txt"] = f"%{txt}%"
+	tokens = [t for t in txt.split() if t]
+	for i, token in enumerate(tokens):
+		key = f"t{i}"
+		where.append(f"(c.name LIKE %({key})s OR c.customer_name LIKE %({key})s)")
+		params[key] = f"%{token}%"
+	if city and has_territory:
+		where.append("(IFNULL(c.territory, '') = '' OR c.territory = %(city)s)")
+		params["city"] = city
 	category_sql = "IFNULL(c.custom_category, '')" if has_category else "''"
 	type_sql = "IFNULL(c.custom_type_of_customer, '')" if has_type else "''"
 	territory_sql = "IFNULL(c.territory, '')" if has_territory else "''"
@@ -657,13 +663,60 @@ def _customer_link_options(txt="", limit=4000):
 	return out
 
 
-
 @frappe.whitelist()
 def search_school_customers(txt=None, city=None, limit=50):
 	"""Typeahead for School Name — Field Visit links this to Customer."""
 	if frappe.session.user == "Guest":
 		frappe.throw(_("Please log in"), frappe.AuthenticationError)
-	return _customer_link_options(txt=txt, limit=max(1, min(cint(limit) or 50, 100)))
+	return _customer_link_options(txt=txt, city=city, limit=max(1, min(cint(limit) or 50, 100)))
+
+
+@frappe.whitelist()
+def search_cities(txt=None, limit=80):
+	"""Typeahead for City Link field."""
+	if frappe.session.user == "Guest":
+		frappe.throw(_("Please log in"), frappe.AuthenticationError)
+	return _city_link_options(txt=txt, limit=max(1, min(cint(limit) or 80, 200)))
+
+
+def _city_link_options(txt="", limit=80):
+	if not frappe.db.exists("DocType", "City"):
+		return []
+	txt = (txt or "").strip()
+	limit = max(1, min(cint(limit) or 80, 500))
+	has_city = frappe.db.has_column("City", "city")
+	params = {}
+	where = ["1=1"]
+	tokens = [t for t in txt.split() if t]
+	for i, token in enumerate(tokens):
+		key = f"t{i}"
+		if has_city:
+			where.append(f"(name LIKE %({key})s OR IFNULL(city, '') LIKE %({key})s)")
+		else:
+			where.append(f"name LIKE %({key})s")
+		params[key] = f"%{token}%"
+	label_sql = "IFNULL(city, name)" if has_city else "name"
+	rows = frappe.db.sql(
+		f"""
+		SELECT name, {label_sql} AS city_label
+		FROM `tabCity`
+		WHERE {" AND ".join(where)}
+		ORDER BY city_label ASC
+		LIMIT {limit}
+		""",
+		params,
+		as_dict=True,
+	)
+	out = []
+	seen = set()
+	for row in rows:
+		name = (row.get("name") or "").strip()
+		label = (row.get("city_label") or name).strip()
+		if not name or name in seen:
+			continue
+		seen.add(name)
+		out.append({"value": name, "label": label, "name": name})
+	return out
 
 
 @frappe.whitelist()
@@ -946,12 +999,71 @@ def download_bulk_import_template():
 	frappe.local.response.type = "download"
 
 
+def _format_follow_up_calls(rows):
+	cleaned = []
+	lines = []
+	for i, row in enumerate(rows or [], 1):
+		if not isinstance(row, dict):
+			continue
+		school = cstr(row.get("school_name_label") or row.get("school_name") or "").strip()
+		person = cstr(row.get("person_name") or "").strip()
+		contact = cstr(row.get("contact_number") or "").strip()
+		designation = cstr(row.get("designation") or "").strip()
+		other = cstr(row.get("designation_other") or "").strip()
+		purpose = cstr(row.get("purpose") or "").strip()
+		if designation == "Other" and other:
+			designation = other
+		if not any([school, person, contact, designation, purpose]):
+			continue
+		cleaned.append(
+			{
+				"school_name": cstr(row.get("school_name") or "").strip(),
+				"school_name_label": school,
+				"person_name": person,
+				"contact_number": contact,
+				"designation": cstr(row.get("designation") or "").strip(),
+				"designation_other": other,
+				"purpose": purpose,
+			}
+		)
+		bits = [f"{i}. School: {school or '-'}"]
+		if person:
+			bits.append(f"Contact person: {person}")
+		if contact:
+			bits.append(f"Contact No: {contact}")
+		if designation:
+			bits.append(f"Designation: {designation}")
+		if purpose:
+			bits.append(f"Purpose: {purpose}")
+		lines.append(", ".join(bits))
+	return cleaned, "\n".join(lines)
+
+
+def _format_other_official_task(data):
+	kind = cstr(data.get("ot_official_task_kind") or "").strip()
+	assigned = cstr(data.get("ot_task_assigned_by") or "").strip()
+	assigned_other = cstr(data.get("ot_task_assigned_by_other") or "").strip()
+	if assigned == "Other" and assigned_other:
+		assigned = assigned_other
+	detail = cstr(data.get("ot_other_official_task_detail") or data.get("ot_academic_work_detail") or "").strip()
+	if kind or (assigned and "Assigned by:" not in detail):
+		lines = []
+		if kind and "Type of official task:" not in detail:
+			lines.append(f"Type of official task: {kind}")
+		if assigned and "Assigned by:" not in detail:
+			lines.append(f"Assigned by: {assigned}")
+		if detail:
+			lines.append(detail if detail.startswith("Details:") or "Type of official task:" in detail else f"Details: {detail}")
+		return "\n".join(lines)
+	return detail
+
+
 def _apply_official_task_fields(doc, data):
 	doc.ot_date = doc.visit_date
 	doc.ot_start_time = doc.visiting_starting_time
 	doc.ot_end_time = doc.visit_ending_time
 	task = (data.get("ot_type_of_task") or "").strip()
-	if doc.type == "Academic Task":
+	if doc.type == "Academic Task" and not task:
 		task = "Academic Tasks"
 	elif doc.type == "Other Official Tasks":
 		task = "Other Official Tasks"
@@ -964,13 +1076,51 @@ def _apply_official_task_fields(doc, data):
 	doc.ot_academic_task_types = "\n".join(academic_types)
 	doc.ot_academic_task_other = data.get("ot_academic_task_other")
 	doc.ot_no_of_pages = data.get("ot_no_of_pages")
+	calls, call_detail = _format_follow_up_calls(_parse_rows(data.get("follow_up_calls")))
+	if calls and not data.get("ot_no_of_calls"):
+		data["ot_no_of_calls"] = len(calls)
+	if calls and not data.get("ot_purpose_of_call"):
+		data["ot_purpose_of_call"] = calls[0].get("purpose") or call_detail
+	if calls and not data.get("school_name"):
+		data["school_name"] = calls[0].get("school_name")
+	if calls and not data.get("school_contacts"):
+		data["school_contacts"] = [
+			{
+				"person_name": c.get("person_name"),
+				"contact_number": c.get("contact_number"),
+				"designation": c.get("designation"),
+				"designation_other": c.get("designation_other"),
+			}
+			for c in calls
+		]
 	doc.ot_no_of_calls = data.get("ot_no_of_calls")
 	doc.ot_purpose_of_call = data.get("ot_purpose_of_call")
 	doc.ot_follow_up_calls_attach = data.get("ot_follow_up_calls_attach")
-	doc.ot_other_official_task_detail = data.get("ot_other_official_task_detail")
+	other_detail = _format_other_official_task(data)
+	doc.ot_other_official_task_detail = other_detail or data.get("ot_other_official_task_detail")
 	doc.ot_visit_meeting_detail = data.get("ot_visit_meeting_detail")
 	doc.ot_hours_spent = data.get("ot_hours_spent")
-	doc.ot_remarks = data.get("ot_visit_meeting_detail") or data.get("ot_other_official_task_detail")
+	extra = cstr(data.get("ot_academic_work_detail") or data.get("ot_remarks") or "").strip()
+	if call_detail and extra:
+		doc.ot_remarks = f"{call_detail}\n{extra}"
+	else:
+		doc.ot_remarks = (
+			call_detail
+			or extra
+			or data.get("ot_visit_meeting_detail")
+			or data.get("ot_other_official_task_detail")
+		)
+	if calls:
+		first = calls[0]
+		if not cstr(doc.school_name or "").strip():
+			doc.school_name = _resolve_customer_link(first.get("school_name"))
+		if not cstr(doc.meeting_with or "").strip() and first.get("person_name"):
+			doc.meeting_with = first.get("person_name")
+		if not cstr(doc.contact_number or "").strip() and first.get("contact_number"):
+			doc.contact_number = first.get("contact_number")
+		if not cstr(doc.designation or "").strip() and first.get("designation"):
+			doc.designation = first.get("designation")
+			doc.designation_other = first.get("designation_other")
 
 
 @frappe.whitelist()
@@ -1195,9 +1345,12 @@ def submit_smes_activity(data):
 		doc.training_mode = data.get("training_mode")
 		doc.training_venue_name = data.get("training_venue_name") or doc.school_name
 		doc.training_no_of_participants = data.get("training_no_of_participants")
-		doc.training_no_of_schools_attended = data.get("training_no_of_schools_attended") or data.get(
-			"training_no_of_schools"
-		)
+		if doc_type == "Teachers Training Meeting":
+			doc.training_no_of_schools_attended = 1
+		else:
+			doc.training_no_of_schools_attended = data.get("training_no_of_schools_attended") or data.get(
+				"training_no_of_schools"
+			)
 		arrange = _as_list(data.get("training_arrange_by"))
 		doc.training_arrange_by = "\n".join(arrange)
 		conducted = cstr(data.get("training_conducted_by")).strip()

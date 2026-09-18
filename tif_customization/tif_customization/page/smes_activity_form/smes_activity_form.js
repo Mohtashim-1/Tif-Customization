@@ -720,13 +720,23 @@ class SmesActivityForm {
 				};
 				if (is_link) {
 					df.options = link_options;
+					df.ignore_user_permissions = 1;
 					if (fieldname === "area") {
 						df.get_query = () => {
 							const filters = {};
 							if (this.data.city) {
 								filters.city = this.data.city;
 							}
-							return { filters };
+							return { filters, ignore_user_permissions: 1 };
+						};
+					}
+					if (fieldname === "school_name") {
+						df.get_query = () => {
+							const filters = {};
+							if (frappe.meta.has_field("Customer", "disabled")) {
+								filters.disabled = 0;
+							}
+							return { filters, ignore_user_permissions: 1 };
 						};
 					}
 				}
@@ -915,6 +925,9 @@ class SmesActivityForm {
 		}
 		if (t === "Teachers Training Meeting" && !this.data.training_session_category) {
 			this.data.training_session_category = "Teachers Training Meeting (One to One)";
+		}
+		if (t === "Teachers Training Meeting") {
+			this.data.training_no_of_schools_attended = this.data.training_no_of_schools_attended || "1";
 		}
 		if (t.includes("Ulama")) {
 			this.data.mt_meeting_type =
@@ -1163,7 +1176,11 @@ class SmesActivityForm {
 			})}
 			${this.field("training_venue_name", __("Venue Name"), "text", { reqd: 1 })}
 			${this.field("training_no_of_participants", __("No. of participants"), "text", { reqd: 1 })}
-			${this.field("training_no_of_schools_attended", __("No. of Schools Attended"), "text", { reqd: 1 })}
+			${
+				(this.data.activity_type || "").includes("Teachers Training")
+					? ""
+					: this.field("training_no_of_schools_attended", __("No. of Schools Attended"), "text", { reqd: 1 })
+			}
 		`;
 	}
 
@@ -1370,7 +1387,7 @@ class SmesActivityForm {
 			.join("");
 		const basics = `
 			<h3>${__("School Related Detail")}</h3>
-			${this.field("school_name", __("School Name"), "text", { reqd: 1 })}
+			${this.field("school_name", __("School Name"), "link", { reqd: 1, options: "Customer" })}
 			<p class="text-muted">${__("Add one row per person if you met more than one contact.")}</p>
 			<div class="smes-multi-list">${contact_rows}</div>
 			<div class="smes-multi-actions">
@@ -2045,21 +2062,19 @@ class SmesActivityForm {
 			);
 		}
 		if (key === "training") {
-			if (
-				!this.need(
-					[
-						"training_arrange_by",
-						"training_conducted_by",
-						"training_session_category",
-						"training_workshop_topic",
-						"training_mode",
-						"training_venue_name",
-						"training_no_of_participants",
-						"training_no_of_schools_attended",
-					],
-					__("Fill Trainings & Workshops required fields"),
-				)
-			) {
+			const training_reqd = [
+				"training_arrange_by",
+				"training_conducted_by",
+				"training_session_category",
+				"training_workshop_topic",
+				"training_mode",
+				"training_venue_name",
+				"training_no_of_participants",
+			];
+			if (!(this.data.activity_type || "").includes("Teachers Training")) {
+				training_reqd.push("training_no_of_schools_attended");
+			}
+			if (!this.need(training_reqd, __("Fill Trainings & Workshops required fields"))) {
 				return false;
 			}
 			if (this.data.training_conducted_by === "Other" && !this.need(["training_conducted_by_other"])) {

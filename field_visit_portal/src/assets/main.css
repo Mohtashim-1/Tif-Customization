@@ -742,6 +742,54 @@ h1.hero {
 	font-size: 13px;
 }
 
+.academic-work {
+	display: grid;
+	gap: 16px;
+}
+
+.work-types {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.work-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 12px;
+	border: 1px solid #e4e4e7;
+	border-radius: 10px;
+	font-size: 13px;
+	background: #fcfcfd;
+	cursor: pointer;
+}
+
+.work-chip input {
+	margin: 0;
+}
+
+.work-chip:has(input:checked) {
+	border-color: #0f7a3c;
+	background: rgba(15, 122, 60, 0.06);
+}
+
+.call-card {
+	border: 1px solid #e4e4e7;
+	border-radius: 14px;
+	padding: 12px 14px 16px;
+	background: #fcfcfd;
+}
+
+.call-card-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	font-size: 12px;
+	font-weight: 600;
+	color: #3f3f46;
+}
+
 .dropzone {
 	cursor: pointer;
 	border-radius: 16px;
@@ -802,7 +850,7 @@ h1.hero {
 .book-head,
 .book-row {
 	display: grid;
-	grid-template-columns: 1.6fr 0.5fr 1fr 40px;
+	grid-template-columns: 1.6fr 0.5fr 40px;
 	gap: 8px;
 	align-items: center;
 	padding: 10px 12px;
