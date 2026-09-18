@@ -179,9 +179,17 @@ const areaOptions = computed(() => {
 	const city = visit.city || meeting.city || training.city;
 	const rows = meta.value.areas || [];
 	return rows
-		.filter((a) => !city || !a.city || a.city === city)
-		.map((a) => ({ value: a.name, label: a.label && a.label !== a.name ? `${a.label}` : a.name }))
-		.filter((a) => a.value);
+		.map((a) => {
+			const value = a.value || a.name || "";
+			const label = a.label || a.area || value;
+			return {
+				value,
+				label,
+				description: a.description || a.city || "",
+				city: a.city || "",
+			};
+		})
+		.filter((a) => a.value && (!city || !a.city || a.city === city));
 });
 const staffOptions = computed(() =>
 	(meta.value.staff_options || []).map((s) => s.employee_name || s.employee).filter(Boolean)
@@ -288,6 +296,15 @@ function pickCard(card) {
 async function searchSchools(txt) {
 	const rows = await apiGet(`${METHOD}.search_school_customers`, {
 		txt: txt || "",
+		limit: 80,
+	});
+	return Array.isArray(rows) ? rows : [];
+}
+
+async function searchAreas(txt) {
+	const rows = await apiGet(`${METHOD}.search_areas`, {
+		txt: txt || "",
+		city: visit.city || meeting.city || "",
 		limit: 80,
 	});
 	return Array.isArray(rows) ? rows : [];
@@ -807,7 +824,16 @@ const steps = [
 							<FieldTime :mode="lang" label-en="Visiting Starting Time" label-ur="آغاز کا وقت" v-model="visit.startTime" />
 							<FieldTime :mode="lang" label-en="Visit Ending Time" label-ur="اختتام کا وقت" v-model="visit.endTime" />
 							<FieldSelect :mode="lang" label-en="City" label-ur="شہر" :options="cityOptions" placeholder-en="Begin typing for results" placeholder-ur="شہر منتخب کریں" v-model="visit.city" />
-							<FieldSelect :mode="lang" label-en="Area" label-ur="علاقہ" :options="areaOptions" placeholder-en="Begin typing for results" placeholder-ur="علاقہ منتخب کریں" v-model="visit.area" />
+							<FieldLink
+								:mode="lang"
+								label-en="Area"
+								label-ur="علاقہ"
+								placeholder="Select area"
+								empty-text="No areas found"
+								:options="areaOptions"
+								:search="searchAreas"
+								v-model="visit.area"
+							/>
 							<FieldSelect :mode="lang" label-en="Province" label-ur="صوبہ" :options="provinceOptions" v-model="visit.province" />
 						</div>
 						<FieldSelect
@@ -826,6 +852,7 @@ const steps = [
 								label-en="School Name"
 								label-ur="اسکول کا نام"
 								placeholder="Select school"
+								empty-text="No customers found"
 								:options="customerOptions"
 								:search="searchSchools"
 								v-model="visit.schoolName"
@@ -937,7 +964,9 @@ const steps = [
 								:mode="lang"
 								label-en="Institute / School Name"
 								label-ur="ادارہ / اسکول کا نام"
-								placeholder="Select customer"
+								placeholder="Select customer or type a name"
+								empty-text="No customers found"
+								allow-custom
 								:options="customerOptions"
 								:search="searchSchools"
 								v-model="meeting.institute"
@@ -945,7 +974,16 @@ const steps = [
 							/>
 							<FieldDate :mode="lang" label-en="Date *" label-ur="تاریخ" v-model="meeting.meetingDate" />
 							<FieldSelect :mode="lang" label-en="City" label-ur="شہر" :options="cityOptions" placeholder-en="Select city" placeholder-ur="شہر منتخب کریں" v-model="meeting.city" />
-							<FieldInput :mode="lang" label-en="Area" label-ur="علاقہ" placeholder="Johar Town" v-model="meeting.area" />
+							<FieldLink
+								:mode="lang"
+								label-en="Area"
+								label-ur="علاقہ"
+								placeholder="Select area"
+								empty-text="No areas found"
+								:options="areaOptions"
+								:search="searchAreas"
+								v-model="meeting.area"
+							/>
 							<div class="grid-2" style="margin-top: 0">
 								<FieldTime :mode="lang" label-en="Start Time" label-ur="آغاز کا وقت" v-model="meeting.startTime" />
 								<FieldTime :mode="lang" label-en="End Time" label-ur="اختتام کا وقت" v-model="meeting.endTime" />

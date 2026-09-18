@@ -179,6 +179,17 @@ ACTIVITY_TYPE_MAP = {
 	"Attendance / Registration in One Day / Half day Workshop": "Attendance / Registration in One Day / Half day Workshop",
 }
 
+SCHOOL_NAME_LINK_TYPES = {
+	"Marketing",
+	"Visits",
+	"Registration of New Schools",
+	"Enrolment of Volunteers",
+	"Model School A",
+	"Model School B",
+	"Books Demand (Quantity)",
+	"Joint Visit with SME",
+}
+
 ENROLMENT_COURSE_OPTIONS = [
 	"TECC - Foundation",
 	"TECC - Professional",
@@ -268,21 +279,14 @@ def get_active_field_officer_staff():
 @frappe.whitelist()
 def get_form_meta():
 	"""Lookups for the easy SMEs Activity Form portal."""
-	cities = frappe.get_all("City", fields=["name"], order_by="name", limit_page_length=500)
-	area_fields = ["name"]
-	if frappe.db.has_column("Area", "city"):
-		area_fields.append("city")
-	if frappe.db.has_column("Area", "area"):
-		area_fields.append("area")
-	areas = frappe.get_all("Area", fields=area_fields, order_by="name", limit_page_length=2000)
-	areas = [
-		{
-			"name": a.name,
-			"city": a.get("city") if isinstance(a, dict) else getattr(a, "city", None),
-			"label": (a.get("area") if isinstance(a, dict) else getattr(a, "area", None)) or a.name,
-		}
-		for a in areas
-	]
+	cities = frappe.get_all(
+		"City",
+		fields=["name"],
+		order_by="name",
+		limit_page_length=500,
+		ignore_permissions=True,
+	)
+	areas = _area_link_options(limit=5000)
 	staff_list = get_active_field_officer_staff()
 	staff_names = [s["employee_name"] for s in staff_list]
 
@@ -661,6 +665,70 @@ def search_school_customers(txt=None, city=None, limit=50):
 		frappe.throw(_("Please log in"), frappe.AuthenticationError)
 	return _customer_link_options(txt=txt, limit=max(1, min(cint(limit) or 50, 100)))
 
+
+@frappe.whitelist()
+def search_areas(txt=None, city=None, limit=80):
+	"""Typeahead for Area Link field."""
+	if frappe.session.user == "Guest":
+		frappe.throw(_("Please log in"), frappe.AuthenticationError)
+	return _area_link_options(txt=txt, city=city, limit=max(1, min(cint(limit) or 80, 200)))
+
+
+def _area_link_options(txt="", city="", limit=80):
+	if not frappe.db.exists("DocType", "Area"):
+		return []
+	txt = (txt or "").strip()
+	city = (city or "").strip()
+	limit = max(1, min(cint(limit) or 80, 5000))
+	has_area = frappe.db.has_column("Area", "area")
+	has_city = frappe.db.has_column("Area", "city")
+	where = ["1=1"]
+	params = {}
+	tokens = [t for t in txt.split() if t]
+	for i, token in enumerate(tokens):
+		key = f"t{i}"
+		if has_area:
+			where.append(f"(name LIKE %({key})s OR IFNULL(area, '') LIKE %({key})s)")
+		else:
+			where.append(f"name LIKE %({key})s")
+		params[key] = f"%{token}%"
+	if city and has_city:
+		where.append("(IFNULL(city, '') = '' OR city = %(city)s)")
+		params["city"] = city
+	area_sql = "IFNULL(area, name)" if has_area else "name"
+	city_sql = "IFNULL(city, '')" if has_city else "''"
+	rows = frappe.db.sql(
+		f"""
+		SELECT name, {area_sql} AS area_label, {city_sql} AS city
+		FROM `tabArea`
+		WHERE {" AND ".join(where)}
+		ORDER BY area_label ASC
+		LIMIT {limit}
+		""",
+		params,
+		as_dict=True,
+	)
+	out = []
+	seen = set()
+	for row in rows:
+		name = (row.get("name") or "").strip()
+		label = (row.get("area_label") or name).strip()
+		if not name or name in seen:
+			continue
+		seen.add(name)
+		desc = (row.get("city") or "").strip()
+		out.append(
+			{
+				"value": name,
+				"label": label,
+				"name": name,
+				"description": desc,
+				"city": desc,
+			}
+		)
+	return out
+
+
 @frappe.whitelist()
 def get_school_customer(name=None):
 	"""Load Customer details to fill School Address / Type on the easy form."""
@@ -729,14 +797,101 @@ def _customer_address_text(customer, primary_name=None):
 
 
 def _resolve_customer_link(value):
-	"""Accept Customer name or customer_name and return the Customer ID."""
+	"""Return a real Customer name, or '' if the text is not a Customer."""
 	val = cstr(value).strip()
-	if not val:
+	if not val or not frappe.db.exists("DocType", "Customer"):
 		return ""
 	if frappe.db.exists("Customer", val):
 		return val
 	found = frappe.db.get_value("Customer", {"customer_name": val}, "name")
-	return found or val
+	if found:
+		return found
+	rows = frappe.db.sql(
+		"""
+		SELECT name
+		FROM `tabCustomer`
+		WHERE name LIKE %(like)s OR customer_name LIKE %(like)s
+		ORDER BY
+			CASE
+				WHEN name = %(val)s THEN 0
+				WHEN customer_name = %(val)s THEN 1
+				WHEN name LIKE %(prefix)s THEN 2
+				ELSE 3
+			END,
+			customer_name
+		LIMIT 5
+		""",
+		{"val": val, "like": f"%{val}%", "prefix": f"{val}%"},
+		as_dict=True,
+	)
+	names = [(r.get("name") or "").strip() for r in rows if (r.get("name") or "").strip()]
+	if len(names) == 1:
+		return names[0]
+	return ""
+
+
+def _resolve_area_link(value, city=None):
+	"""Map typed/partial Area text to a real Area name for Link validation."""
+	val = cstr(value).strip()
+	if not val:
+		return ""
+	if not frappe.db.exists("DocType", "Area"):
+		return val
+	if frappe.db.exists("Area", val):
+		return val
+
+	has_area = frappe.db.has_column("Area", "area")
+	has_city = frappe.db.has_column("Area", "city")
+	params = {"val": val, "like": f"%{val}%", "prefix": f"{val}%"}
+	conds = ["name = %(val)s", "name LIKE %(like)s"]
+	if has_area:
+		conds.extend(["IFNULL(area, '') = %(val)s", "IFNULL(area, '') LIKE %(like)s"])
+	where_sql = "(" + " OR ".join(conds) + ")"
+	if city and has_city:
+		where_sql += " AND (IFNULL(city, '') = '' OR city = %(city)s)"
+		params["city"] = cstr(city).strip()
+
+	rows = frappe.db.sql(
+		f"""
+		SELECT name
+		FROM `tabArea`
+		WHERE {where_sql}
+		ORDER BY
+			CASE
+				WHEN name = %(val)s THEN 0
+				WHEN IFNULL(area, name) = %(val)s THEN 1
+				WHEN name LIKE %(prefix)s THEN 2
+				ELSE 3
+			END,
+			name
+		LIMIT 20
+		""",
+		params,
+		as_dict=True,
+	)
+	names = []
+	seen = set()
+	for row in rows:
+		name = (row.get("name") or "").strip()
+		if name and name not in seen:
+			seen.add(name)
+			names.append(name)
+
+	if val in names:
+		return val
+	if len(names) == 1:
+		return names[0]
+	if not names:
+		frappe.throw(
+			_("Area '{0}' was not found. Select an area from the list.").format(val),
+			frappe.LinkValidationError,
+		)
+	frappe.throw(
+		_(
+			"Area '{0}' is not a specific Area record. Choose one from the list, for example: {1}"
+		).format(val, ", ".join(names[:8])),
+		frappe.LinkValidationError,
+	)
 
 
 def _sme_display_names(staff_list):
@@ -855,7 +1010,7 @@ def submit_smes_activity(data):
 	doc.visiting_starting_time = data.get("starting_time")
 	doc.visit_ending_time = data.get("ending_time")
 	doc.city = data.get("city")
-	doc.area = data.get("area")
+	doc.area = _resolve_area_link(data.get("area"), city=data.get("city"))
 	doc.province = province
 	doc.frequency_of_visits = data.get("frequency_of_visits")
 	material = data.get("marketing_material_provided")
@@ -870,7 +1025,16 @@ def submit_smes_activity(data):
 	doc.reasons_if_not_agreed = detail_reason
 	doc.school_remarks_follow_up = data.get("school_remarks_follow_up")
 
-	doc.school_name = _resolve_customer_link(data.get("school_name"))
+	raw_school = cstr(data.get("school_name")).strip()
+	resolved_school = _resolve_customer_link(raw_school)
+	if doc_type in SCHOOL_NAME_LINK_TYPES and raw_school and not resolved_school:
+		frappe.throw(
+			_(
+				"School Name '{0}' was not found in Customer. Select a school from the list."
+			).format(raw_school),
+			frappe.LinkValidationError,
+		)
+	doc.school_name = resolved_school
 	_apply_school_contacts(doc, data)
 	doc.school_address = data.get("school_address")
 	doc.school_type = data.get("school_type")
@@ -994,7 +1158,7 @@ def submit_smes_activity(data):
 			doc.mt_external_meeting_with = doc.mt_external_meeting_with or "Ulma Karam"
 		doc.mt_meeting_with_person_name = data.get("mt_person_name") or doc.meeting_with
 		doc.mt_contact_no = data.get("mt_contact_number") or doc.contact_number
-		doc.mt_venue = data.get("mt_venue")
+		doc.mt_venue = cstr(data.get("mt_venue") or raw_school).strip()
 		doc.mt_remarks = data.get("mt_meeting_detail")
 		doc.mt_reference = doc.reference
 		doc.mt_visiting_card = data.get("visiting_card_attach")
@@ -1182,7 +1346,7 @@ def _apply_books_demand(doc, data):
 	existing = cstr(doc.school_additional_remarks or "").strip()
 	doc.school_additional_remarks = f"{existing}\n{note}".strip() if existing else note
 	if first_school and not cstr(doc.school_name or "").strip():
-		doc.school_name = first_school
+		doc.school_name = _resolve_customer_link(first_school)
 
 
 def _apply_travel_fields(doc, data):

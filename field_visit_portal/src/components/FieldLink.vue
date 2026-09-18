@@ -5,7 +5,9 @@ const props = defineProps({
 	labelEn: String,
 	labelUr: String,
 	mode: { type: String, default: "both" },
-	placeholder: { type: String, default: "Select customer" },
+	placeholder: { type: String, default: "Select" },
+	emptyText: { type: String, default: "No matching results" },
+	allowCustom: { type: Boolean, default: false },
 	options: { type: Array, default: () => [] },
 	search: Function,
 });
@@ -15,18 +17,20 @@ const label = defineModel("label", { type: String, default: "" });
 const open = ref(false);
 const query = ref("");
 const extra = ref([]);
+const loading = ref(false);
 const root = ref(null);
 const placement = ref("bottom");
 let timer = null;
+let searchSeq = 0;
 
 const display = computed(() => label.value || model.value || "");
 
 function asItem(opt) {
 	if (opt && typeof opt === "object") {
 		return {
-			value: String(opt.value ?? ""),
-			label: String(opt.label || opt.value || ""),
-			description: String(opt.description || ""),
+			value: String(opt.value ?? opt.name ?? ""),
+			label: String(opt.label || opt.value || opt.name || ""),
+			description: String(opt.description || opt.city || ""),
 			city: opt.city || "",
 			school_type: opt.school_type || "",
 		};
@@ -36,55 +40,62 @@ function asItem(opt) {
 
 const allLocal = computed(() => (props.options || []).map(asItem).filter((o) => o.value));
 
+function matchesQuery(o, q) {
+	const tokens = q
+		.trim()
+		.toLowerCase()
+		.split(/\s+/)
+		.filter(Boolean);
+	if (!tokens.length) return true;
+	const hay = `${o.label} ${o.value} ${o.description}`.toLowerCase();
+	return tokens.every((t) => hay.includes(t));
+}
+
 const items = computed(() => {
-	const q = query.value.trim().toLowerCase();
-	const src = extra.value.length ? extra.value : allLocal.value;
-	const filtered = q
-		? src.filter(
-				(o) =>
-					o.label.toLowerCase().includes(q) ||
-					o.value.toLowerCase().includes(q) ||
-					o.description.toLowerCase().includes(q),
-			)
-		: src;
-	return filtered.slice(0, 300);
+	const q = query.value;
+	const seen = new Set();
+	const out = [];
+	for (const o of [...extra.value, ...allLocal.value]) {
+		if (!o.value || seen.has(o.value) || !matchesQuery(o, q)) continue;
+		seen.add(o.value);
+		out.push(o);
+	}
+	return out.slice(0, 300);
 });
 
 function place() {
 	placement.value = "bottom";
 }
 
+async function runSearch(txt) {
+	if (!props.search) return;
+	const seq = ++searchSeq;
+	loading.value = true;
+	try {
+		const rows = ((await props.search(txt || "")) || []).map(asItem).filter((o) => o.value);
+		if (seq === searchSeq) extra.value = rows;
+	} catch {
+		if (seq === searchSeq) extra.value = extra.value.length ? extra.value : [];
+	} finally {
+		if (seq === searchSeq) loading.value = false;
+	}
+}
+
 async function toggle() {
 	open.value = !open.value;
 	if (!open.value) return;
 	query.value = "";
+	extra.value = allLocal.value.slice(0, 300);
 	await nextTick();
 	place();
-	if (allLocal.value.length) {
-		extra.value = allLocal.value;
-		return;
-	}
-	if (!props.search) return;
-	try {
-		extra.value = ((await props.search("")) || []).map(asItem);
-	} catch {
-		extra.value = [];
-	}
+	await runSearch("");
 }
 
 async function onInput(e) {
 	query.value = e.target.value;
 	clearTimeout(timer);
-	const q = query.value.trim();
-	if (!q || !props.search) return;
-	if (allLocal.value.some((o) => o.label.toLowerCase().includes(q.toLowerCase()))) return;
-	timer = setTimeout(async () => {
-		try {
-			extra.value = ((await props.search(q)) || []).map(asItem);
-		} catch {
-			extra.value = [];
-		}
-	}, 250);
+	if (!props.search) return;
+	timer = setTimeout(() => runSearch(query.value.trim()), 200);
 }
 
 function pick(row) {
@@ -92,6 +103,23 @@ function pick(row) {
 	label.value = row.label || row.value;
 	query.value = "";
 	open.value = false;
+}
+
+function useCustom() {
+	const q = query.value.trim();
+	if (!props.allowCustom || !q) return;
+	pick({ value: q, label: q, description: "" });
+}
+
+function onFilterKey(e) {
+	if (e.key === "Enter" && props.allowCustom && query.value.trim()) {
+		e.preventDefault();
+		if (items.value[0] && matchesQuery(items.value[0], query.value)) {
+			pick(items.value[0]);
+			return;
+		}
+		useCustom();
+	}
 }
 
 function onDoc(e) {
@@ -129,9 +157,20 @@ onBeforeUnmount(() => {
 			<span class="caret">▾</span>
 		</button>
 		<div v-if="open" class="menu" :class="placement">
-			<input class="filter" :value="query" placeholder="Type to filter…" @input="onInput" />
+			<input class="filter" :value="query" placeholder="Type to filter…" @input="onInput" @keydown="onFilterKey" />
 			<div class="list">
-				<button v-if="!items.length" type="button" class="item muted" disabled>No customers found</button>
+				<button v-if="loading && !items.length" type="button" class="item muted" disabled>Loading…</button>
+				<button v-else-if="!items.length && !allowCustom" type="button" class="item muted" disabled>{{ emptyText }}</button>
+				<button
+					v-if="allowCustom && query.trim() && !items.some((o) => o.label.toLowerCase() === query.trim().toLowerCase() || o.value.toLowerCase() === query.trim().toLowerCase())"
+					type="button"
+					class="item"
+					@click="useCustom"
+				>
+					<div class="title">Use “{{ query.trim() }}”</div>
+					<div class="desc">Save as typed name</div>
+				</button>
+				<button v-else-if="!items.length && allowCustom && !query.trim()" type="button" class="item muted" disabled>{{ emptyText }}</button>
 				<button
 					v-for="row in items"
 					:key="row.value"
