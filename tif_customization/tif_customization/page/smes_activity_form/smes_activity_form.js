@@ -1421,10 +1421,14 @@ class SmesActivityForm {
 			${this.field("model_school", __("Is this a Model School"), "radio", {
 				options: this.meta.model_school_options || [],
 			})}
-			${this.field("registered_volunteer", __("Registered with TIF as a Volunteer"), "radio", {
-				reqd: 1,
-				options: ["Yes", "No"],
-			})}
+			${
+				this.data.activity_type === "Enrolment of Volunteers"
+					? this.field("registered_volunteer", __("Registered with TIF as a Volunteer"), "radio", {
+							reqd: 1,
+							options: ["Yes", "No"],
+						})
+					: ""
+			}
 		`;
 	}
 
@@ -2119,7 +2123,9 @@ class SmesActivityForm {
 							"qps_affiliated",
 							"tps_affiliated",
 							"cee_affiliated",
-							"registered_volunteer",
+							...(this.data.activity_type === "Enrolment of Volunteers"
+								? ["registered_volunteer"]
+								: []),
 						];
 			if (!this.need(school_req, __("Fill required School Detail fields"))) {
 				return false;

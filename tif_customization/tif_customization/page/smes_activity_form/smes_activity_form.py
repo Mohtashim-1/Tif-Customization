@@ -5,7 +5,7 @@ import os
 
 import frappe
 from frappe import _
-from frappe.utils import get_url, getdate, today
+from frappe.utils import cint, get_url, getdate, today
 
 from tif_customization.tif_customization.field_visit_enrolment_access import (
 	FARHAN_ONLY_FIELD_VISIT_TYPES,
@@ -303,6 +303,7 @@ def get_form_meta():
 		staff_employee = current_emp.name if staff_name else ""
 
 	return {
+		"customers": _customer_link_options(limit=5000),
 		"staff_name": staff_name,
 		"staff_employee": staff_employee,
 		"staff_options": staff_list,
@@ -339,6 +340,13 @@ def get_form_meta():
 			"Walking",
 			"Other",
 		],
+		"book_titles": [
+			"Noorani Qaida",
+			"Mutalae Quran Hakim - Grade 1",
+			"Mutalae Quran Hakim - Grade 2",
+			"Tajweed Guide",
+			"Teacher's Manual",
+		],
 		"provinces": list(PROVINCE_MAP.keys()),
 		"province_options_full": [
 			"Punjab",
@@ -348,6 +356,11 @@ def get_form_meta():
 			"Azad Jammu & Kashmir",
 			"Gilgit-Baltistan",
 			"Islamabad Capital Territory",
+		],
+		"marketing_visit_categories": [
+			"New",
+			"Followup & Other Visits",
+			"TPS Visits",
 		],
 		"frequencies": [
 			"New",
@@ -582,6 +595,150 @@ def get_form_meta():
 	}
 
 
+def _customer_link_options(txt="", limit=4000):
+	"""Customer rows for School Name (Field Visit Link → Customer)."""
+	if not frappe.db.exists("DocType", "Customer"):
+		return []
+	txt = (txt or "").strip()
+	limit = max(1, min(cint(limit) or 4000, 5000))
+	meta = frappe.get_meta("Customer")
+	has_disabled = meta.has_field("disabled")
+	has_territory = meta.has_field("territory")
+	has_category = meta.has_field("custom_category")
+	has_type = meta.has_field("custom_type_of_customer")
+	where = ["1=1"]
+	params = {}
+	if has_disabled:
+		where.append("IFNULL(disabled, 0) = 0")
+	if txt:
+		where.append("(c.name LIKE %(txt)s OR c.customer_name LIKE %(txt)s)")
+		params["txt"] = f"%{txt}%"
+	category_sql = "IFNULL(c.custom_category, '')" if has_category else "''"
+	type_sql = "IFNULL(c.custom_type_of_customer, '')" if has_type else "''"
+	territory_sql = "IFNULL(c.territory, '')" if has_territory else "''"
+	rows = frappe.db.sql(
+		f"""
+		SELECT c.name,
+			TRIM(IFNULL(c.customer_name, c.name)) AS customer_name,
+			{territory_sql} AS territory,
+			{category_sql} AS custom_category,
+			{type_sql} AS custom_type_of_customer
+		FROM `tabCustomer` c
+		WHERE {" AND ".join(where)}
+		ORDER BY c.customer_name ASC
+		LIMIT {limit}
+		""",
+		params,
+		as_dict=True,
+	)
+	out = []
+	seen = set()
+	for row in rows:
+		name = (row.get("name") or "").strip()
+		label = (row.get("customer_name") or name).strip()
+		if not name or name in seen:
+			continue
+		seen.add(name)
+		school_type = _school_type_from_customer(row.get("custom_category"))
+		bits = [b for b in [row.get("territory"), row.get("custom_type_of_customer")] if b]
+		out.append(
+			{
+				"value": name,
+				"label": label,
+				"description": " · ".join(bits),
+				"city": (row.get("territory") or "").strip(),
+				"school_type": school_type,
+			}
+		)
+	return out
+
+
+
+@frappe.whitelist()
+def search_school_customers(txt=None, city=None, limit=50):
+	"""Typeahead for School Name — Field Visit links this to Customer."""
+	if frappe.session.user == "Guest":
+		frappe.throw(_("Please log in"), frappe.AuthenticationError)
+	return _customer_link_options(txt=txt, limit=max(1, min(cint(limit) or 50, 100)))
+
+@frappe.whitelist()
+def get_school_customer(name=None):
+	"""Load Customer details to fill School Address / Type on the easy form."""
+	if frappe.session.user == "Guest":
+		frappe.throw(_("Please log in"), frappe.AuthenticationError)
+	name = (name or "").strip()
+	if not name or not frappe.db.exists("Customer", name):
+		return {}
+	cust_fields = ["name", "customer_name", "territory"]
+	meta = frappe.get_meta("Customer")
+	if meta.has_field("custom_category"):
+		cust_fields.append("custom_category")
+	if meta.has_field("customer_primary_address"):
+		cust_fields.append("customer_primary_address")
+	cust = frappe.db.get_value("Customer", name, cust_fields, as_dict=True) or {}
+	address = _customer_address_text(name, cust.get("customer_primary_address"))
+	return {
+		"value": cust.get("name") or name,
+		"label": (cust.get("customer_name") or name).strip(),
+		"city": (cust.get("territory") or "").strip(),
+		"school_type": _school_type_from_customer(cust.get("custom_category")),
+		"address": address,
+	}
+
+
+def _school_type_from_customer(category):
+	cat = (category or "").strip().lower()
+	if cat in ("chain school", "chains of school", "chain of school"):
+		return "Chains of School"
+	if cat in ("individual school", "individual"):
+		return "Individual School"
+	return ""
+
+
+def _customer_address_text(customer, primary_name=None):
+	if primary_name and frappe.db.exists("Address", primary_name):
+		addr = frappe.get_cached_value(
+			"Address",
+			primary_name,
+			["address_line1", "address_line2", "city", "state", "pincode"],
+			as_dict=True,
+		)
+		if addr:
+			return ", ".join(
+				[cstr(addr.get(k)).strip() for k in ("address_line1", "address_line2", "city", "state", "pincode") if cstr(addr.get(k)).strip()]
+			)
+	rows = frappe.db.sql(
+		"""
+		SELECT addr.address_line1, addr.address_line2, addr.city, addr.state, addr.pincode
+		FROM `tabAddress` addr
+		INNER JOIN `tabDynamic Link` dl
+			ON dl.parent = addr.name AND dl.parenttype = 'Address'
+		WHERE dl.link_doctype = 'Customer' AND dl.link_name = %s
+		ORDER BY addr.is_primary_address DESC, addr.modified DESC
+		LIMIT 1
+		""",
+		customer,
+		as_dict=True,
+	)
+	if not rows:
+		return ""
+	addr = rows[0]
+	return ", ".join(
+		[cstr(addr.get(k)).strip() for k in ("address_line1", "address_line2", "city", "state", "pincode") if cstr(addr.get(k)).strip()]
+	)
+
+
+def _resolve_customer_link(value):
+	"""Accept Customer name or customer_name and return the Customer ID."""
+	val = cstr(value).strip()
+	if not val:
+		return ""
+	if frappe.db.exists("Customer", val):
+		return val
+	found = frappe.db.get_value("Customer", {"customer_name": val}, "name")
+	return found or val
+
+
 def _sme_display_names(staff_list):
 	names = []
 	for s in staff_list:
@@ -692,6 +849,8 @@ def submit_smes_activity(data):
 	# Shared / marketing-style fields
 	doc.visit_by = data.get("visit_by")
 	doc.month = data.get("month")
+	doc.quarter = data.get("quarter")
+	doc.marketing_visit_category = data.get("marketing_visit_category")
 	doc.visit_date = getdate(data.get("visit_date"))
 	doc.visiting_starting_time = data.get("starting_time")
 	doc.visit_ending_time = data.get("ending_time")
@@ -699,8 +858,10 @@ def submit_smes_activity(data):
 	doc.area = data.get("area")
 	doc.province = province
 	doc.frequency_of_visits = data.get("frequency_of_visits")
-	material = (data.get("marketing_material_provided") or "").strip().lower()
-	doc.marketing_material_provided = 1 if material in ("yes", "1") else 0
+	material = data.get("marketing_material_provided")
+	if isinstance(material, str):
+		material = material.strip().lower()
+	doc.marketing_material_provided = 1 if material in (True, 1, "1", "true", "yes") else 0
 	doc.status = data.get("status")
 	doc.reason_not_agreed = data.get("reasons_if_not_agreed")
 	doc.reasons_if_not_agreed_other = data.get("reasons_if_not_agreed_other")
@@ -709,7 +870,7 @@ def submit_smes_activity(data):
 	doc.reasons_if_not_agreed = detail_reason
 	doc.school_remarks_follow_up = data.get("school_remarks_follow_up")
 
-	doc.school_name = data.get("school_name")
+	doc.school_name = _resolve_customer_link(data.get("school_name"))
 	_apply_school_contacts(doc, data)
 	doc.school_address = data.get("school_address")
 	doc.school_type = data.get("school_type")
@@ -855,8 +1016,8 @@ def submit_smes_activity(data):
 	elif doc_type in ("Training", "Workshop", "Teachers Training Meeting", "Workshop Arranged"):
 		doc.training_month = doc.month
 		doc.training_date = doc.visit_date
-		doc.training_trainer_name = doc.visit_by
-		doc.training_entry_filled_by = doc.visit_by
+		doc.training_trainer_name = data.get("training_trainer_name") or doc.visit_by
+		doc.training_entry_filled_by = data.get("training_entry_filled_by") or doc.visit_by
 		doc.training_city = doc.city
 		doc.training_province = doc.province
 		doc.training_session_category = data.get("training_session_category")
@@ -864,11 +1025,15 @@ def submit_smes_activity(data):
 			doc.training_session_category = "Half Day Workshop"
 		if not doc.training_session_category and doc_type == "Teachers Training Meeting":
 			doc.training_session_category = "Teachers Training Meeting (One to One)"
+		if not doc.training_session_category and doc_type == "Workshop Arranged":
+			doc.training_session_category = "Half Day Workshop"
 		doc.training_workshop_topic = data.get("training_workshop_topic")
 		doc.training_mode = data.get("training_mode")
 		doc.training_venue_name = data.get("training_venue_name") or doc.school_name
 		doc.training_no_of_participants = data.get("training_no_of_participants")
-		doc.training_no_of_schools_attended = data.get("training_no_of_schools_attended")
+		doc.training_no_of_schools_attended = data.get("training_no_of_schools_attended") or data.get(
+			"training_no_of_schools"
+		)
 		arrange = _as_list(data.get("training_arrange_by"))
 		doc.training_arrange_by = "\n".join(arrange)
 		conducted = cstr(data.get("training_conducted_by")).strip()
@@ -881,23 +1046,50 @@ def submit_smes_activity(data):
 		"Enrolment of Participant in ELP/ TECC/ TTC/ Online Tajweed",
 	):
 		_append_enrolment_rows(doc, data)
-		_apply_travel_fields(doc, data)
 	elif doc_type in (
 		"Attendance / Registration in One Day / Half day Workshop",
 		"Registration of Participant in Workshops",
 	):
 		_append_workshop_rows(doc, data)
-		_apply_travel_fields(doc, data)
 
+	if data.get("mutalae_sample") in (True, 1, "1", "true", "True", "yes", "Yes"):
+		note = "Mutalae Quran Sample given: Yes"
+		existing = cstr(doc.school_additional_remarks or "").strip()
+		doc.school_additional_remarks = f"{existing}\n{note}".strip() if existing else note
+
+	_apply_books_demand(doc, data)
+	_apply_travel_fields(doc, data)
 	sync_travel_cost(doc)
 
 	doc.insert(ignore_permissions=False)
+	submitted = False
+	if data.get("submit_doc") in (True, 1, "1", "true", "True"):
+		doc.submit()
+		submitted = True
 	frappe.db.commit()
 
 	return {
 		"name": doc.name,
+		"submitted": submitted,
 		"url": get_url(f"/app/field-visit/{doc.name}"),
 		"message": _("Activity saved as {0}").format(doc.name),
+	}
+
+
+@frappe.whitelist()
+def submit_field_visit_doc(name):
+	"""Submit a Field Visit created from the easy portal after attachments are uploaded."""
+	if not name:
+		frappe.throw(_("Field Visit name is required."))
+	doc = frappe.get_doc("Field Visit", name)
+	if doc.docstatus == 0:
+		doc.submit()
+		frappe.db.commit()
+	return {
+		"name": doc.name,
+		"submitted": True,
+		"url": get_url(f"/app/field-visit/{doc.name}"),
+		"message": _("Visit submitted as {0}").format(doc.name),
 	}
 
 
@@ -962,6 +1154,37 @@ def _apply_school_contacts(doc, data):
 		doc.designation_other = data.get("designation_other")
 
 
+def _apply_books_demand(doc, data):
+	rows = _parse_rows(data.get("books_demand"))
+	if not rows:
+		return
+	lines = []
+	first_school = ""
+	for row in rows:
+		if not isinstance(row, dict):
+			continue
+		book = cstr(row.get("book_name") or "").strip()
+		qty = cstr(row.get("qty") or "").strip()
+		school = cstr(row.get("school") or "").strip()
+		if not (book or qty or school):
+			continue
+		part = book or "Book"
+		if qty:
+			part = f"{part} × {qty}"
+		if school:
+			part = f"{part} — {school}"
+			if not first_school:
+				first_school = school
+		lines.append(part)
+	if not lines:
+		return
+	note = "Books demand:\n" + "\n".join(lines)
+	existing = cstr(doc.school_additional_remarks or "").strip()
+	doc.school_additional_remarks = f"{existing}\n{note}".strip() if existing else note
+	if first_school and not cstr(doc.school_name or "").strip():
+		doc.school_name = first_school
+
+
 def _apply_travel_fields(doc, data):
 	doc.travel_mode = data.get("travel_mode")
 	doc.travel_from = data.get("travel_from")
@@ -997,7 +1220,8 @@ def _append_enrolment_rows(doc, data):
 					cstr(row.get("province") or "").strip(),
 					cstr(row.get("province") or data.get("province") or "").strip(),
 				)
-				or province,
+				or data.get("province")
+				or "",
 				"enroll_in_course": cstr(row.get("enroll_in_course") or "").strip(),
 				"date_of_enrolment": row.get("date_of_enrolment") or data.get("visit_date"),
 				"other_special_session_name": cstr(row.get("other_special_session_name") or "").strip(),

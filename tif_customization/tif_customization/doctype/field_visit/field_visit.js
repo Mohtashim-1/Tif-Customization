@@ -16,6 +16,15 @@ const SCHOOL_TYPES = [
 	"Model School B",
 	"Books Demand (Quantity)",
 ];
+const SCHOOL_VISIT_FORM_TYPES = [
+	"Marketing",
+	"Visits",
+	"Registration of New Schools",
+	"Enrolment of Volunteers",
+	"Model School A",
+	"Model School B",
+	"Books Demand (Quantity)",
+];
 const TRAINING_TYPES = ["Training", "Workshop", "Teachers Training Meeting", "Workshop Arranged"];
 const MEETING_TYPES = ["Meeting", "Meeting with Ulama and Educationist"];
 const COCURRICULAR_TYPES = ["Co-curricular Activity", "Quiz Arranged"];
@@ -500,7 +509,7 @@ function apply_field_visit_logic(frm) {
 	set_hidden(frm, all_type_fields, true);
 
 	// --- Type sections ---
-	if (type === "Marketing") {
+	if (SCHOOL_VISIT_FORM_TYPES.includes(type)) {
 		set_hidden(frm, marketing_fields, false);
 	}
 
@@ -563,6 +572,13 @@ function apply_field_visit_logic(frm) {
 	if (SCHOOL_TYPES.includes(type)) {
 		set_hidden(frm, school_fields, false);
 		set_hidden(frm, attachment_fields, false);
+		if (type !== "Enrolment of Volunteers") {
+			set_hidden(
+				frm,
+				["registered_volunteer", "section_break_volunteers", "volunteer_enrolments"],
+				true,
+			);
+		}
 		if (TRAINING_TYPES.includes(type)) {
 			set_hidden(
 				frm,
@@ -626,7 +642,8 @@ function apply_field_visit_logic(frm) {
 	// --- Nested conditional logic ---
 
 	// Marketing: reasons / follow-up
-	const show_not_agree = type === "Marketing" && (status === "Not Agree" || status === "Other");
+	const show_not_agree =
+		SCHOOL_VISIT_FORM_TYPES.includes(type) && (status === "Not Agree" || status === "Other");
 	set_hidden(frm, ["reason_not_agreed", "reasons_if_not_agreed"], !show_not_agree);
 	set_hidden(
 		frm,
@@ -636,7 +653,7 @@ function apply_field_visit_logic(frm) {
 	set_hidden(
 		frm,
 		["school_remarks_follow_up"],
-		!(type === "Marketing" && status === "Need follow up visit"),
+		!(SCHOOL_VISIT_FORM_TYPES.includes(type) && status === "Need follow up visit"),
 	);
 
 	// M&E: inactive reasons
@@ -700,7 +717,9 @@ function apply_field_visit_logic(frm) {
 
 	// Academic: task-specific fields
 	const is_academic_task =
-		type === "Academic" || (type === "Academic / Other Official Tasks" && task === "Academic Tasks");
+		type === "Academic" ||
+		type === "Academic Task" ||
+		(type === "Academic / Other Official Tasks" && task === "Academic Tasks");
 	const is_calls = type === "Academic / Other Official Tasks" && task.includes("Follow up Calls");
 	const is_other_task =
 		type === "Other Official Tasks" ||
