@@ -360,8 +360,8 @@ def _enriched_actuals(from_date, to_date, staff, tokens):
 	actuals["new_schools"] = _distinct_schools(from_date, to_date, tokens, NEW_SCHOOL_SQL)
 	actuals["new_school_registration"] = actuals["new_schools"]
 	dept = department_count_sql("fv")
-	actuals["model_school_a"] = _distinct_schools(from_date, to_date, tokens, f"{dept} >= 2")
-	actuals["model_school_b"] = _distinct_schools(from_date, to_date, tokens, f"{dept} = 1")
+	actuals["model_school_a"] = _distinct_schools(from_date, to_date, tokens, f"{dept} >= 3")
+	actuals["model_school_b"] = _distinct_schools(from_date, to_date, tokens, f"{dept} = 2")
 	sum_participants = _training_participants(from_date, to_date, tokens)
 	actuals["workshop_registration"] = max(workshop_children, sum_participants)
 	return actuals

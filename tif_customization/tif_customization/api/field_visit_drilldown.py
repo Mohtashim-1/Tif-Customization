@@ -116,9 +116,9 @@ def _metric_condition(metric: str, alias: str = "fv") -> str:
 			OR {a}.cee_affiliated = 'Yes - Newly Registered'
 		)"""
 	if m == "model_school_a":
-		return f"{department_count_sql(a)} >= 2"
+		return f"{department_count_sql(a)} >= 3"
 	if m == "model_school_b":
-		return f"{department_count_sql(a)} = 1"
+		return f"{department_count_sql(a)} = 2"
 	if m == "me_active":
 		return f"""{a}.type = 'M&E' AND LOWER(REPLACE(REPLACE(IFNULL({a}.me_activity_status,''),'-',' '),'  ',' ')) = 'active'"""
 	if m == "me_inactive":

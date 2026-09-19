@@ -50,9 +50,9 @@ const HIDDEN_TYPE_OPTIONS = [
 const AFFILIATED_YES = ["Yes - Already Affiliated", "Yes - Newly Registered", "Yes"];
 
 const MODEL_SCHOOL_A =
-	"Yes - Model School A: (Affiliated with programmes from 2 or more TIF departments)";
+	"Yes - Model School A: (Affiliated atleast 1 Program of all 3 Department of TIF)";
 const MODEL_SCHOOL_B =
-	"Yes - Model School B: (Affiliated with programmes from 1 TIF department)";
+	"Yes - Model School B: (Affiliated atleast 1 Program of all 2 Department of TIF)";
 const MODEL_SCHOOL_NO = "No - This is not a Model School";
 
 function is_affiliated_yes(value) {
@@ -74,9 +74,9 @@ function sync_model_school_from_departments(frm) {
 		deptCount += 1;
 	}
 	let modelSchool = MODEL_SCHOOL_NO;
-	if (deptCount >= 2) {
+	if (deptCount >= 3) {
 		modelSchool = MODEL_SCHOOL_A;
-	} else if (deptCount === 1) {
+	} else if (deptCount === 2) {
 		modelSchool = MODEL_SCHOOL_B;
 	}
 	if (frm.doc.model_school !== modelSchool) {

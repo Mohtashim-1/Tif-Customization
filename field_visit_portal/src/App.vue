@@ -575,7 +575,7 @@ function buildPayload(submitDoc) {
 		school_name: schoolForm ? visit.schoolName : meeting.institute || training.venueName,
 		contact_person_name: schoolForm ? visit.meetingWith : meeting.meetingWith,
 		contact_number: schoolForm ? visit.contactNumber : meeting.contactNo,
-		designation: schoolForm ? visit.designation : meeting.designation,
+		designation: schoolForm ? visit.designation : "",
 		designation_other: card?.group === "visits" ? visit.designationOther : "",
 		school_additional_remarks: schoolForm ? visit.schoolAdditionalRemarks : meeting.remarks,
 		frequency_of_visits: card?.group === "visits" ? visit.frequency : meeting.frequency,
@@ -625,6 +625,7 @@ function buildPayload(submitDoc) {
 	if (card?.group === "meeting") {
 		payload.mt_person_name = meeting.meetingWith;
 		payload.mt_contact_number = meeting.contactNo;
+		payload.mt_designation = meeting.designation;
 		payload.mt_venue = meeting.instituteLabel || meeting.institute;
 		payload.school_name = meeting.institute;
 		payload.mt_meeting_detail = [meeting.agenda, meeting.remarks].filter(Boolean).join("\n");

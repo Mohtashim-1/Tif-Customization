@@ -17,6 +17,7 @@ from tif_customization.tif_customization.field_visit_supervisor_only import (
 	can_manage_supervisor_only_field_visits,
 )
 from tif_customization.tif_customization.field_visit_travel_cost import sync_travel_cost
+from tif_customization.tif_customization.model_school import sync_model_school_field
 
 BULK_IMPORT_TEMPLATE = "Field_Visit_Bulk_Import_Template.xlsx"
 
@@ -83,6 +84,36 @@ OFFICIAL_TASK_DOC_TYPES = (
 	"Other Official Tasks",
 	"Headoffice/ Regional Office/ Out of Station Visit",
 )
+
+MEETING_DOC_TYPES = ("Meeting", "Meeting with Ulama and Educationist")
+
+DESIGNATION_SELECT_OPTIONS = frozenset(
+	{
+		"Owner",
+		"Director",
+		"Principal",
+		"Vice Principal",
+		"Admin",
+		"Administrator",
+		"Incharge",
+		"Coordinator",
+		"Teacher",
+		"Receptionist",
+		"Front Desk Officer (FDO)",
+		"Other",
+	}
+)
+
+
+def _normalize_designation(value, other=""):
+	"""Map free-text titles (Mudaris, Mohtamim, etc.) onto the Designation Select."""
+	value = cstr(value).strip()
+	other = cstr(other).strip()
+	if not value:
+		return "", other
+	if value in DESIGNATION_SELECT_OPTIONS:
+		return value, other if value == "Other" else ""
+	return "Other", other or value
 
 
 def _activity_type_labels_for_user():
@@ -411,8 +442,8 @@ def get_form_meta():
 			"No - Not Affiliated",
 		],
 		"model_school_options": [
-			"Yes - Model School A: (Affiliated with programmes from 2 or more TIF departments)",
-			"Yes - Model School B: (Affiliated with programmes from 1 TIF department)",
+			"Yes - Model School A: (Affiliated atleast 1 Program of all 3 Department of TIF)",
+			"Yes - Model School B: (Affiliated atleast 1 Program of all 2 Department of TIF)",
 			"No - This is not a Model School",
 		],
 		"meeting_types": [
@@ -1194,6 +1225,7 @@ def submit_smes_activity(data):
 	doc.qps_affiliated = data.get("qps_affiliated")
 	doc.tps_affiliated = data.get("tps_affiliated")
 	doc.cee_affiliated = data.get("cee_affiliated")
+	sync_model_school_field(doc)
 
 	for key in (
 		"qps_mqh_books",
@@ -1218,7 +1250,6 @@ def submit_smes_activity(data):
 		if data.get(key):
 			doc.set(key, data.get(key))
 
-	doc.model_school = data.get("model_school")
 	doc.registered_volunteer = data.get("registered_volunteer")
 
 	doc.meeting_picture = data.get("meeting_picture")
@@ -1308,6 +1339,7 @@ def submit_smes_activity(data):
 			doc.mt_external_meeting_with = doc.mt_external_meeting_with or "Ulma Karam"
 		doc.mt_meeting_with_person_name = data.get("mt_person_name") or doc.meeting_with
 		doc.mt_contact_no = data.get("mt_contact_number") or doc.contact_number
+		doc.mt_designation = cstr(data.get("mt_designation") or data.get("designation") or "").strip()
 		doc.mt_venue = cstr(data.get("mt_venue") or raw_school).strip()
 		doc.mt_remarks = data.get("mt_meeting_detail")
 		doc.mt_reference = doc.reference
@@ -1421,13 +1453,22 @@ def _parse_rows(value):
 
 
 def _apply_school_contacts(doc, data):
+	raw_designation = cstr(data.get("designation") or data.get("mt_designation") or "").strip()
+	if (doc.type or "") in MEETING_DOC_TYPES and not _parse_rows(data.get("school_contacts")):
+		doc.meeting_with = data.get("contact_person_name")
+		doc.contact_number = data.get("contact_number")
+		# Meeting titles like Mudaris belong on mt_designation (Data), not this Select.
+		doc.designation = ""
+		doc.designation_other = ""
+		return
+
 	rows = _parse_rows(data.get("school_contacts"))
 	if not rows:
 		rows = [
 			{
 				"person_name": data.get("contact_person_name"),
 				"contact_number": data.get("contact_number"),
-				"designation": data.get("designation"),
+				"designation": raw_designation,
 				"designation_other": data.get("designation_other"),
 			}
 		]
@@ -1438,8 +1479,10 @@ def _apply_school_contacts(doc, data):
 			continue
 		name = cstr(row.get("person_name") or row.get("contact_person_name") or "").strip()
 		contact = cstr(row.get("contact_number") or "").strip()
-		designation = cstr(row.get("designation") or "").strip()
-		other = cstr(row.get("designation_other") or "").strip()
+		designation, other = _normalize_designation(
+			row.get("designation"),
+			row.get("designation_other"),
+		)
 		if not (name or contact or designation):
 			continue
 		doc.append(
@@ -1465,10 +1508,11 @@ def _apply_school_contacts(doc, data):
 		doc.designation = first["designation"]
 		doc.designation_other = first["designation_other"]
 	else:
+		select_d, other = _normalize_designation(raw_designation, data.get("designation_other"))
 		doc.meeting_with = data.get("contact_person_name")
 		doc.contact_number = data.get("contact_number")
-		doc.designation = data.get("designation")
-		doc.designation_other = data.get("designation_other")
+		doc.designation = select_d
+		doc.designation_other = other
 
 
 def _apply_books_demand(doc, data):

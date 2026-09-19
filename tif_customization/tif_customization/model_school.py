@@ -9,10 +9,10 @@ import frappe
 AFFILIATED_YES = frozenset({"Yes - Already Affiliated", "Yes - Newly Registered"})
 
 MODEL_SCHOOL_A = (
-	"Yes - Model School A: (Affiliated with programmes from 2 or more TIF departments)"
+	"Yes - Model School A: (Affiliated atleast 1 Program of all 3 Department of TIF)"
 )
 MODEL_SCHOOL_B = (
-	"Yes - Model School B: (Affiliated with programmes from 1 TIF department)"
+	"Yes - Model School B: (Affiliated atleast 1 Program of all 2 Department of TIF)"
 )
 MODEL_SCHOOL_NO = "No - This is not a Model School"
 
@@ -39,15 +39,15 @@ def count_tif_departments(doc) -> int:
 def derive_model_school(dept_count: int | None = None, doc=None) -> str:
 	if dept_count is None:
 		dept_count = count_tif_departments(doc or {})
-	if dept_count >= 2:
+	if dept_count >= 3:
 		return MODEL_SCHOOL_A
-	if dept_count == 1:
+	if dept_count == 2:
 		return MODEL_SCHOOL_B
 	return MODEL_SCHOOL_NO
 
 
 def sync_model_school_field(doc) -> None:
-	"""Set model_school from QPS/TPS/CEE (Model A = 2+ depts, Model B = 1 dept)."""
+	"""Set model_school from QPS/TPS/CEE (Model A = 3 depts, Model B = 2 depts)."""
 	if isinstance(doc, dict):
 		doc["model_school"] = derive_model_school(doc=doc)
 	else:
