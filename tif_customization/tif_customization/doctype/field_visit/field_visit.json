@@ -247,7 +247,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Type of Activity",
-   "options": "\nVisits\nWorkshop\nMeeting with Ulama and Educationist\nTeachers Training Meeting\nHeadoffice/ Regional Office/ Out of Station Visit\nAcademic Task\nOther Official Tasks\nEnrolment of Participants\nEnrolment of Participant in ELP/ TECC/ TTC/ Online Tajweed\nQuiz Arranged\nCo-curricular Activity\nRegistration of New Schools\nRegistration of Participant in Workshops\nWorkshop Arranged\nBooks Demand (Quantity)\nEnrolment of Volunteers\nModel School A\nModel School B",
+   "options": "\nVisits\nM&E\nWorkshop\nMeeting with Ulama and Educationist\nTeachers Training Meeting\nHeadoffice/ Regional Office/ Out of Station Visit\nAcademic Task\nOther Official Tasks\nEnrolment of Participants\nEnrolment of Participant in ELP/ TECC/ TTC/ Online Tajweed\nQuiz Arranged\nCo-curricular Activity\nRegistration of New Schools\nRegistration of Participant in Workshops\nWorkshop Arranged\nBooks Demand (Quantity)\nEnrolment of Volunteers\nModel School A\nModel School B",
    "reqd": 1
   },
   {
@@ -1292,7 +1292,7 @@
    "options": "\nYes - Model School A: (Affiliated atleast 1 Program of all 3 Department of TIF)\nYes - Model School B: (Affiliated atleast 1 Program of all 2 Department of TIF)\nNo - This is not a Model School"
   },
   {
-   "depends_on": "eval:doc.type=='Enrolment of Volunteers'",
+   "depends_on": "eval:in_list(['Enrolment of Volunteers','M&E'], doc.type)",
    "fieldname": "registered_volunteer",
    "fieldtype": "Select",
    "label": "Registered with TIF as a Volunteer",

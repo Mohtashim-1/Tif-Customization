@@ -1,5 +1,6 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
+import FieldLabel from "./FieldLabel.vue";
 
 const props = defineProps({
 	labelEn: String,
@@ -8,6 +9,7 @@ const props = defineProps({
 	options: { type: Array, default: () => [] },
 	placeholderEn: { type: String, default: "Select" },
 	placeholderUr: { type: String, default: "منتخب کریں" },
+	required: { type: Boolean, default: false },
 });
 const model = defineModel({ type: [String, Number], default: "" });
 
@@ -78,10 +80,7 @@ onBeforeUnmount(() => {
 
 <template>
 	<div ref="root" class="field" :class="{ open }">
-		<label>
-			<span class="en">{{ labelEn }}</span>
-			<span v-if="mode !== 'en' && labelUr" class="ur urdu">{{ labelUr }}</span>
-		</label>
+		<FieldLabel :en="labelEn" :ur="labelUr" :mode="mode" :required="required" />
 		<button type="button" class="trigger" :class="{ empty: !model, open }" @click="toggle">
 			<span>{{ display }}</span>
 			<span class="caret">▾</span>

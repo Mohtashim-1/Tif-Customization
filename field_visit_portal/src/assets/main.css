@@ -693,6 +693,13 @@ h1.hero {
 	color: #3f3f46;
 }
 
+.req {
+	color: #dc2626;
+	font-weight: 700;
+	margin-left: 3px;
+	font-family: inherit;
+}
+
 .field label span.ur {
 	font-size: 11px;
 	color: var(--muted);
@@ -1095,4 +1102,47 @@ h1.hero {
 	50% {
 		opacity: 0.5;
 	}
+}
+
+.soa-panel {
+	margin-top: 16px;
+	padding: 16px;
+	border: 1px dashed #0f7a3c;
+	border-radius: 16px;
+	background: rgba(15, 122, 60, 0.03);
+	display: grid;
+	gap: 12px;
+}
+
+.soa-head {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.soa-title {
+	font-size: 15px;
+	font-weight: 700;
+}
+
+.soa-sub {
+	font-size: 12px;
+	color: #71717a;
+	margin-top: 4px;
+}
+
+.soa-warn {
+	background: #fffbeb;
+	border: 1px solid #fde68a;
+	color: #92400e;
+	border-radius: 12px;
+	padding: 10px 12px;
+	font-size: 13px;
+}
+
+.soa-contacts .contact-head,
+.soa-contacts .contact-row,
+.soa-contacts .soa-contact-row {
+	grid-template-columns: 1.1fr 1.2fr 1fr;
 }

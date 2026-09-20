@@ -578,7 +578,10 @@ function apply_field_visit_logic(frm) {
 	if (SCHOOL_TYPES.includes(type)) {
 		set_hidden(frm, school_fields, false);
 		set_hidden(frm, attachment_fields, false);
-		if (type !== "Enrolment of Volunteers") {
+		if (type === "M&E") {
+			set_hidden(frm, ["registered_volunteer"], false);
+			set_hidden(frm, ["section_break_volunteers", "volunteer_enrolments"], true);
+		} else if (type !== "Enrolment of Volunteers") {
 			set_hidden(
 				frm,
 				["registered_volunteer", "section_break_volunteers", "volunteer_enrolments"],

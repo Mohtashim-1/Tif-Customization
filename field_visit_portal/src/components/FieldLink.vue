@@ -1,5 +1,6 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
+import FieldLabel from "./FieldLabel.vue";
 
 const props = defineProps({
 	labelEn: String,
@@ -8,6 +9,9 @@ const props = defineProps({
 	placeholder: { type: String, default: "Select" },
 	emptyText: { type: String, default: "No matching results" },
 	allowCustom: { type: Boolean, default: false },
+	allowCreate: { type: Boolean, default: false },
+	createLabel: { type: String, default: "Create School" },
+	required: { type: Boolean, default: false },
 	options: { type: Array, default: () => [] },
 	search: Function,
 });
@@ -111,6 +115,21 @@ function useCustom() {
 	pick({ value: q, label: q, description: "" });
 }
 
+const emit = defineEmits(["create"]);
+
+function hasExactMatch() {
+	const q = query.value.trim().toLowerCase();
+	if (!q) return false;
+	return items.value.some((o) => o.label.toLowerCase() === q || o.value.toLowerCase() === q);
+}
+
+function emitCreate() {
+	const q = query.value.trim();
+	if (!q) return;
+	emit("create", q);
+	open.value = false;
+}
+
 function onFilterKey(e) {
 	if (e.key === "Enter" && props.allowCustom && query.value.trim()) {
 		e.preventDefault();
@@ -148,10 +167,7 @@ onBeforeUnmount(() => {
 
 <template>
 	<div ref="root" class="field" :class="{ open }">
-		<label>
-			<span class="en">{{ labelEn }}</span>
-			<span v-if="mode !== 'en' && labelUr" class="ur urdu">{{ labelUr }}</span>
-		</label>
+		<FieldLabel :en="labelEn" :ur="labelUr" :mode="mode" :required="required" />
 		<button type="button" class="trigger" :class="{ empty: !model, open }" @click="toggle">
 			<span>{{ display || placeholder }}</span>
 			<span class="caret">▾</span>
@@ -160,9 +176,9 @@ onBeforeUnmount(() => {
 			<input class="filter" :value="query" placeholder="Type to filter…" @input="onInput" @keydown="onFilterKey" />
 			<div class="list">
 				<button v-if="loading && !items.length" type="button" class="item muted" disabled>Loading…</button>
-				<button v-else-if="!items.length && !allowCustom" type="button" class="item muted" disabled>{{ emptyText }}</button>
+				<button v-else-if="!items.length && !allowCustom && !allowCreate" type="button" class="item muted" disabled>{{ emptyText }}</button>
 				<button
-					v-if="allowCustom && query.trim() && !items.some((o) => o.label.toLowerCase() === query.trim().toLowerCase() || o.value.toLowerCase() === query.trim().toLowerCase())"
+					v-if="allowCustom && query.trim() && !hasExactMatch()"
 					type="button"
 					class="item"
 					@click="useCustom"
@@ -181,6 +197,15 @@ onBeforeUnmount(() => {
 				>
 					<div class="title">{{ row.label }}</div>
 					<div v-if="row.description" class="desc">{{ row.description }}</div>
+				</button>
+				<button
+					v-if="allowCreate && query.trim().length >= 2 && !loading && !hasExactMatch()"
+					type="button"
+					class="item create"
+					@click="emitCreate"
+				>
+					<div class="title">+ {{ createLabel }} “{{ query.trim() }}”</div>
+					<div class="desc">Not in School Database — fill School Opening form</div>
 				</button>
 			</div>
 		</div>
@@ -278,6 +303,14 @@ onBeforeUnmount(() => {
 .item.muted {
 	color: #a1a1aa;
 	cursor: default;
+}
+.item.create {
+	margin-top: 4px;
+	border: 1px dashed #0f7a3c;
+	background: rgba(15, 122, 60, 0.06);
+}
+.item.create .desc {
+	color: #0f7a3c;
 }
 .title {
 	font-size: 13px;

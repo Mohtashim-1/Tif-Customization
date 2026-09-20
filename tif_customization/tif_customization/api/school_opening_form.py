@@ -19,6 +19,12 @@ CONTACT_ROLES = [
 	"Coordinator",
 ]
 
+FILE_FIELD_MAP = {
+	"visiting_card": "visiting_card",
+	"school_picture": "school_picture",
+	"meeting_picture": "meeting_picture",
+}
+
 
 def _list_to_csv(value):
 	if value is None:
@@ -55,11 +61,27 @@ def submit_school_opening_application():
 	else:
 		data = raw
 
+	doc = create_school_opening_application(data)
+	_save_request_attachments(doc)
+	frappe.db.commit()
+	return {
+		"name": doc.name,
+		"message": _(
+			"Your School Opening form was submitted successfully. Reference: {0}. Our team will review it shortly."
+		).format(doc.name),
+	}
+
+
+def create_school_opening_application(data):
+	"""Insert a School Opening Application from portal / guest payload."""
+	if isinstance(data, str):
+		data = json.loads(data)
+	data = data or {}
 	school_name = (data.get("school_name") or "").strip()
 	if not school_name:
 		frappe.throw(_("Name of School is required."))
 
-	visit_type = (data.get("visit_type") or "").strip()
+	visit_type = (data.get("visit_type") or "").strip() or "Visit with enrollment"
 	if visit_type not in ("Visit without enrollment", "Visit with enrollment"):
 		frappe.throw(_("Please select Visit without enrollment or Visit with enrollment."))
 
@@ -102,28 +124,20 @@ def submit_school_opening_application():
 	contacts = data.get("key_contacts") or {}
 	for role in CONTACT_ROLES:
 		row = contacts.get(role) or {}
+		if not isinstance(row, dict):
+			row = {}
 		doc.append(
 			"key_contacts",
 			{
 				"role": role,
 				"contact_name": (row.get("name") or "").strip(),
-				"cell_no": (row.get("cell") or "").strip(),
+				"cell_no": (row.get("cell") or row.get("cell_no") or "").strip(),
 			},
 		)
 
 	doc.flags.ignore_permissions = True
 	doc.insert()
-
-	_save_request_attachments(doc)
-
-	frappe.db.commit()
-
-	return {
-		"name": doc.name,
-		"message": _(
-			"Your School Opening form was submitted successfully. Reference: {0}. Our team will review it shortly."
-		).format(doc.name),
-	}
+	return doc
 
 
 def _save_request_attachments(doc):

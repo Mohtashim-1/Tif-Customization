@@ -1,4 +1,6 @@
 <script setup>
+import FieldLabel from "./FieldLabel.vue";
+
 defineProps({
 	labelEn: String,
 	labelUr: String,
@@ -7,6 +9,7 @@ defineProps({
 	placeholder: String,
 	helperEn: String,
 	helperUr: String,
+	required: { type: Boolean, default: false },
 	modelValue: [String, Number],
 });
 const emit = defineEmits(["update:modelValue"]);
@@ -14,10 +17,7 @@ const emit = defineEmits(["update:modelValue"]);
 
 <template>
 	<div class="field">
-		<label>
-			<span class="en">{{ labelEn }}</span>
-			<span v-if="mode !== 'en' && labelUr" class="ur urdu">{{ labelUr }}</span>
-		</label>
+		<FieldLabel :en="labelEn" :ur="labelUr" :mode="mode" :required="required" />
 		<input
 			:type="type"
 			:value="modelValue"

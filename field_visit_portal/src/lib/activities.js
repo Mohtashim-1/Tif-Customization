@@ -10,6 +10,16 @@ export const ACTIVITY_CARDS = [
 		subUr: "نیا یا فالو اپ اسکول وزٹ",
 	},
 	{
+		id: "me",
+		type: "M&E",
+		group: "me",
+		emoji: "🔍",
+		titleEn: "Monitoring & Evaluation",
+		titleUr: "مانیٹرنگ اینڈ ایویلیوایشن",
+		subEn: "Mutalae Quran-e-Hakeem (2025-26)",
+		subUr: "مطالعہ قرآن حکیم (۲۰۲۵-۲۶)",
+	},
+	{
 		id: "meeting",
 		type: "Meeting with Ulama and Educationist",
 		group: "meeting",
@@ -85,6 +95,18 @@ export const ACTIVITY_CARDS = [
 		subEn: "Books requirement from schools",
 		subUr: "اسکولوں سے کتب کی ضرورت",
 	},
+	{
+		id: "report",
+		type: "Report",
+		group: "report",
+		alwaysShow: true,
+		href: "/app/sme-summary-report",
+		emoji: "📊",
+		titleEn: "Report",
+		titleUr: "رپورٹ",
+		subEn: "SME Summary Report",
+		subUr: "SME سمری رپورٹ",
+	},
 ];
 
 export const TRAVEL_MODE_UR = {
@@ -106,6 +128,7 @@ export const QUARTER_OPTIONS = [
 export function cardsForUser(activityTypes = []) {
 	const allowed = new Set(activityTypes);
 	return ACTIVITY_CARDS.filter((card) => {
+		if (card.alwaysShow) return true;
 		if (allowed.has(card.type)) return true;
 		return (card.altTypes || []).some((t) => allowed.has(t));
 	});

@@ -7,6 +7,7 @@ defineProps({
 	accept: { type: String, default: "image/*,.pdf,.xlsx,.xls,.csv" },
 	hintEn: { type: String, default: "" },
 	hintUr: { type: String, default: "" },
+	required: { type: Boolean, default: false },
 });
 const emit = defineEmits(["pick"]);
 
@@ -33,7 +34,7 @@ function onChange(e) {
 			<div class="ico">📎</div>
 			<div>
 				<div class="dz-title">
-					{{ labelEn }}
+					{{ labelEn }}<span v-if="required" class="req">*</span>
 					<div v-if="mode !== 'en'" class="urdu muted">{{ labelUr }}</div>
 				</div>
 				<div class="muted">

@@ -9,6 +9,7 @@ import FieldDate from "./components/FieldDate.vue";
 import FieldTime from "./components/FieldTime.vue";
 import SectionTitle from "./components/SectionTitle.vue";
 import AttachDrop from "./components/AttachDrop.vue";
+import SchoolOpeningPanel from "./components/SchoolOpeningPanel.vue";
 import { apiGet, apiPost, uploadFile, METHOD, TRAVEL_METHOD } from "./lib/api";
 import {
 	ACTIVITY_CARDS,
@@ -63,6 +64,16 @@ const meta = ref({
 	tps_services: [],
 	cee_services: [],
 	not_agree_reasons: [],
+	me_inactive_reasons: [],
+	me_mqh_versions: [],
+	me_mqh_parts: [],
+	me_teachers_count: [],
+	me_classes_per_week: [],
+	me_class_durations: [],
+	me_behavior_changes: [],
+	me_assessment_from: [],
+	me_tif_office_changes: [],
+	school_opening_contact_roles: [],
 });
 
 const meeting = reactive({
@@ -113,6 +124,98 @@ const visit = reactive({
 	reasonsIfNotAgreed: "",
 	services: {},
 });
+function emptyMe() {
+	return {
+		designation: "",
+		bookStatus: "",
+		inactiveReasons: [],
+		inactiveOther: "",
+		teachersTraining: "",
+		teachersCount: "",
+		teachersOther: "",
+		usedGuide: "",
+		bookVersion: "",
+		bookParts: [],
+		classesPerWeek: "",
+		classDuration: "",
+		tookAssessment: "",
+		assessmentFrom: [],
+		behavior: "",
+		tifChanges: [],
+		changeDetails: "",
+		newSchoolAddress: "",
+		newPersonName: "",
+		newPersonDesignation: "",
+		newPersonMobile: "",
+		newPersonEmail: "",
+		volunteer: "",
+	};
+}
+const me = reactive(emptyMe());
+const SOA_CONTACT_ROLES = [
+	"Director",
+	"Administrator",
+	"Principal",
+	"Vice Principal",
+	"Academic Manager",
+	"Academic Coordinator",
+	"Admin Person",
+	"Receptionist",
+	"Coordinator",
+];
+const SOA_PROVINCE_FROM_VISIT = {
+	Sindh: "Sindh",
+	Punjab: "Punjab",
+	KPK: "KPK",
+	"Khyber Pakhtunkhwa": "KPK",
+	Balochistan: "Balochistan",
+	AJK: "Azad Jammu & Kashmir",
+	"Azad Jammu & Kashmir": "Azad Jammu & Kashmir",
+	"Gilgit-Baltistan": "Gilgit-Baltistan",
+};
+function emptySchoolOpening() {
+	const key_contacts = {};
+	for (const role of SOA_CONTACT_ROLES) key_contacts[role] = { name: "", cell: "" };
+	return {
+		form_date: todayISO(),
+		visit_type: "Visit with enrollment",
+		school_name: "",
+		tif_representative: "",
+		institution_types: [],
+		institution_category: "",
+		educational_system: [],
+		type_of_school: "",
+		no_of_campuses: "",
+		no_of_students: "",
+		structure: "",
+		academic_shift: "",
+		teacher_training_services: [],
+		tilawat_services: [],
+		quran_program_services: [],
+		running_tif_services: [],
+		curriculum_in_use: [],
+		curriculum_others: "",
+		fee_structure: "",
+		website: "",
+		facebook: "",
+		instagram: "",
+		linkedin: "",
+		other_links: "",
+		address: "",
+		area: "",
+		province: "",
+		city: "",
+		country: "Pakistan",
+		marketing_sample_provided: "",
+		school_ptcl: "",
+		school_mobile: "",
+		school_whatsapp: "",
+		school_email: "",
+		key_contacts,
+	};
+}
+const creatingSchool = ref(false);
+const schoolOpening = reactive(emptySchoolOpening());
 const schoolContacts = ref([
 	{ id: "1", person_name: "", contact_number: "", designation: "", designation_other: "" },
 ]);
@@ -320,6 +423,58 @@ const affiliationOptions = computed(() =>
 function isAffiliated(val) {
 	return ["Yes - Already Affiliated", "Yes - Newly Registered"].includes(val);
 }
+const meInactiveReasons = computed(() =>
+	nonempty(meta.value.me_inactive_reasons, [
+		"Books not receive or late delivery of books",
+		"Books from other publishers have replaced MQH",
+		"Change of Management",
+		"Unavailability of Teacher",
+		"Untrained Teachers",
+		"Change in Government Policy",
+		"Sect issue",
+		"Lengthy Course",
+		"Shortage of time",
+		"Course Permanently Stop due to Parents Request",
+		"School closed",
+		"Stop due to Negative Propaganda",
+		"Others",
+	])
+);
+const meMqhVersions = computed(() =>
+	nonempty(meta.value.me_mqh_versions, [
+		"Urdu Original Version",
+		"KPK Edition",
+		"English Version",
+		"Sindhi Version",
+		"Braille",
+		"Punjab Edition",
+		"Balochistan Edition",
+		"AJK Edition",
+	])
+);
+const meMqhParts = computed(() =>
+	nonempty(meta.value.me_mqh_parts, ["Part-1", "Part-2", "Part-3", "Part-4", "Part-5", "Part-6", "Part-7", "Other"])
+);
+const meTeachersCount = computed(() => nonempty(meta.value.me_teachers_count, ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "Others"]));
+const meClassesPerWeek = computed(() => nonempty(meta.value.me_classes_per_week, ["1", "2", "3", "4", "5"]));
+const meClassDurations = computed(() =>
+	nonempty(meta.value.me_class_durations, ["20 Minutes", "25 Minutes", "30 Minutes", "35 Minutes", "40 Minutes", "45 Minutes", "50 Minutes", "55 Minutes", "60 Minutes"])
+);
+const meBehaviorChanges = computed(() => nonempty(meta.value.me_behavior_changes, ["No Change", "Minor Change", "Major Change"]));
+const meAssessmentFrom = computed(() =>
+	nonempty(meta.value.me_assessment_from, [
+		"Principal",
+		"Class Teacher",
+		"Management (Incharge / Coordinator / HOO etc)",
+		"Students",
+	])
+);
+const meOfficeChanges = computed(() =>
+	nonempty(meta.value.me_tif_office_changes, ["School Name", "Contact Person", "Contact Number", "Address", "Email"])
+);
+function meHasChange(label) {
+	return (me.tifChanges || []).includes(label);
+}
 const travelModeOptions = computed(() =>
 	travelModes.value.map((m) => ({
 		value: m,
@@ -359,11 +514,42 @@ watch(
 );
 
 function pickCard(card) {
+	if (card?.href) {
+		window.location.href = card.href;
+		return;
+	}
 	selectedId.value = card.id;
 	error.value = "";
+	cancelCreateSchool();
 	setTimeout(() => {
 		if (selectedId.value === card.id && step.value === 1) step.value = 2;
 	}, 500);
+}
+
+function startCreateSchool(name) {
+	const school = (name || "").trim();
+	if (!school) return;
+	creatingSchool.value = true;
+	Object.assign(schoolOpening, emptySchoolOpening());
+	schoolOpening.school_name = school;
+	schoolOpening.tif_representative = staffName.value;
+	schoolOpening.form_date = visit.visitDate || meeting.meetingDate || todayISO();
+	schoolOpening.city = visit.city || meeting.city || "";
+	schoolOpening.area = visit.area || meeting.area || "";
+	schoolOpening.province = SOA_PROVINCE_FROM_VISIT[visit.province || training.province] || visit.province || "";
+	schoolOpening.address = visit.schoolAddress || "";
+	if (selected.value?.group === "meeting") {
+		meeting.institute = school;
+		meeting.instituteLabel = school;
+	} else {
+		visit.schoolName = school;
+		visit.schoolNameLabel = school;
+	}
+}
+
+function cancelCreateSchool() {
+	creatingSchool.value = false;
+	Object.assign(schoolOpening, emptySchoolOpening());
 }
 
 async function searchSchools(txt) {
@@ -396,9 +582,11 @@ watch(
 	() => visit.schoolName,
 	async (name) => {
 		if (!name) return;
+		if (creatingSchool.value && name === schoolOpening.school_name) return;
 		try {
 			const row = await apiGet(`${METHOD}.get_school_customer`, { name });
 			if (!row || !row.value) return;
+			creatingSchool.value = false;
 			visit.schoolNameLabel = row.label || visit.schoolNameLabel || name;
 			if (row.address && !visit.schoolAddress) visit.schoolAddress = row.address;
 			if (row.school_type && !visit.schoolType) visit.schoolType = row.school_type;
@@ -557,7 +745,7 @@ function attachField(card) {
 function buildPayload(submitDoc) {
 	const card = selected.value;
 	const activityType = resolveActivityType(card, training.otType, meta.value.activity_types || []);
-	const schoolForm = card?.group === "visits" || card?.group === "books";
+	const schoolForm = card?.group === "visits" || card?.group === "books" || card?.group === "me";
 	const visitDate = schoolForm ? visit.visitDate : meeting.meetingDate || training.date || todayISO();
 	const city = schoolForm ? visit.city : meeting.city || training.city;
 	const payload = {
@@ -567,8 +755,8 @@ function buildPayload(submitDoc) {
 		month: (schoolForm ? visit.month : training.month) || currentMonthName(),
 		quarter: schoolForm ? visit.quarter : training.quarter,
 		visit_date: visitDate,
-		starting_time: card?.group === "visits" ? visit.startTime : meeting.startTime,
-		ending_time: card?.group === "visits" ? visit.endTime : meeting.endTime,
+		starting_time: card?.group === "visits" || card?.group === "me" ? visit.startTime : meeting.startTime,
+		ending_time: card?.group === "visits" || card?.group === "me" ? visit.endTime : meeting.endTime,
 		city,
 		area: schoolForm ? visit.area : meeting.area,
 		province: schoolForm ? visit.province : training.province,
@@ -619,6 +807,37 @@ function buildPayload(submitDoc) {
 			payload.designation = firstContact.designation;
 			payload.designation_other = firstContact.designation_other;
 		}
+		Object.assign(payload, visit.services);
+	}
+
+	if (card?.group === "me") {
+		payload.qps_affiliated = visit.qpsAffiliated;
+		payload.tps_affiliated = visit.tpsAffiliated;
+		payload.cee_affiliated = visit.ceeAffiliated;
+		payload.me_designation_meeting_with = me.designation;
+		payload.me_mqh_book_status = me.bookStatus;
+		const reasons = [...(me.inactiveReasons || [])];
+		if (reasons.includes("Others") && me.inactiveOther) reasons.push(me.inactiveOther);
+		payload.me_inactive_reasons = reasons;
+		payload.me_teachers_training_session = me.teachersTraining;
+		payload.me_number_of_teachers_mqh = me.teachersCount;
+		payload.me_teachers_mqh_other = me.teachersOther;
+		payload.me_used_teachers_guide = me.usedGuide;
+		payload.me_mqh_book_version = me.bookVersion;
+		payload.me_mqh_book_part = me.bookParts;
+		payload.me_classes_per_week = me.classesPerWeek;
+		payload.me_class_duration = me.classDuration;
+		payload.me_took_assessment = me.tookAssessment;
+		payload.me_assessment_from = me.assessmentFrom;
+		payload.me_student_behavior_changes = me.behavior;
+		payload.me_changes_made = me.tifChanges;
+		payload.me_details_of_changes_made = me.changeDetails;
+		payload.me_new_school_address = me.newSchoolAddress;
+		payload.me_new_person_name = me.newPersonName;
+		payload.me_new_person_designation = me.newPersonDesignation;
+		payload.me_new_person_mobile_number = me.newPersonMobile;
+		payload.me_new_person_email = me.newPersonEmail;
+		payload.registered_volunteer = me.volunteer;
 		Object.assign(payload, visit.services);
 	}
 
@@ -744,13 +963,24 @@ function buildPayload(submitDoc) {
 		}));
 	}
 
+	if (creatingSchool.value) {
+		const opening = JSON.parse(JSON.stringify(schoolOpening));
+		if (!opening.school_name) opening.school_name = visit.schoolNameLabel || visit.schoolName || meeting.instituteLabel || meeting.institute;
+		payload.school_opening = opening;
+		const contacts = opening.key_contacts || {};
+		const first = contacts.Principal || contacts.Director || contacts.Administrator || {};
+		if (!payload.contact_person_name && first.name) payload.contact_person_name = first.name;
+		if (!payload.contact_number && first.cell) payload.contact_number = first.cell;
+		if (!payload.school_address && opening.address) payload.school_address = opening.address;
+	}
+
 	return payload;
 }
 
 async function uploadAttachments(docname) {
 	const card = selected.value;
 	const jobs = [];
-	const map = card?.group === "visits"
+	const map = card?.group === "visits" || card?.group === "me"
 		? [
 				["meeting_picture", "meeting_picture"],
 				["school_picture", "school_picture"],
@@ -771,6 +1001,24 @@ async function uploadAttachments(docname) {
 	await Promise.all(jobs);
 }
 
+async function uploadSoaAttachments(docname) {
+	if (!docname) return;
+	const jobs = [];
+	const map = [
+		["school_picture", "school_picture"],
+		["visiting_card_attach", "visiting_card"],
+		["meeting_picture", "meeting_picture"],
+		["meeting", "meeting_picture"],
+		["card", "visiting_card"],
+	];
+	for (const [key, fieldname] of map) {
+		if (attachments[key]) {
+			jobs.push(uploadFile(attachments[key], { doctype: "School Opening Application", docname, fieldname, isPrivate: false }));
+		}
+	}
+	await Promise.all(jobs);
+}
+
 async function saveVisit(submitDoc) {
 	error.value = "";
 	if (!selected.value) {
@@ -781,13 +1029,33 @@ async function saveVisit(submitDoc) {
 		error.value = "Your employee profile is not linked as Field Staff. Ask admin to set user on Employee.";
 		return;
 	}
+	if (creatingSchool.value && !(schoolOpening.school_name || "").trim()) {
+		error.value = "Enter the school name in the Create School section.";
+		return;
+	}
+	if (creatingSchool.value && !(schoolOpening.visit_type || "").trim()) {
+		error.value = "Select Visit with enrollment or Visit without enrollment.";
+		return;
+	}
 	saving.value = true;
 	try {
 		const result = await apiPost(`${METHOD}.submit_smes_activity`, {
 			data: buildPayload(false),
 		});
+		if (result?.books_blocked) {
+			savedName.value = result.school_opening || "";
+			await uploadSoaAttachments(result.school_opening);
+			success.value = true;
+			error.value = "";
+			setTimeout(() => {
+				success.value = false;
+				resetForm();
+			}, 4500);
+			return;
+		}
 		savedName.value = result.name;
 		await uploadAttachments(result.name);
+		if (result.school_opening) await uploadSoaAttachments(result.school_opening);
 		if (submitDoc) {
 			await apiPost(`${METHOD}.submit_field_visit_doc`, { name: result.name });
 		}
@@ -825,6 +1093,8 @@ function resetForm() {
 	visit.schoolAddress = "";
 	visit.schoolAdditionalRemarks = "";
 	visit.services = {};
+	Object.assign(me, emptyMe());
+	cancelCreateSchool();
 	meeting.meetingWith = "";
 	meeting.contactNo = "";
 	meeting.institute = "";
@@ -951,7 +1221,12 @@ const steps = [
 							<template v-else>{{ card.subEn }} / {{ card.subUr }}</template>
 						</div>
 						<div class="card-go">
-							<Bi :mode="lang" en="Click to continue" ur="جاری رکھنے کے لیے کلک کریں" /> →
+							<Bi
+								:mode="lang"
+								:en="card.href ? 'Open report' : 'Click to continue'"
+								:ur="card.href ? 'رپورٹ کھولیں' : 'جاری رکھنے کے لیے کلک کریں'"
+							/>
+							→
 						</div>
 					</button>
 				</div>
@@ -1003,13 +1278,13 @@ const steps = [
 						<div class="grid-3">
 							<FieldSelect :mode="lang" label-en="Month" label-ur="مہینہ" :options="meta.months" v-model="visit.month" />
 							<FieldSelect :mode="lang" label-en="Quarter" label-ur="سہ ماہی" :options="QUARTER_OPTIONS" v-model="visit.quarter" />
-							<FieldSelect :mode="lang" label-en="Name of Staff" label-ur="سٹاف کا نام" :options="staffOptions" v-model="visit.visitBy" />
+							<FieldSelect :mode="lang" label-en="Name of Staff" label-ur="سٹاف کا نام" :options="staffOptions" required v-model="visit.visitBy" />
 							<FieldSelect :mode="lang" label-en="Marketing Visit Category" label-ur="مارکیٹنگ وزٹ کیٹیگری" :options="marketingCategories" placeholder-en="Select" placeholder-ur="منتخب کریں" v-model="visit.marketingVisitCategory" />
 							<FieldSelect :mode="lang" label-en="Frequency of Visits" label-ur="وزٹ کی فریکوئنسی" :options="frequencyOptions" placeholder-en="Select" placeholder-ur="منتخب کریں" v-model="visit.frequency" />
 							<FieldSelect :mode="lang" label-en="Status" label-ur="سٹیٹس" :options="statusOptions" placeholder-en="Select" placeholder-ur="منتخب کریں" v-model="visit.status" />
-							<FieldDate :mode="lang" label-en="Visit Date" label-ur="وزٹ کی تاریخ" v-model="visit.visitDate" />
-							<FieldTime :mode="lang" label-en="Visiting Starting Time" label-ur="آغاز کا وقت" v-model="visit.startTime" />
-							<FieldTime :mode="lang" label-en="Visit Ending Time" label-ur="اختتام کا وقت" v-model="visit.endTime" />
+							<FieldDate :mode="lang" label-en="Visit Date" label-ur="وزٹ کی تاریخ" required v-model="visit.visitDate" />
+							<FieldTime :mode="lang" label-en="Visiting Starting Time" label-ur="آغاز کا وقت" required v-model="visit.startTime" />
+							<FieldTime :mode="lang" label-en="Visit Ending Time" label-ur="اختتام کا وقت" required v-model="visit.endTime" />
 							<FieldLink
 								:mode="lang"
 								label-en="City"
@@ -1018,6 +1293,7 @@ const steps = [
 								empty-text="No cities found"
 								:options="cityLinkOptions"
 								:search="searchCities"
+								required
 								v-model="visit.city"
 							/>
 							<FieldLink
@@ -1028,9 +1304,10 @@ const steps = [
 								empty-text="No areas found"
 								:options="areaOptions"
 								:search="searchAreas"
+								required
 								v-model="visit.area"
 							/>
-							<FieldSelect :mode="lang" label-en="Province" label-ur="صوبہ" :options="provinceOptions" v-model="visit.province" />
+							<FieldSelect :mode="lang" label-en="Province" label-ur="صوبہ" :options="provinceOptions" required v-model="visit.province" />
 						</div>
 						<FieldSelect
 							v-if="visit.status === 'Not Agree' || visit.status === 'Other'"
@@ -1047,12 +1324,15 @@ const steps = [
 								:mode="lang"
 								label-en="School Name"
 								label-ur="اسکول کا نام"
-								placeholder="Select school"
+								placeholder="Type to search school"
 								empty-text="No customers found"
+								allow-create
+								required
 								:options="customerOptions"
 								:search="searchSchools"
 								v-model="visit.schoolName"
 								v-model:label="visit.schoolNameLabel"
+								@create="startCreateSchool"
 							/>
 							<FieldSelect :mode="lang" label-en="School Type" label-ur="اسکول کی قسم" :options="schoolTypeOptions" placeholder-en="Select" placeholder-ur="منتخب کریں" v-model="visit.schoolType" />
 							<FieldTextarea :mode="lang" label-en="School Address" label-ur="اسکول کا پتہ" v-model="visit.schoolAddress" />
@@ -1065,6 +1345,14 @@ const steps = [
 								</div>
 							</label>
 						</div>
+
+						<SchoolOpeningPanel
+							v-if="creatingSchool"
+							:mode="lang"
+							:model="schoolOpening"
+							:options="meta"
+							@cancel="cancelCreateSchool"
+						/>
 
 						<div class="block-title">Contact Person / رابطہ شخص</div>
 						<div class="table-head">
@@ -1098,7 +1386,7 @@ const steps = [
 
 						<div class="block-title">Affiliation / الحاق</div>
 						<div class="grid-1">
-							<FieldSelect :mode="lang" label-en="Is this school affiliated with QPS?" label-ur="کیا یہ اسکول QPS سے الحاق شدہ ہے؟" :options="affiliationOptions" placeholder-en="Select" placeholder-ur="منتخب کریں" v-model="visit.qpsAffiliated" />
+							<FieldSelect :mode="lang" label-en="Is this school affiliated with QPS?" label-ur="کیا یہ اسکول QPS سے الحاق شدہ ہے؟" :options="affiliationOptions" placeholder-en="Select" placeholder-ur="منتخب کریں" required v-model="visit.qpsAffiliated" />
 							<div v-if="isAffiliated(visit.qpsAffiliated)" class="service-grid">
 								<div v-for="s in meta.qps_services" :key="s.field" class="service">
 									<span>{{ s.label }}</span>
@@ -1109,7 +1397,7 @@ const steps = [
 									</select>
 								</div>
 							</div>
-							<FieldSelect :mode="lang" label-en="Is this school affiliated with TPS?" label-ur="کیا یہ اسکول TPS سے الحاق شدہ ہے؟" :options="affiliationOptions" placeholder-en="Select" placeholder-ur="منتخب کریں" v-model="visit.tpsAffiliated" />
+							<FieldSelect :mode="lang" label-en="Is this school affiliated with TPS?" label-ur="کیا یہ اسکول TPS سے الحاق شدہ ہے؟" :options="affiliationOptions" placeholder-en="Select" placeholder-ur="منتخب کریں" required v-model="visit.tpsAffiliated" />
 							<div v-if="isAffiliated(visit.tpsAffiliated)" class="service-grid">
 								<div v-for="s in meta.tps_services" :key="s.field" class="service">
 									<span>{{ s.label }}</span>
@@ -1120,7 +1408,7 @@ const steps = [
 									</select>
 								</div>
 							</div>
-							<FieldSelect :mode="lang" label-en="Is this school affiliated with Teachers Training Department (CEE)?" label-ur="کیا یہ اسکول ٹیچرز ٹریننگ ڈیپارٹمنٹ (CEE) سے الحاق شدہ ہے؟" :options="affiliationOptions" placeholder-en="Select" placeholder-ur="منتخب کریں" v-model="visit.ceeAffiliated" />
+							<FieldSelect :mode="lang" label-en="Is this school affiliated with Teachers Training Department (CEE)?" label-ur="کیا یہ اسکول ٹیچرز ٹریننگ ڈیپارٹمنٹ (CEE) سے الحاق شدہ ہے؟" :options="affiliationOptions" placeholder-en="Select" placeholder-ur="منتخب کریں" required v-model="visit.ceeAffiliated" />
 							<div v-if="isAffiliated(visit.ceeAffiliated)" class="service-grid">
 								<div v-for="s in meta.cee_services" :key="s.field" class="service">
 									<span>{{ s.label }}</span>
@@ -1144,6 +1432,197 @@ const steps = [
 						</div>
 					</div>
 
+					<div class="panel-body" v-else-if="selected.group === 'me'">
+						<SectionTitle
+							:mode="lang"
+							title-en="Monitoring & Evaluation of Mutalae Quran-e-Hakeem"
+							title-ur="مطالعہ قرآن حکیم کی مانیٹرنگ اینڈ ایویلیوایشن"
+							sub-en="2025-26"
+							sub-ur="۲۰۲۵-۲۶"
+						/>
+						<div class="grid-3">
+							<FieldSelect :mode="lang" label-en="Visit by" label-ur="وزٹ کنندہ" :options="staffOptions" required v-model="visit.visitBy" />
+							<FieldDate :mode="lang" label-en="Visit Date" label-ur="وزٹ کی تاریخ" required v-model="visit.visitDate" />
+							<FieldSelect :mode="lang" label-en="Month" label-ur="مہینہ" :options="meta.months" v-model="visit.month" />
+							<FieldTime :mode="lang" label-en="Starting Time" label-ur="آغاز کا وقت" required v-model="visit.startTime" />
+							<FieldTime :mode="lang" label-en="Ending Time" label-ur="اختتام کا وقت" required v-model="visit.endTime" />
+							<FieldSelect :mode="lang" label-en="Province" label-ur="صوبہ" :options="provinceOptions" required v-model="visit.province" />
+							<FieldLink
+								:mode="lang"
+								label-en="City"
+								label-ur="شہر"
+								placeholder="Type to search city"
+								empty-text="No cities found"
+								:options="cityLinkOptions"
+								:search="searchCities"
+								required
+								v-model="visit.city"
+							/>
+							<FieldLink
+								:mode="lang"
+								label-en="Area"
+								label-ur="علاقہ"
+								placeholder="Select area"
+								empty-text="No areas found"
+								:options="areaOptions"
+								:search="searchAreas"
+								required
+								v-model="visit.area"
+							/>
+							<FieldLink
+								:mode="lang"
+								label-en="Name of School"
+								label-ur="اسکول کا نام"
+								placeholder="Type to search school"
+								empty-text="No customers found"
+								allow-create
+								required
+								:options="customerOptions"
+								:search="searchSchools"
+								v-model="visit.schoolName"
+								v-model:label="visit.schoolNameLabel"
+								@create="startCreateSchool"
+							/>
+							<FieldInput :mode="lang" label-en="Meeting with (Person Name)" label-ur="ملاقات کس سے" required v-model="visit.meetingWith" />
+							<FieldInput :mode="lang" label-en="Designation (Meeting with)" label-ur="عہدہ" placeholder="Principal, Mudaris, Mohtamim" required v-model="me.designation" />
+							<FieldInput :mode="lang" label-en="Contact no. (Meeting with)" label-ur="رابطہ نمبر" placeholder="03XX-" required v-model="visit.contactNumber" />
+						</div>
+
+						<SchoolOpeningPanel
+							v-if="creatingSchool"
+							:mode="lang"
+							:model="schoolOpening"
+							:options="meta"
+							@cancel="cancelCreateSchool"
+						/>
+
+						<div class="block-title">Mutalae Quran Hakeem Book Status / کتاب کی حیثیت</div>
+						<div class="academic-work">
+							<FieldSelect :mode="lang" label-en="Mutalae Quran Hakeem Book Status" label-ur="مطالعہ قرآن حکیم کی حیثیت" :options="['Active', 'In-Active']" v-model="me.bookStatus" />
+							<div v-if="me.bookStatus === 'In-Active'" class="field">
+								<label>
+									<span class="en">Reason of Above</span>
+									<span v-if="lang !== 'en'" class="ur urdu">مندرجہ بالا کی وجہ</span>
+								</label>
+								<div class="work-types">
+									<label v-for="r in meInactiveReasons" :key="r" class="work-chip">
+										<input type="checkbox" :value="r" v-model="me.inactiveReasons" />
+										<span>{{ r }}</span>
+									</label>
+								</div>
+							</div>
+							<FieldInput
+								v-if="me.bookStatus === 'In-Active' && me.inactiveReasons.includes('Others')"
+								:mode="lang"
+								label-en="Other reason"
+								label-ur="دیگر وجہ"
+								v-model="me.inactiveOther"
+							/>
+							<FieldSelect :mode="lang" label-en="Has any Teachers Training Session Occurred in School?" label-ur="کیا اسکول میں ٹیچرز ٹریننگ ہوئی؟" :options="['Yes', 'No']" v-model="me.teachersTraining" />
+							<FieldSelect :mode="lang" label-en="Number of Teachers designated for MQH" label-ur="MQH کے اساتذہ کی تعداد" :options="meTeachersCount" v-model="me.teachersCount" />
+							<FieldInput v-if="me.teachersCount === 'Others'" :mode="lang" label-en="Specify number of teachers" label-ur="اساتذہ کی تعداد لکھیں" v-model="me.teachersOther" />
+							<FieldSelect :mode="lang" label-en="Did you use the Teacher's Guide of MQH for Teaching?" label-ur="کیا MQH ٹیچرز گائیڈ استعمال کی؟" :options="['Yes', 'No']" v-model="me.usedGuide" />
+							<FieldSelect :mode="lang" label-en="Which version / language of MQH book taught?" label-ur="MQH کتاب کا ورژن / زبان" :options="meMqhVersions" v-model="me.bookVersion" />
+							<div class="field">
+								<label>
+									<span class="en">Which version of Mutalae Quran-e-Hakeem Book Taught?<span class="req">*</span></span>
+									<span v-if="lang !== 'en'" class="ur urdu">مطالعہ قرآن حکیم کتاب کا حصہ</span>
+								</label>
+								<div class="work-types">
+									<label v-for="p in meMqhParts" :key="p" class="work-chip">
+										<input type="checkbox" :value="p" v-model="me.bookParts" />
+										<span>{{ p }}</span>
+									</label>
+								</div>
+							</div>
+							<div class="grid-2" style="margin-top: 0">
+								<FieldSelect :mode="lang" label-en="How many classes allocated per week for MQH?" label-ur="ہفتے میں MQH کی کلاسز" :options="meClassesPerWeek" v-model="me.classesPerWeek" />
+								<FieldSelect :mode="lang" label-en="Duration of Class" label-ur="کلاس کا دورانیہ" :options="meClassDurations" v-model="me.classDuration" />
+							</div>
+							<FieldSelect :mode="lang" label-en="Did you take assessment?" label-ur="کیا اسیسمنٹ لی؟" :options="['Yes', 'No']" v-model="me.tookAssessment" />
+							<div v-if="me.tookAssessment === 'Yes'" class="field">
+								<label>
+									<span class="en">From whom have you taken assessment?</span>
+									<span v-if="lang !== 'en'" class="ur urdu">اسسیسمنٹ کس سے لی؟</span>
+								</label>
+								<div class="work-types">
+									<label v-for="p in meAssessmentFrom" :key="p" class="work-chip">
+										<input type="checkbox" :value="p" v-model="me.assessmentFrom" />
+										<span>{{ p }}</span>
+									</label>
+								</div>
+							</div>
+							<FieldSelect :mode="lang" label-en="What kind of changes you noticed in student behavior?" label-ur="طلباء کے رویے میں کیا تبدیلی دیکھی؟" :options="meBehaviorChanges" v-model="me.behavior" />
+						</div>
+
+						<div class="block-title">Updates for TIF Office (If Any Changes) / آفس کے لیے اپڈیٹس</div>
+						<div class="academic-work">
+							<div class="field">
+								<label>
+									<span class="en">What changes have been Made?</span>
+									<span v-if="lang !== 'en'" class="ur urdu">کون سی تبدیلیاں ہوئی ہیں؟</span>
+								</label>
+								<div class="work-types">
+									<label v-for="c in meOfficeChanges" :key="c" class="work-chip">
+										<input type="checkbox" :value="c" v-model="me.tifChanges" />
+										<span>{{ c }}</span>
+									</label>
+								</div>
+							</div>
+							<FieldTextarea v-if="me.tifChanges.length" :mode="lang" label-en="Details of Changes Made" label-ur="تبدیلیوں کی تفصیل" v-model="me.changeDetails" />
+							<FieldInput v-if="meHasChange('Address')" :mode="lang" label-en="New School Address" label-ur="نیا اسکول ایڈریس" v-model="me.newSchoolAddress" />
+							<FieldInput v-if="meHasChange('Contact Person') || meHasChange('Contact Number') || meHasChange('Email')" :mode="lang" label-en="New Person Name" label-ur="نئے شخص کا نام" v-model="me.newPersonName" />
+							<FieldInput v-if="meHasChange('Contact Person') || meHasChange('Contact Number') || meHasChange('Email')" :mode="lang" label-en="New Person Designation" label-ur="نئے شخص کا عہدہ" v-model="me.newPersonDesignation" />
+							<FieldInput v-if="meHasChange('Contact Number')" :mode="lang" label-en="New Person Mobile Number" label-ur="نیا موبائل نمبر" v-model="me.newPersonMobile" />
+							<FieldInput v-if="meHasChange('Email')" :mode="lang" label-en="New Person Email" label-ur="نیا ای میل" v-model="me.newPersonEmail" />
+						</div>
+
+						<div class="block-title">Affiliation / الحاق</div>
+						<div class="grid-1">
+							<FieldSelect :mode="lang" label-en="Is this school affiliated with QPS?" label-ur="کیا یہ اسکول QPS سے الحاق شدہ ہے؟" :options="affiliationOptions" placeholder-en="Select" placeholder-ur="منتخب کریں" required v-model="visit.qpsAffiliated" />
+							<div v-if="isAffiliated(visit.qpsAffiliated)" class="service-grid">
+								<div v-for="s in meta.qps_services" :key="s.field" class="service">
+									<span>{{ s.label }}</span>
+									<select :value="visit.services[s.field] || ''" @change="setService(s.field, $event.target.value)">
+										<option value="">—</option>
+										<option value="Yes">Yes</option>
+										<option value="No">No</option>
+									</select>
+								</div>
+							</div>
+							<FieldSelect :mode="lang" label-en="Is this school affiliated with TPS?" label-ur="کیا یہ اسکول TPS سے الحاق شدہ ہے؟" :options="affiliationOptions" placeholder-en="Select" placeholder-ur="منتخب کریں" required v-model="visit.tpsAffiliated" />
+							<div v-if="isAffiliated(visit.tpsAffiliated)" class="service-grid">
+								<div v-for="s in meta.tps_services" :key="s.field" class="service">
+									<span>{{ s.label }}</span>
+									<select :value="visit.services[s.field] || ''" @change="setService(s.field, $event.target.value)">
+										<option value="">—</option>
+										<option value="Yes">Yes</option>
+										<option value="No">No</option>
+									</select>
+								</div>
+							</div>
+							<FieldSelect :mode="lang" label-en="Is this school affiliated with CEE?" label-ur="کیا یہ اسکول CEE سے الحاق شدہ ہے؟" :options="affiliationOptions" placeholder-en="Select" placeholder-ur="منتخب کریں" required v-model="visit.ceeAffiliated" />
+							<div v-if="isAffiliated(visit.ceeAffiliated)" class="service-grid">
+								<div v-for="s in meta.cee_services" :key="s.field" class="service">
+									<span>{{ s.label }}</span>
+									<select :value="visit.services[s.field] || ''" @change="setService(s.field, $event.target.value)">
+										<option value="">—</option>
+										<option value="Yes">Yes</option>
+										<option value="No">No</option>
+									</select>
+								</div>
+							</div>
+							<FieldSelect :mode="lang" label-en="Registered with TIF as a Volunteer" label-ur="کیا TIF کے ساتھ والینٹیئر رجسٹرڈ ہے؟" :options="['Yes', 'No']" required v-model="me.volunteer" />
+						</div>
+
+						<div class="block-title">Attachments / منسلکات</div>
+						<div class="attach-grid">
+							<AttachDrop :mode="lang" label-en="School Picture" label-ur="اسکول کی تصویر" :file="attachments.school_picture" @pick="attachments.school_picture = $event" />
+							<AttachDrop :mode="lang" label-en="Visiting Card" label-ur="وزٹنگ کارڈ" :file="attachments.visiting_card_attach" @pick="attachments.visiting_card_attach = $event" />
+							<AttachDrop :mode="lang" label-en="School Visit form" label-ur="اسکول وزٹ فارم" required :file="attachments.attendance_sheet_attach" @pick="attachments.attendance_sheet_attach = $event" />
+						</div>
+					</div>
+
 					<div class="panel-body" v-else-if="selected.group === 'meeting'">
 						<SectionTitle
 							:mode="lang"
@@ -1153,7 +1632,7 @@ const steps = [
 							sub-ur="بنیادی معلومات ضروری ہیں"
 						/>
 						<div class="grid-2">
-							<FieldInput :mode="lang" label-en="Meeting With (Person Name) *" label-ur="ملاقات کس سے (شخص کا نام)" placeholder="e.g. Mufti Sahib / مفتی صاحب" v-model="meeting.meetingWith" />
+							<FieldInput :mode="lang" label-en="Meeting With (Person Name)" label-ur="ملاقات کس سے (شخص کا نام)" required placeholder="e.g. Mufti Sahib / مفتی صاحب" v-model="meeting.meetingWith" />
 							<FieldInput :mode="lang" label-en="Contact No." label-ur="رابطہ نمبر" placeholder="03XX-XXXXXXX" v-model="meeting.contactNo" />
 							<FieldInput :mode="lang" label-en="Designation" label-ur="عہدہ" placeholder="Mohtamim, Principal / مہتمم، پرنسپل" v-model="meeting.designation" />
 							<FieldLink
@@ -1163,12 +1642,15 @@ const steps = [
 								placeholder="Select customer or type a name"
 								empty-text="No customers found"
 								allow-custom
+								allow-create
+								required
 								:options="customerOptions"
 								:search="searchSchools"
 								v-model="meeting.institute"
 								v-model:label="meeting.instituteLabel"
+								@create="startCreateSchool"
 							/>
-							<FieldDate :mode="lang" label-en="Date *" label-ur="تاریخ" v-model="meeting.meetingDate" />
+							<FieldDate :mode="lang" label-en="Date" label-ur="تاریخ" required v-model="meeting.meetingDate" />
 							<FieldLink
 								:mode="lang"
 								label-en="City"
@@ -1177,6 +1659,7 @@ const steps = [
 								empty-text="No cities found"
 								:options="cityLinkOptions"
 								:search="searchCities"
+								required
 								v-model="meeting.city"
 							/>
 							<FieldLink
@@ -1194,6 +1677,13 @@ const steps = [
 								<FieldTime :mode="lang" label-en="End Time" label-ur="اختتام کا وقت" v-model="meeting.endTime" />
 							</div>
 						</div>
+						<SchoolOpeningPanel
+							v-if="creatingSchool"
+							:mode="lang"
+							:model="schoolOpening"
+							:options="meta"
+							@cancel="cancelCreateSchool"
+						/>
 						<div class="grid-2" style="margin-top: 24px">
 							<FieldTextarea :mode="lang" label-en="Agenda" label-ur="ایجنڈا" placeholder="Purpose of meeting / ملاقات کا مقصد" v-model="meeting.agenda" />
 							<FieldTextarea :mode="lang" label-en="Remarks" label-ur="ریمارکس / اگلا قدم" placeholder="Next follow-up?" v-model="meeting.remarks" />
@@ -1223,7 +1713,7 @@ const steps = [
 							:sub-ur="`${clock} • خودکار وقت`"
 						/>
 						<div class="grid-3">
-							<FieldSelect v-if="selected.group === 'academic'" :mode="lang" label-en="Type of Task" label-ur="کام کی قسم" :options="meta.academic_task_types" v-model="training.otType" />
+							<FieldSelect v-if="selected.group === 'academic'" :mode="lang" label-en="Type of Task" label-ur="کام کی قسم" :options="meta.academic_task_types" required v-model="training.otType" />
 							<FieldSelect :mode="lang" label-en="Month" label-ur="مہینہ" :options="meta.months" v-model="training.month" />
 							<FieldSelect :mode="lang" label-en="Quarter" label-ur="سہ ماہی" :options="QUARTER_OPTIONS" v-model="training.quarter" />
 							<FieldInput v-if="selected.group !== 'academic'" :mode="lang" label-en="School Category" label-ur="اسکول کی کیٹیگری" v-model="training.schoolCategory" />
@@ -1235,12 +1725,13 @@ const steps = [
 								empty-text="No cities found"
 								:options="cityLinkOptions"
 								:search="searchCities"
+								required
 								v-model="training.city"
 							/>
-							<FieldSelect :mode="lang" label-en="Province" label-ur="صوبہ" :options="provinceOptions" v-model="training.province" />
+							<FieldSelect :mode="lang" label-en="Province" label-ur="صوبہ" :options="provinceOptions" required v-model="training.province" />
 							<FieldInput v-if="selected.group !== 'academic' && selected.id !== 'training'" :mode="lang" label-en="No. of Schools" label-ur="اسکولوں کی تعداد" v-model="training.noOfSchools" />
-							<FieldDate :mode="lang" label-en="Date" label-ur="تاریخ" v-model="training.date" />
-							<FieldInput :mode="lang" :label-en="selected.group === 'academic' ? 'Name of Staff' : 'Name of Trainer / Staff'" :label-ur="selected.group === 'academic' ? 'سٹاف کا نام' : 'ٹرینر / سٹاف کا نام'" v-model="training.trainerName" />
+							<FieldDate :mode="lang" label-en="Date" label-ur="تاریخ" required v-model="training.date" />
+							<FieldInput :mode="lang" :label-en="selected.group === 'academic' ? 'Name of Staff' : 'Name of Trainer / Staff'" :label-ur="selected.group === 'academic' ? 'سٹاف کا نام' : 'ٹرینر / سٹاف کا نام'" required v-model="training.trainerName" />
 							<FieldInput v-if="selected.group !== 'academic'" :mode="lang" label-en="Venue Name" label-ur="مقام کا نام" v-model="training.venueName" />
 							<FieldInput :mode="lang" label-en="Entry Filled By" label-ur="اندراج کنندہ" v-model="training.entryFilledBy" />
 							<FieldInput v-if="selected.group !== 'academic'" :mode="lang" label-en="No. of Participants" label-ur="شرکاء کی تعداد" v-model="training.noOfParticipants" />
@@ -1450,12 +1941,15 @@ const steps = [
 								:mode="lang"
 								label-en="School / Madrasa Name"
 								label-ur="اسکول / مدرسہ کا نام"
-								placeholder="Select school"
+								placeholder="Type to search school"
 								empty-text="No customers found"
+								allow-create
+								required
 								:options="customerOptions"
 								:search="searchSchools"
 								v-model="visit.schoolName"
 								v-model:label="visit.schoolNameLabel"
+								@create="startCreateSchool"
 							/>
 							<FieldSelect :mode="lang" label-en="School Type" label-ur="اسکول کی قسم" :options="schoolTypeOptions" placeholder-en="Select" placeholder-ur="منتخب کریں" v-model="visit.schoolType" />
 							<FieldLink
@@ -1466,6 +1960,7 @@ const steps = [
 								empty-text="No cities found"
 								:options="cityLinkOptions"
 								:search="searchCities"
+								required
 								v-model="visit.city"
 							/>
 							<FieldLink
@@ -1476,16 +1971,30 @@ const steps = [
 								empty-text="No areas found"
 								:options="areaOptions"
 								:search="searchAreas"
+								required
 								v-model="visit.area"
 							/>
-							<FieldSelect :mode="lang" label-en="Province" label-ur="صوبہ" :options="provinceOptions" v-model="visit.province" />
-							<FieldDate :mode="lang" label-en="Date" label-ur="تاریخ" v-model="visit.visitDate" />
+							<FieldSelect :mode="lang" label-en="Province" label-ur="صوبہ" :options="provinceOptions" required v-model="visit.province" />
+							<FieldDate :mode="lang" label-en="Date" label-ur="تاریخ" required v-model="visit.visitDate" />
 							<FieldInput :mode="lang" label-en="Contact Person" label-ur="رابطہ شخص" v-model="visit.meetingWith" />
 							<FieldInput :mode="lang" label-en="Contact No." label-ur="رابطہ نمبر" placeholder="03XX-XXXXXXX" v-model="visit.contactNumber" />
 							<FieldTextarea :mode="lang" label-en="School / Madrasa Address" label-ur="اسکول / مدرسہ کا پتہ" v-model="visit.schoolAddress" />
 							<FieldTextarea :mode="lang" label-en="Remarks" label-ur="ریمارکس" v-model="visit.schoolAdditionalRemarks" />
 						</div>
 
+						<SchoolOpeningPanel
+							v-if="creatingSchool"
+							:mode="lang"
+							:model="schoolOpening"
+							:options="meta"
+							books-blocked
+							@cancel="cancelCreateSchool"
+						/>
+
+						<div v-if="creatingSchool" class="soa-warn" style="margin-top: 20px">
+							Books Demand is disabled until this school is added to the School Database. Submit the School Opening request now, then add Book Demand after approval.
+						</div>
+						<template v-else>
 						<div style="display: flex; justify-content: space-between; gap: 12px; margin-top: 28px">
 							<SectionTitle :mode="lang" title-en="Books Demand" title-ur="کتب کی طلب" sub-en="Add each book and quantity" sub-ur="ہر کتاب اور تعداد شامل کریں" />
 							<button class="btn btn-green" type="button" @click="addBook">
@@ -1513,6 +2022,7 @@ const steps = [
 							<Bi :mode="lang" en="Total demand:" ur="کل طلب:" />
 							<strong>{{ bookTotal() }} books / {{ bookTotal() }} کتب</strong>
 						</div>
+						</template>
 					</div>
 
 					<div class="panel-foot">
@@ -1590,7 +2100,7 @@ const steps = [
 						</div>
 						<div class="summary-row">
 							<span style="opacity: 0.7">City / Province</span>
-							<span>{{ selected?.group === "visits" || selected?.group === "books" ? visit.city || "-" : meeting.city || training.city || "-" }} • {{ selected?.group === "visits" || selected?.group === "books" ? visit.province : training.province || "-" }}</span>
+							<span>{{ selected?.group === "visits" || selected?.group === "books" || selected?.group === "me" ? visit.city || "-" : meeting.city || training.city || "-" }} • {{ selected?.group === "visits" || selected?.group === "books" || selected?.group === "me" ? visit.province : training.province || "-" }}</span>
 						</div>
 						<div v-if="selected?.group === 'enrolment'" class="summary-row">
 							<span style="opacity: 0.7">Participants</span>
@@ -1602,7 +2112,7 @@ const steps = [
 						</div>
 						<div class="summary-row">
 							<span style="opacity: 0.7">Date</span>
-							<span>{{ selected?.group === "visits" || selected?.group === "books" ? visit.visitDate : meeting.meetingDate || training.date }}</span>
+							<span>{{ selected?.group === "visits" || selected?.group === "books" || selected?.group === "me" ? visit.visitDate : meeting.meetingDate || training.date }}</span>
 						</div>
 						<div v-if="travel.needed && travel.distance" class="summary-row">
 							<span style="opacity: 0.7">Travel</span>
@@ -1633,7 +2143,11 @@ const steps = [
 						<Bi :mode="lang" en="Back" ur="واپس" />
 					</button>
 					<button class="btn btn-green" type="button" :disabled="(step === 1 && !selected) || saving" @click="saveVisit(true)">
-						<Bi :mode="lang" en="Submit Visit ✓" ur="جمع کرائیں ✓" />
+						<Bi
+							:mode="lang"
+							:en="selected?.group === 'books' && creatingSchool ? 'Submit School Opening Request' : 'Submit Visit ✓'"
+							:ur="selected?.group === 'books' && creatingSchool ? 'اسکول اوپننگ درخواست بھیجیں' : 'جمع کرائیں ✓'"
+						/>
 					</button>
 				</div>
 			</div>
@@ -1649,12 +2163,12 @@ const steps = [
 				</div>
 				<div class="grid-2" style="margin-top: 20px">
 					<div style="grid-column: 1 / -1">
-						<FieldInput :mode="lang" label-en="Name *" label-ur="نام *" v-model="participantForm.name" />
+						<FieldInput :mode="lang" label-en="Name" label-ur="نام" required v-model="participantForm.name" />
 					</div>
 					<FieldInput :mode="lang" label-en="Contact" label-ur="رابطہ" v-model="participantForm.contact" />
 					<FieldInput :mode="lang" label-en="City" label-ur="شہر" v-model="participantForm.city" />
 					<FieldSelect :mode="lang" label-en="Province" label-ur="صوبہ" :options="provinceOptions" v-model="participantForm.province" />
-					<FieldSelect :mode="lang" label-en="Course Name *" label-ur="کورس کا نام *" :options="courseOptions" v-model="participantForm.course" />
+					<FieldSelect :mode="lang" label-en="Course Name" label-ur="کورس کا نام" :options="courseOptions" required v-model="participantForm.course" />
 					<FieldDate :mode="lang" label-en="Date" label-ur="تاریخ" v-model="participantForm.date" />
 				</div>
 				<div style="margin-top: 24px; display: flex; justify-content: flex-end; gap: 8px">
@@ -1672,12 +2186,12 @@ const steps = [
 			<div class="success">
 				<div class="check">✓</div>
 				<div style="margin-top: 20px; font-weight: 700; font-size: 20px">
-					<Bi :mode="lang" en="Visit submitted!" ur="دورہ جمع ہو گیا!" />
+					<Bi :mode="lang" en="Saved!" ur="محفوظ ہو گیا!" />
 				</div>
 				<div style="font-size: 13px; color: #71717a; margin-top: 8px; line-height: 1.6">
-					Your field visit has been saved.
+					Your request has been saved.
 					<strong v-if="savedName"> {{ savedName }}</strong>
-					<div class="urdu">آپ کا فیلڈ وزٹ محفوظ ہو گیا ہے۔ ڈیٹا ہیڈ آفس ڈیش بورڈ پر سنک ہو جائے گا۔</div>
+					<div class="urdu">آپ کی درخواست محفوظ ہو گئی ہے۔</div>
 				</div>
 			</div>
 		</div>

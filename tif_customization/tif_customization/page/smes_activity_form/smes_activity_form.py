@@ -18,6 +18,10 @@ from tif_customization.tif_customization.field_visit_supervisor_only import (
 )
 from tif_customization.tif_customization.field_visit_travel_cost import sync_travel_cost
 from tif_customization.tif_customization.model_school import sync_model_school_field
+from tif_customization.tif_customization.api.school_opening_form import (
+	CONTACT_ROLES,
+	create_school_opening_application,
+)
 
 BULK_IMPORT_TEMPLATE = "Field_Visit_Bulk_Import_Template.xlsx"
 
@@ -51,6 +55,7 @@ HIDDEN_ACTIVITY_TYPE_LABELS = {
 # Same order as Field Visit Type of Activity (Target Base sheet).
 SHEET_ACTIVITY_TYPES = [
 	"Visits",
+	"M&E",
 	"Workshop",
 	"Meeting with Ulama and Educationist",
 	"Teachers Training Meeting",
@@ -183,6 +188,7 @@ PROVINCE_MAP = {
 
 ACTIVITY_TYPE_MAP = {
 	"Visits": "Visits",
+	"M&E": "M&E",
 	"Workshop": "Workshop",
 	"Meeting with Ulama and Educationist": "Meeting with Ulama and Educationist",
 	"Teachers Training Meeting": "Teachers Training Meeting",
@@ -219,6 +225,7 @@ SCHOOL_NAME_LINK_TYPES = {
 	"Model School B",
 	"Books Demand (Quantity)",
 	"Joint Visit with SME",
+	"M&E",
 }
 
 ENROLMENT_COURSE_OPTIONS = [
@@ -627,6 +634,97 @@ def get_form_meta():
 		"me_nazra_books": ["Noorani Qaida", "Noorani Qaida Workbook"],
 		"sme_name_options": _sme_display_names(staff_list),
 		"training_conducted_by_options": _training_conducted_by_options(staff_list),
+		"school_opening_contact_roles": CONTACT_ROLES,
+		"school_opening_visit_types": [
+			"Visit without enrollment",
+			"Visit with enrollment",
+		],
+		"school_opening_institution_types": [
+			"School",
+			"College",
+			"University",
+			"Madaris",
+			"Library",
+			"Special School",
+		],
+		"school_opening_categories": ["Provincial Govt.", "Private"],
+		"school_opening_educational_system": [
+			"Pre-Primary",
+			"Primary",
+			"Matric",
+			"Intermediate",
+			"Hifz-o-Nazra",
+			"Cambridge",
+			"O / A Levels",
+		],
+		"school_opening_structure": ["Single Campus", "Chain"],
+		"school_opening_shifts": ["Morning", "Evening", "Both"],
+		"school_opening_teacher_training": [
+			"ELP",
+			"One Day Workshop (Intro of Tajweed)",
+			"TECC Professional",
+			"TECC Foundation",
+			"V-Campers",
+			"Effective Teaching of the Holy Qur'an Workshop",
+			"PEF Pakistan",
+			"Intro to Tajweed — One Day Workshop",
+			"Tajweed Training Course",
+		],
+		"school_opening_tilawat": [
+			"Noorani Qaida — NQ Teachers Guide",
+			"Tajweed Workshop for Kids",
+			"Teachers Training (Online)",
+			"Teachers Training (On-site)",
+			"Noorani Qaida — NQ Workbook",
+		],
+		"school_opening_quran": [
+			"MQH Part-1 + Part-1 (Sample)",
+			"MQH Part-1 (MQH T.G Part-1)",
+			"MQH Part-2 (MQH T.G Part-2)",
+			"MQH Part-3 (MQH T.G Part-3)",
+			"MQH Part-4 (MQH T.G Part-4)",
+			"MQH Part-5 (MQH T.G Part-5)",
+			"MQH Part-6",
+			"MQH Part-7",
+			"MQH Part-1 — English Version",
+			"MQH Part-2 — English Version",
+			"MQH Part-1 — Sindhi Version",
+			"MQH Part-2 — Sindhi Version",
+			"MQH Part-3 — Sindhi Version",
+			"Intro Workshops",
+		],
+		"school_opening_running_tif": [
+			"Quran Program for Student",
+			"Tilawat Program for School",
+			"Teacher Training",
+		],
+		"school_opening_curriculum": [
+			"Oral Nazra",
+			"Qaida",
+			"Afaq",
+			"National Book Foundation",
+			"Noorani Qaida (Not TPS)",
+			"Iqra Qaida",
+			"Spectrum",
+			"Rehmani Qaida",
+			"Madni Qaida",
+			"Gaba",
+			"Jamiat Qaida",
+			"Qurani Qaida",
+			"Moonlight",
+			"Islamic Values",
+			"CEF",
+			"Zia ul Quran",
+		],
+		"school_opening_fee": ["Above 15K", "Between 5K – 15K", "Below 5K"],
+		"school_opening_provinces": [
+			"Sindh",
+			"Punjab",
+			"KPK",
+			"Balochistan",
+			"Gilgit-Baltistan",
+			"Azad Jammu & Kashmir",
+		],
 	}
 
 
@@ -1208,10 +1306,37 @@ def submit_smes_activity(data):
 
 	raw_school = cstr(data.get("school_name")).strip()
 	resolved_school = _resolve_customer_link(raw_school)
-	if doc_type in SCHOOL_NAME_LINK_TYPES and raw_school and not resolved_school:
+	school_opening_data = data.get("school_opening")
+	soa_doc = None
+	if school_opening_data and not resolved_school:
+		if not isinstance(school_opening_data, dict):
+			school_opening_data = {}
+		if not (school_opening_data.get("school_name") or "").strip():
+			school_opening_data["school_name"] = raw_school
+		if not (school_opening_data.get("tif_representative") or "").strip():
+			school_opening_data["tif_representative"] = data.get("visit_by")
+		if not (school_opening_data.get("city") or "").strip():
+			school_opening_data["city"] = data.get("city")
+		if not (school_opening_data.get("area") or "").strip():
+			school_opening_data["area"] = data.get("area")
+		if not (school_opening_data.get("province") or "").strip():
+			school_opening_data["province"] = data.get("province")
+		if not (school_opening_data.get("form_date") or "").strip():
+			school_opening_data["form_date"] = data.get("visit_date")
+		soa_doc = create_school_opening_application(school_opening_data)
+		if doc_type == "Books Demand (Quantity)":
+			return {
+				"name": None,
+				"school_opening": soa_doc.name,
+				"books_blocked": True,
+				"message": _(
+					"School Opening request {0} was saved. Book Demand can be submitted after this school is added to the School Database."
+				).format(soa_doc.name),
+			}
+	elif doc_type in SCHOOL_NAME_LINK_TYPES and raw_school and not resolved_school:
 		frappe.throw(
 			_(
-				"School Name '{0}' was not found in Customer. Select a school from the list."
+				"School Name '{0}' was not found in Customer. Select a school from the list or Create School."
 			).format(raw_school),
 			frappe.LinkValidationError,
 		)
@@ -1221,6 +1346,20 @@ def submit_smes_activity(data):
 	doc.school_type = data.get("school_type")
 	doc.reference = data.get("reference")
 	doc.school_additional_remarks = data.get("school_additional_remarks")
+	if soa_doc:
+		pending_name = cstr(soa_doc.school_name or raw_school).strip()
+		fv_meta = frappe.get_meta("Field Visit")
+		if fv_meta.has_field("school_opening_application"):
+			doc.school_opening_application = soa_doc.name
+		if fv_meta.has_field("pending_school_name"):
+			doc.pending_school_name = pending_name
+		note = _("Pending school (School Opening {0}): {1}").format(soa_doc.name, pending_name)
+		extra = cstr(doc.school_additional_remarks or "").strip()
+		doc.school_additional_remarks = f"{note}\n{extra}".strip() if extra else note
+		if not cstr(doc.school_address or "").strip() and soa_doc.address:
+			doc.school_address = soa_doc.address
+		if not cstr(doc.reference or "").strip():
+			doc.reference = soa_doc.name
 
 	doc.qps_affiliated = data.get("qps_affiliated")
 	doc.tps_affiliated = data.get("tps_affiliated")
@@ -1269,9 +1408,11 @@ def submit_smes_activity(data):
 		doc.me_area = doc.area
 		doc.me_province = doc.province
 		doc.me_school_name = doc.school_name
+		doc.me_quarter = doc.quarter
 		doc.me_meeting_with_person_name = doc.meeting_with
 		doc.me_designation_meeting_with = (
-			doc.designation_other if doc.designation == "Other" else doc.designation
+			cstr(data.get("me_designation_meeting_with") or "").strip()
+			or (doc.designation_other if doc.designation == "Other" else doc.designation)
 		)
 		doc.me_contact_no_meeting_with = doc.contact_number
 
@@ -1421,7 +1562,13 @@ def submit_smes_activity(data):
 		"name": doc.name,
 		"submitted": submitted,
 		"url": get_url(f"/app/field-visit/{doc.name}"),
-		"message": _("Activity saved as {0}").format(doc.name),
+		"school_opening": soa_doc.name if soa_doc else None,
+		"message": _("Activity saved as {0}").format(doc.name)
+		+ (
+			_(" School Opening request {0} was also saved.").format(soa_doc.name)
+			if soa_doc
+			else ""
+		),
 	}
 
 
@@ -1454,7 +1601,7 @@ def _parse_rows(value):
 
 def _apply_school_contacts(doc, data):
 	raw_designation = cstr(data.get("designation") or data.get("mt_designation") or "").strip()
-	if (doc.type or "") in MEETING_DOC_TYPES and not _parse_rows(data.get("school_contacts")):
+	if (doc.type or "") in (*MEETING_DOC_TYPES, "M&E") and not _parse_rows(data.get("school_contacts")):
 		doc.meeting_with = data.get("contact_person_name")
 		doc.contact_number = data.get("contact_number")
 		# Meeting titles like Mudaris belong on mt_designation (Data), not this Select.
