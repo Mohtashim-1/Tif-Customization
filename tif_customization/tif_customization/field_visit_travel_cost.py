@@ -101,9 +101,9 @@ def aggregate_visit_expenses_by_staff(
 	visit_day_sql: str,
 	resolve_staff_key,
 	staff_key_index,
-	estimate_if_blank: bool = True,
+	estimate_if_blank: bool = False,
 ) -> dict[str, float]:
-	"""Sum recorded travel_cost. If estimate_if_blank, empty days use 22 km × per km."""
+	"""Sum recorded travel_cost. Blank KM / zero travel_cost is Rs 0 unless estimate_if_blank."""
 	if not staff_rows:
 		return {}
 

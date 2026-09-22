@@ -44,6 +44,10 @@ def get_report_data(filters=None):
 		include_cash=cint_all(filters.get("all_bank_accounts")),
 	)
 
+	vehicle_rows, vehicle_banks = _split_off_asset_sales(
+		banks, company, from_date, to_date, month_keys
+	)
+
 	donation_rows = []
 	expense_rows = []
 	for month in months:
@@ -67,6 +71,7 @@ def get_report_data(filters=None):
 	total_expense = sum(
 		flt(b["expenses"].get(key)) for b in banks for key in month_keys
 	)
+	total_vehicle = sum(flt(v) for v in vehicle_banks.values())
 	donation_banks = {
 		b["bank_account"]: sum(flt(b["donations"].get(key)) for key in month_keys) for b in banks
 	}
@@ -74,7 +79,9 @@ def get_report_data(filters=None):
 		b["bank_account"]: sum(flt(b["expenses"].get(key)) for key in month_keys) for b in banks
 	}
 	difference_banks = {
-		bank_account: flt(donation_banks.get(bank_account)) - flt(expense_banks.get(bank_account))
+		bank_account: flt(donation_banks.get(bank_account))
+		+ flt(vehicle_banks.get(bank_account))
+		- flt(expense_banks.get(bank_account))
 		for bank_account in donation_banks
 	}
 
@@ -99,6 +106,7 @@ def get_report_data(filters=None):
 			"banks": {b["bank_account"]: flt(b["initial"]) for b in banks},
 		},
 		"donations": donation_rows,
+		"vehicles": vehicle_rows,
 		"expenses": expense_rows,
 		"ending_balance": {
 			"date_label": formatdate(to_date, "dd MMM yyyy"),
@@ -106,9 +114,11 @@ def get_report_data(filters=None):
 		},
 		"totals": {
 			"total_donation": total_donation,
+			"total_vehicle": total_vehicle,
 			"total_expense": total_expense,
-			"total_difference": flt(total_donation) - flt(total_expense),
+			"total_difference": flt(total_donation) + flt(total_vehicle) - flt(total_expense),
 			"donation_banks": donation_banks,
+			"vehicle_banks": vehicle_banks,
 			"expense_banks": expense_banks,
 			"difference_banks": difference_banks,
 		},
@@ -225,6 +235,19 @@ def download_reconciliation_excel(filters=None):
 			write_amount_row("", item.get("month_label"), item.get("banks"))
 	write_summary_row(_("Total Donation"), (report.get("totals") or {}).get("donation_banks"))
 
+	vehicles = report.get("vehicles") or []
+	if vehicles:
+		start = row
+		end = row + len(vehicles) - 1
+		ws.merge_cells(start_row=start, start_column=1, end_row=end, end_column=1)
+		cell = ws.cell(row=start, column=1, value=_("Vehicle"))
+		cell.font = bold
+		cell.fill = band_fill
+		cell.alignment = Alignment(vertical="center", wrap_text=True)
+		for item in vehicles:
+			write_amount_row("", item.get("label"), item.get("banks"))
+	write_summary_row(_("Total Vehicle"), (report.get("totals") or {}).get("vehicle_banks"))
+
 	expenses = report.get("expenses") or []
 	if expenses:
 		start = row
@@ -239,7 +262,7 @@ def download_reconciliation_excel(filters=None):
 	write_summary_row(_("Total Expense"), (report.get("totals") or {}).get("expense_banks"))
 
 	totals = report.get("totals") or {}
-	write_summary_row(_("Difference (Donation - Expense)"), totals.get("difference_banks"))
+	write_summary_row(_("Difference (Donation + Vehicle - Expense)"), totals.get("difference_banks"))
 
 	ending = report.get("ending_balance") or {}
 	write_amount_row(
@@ -352,6 +375,107 @@ def _overlay_purchase_invoice_expenses(banks, from_date, to_date, month_keys, in
 				"ending": 0.0,
 			}
 		)
+
+
+def _split_off_asset_sales(banks, company, from_date, to_date, month_keys):
+	"""Move sold-asset receipts out of Donation into a Vehicle section (one row per asset)."""
+	vehicle_banks = {b["bank_account"]: 0.0 for b in banks}
+	if not banks:
+		return [], vehicle_banks
+
+	payments = frappe.db.sql(
+		"""
+		SELECT
+			pe.name AS payment_entry,
+			pe.posting_date,
+			pe.paid_to,
+			DATE_FORMAT(pe.posting_date, '%%Y-%%m') AS month_key,
+			COALESCE(per.allocated_amount, pe.paid_amount, 0) AS allocated_amount,
+			per.reference_name AS sales_invoice
+		FROM `tabPayment Entry` pe
+		INNER JOIN `tabPayment Entry Reference` per ON per.parent = pe.name
+		INNER JOIN `tabSales Invoice` si
+			ON si.name = per.reference_name AND si.docstatus = 1
+		WHERE pe.docstatus = 1
+		  AND pe.payment_type = 'Receive'
+		  AND pe.company = %(company)s
+		  AND per.reference_doctype = 'Sales Invoice'
+		  AND pe.posting_date BETWEEN %(from_date)s AND %(to_date)s
+		  AND EXISTS (
+			SELECT 1
+			FROM `tabSales Invoice Item` sii
+			WHERE sii.parent = si.name
+			  AND (sii.is_fixed_asset = 1 OR IFNULL(sii.asset, '') != '')
+		  )
+		""",
+		{"company": company, "from_date": from_date, "to_date": to_date},
+		as_dict=True,
+	)
+	if not payments:
+		return [], vehicle_banks
+
+	invoices = sorted({row.sales_invoice for row in payments if row.sales_invoice})
+	items = frappe.db.sql(
+		"""
+		SELECT
+			sii.parent AS sales_invoice,
+			sii.asset,
+			sii.item_name,
+			COALESCE(sii.amount, sii.net_amount, 0) AS amount,
+			a.asset_name,
+			a.asset_category,
+			a.disposal_date
+		FROM `tabSales Invoice Item` sii
+		LEFT JOIN `tabAsset` a ON a.name = sii.asset
+		WHERE sii.parent IN %(invoices)s
+		  AND (sii.is_fixed_asset = 1 OR IFNULL(sii.asset, '') != '')
+		ORDER BY sii.idx
+		""",
+		{"invoices": tuple(invoices)},
+		as_dict=True,
+	)
+	items_by_invoice = {}
+	for item in items:
+		items_by_invoice.setdefault(item.sales_invoice, []).append(item)
+
+	gl_to_bank = {b.get("gl_account"): b for b in banks if b.get("gl_account")}
+	asset_rows = {}
+
+	for pay in payments:
+		invoice_items = items_by_invoice.get(pay.sales_invoice) or []
+		if not invoice_items:
+			continue
+		item_total = sum(flt(it.amount) for it in invoice_items) or len(invoice_items)
+		allocated = flt(pay.allocated_amount)
+		month_key = pay.month_key
+		bank = gl_to_bank.get(pay.paid_to)
+
+		for item in invoice_items:
+			share = allocated * (flt(item.amount) / item_total) if item_total else 0.0
+			if share <= 0:
+				continue
+			key = item.asset or item.asset_name or item.item_name or pay.sales_invoice
+			row = asset_rows.setdefault(
+				key,
+				{
+					"label": item.asset_name or item.item_name or key,
+					"asset": item.asset or "",
+					"asset_category": item.asset_category or "",
+					"disposal_date": str(item.disposal_date) if item.disposal_date else "",
+					"banks": {b["bank_account"]: 0.0 for b in banks},
+				},
+			)
+			if bank:
+				acct = bank["bank_account"]
+				row["banks"][acct] = flt(row["banks"].get(acct)) + share
+				vehicle_banks[acct] = flt(vehicle_banks.get(acct)) + share
+				if month_key in month_keys:
+					bank["donations"][month_key] = max(
+						flt(bank["donations"].get(month_key)) - share, 0.0
+					)
+
+	rows = sorted(asset_rows.values(), key=lambda r: (r.get("label") or "").lower())
+	return rows, vehicle_banks
 
 
 def _parse_filters(filters):

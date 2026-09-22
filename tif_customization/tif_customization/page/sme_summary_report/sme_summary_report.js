@@ -138,6 +138,8 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 					<strong>KPI Activities</strong> are the Target Base counts that make up earned points
 					(Total Visits, workshops, Ulama meetings, academic, etc.).
 					Workshop score uses session count, not participant heads.
+					<strong>Expenses</strong> are recorded Field Visit travel cost plus submitted Expense Claims only.
+					If KM / travel cost was not entered, that visit adds Rs 0 — nothing is estimated.
 				</p>
 				<div id="sme-sum-filters" class="sme-sum-filters row" style="margin-bottom:12px;"></div>
 				<div id="sme-sum-body"></div>
@@ -432,9 +434,7 @@ frappe.tif_customization.SMESummaryReport = class SMESummaryReport {
 						value: this.fmt_cur(expenseTotal),
 						style: "expenses",
 						cardKind: "expenses",
-						hint: __(
-							"Travel on Field Visit, or Rs 396/day estimated (22 km × Rs 18) when travel is blank"
-						),
+						hint: __("Recorded Field Visit travel cost plus Expense Claims. Blank KM is not estimated."),
 					},
 					{
 						label: __("Visited Days"),

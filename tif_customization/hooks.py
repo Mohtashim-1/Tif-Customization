@@ -82,6 +82,7 @@ doctype_list_js = {
 	"Leave Application": "public/js/leave_application_list.js",
 	"Reporting": "public/js/reporting_list.js",
 	"Upcoming Training": "public/js/upcoming_training_list.js",
+	"Field Visit": "tif_customization/doctype/field_visit/field_visit_list.js",
 }
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}

@@ -21,11 +21,7 @@ from tif_customization.tif_customization.field_visit_permissions import (
 	visit_day_sql as _visit_day_sql,
 )
 from tif_customization.tif_customization.field_visit_travel_cost import (
-	DEFAULT_DAILY_TRAVEL_KM,
-	DEFAULT_PER_KM_FUEL,
 	aggregate_visit_expenses_by_staff,
-	daily_travel_allowance,
-	resolve_per_km_fuel,
 )
 from tif_customization.tif_customization.page.smes_target_base___k.smes_target_base_kpi_config import (
 	KPI_ACTIVITIES,
@@ -741,20 +737,12 @@ def _staff_key_index(staff_rows):
 
 
 def _field_visit_expense_rows(from_date, to_date, staff_rows):
-	"""Field Visit expense lines (explicit travel or estimated daily travel)."""
+	"""One row per staff visit-day that has recorded travel_cost. Blank KM is not estimated."""
 	if not staff_rows:
 		return []
 
 	index = _staff_key_index(staff_rows)
 	visit_day = _visit_day_sql("fv")
-	per_km_by_key = {
-		s["key"]: resolve_per_km_fuel(
-			visit_by=s.get("employee_name"),
-			owner=s.get("user_id"),
-			employee=s.get("employee"),
-		)
-		for s in staff_rows
-	}
 	key_to_name = {
 		s["key"]: s.get("employee_name") or s.get("user_id") or s.get("employee") for s in staff_rows
 	}
@@ -797,18 +785,13 @@ def _field_visit_expense_rows(from_date, to_date, staff_rows):
 
 	out = []
 	for day_key, explicit in day_totals.items():
+		if explicit <= 0:
+			continue
 		staff_key, day = day_key
 		row = day_sample[day_key]
-		if explicit > 0:
-			amt = explicit
-			status = row.get("type") or ""
-			source = _("Field Visit")
-		else:
-			amt = daily_travel_allowance(per_km_by_key.get(staff_key))
-			status = _("Estimated ({0} km × Rs {1})").format(
-				int(DEFAULT_DAILY_TRAVEL_KM), int(per_km_by_key.get(staff_key) or DEFAULT_PER_KM_FUEL)
-			)
-			source = _("Field Visit (estimated)")
+		amt = explicit
+		status = row.get("type") or ""
+		source = _("Field Visit")
 
 		out.append(
 			{
@@ -826,7 +809,7 @@ def _field_visit_expense_rows(from_date, to_date, staff_rows):
 
 
 def _load_expenses(from_date, to_date, staff_rows):
-	"""Expense Claims plus Field Visit travel (recorded or estimated per visit day)."""
+	"""Expense Claims plus recorded Field Visit travel_cost only. Blank KM is Rs 0."""
 	result = {s["key"]: 0.0 for s in staff_rows}
 	if not staff_rows:
 		return result
@@ -838,6 +821,7 @@ def _load_expenses(from_date, to_date, staff_rows):
 		visit_day_sql=_visit_day_sql("fv"),
 		resolve_staff_key=_resolve_staff_key,
 		staff_key_index=_staff_key_index,
+		estimate_if_blank=False,
 	)
 	for key, amt in fv_totals.items():
 		if key in result:

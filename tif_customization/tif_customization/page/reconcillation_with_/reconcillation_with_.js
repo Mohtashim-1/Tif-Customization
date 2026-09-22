@@ -119,9 +119,18 @@ class ReconciliationWithBankPage {
 				}
 				.recon-bank-table .recon-money { text-align: right; white-space: nowrap; }
 				.recon-bank-table .recon-ending td { font-weight: 700; background: #f1f5f9; }
+				.recon-summary-vehicle .recon-grand {
+					background: #86efac;
+				}
 				.recon-bank-table .recon-summary td { font-weight: 700; background: #dbeafe; }
 				.recon-bank-table .recon-summary-expense td { font-weight: 700; background: #fee2e2; }
-				.recon-bank-table .recon-summary-diff td { font-weight: 700; background: #dcfce7; }
+				.recon-bank-table .recon-summary-vehicle td { font-weight: 700; background: #dcfce7; }
+				.recon-bank-table .recon-summary-diff td { font-weight: 700; background: #e0e7ff; }
+				.recon-bank-table .recon-section-vehicle {
+					background: #86efac;
+					font-weight: 700;
+					min-width: 160px;
+				}
 				.recon-bank-scroll { overflow-x: auto; }
 				.recon-filter-grid .recon-filter-row {
 					margin-left: -8px;
@@ -451,6 +460,12 @@ class ReconciliationWithBankPage {
 				gradient: "#4facfe, #00f2fe",
 			},
 			{
+				label: __("Total Vehicle"),
+				value: this.money(totals.total_vehicle),
+				gradient: "#11998e, #38ef7d",
+				hint: __("Sold assets received in bank"),
+			},
+			{
 				label: __("Total Expense"),
 				value: this.money(totals.total_expense),
 				gradient: "#fa709a, #fee140",
@@ -485,6 +500,7 @@ class ReconciliationWithBankPage {
 		}
 
 		const donations = data.donations || [];
+		const vehicles = data.vehicles || [];
 		const expenses = data.expenses || [];
 		const totals = data.totals || {};
 		const initial = data.initial_amount || {};
@@ -494,6 +510,7 @@ class ReconciliationWithBankPage {
 
 		this.render_kpis({
 			total_donation: this.sumBanks(banks, totals.donation_banks),
+			total_vehicle: this.sumBanks(banks, totals.vehicle_banks),
 			total_expense: this.sumBanks(banks, totals.expense_banks),
 		});
 
@@ -516,6 +533,24 @@ class ReconciliationWithBankPage {
 					<tr>
 						${section}
 						<td>${frappe.utils.escape_html(row.month_label || "")}</td>
+						${this.amountCells(banks, row.banks)}
+					</tr>
+				`;
+			})
+			.join("");
+
+		const vehicleRows = vehicles
+			.map((row, idx) => {
+				const section =
+					idx === 0
+						? `<td class="recon-section recon-section-vehicle" rowspan="${vehicles.length}">${__(
+								"Vehicle"
+						  )}</td>`
+						: "";
+				return `
+					<tr>
+						${section}
+						<td>${frappe.utils.escape_html(row.label || "")}</td>
 						${this.amountCells(banks, row.banks)}
 					</tr>
 				`;
@@ -562,10 +597,12 @@ class ReconciliationWithBankPage {
 						</tr>
 						${donationRows}
 						${this.summaryRow(__("Total Donation"), banks, totals.donation_banks, "recon-summary")}
+						${vehicleRows}
+						${this.summaryRow(__("Total Vehicle"), banks, totals.vehicle_banks, "recon-summary-vehicle")}
 						${expenseRows}
 						${this.summaryRow(__("Total Expense"), banks, totals.expense_banks, "recon-summary-expense")}
 						${this.summaryRow(
-							__("Difference (Donation - Expense)"),
+							__("Difference (Donation + Vehicle - Expense)"),
 							banks,
 							totals.difference_banks,
 							"recon-summary-diff"
@@ -580,7 +617,7 @@ class ReconciliationWithBankPage {
 			</div>
 			<p class="text-muted small mt-2 mb-0">
 				${__(
-					"Total Expense matches the Expense report: Payment Entries (Pay) allocated to Purchase Invoices in this date range, including cash and cheque (gross, before withholding tax). Donations, opening, and ending balances still come from bank GL. Internal bank transfers are excluded from Donation."
+					"Total Expense matches the Expense report: Payment Entries (Pay) allocated to Purchase Invoices in this date range, including cash and cheque (gross, before withholding tax). Vehicle rows are sold assets (Sales Invoice + bank receipt) and are excluded from Donation. Donations, opening, and ending balances still come from bank GL. Internal bank transfers are excluded from Donation."
 				)}
 			</p>
 		`);
