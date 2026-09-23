@@ -53,9 +53,11 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						background:#f3f4f6;
 						text-align:center;
 						font-weight:600;
-						white-space:nowrap;
+						white-space:normal;
+						line-height:1.25;
 						box-shadow:0 1px 0 #e5e7eb;
 					}
+					.sme-sum-table thead tr:first-child th{white-space:nowrap}
 					.sme-sum-table thead tr:first-child th{top:0;z-index:5}
 					.sme-sum-table thead tr:nth-child(2) th{top:var(--sme-sum-thead-row1,38px);z-index:4}
 					.sme-sum-table thead tr:nth-child(3) th{top:var(--sme-sum-thead-row2,76px);z-index:3}
@@ -107,6 +109,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					.sme-sum-kpi--teachers{border-top-color:#0284c7}
 					.sme-sum-kpi--headoffice{border-top-color:#6366f1}
 					.sme-sum-kpi--academic{border-top-color:#64748b}
+					.sme-sum-kpi--quiz{border-top-color:#c026d3}
 					.sme-sum-kpi--co_curricular{border-top-color:#9333ea}
 					.sme-sum-kpi--grand{border-top-color:#334155}
 					.sme-sum-kpi--school{border-top-color:#0f766e}
@@ -374,7 +377,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			{ label: __("Marketing"), metric: "new", value: (r) => r.new },
 			{ label: __("Monitoring"), metric: "monitoring", value: (r) => this.me_visits(r), cellClass: "visit-mon-col" },
 			{ label: __("Follow up"), metric: "followup", value: (r) => r.followup },
-			{ label: __("Meetings"), metric: "meeting", value: (r) => r.meetings },
+			// { label: __("Meetings"), metric: "meeting", value: (r) => r.meetings },
 		];
 	}
 
@@ -395,24 +398,26 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 	outcome_columns(data) {
 		return (
 			(data && data.outcome_columns) || [
-				{ key: "outcome_enrolment", label: __("Enrolment of participants"), metric: "enrolment" },
-				{ key: "outcome_co_curricular", label: __("Quiz / co-curricular activities"), metric: "co_curricular" },
+				{ key: "outcome_enrolment", label: __("Enrollment of Participants"), short_label: __("Enrollment of Participants"), metric: "enrolment" },
+				{ key: "outcome_quiz", label: __("Quiz Arranged"), short_label: __("Quiz Arranged"), metric: "quiz" },
+				{ key: "outcome_co_curricular", label: __("Co-curricular Activities"), short_label: __("Co-curricular Activities"), metric: "co_curricular" },
 				{
 					key: "outcome_new_schools",
-					label: __("New schools (distinct, from school / field visits)"),
+					label: __("New Schools (distinct, from school / field visits)"),
+					short_label: __("New Schools"),
 					metric: "new_schools",
 				},
-				{ key: "outcome_workshop_registration", label: __("Workshop participants"), metric: "workshop_registration" },
-				{ key: "outcome_volunteers", label: __("Volunteers enrolled"), metric: "volunteers" },
-				{ key: "outcome_model_school_a", label: __("Model School A"), metric: "model_school_a" },
-				{ key: "outcome_model_school_b", label: __("Model School B"), metric: "model_school_b" },
+				{ key: "outcome_workshop_registration", label: __("Workshop Participants"), short_label: __("Workshop Participants"), metric: "workshop_registration" },
+				{ key: "outcome_volunteers", label: __("Volunteers Enrolled"), short_label: __("Volunteers Enrolled"), metric: "volunteers" },
+				// { key: "outcome_model_school_a", label: __("Model School A"), metric: "model_school_a" },
+				// { key: "outcome_model_school_b", label: __("Model School B"), metric: "model_school_b" },
 			]
 		);
 	}
 
 	outcome_subcolumns(data) {
 		return this.outcome_columns(data).map((col) => {
-			const short = (col.label || "").split("(")[0].trim().slice(0, 22);
+			const short = (col.short_label || col.shortLabel || (col.label || "").split("(")[0]).trim();
 			return {
 				...col,
 				header: `${col.label} (${__("YTD")})`,
@@ -468,7 +473,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				},
 				{
 					key: "headoffice_visit",
-					label: __("Headoffice / Regional Office / Out of Station Visit"),
+					label: __("Head Office / Regional Office / Out of Station Visit"),
 					metric: "headoffice_visit",
 				},
 				{ key: "academic_task", label: __("Academic Task"), metric: "academic_task" },
@@ -499,7 +504,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			{ label: __("Marketing"), value: this.fmt(k.new), style: "new", metric: "new" },
 			{ label: __("Monitoring"), value: this.fmt(k.me), style: "me", metric: "monitoring" },
 			{ label: __("Follow up"), value: this.fmt(k.followup), style: "followup", metric: "followup" },
-			{ label: __("Meetings"), value: this.fmt(k.meetings), style: "meeting", metric: "meeting" },
+			// { label: __("Meetings"), value: this.fmt(k.meetings), style: "meeting", metric: "meeting" },
 			...this.kpi_columns(data).map((col) => ({
 				label: col.label,
 				value: this.fmt(k[col.key]),
@@ -538,23 +543,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						style: "followup",
 						metric: "followup",
 						hint: __("Marketing follow-up / existing school visits"),
-					},
-					{
-						label: __("New School Model A"),
-						value: this.fmt(k.model_school_a ?? t.outcome_model_school_a),
-						style: "model-a",
-						metric: "model_school_a",
-						useYtd: true,
-						hint: __("YTD distinct Model A schools"),
-					},
-					{
-						label: __("New School Model B"),
-						value: this.fmt(k.model_school_b ?? t.outcome_model_school_b),
-						style: "model-b",
-						metric: "model_school_b",
-						useYtd: true,
-						hint: __("YTD distinct Model B schools"),
-					},
+					}
 				],
 			},
 			{
@@ -566,7 +555,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				cards: this.outcome_columns(data).map((col) => ({
 					label: col.label,
 					value: this.fmt((data.totals || {})[col.key]),
-					style: "outcome",
+					style: col.metric === "quiz" ? "quiz" : col.metric === "co_curricular" ? "co_curricular" : "outcome",
 					metric: col.metric,
 					useYtd: true,
 				})),

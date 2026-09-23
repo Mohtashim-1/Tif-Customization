@@ -1019,3 +1019,229 @@ def portal_logout():
 		frappe.local.login_manager = frappe.auth.LoginManager()
 		frappe.local.login_manager.logout()
 	return {"ok": 1}
+
+
+def _require_staff():
+	if frappe.session.user == "Guest":
+		frappe.throw(_("Sign in to manage courses and lessons."), frappe.PermissionError)
+
+
+def _slug_id(prefix, name):
+	raw = re.sub(r"[^a-z0-9]+", "-", (name or "").lower()).strip("-")[:48] or "other"
+	return f"{prefix}-{raw}"
+
+
+def _course_to_dict(doc):
+	return {
+		"id": doc.name,
+		"courseId": doc.course_id or _slug_id("c", doc.course_title),
+		"name": doc.course_title,
+		"code": doc.code or "",
+		"category": doc.category or "Training",
+		"trainer": doc.trainer_name or "",
+		"color": doc.color or "#6366f1",
+		"duration": doc.duration or "",
+		"status": doc.status or "Active",
+		"description": doc.description or "",
+		"kind": "course",
+	}
+
+
+def _lesson_to_dict(doc):
+	return {
+		"id": doc.name,
+		"title": doc.lesson_title,
+		"course": doc.course or "",
+		"courseId": doc.course_id or "",
+		"courseName": doc.course_name or "",
+		"module": doc.module_title or "Lessons",
+		"duration": int(doc.duration_minutes or 0),
+		"order": int(doc.sort_order or 0),
+		"published": int(doc.published or 0),
+		"summary": doc.summary or "",
+		"content": doc.content or "",
+		"kind": "lesson",
+	}
+
+
+def _ensure_training_type(title):
+	title = (title or "").strip()
+	if not title or not frappe.db.exists("DocType", "Training Type"):
+		return
+	if frappe.db.exists("Training Type", title):
+		return
+	try:
+		doc = frappe.new_doc("Training Type")
+		if frappe.get_meta("Training Type").has_field("type"):
+			doc.type = title
+		doc.insert(ignore_permissions=True)
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "Training Type create")
+
+
+@frappe.whitelist()
+def list_courses():
+	if not frappe.db.exists("DocType", "Training LMS Course"):
+		return []
+	rows = frappe.get_all(
+		"Training LMS Course",
+		fields=[
+			"name",
+			"course_title",
+			"course_id",
+			"code",
+			"category",
+			"trainer_name",
+			"color",
+			"duration",
+			"status",
+			"description",
+			"modified",
+		],
+		order_by="modified desc",
+		limit_page_length=500,
+		ignore_permissions=True,
+	)
+	out = []
+	for r in rows:
+		out.append(_course_to_dict(frappe._dict(r)))
+	return out
+
+
+@frappe.whitelist()
+def save_course(payload=None):
+	_require_staff()
+	payload = _parse_payload(payload)
+	title = (payload.get("name") or payload.get("course_title") or "").strip()
+	if not title:
+		frappe.throw(_("Course name is required."))
+	name = (payload.get("id") or "").strip()
+	if name and frappe.db.exists("Training LMS Course", name):
+		doc = frappe.get_doc("Training LMS Course", name)
+	else:
+		existing = frappe.db.get_value("Training LMS Course", {"course_title": title}, "name")
+		doc = frappe.get_doc("Training LMS Course", existing) if existing else frappe.new_doc("Training LMS Course")
+	doc.course_title = title
+	doc.course_id = (payload.get("courseId") or payload.get("course_id") or "").strip() or _slug_id("c", title)
+	doc.code = (payload.get("code") or "").strip() or doc.course_id.replace("c-", "").upper()[:16]
+	doc.category = payload.get("category") or "Training"
+	doc.trainer_name = payload.get("trainer") or payload.get("trainer_name") or ""
+	doc.color = payload.get("color") or "#6366f1"
+	doc.duration = payload.get("duration") or ""
+	doc.status = payload.get("status") or "Active"
+	doc.description = payload.get("description") or ""
+	doc.save(ignore_permissions=True)
+	_ensure_training_type(title)
+	frappe.db.commit()
+	return _course_to_dict(doc)
+
+
+@frappe.whitelist()
+def delete_course(name=None):
+	_require_staff()
+	if name and frappe.db.exists("Training LMS Course", name):
+		frappe.delete_doc("Training LMS Course", name, ignore_permissions=True)
+		frappe.db.commit()
+	return {"ok": 1}
+
+
+@frappe.whitelist()
+def list_lessons(course_id=None):
+	if not frappe.db.exists("DocType", "Training LMS Lesson"):
+		return []
+	filters = {}
+	course_id = (course_id or "").strip()
+	if course_id:
+		filters["course_id"] = course_id
+	rows = frappe.get_all(
+		"Training LMS Lesson",
+		filters=filters,
+		fields=[
+			"name",
+			"lesson_title",
+			"course",
+			"course_id",
+			"course_name",
+			"module_title",
+			"duration_minutes",
+			"sort_order",
+			"published",
+			"summary",
+			"content",
+			"modified",
+		],
+		order_by="sort_order asc, modified desc",
+		limit_page_length=1000,
+		ignore_permissions=True,
+	)
+	if course_id:
+		# also match by course name / course link
+		extra = frappe.get_all(
+			"Training LMS Lesson",
+			filters={"course_name": course_id},
+			fields=[
+				"name",
+				"lesson_title",
+				"course",
+				"course_id",
+				"course_name",
+				"module_title",
+				"duration_minutes",
+				"sort_order",
+				"published",
+				"summary",
+				"content",
+			],
+			ignore_permissions=True,
+		)
+		seen = {r.name for r in rows}
+		for r in extra:
+			if r.name not in seen:
+				rows.append(r)
+	return [_lesson_to_dict(frappe._dict(r)) for r in rows]
+
+
+@frappe.whitelist()
+def save_lesson(payload=None):
+	_require_staff()
+	payload = _parse_payload(payload)
+	title = (payload.get("title") or payload.get("lesson_title") or "").strip()
+	if not title:
+		frappe.throw(_("Lesson title is required."))
+	name = (payload.get("id") or "").strip()
+	if name and frappe.db.exists("Training LMS Lesson", name):
+		doc = frappe.get_doc("Training LMS Lesson", name)
+	else:
+		doc = frappe.new_doc("Training LMS Lesson")
+	course_name = (payload.get("courseName") or payload.get("course_name") or "").strip()
+	course_link = (payload.get("course") or "").strip()
+	if course_link and frappe.db.exists("Training LMS Course", course_link):
+		course_doc = frappe.get_doc("Training LMS Course", course_link)
+		doc.course = course_link
+		doc.course_id = course_doc.course_id or _slug_id("c", course_doc.course_title)
+		doc.course_name = course_doc.course_title
+	else:
+		doc.course = None
+		doc.course_id = (payload.get("courseId") or payload.get("course_id") or "").strip() or _slug_id(
+			"c", course_name
+		)
+		doc.course_name = course_name
+	doc.lesson_title = title
+	doc.module_title = payload.get("module") or payload.get("module_title") or "Lessons"
+	doc.duration_minutes = int(payload.get("duration") or payload.get("duration_minutes") or 20)
+	doc.sort_order = int(payload.get("order") or payload.get("sort_order") or 0)
+	doc.published = 0 if payload.get("published") in (0, "0", False) else 1
+	doc.summary = payload.get("summary") or ""
+	doc.content = payload.get("content") or ""
+	doc.save(ignore_permissions=True)
+	frappe.db.commit()
+	return _lesson_to_dict(doc)
+
+
+@frappe.whitelist()
+def delete_lesson(name=None):
+	_require_staff()
+	if name and frappe.db.exists("Training LMS Lesson", name):
+		frappe.delete_doc("Training LMS Lesson", name, ignore_permissions=True)
+		frappe.db.commit()
+	return {"ok": 1}

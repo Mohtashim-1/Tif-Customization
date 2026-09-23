@@ -112,7 +112,7 @@ KPI_ACTIVITIES = [
 	},
 	{
 		"key": "co_curricular",
-		"label": "Co-curricular Activities (Quiz, Demo Class, Intro in School Functions/ Exhibitions, etc.)",
+		"label": "Co-curricular Activities (Demo Class, Intro in School Functions/ Exhibitions, etc.)",
 		"category": "Core Responsibility",
 		"metric": "co_curricular",
 		"targets": _targets(_t(0, 5, 1), _t(0, 0, 2), _t(0, 10, 2), _t(0, 10, 2)),

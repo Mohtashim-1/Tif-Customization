@@ -69,8 +69,9 @@ watch(
 	() => loadQuizzes()
 );
 
-function openLesson(title) {
-	state.lessonTitle = title;
+function openLesson(lesson) {
+	state.lessonTitle = typeof lesson === "string" ? lesson : lesson.title;
+	state.lessonBody = typeof lesson === "string" ? "" : lesson.content || lesson.summary || "";
 	const e = enrollment.value;
 	if (e && e.progress < 95) e.progress = Math.min(100, e.progress + 10);
 	if (e) e.lessonsDone = (e.lessonsDone || 0) + 1;
@@ -159,13 +160,13 @@ async function submit() {
 					<strong>{{ m.title }}</strong>
 					<button
 						v-for="lesson in m.lessons"
-						:key="lesson"
+						:key="lesson.id || lesson.title || lesson"
 						class="btn"
 						style="display: block; width: 100%; text-align: left; margin-top: 6px"
 						type="button"
 						@click="openLesson(lesson)"
 					>
-						{{ lesson }}
+						{{ lesson.title || lesson }}
 					</button>
 				</div>
 				<div>
@@ -201,7 +202,8 @@ async function submit() {
 	<div v-else-if="state.screen === 'lms_lesson'" class="card" style="max-width: 760px">
 		<div class="q-meta">Lesson</div>
 		<h2>{{ state.lessonTitle }}</h2>
-		<p>
+		<p v-if="state.lessonBody" v-html="state.lessonBody"></p>
+		<p v-else>
 			This lesson covers the key talking points for <strong>{{ course?.name }}</strong>. Watch the briefing, download
 			the one-pager, and mark the checkpoint before returning to the module list.
 		</p>

@@ -61,6 +61,7 @@ SUMMARY_TYPES = (
 	"Other Official Tasks",
 	"Headoffice/ Regional Office/ Out of Station Visit",
 	"Co-curricular Activity",
+	"Quiz Arranged",
 )
 
 # Activity (period) columns — aligned with SME KPI Details / Target Base KPI sheet
@@ -70,7 +71,7 @@ KPI_COLUMNS = (
 	{"key": "teachers_training_meeting", "label": "Teachers Training Meeting", "metric": "teachers_training_meeting"},
 	{
 		"key": "headoffice_visit",
-		"label": "Headoffice / Regional Office / Out of Station Visit",
+		"label": "Head Office / Regional Office / Out of Station Visit",
 		"metric": "headoffice_visit",
 	},
 	{"key": "academic_task", "label": "Academic Task", "metric": "academic_task"},
@@ -82,6 +83,7 @@ OUTCOME_COLUMNS = tuple(
 	{
 		"key": f"outcome_{cfg['key']}",
 		"label": cfg["label"],
+		"short_label": cfg.get("short_label") or cfg["label"],
 		"metric": cfg["metric"],
 		"yearly_min": cfg["target"],
 	}
@@ -502,6 +504,7 @@ def get_report_data(filters=None):
 			"headoffice_visit": cint(totals.get("headoffice_visit") or 0),
 			"academic_task": cint(totals.get("academic_task") or 0),
 			"other_official": cint(totals.get("other_official") or 0),
+			"quiz": cint(totals.get("quiz") or 0) or cint(totals.get("outcome_quiz") or 0),
 			"co_curricular": cint(totals.get("co_curricular") or 0),
 			"marketing": cint(totals.get("followup") or 0) + cint(totals.get("new") or 0),
 			"me": cint(totals.get("me") or 0),

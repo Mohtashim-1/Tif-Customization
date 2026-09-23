@@ -11,6 +11,7 @@ import ScheduleLegend from "./components/ScheduleLegend.vue";
 import CalendarBoard from "./components/CalendarBoard.vue";
 import DirectoryView from "./components/DirectoryView.vue";
 import SessionForm from "./components/SessionForm.vue";
+import CardStudio from "./components/CardStudio.vue";
 
 const activeNav = ref("dashboard");
 const search = ref("");
@@ -66,6 +67,7 @@ const pageMeta = computed(() => {
 		trainers: ["Trainers", "People delivering Upcoming Training"],
 		programs: ["Programs", "Topics and programs from Upcoming Training"],
 		sessions: ["Sessions", "Create and edit Upcoming Training here"],
+		cards: ["Create Cards", "Course, session, and lesson cards"],
 		rooms: ["Rooms & Venues", "Where sessions are delivered"],
 		reports: ["Reports", "Counts from Upcoming Training"],
 		notifications: ["Notifications", "Upcoming and in-progress sessions"],
@@ -81,6 +83,7 @@ const searchPlaceholder = computed(() => {
 		trainers: "Search trainers…",
 		programs: "Search programs…",
 		sessions: "Search sessions…",
+		cards: "Search cards…",
 		rooms: "Search venues…",
 		reports: "Filter reports…",
 		notifications: "Search upcoming…",
@@ -363,6 +366,9 @@ function onNavigate(id) {
 		loadRange();
 		return;
 	}
+	if (id === "cards") {
+		return;
+	}
 	if (id === "settings") {
 		directory.value = { view: "settings", rows: [] };
 		return;
@@ -469,6 +475,10 @@ function onCustomTo(value) {
 }
 
 onMounted(() => {
+	const params = new URLSearchParams(window.location.search);
+	if ((params.get("view") || "").toLowerCase() === "cards" || window.location.hash === "#cards") {
+		activeNav.value = "cards";
+	}
 	loadRange();
 });
 
@@ -489,7 +499,7 @@ watch(plannerView, () => {
 		<main class="ts-main">
 			<nav class="ts-mobile-nav">
 				<button
-					v-for="id in ['dashboard', 'schedule', 'sessions', 'trainers']"
+					v-for="id in ['dashboard', 'schedule', 'cards', 'sessions', 'trainers']"
 					:key="id"
 					type="button"
 					:class="{ active: activeNav === id }"
@@ -578,6 +588,12 @@ watch(plannerView, () => {
 					</p>
 				</template>
 			</template>
+
+			<CardStudio
+				v-else-if="activeNav === 'cards'"
+				@toast="showToast"
+				@open-session="openEdit"
+			/>
 
 			<DirectoryView
 				v-else

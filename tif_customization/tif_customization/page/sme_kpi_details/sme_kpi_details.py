@@ -46,21 +46,24 @@ OUTCOME_WEIGHT = 0.30
 
 # Yearly compulsory mins from KPI Details policy (all areas)
 OUTCOME_TARGETS = (
-	{"key": "enrolment", "label": _("Enrolment of participants"), "target": 50, "metric": "enrolment"},
-	{"key": "co_curricular", "label": _("Quiz / co-curricular activities"), "target": 1, "metric": "co_curricular"},
+	{"key": "enrolment", "label": _("Enrollment of Participants"), "short_label": _("Enrollment of Participants"), "target": 50, "metric": "enrolment"},
+	{"key": "quiz", "label": _("Quiz Arranged"), "short_label": _("Quiz Arranged"), "target": 1, "metric": "quiz"},
+	{"key": "co_curricular", "label": _("Co-curricular Activities"), "short_label": _("Co-curricular Activities"), "target": 1, "metric": "co_curricular"},
 	{
 		"key": "new_schools",
-		"label": _("New schools (distinct, from school / field visits)"),
+		"label": _("New Schools (distinct, from school / field visits)"),
+		"short_label": _("New Schools"),
 		"target": 24,
 		"metric": "new_schools",
 	},
 	{
 		"key": "workshop_registration",
-		"label": _("Workshop participants"),
+		"label": _("Workshop Participants"),
+		"short_label": _("Workshop Participants"),
 		"target": 148,
 		"metric": "workshop_registration",
 	},
-	{"key": "volunteers", "label": _("Volunteers enrolled"), "target": 25, "metric": "volunteers"},
+	{"key": "volunteers", "label": _("Volunteers Enrolled"), "short_label": _("Volunteers Enrolled"), "target": 25, "metric": "volunteers"},
 	{"key": "model_school_a", "label": _("Model School A"), "target": 6, "metric": "model_school_a"},
 	{"key": "model_school_b", "label": _("Model School B"), "target": 12, "metric": "model_school_b"},
 )
@@ -91,6 +94,10 @@ NEW_SCHOOL_SQL = """
 		OR fv.tps_affiliated = 'Yes - Newly Registered'
 		OR fv.cee_affiliated = 'Yes - Newly Registered'
 	)
+"""
+
+QUIZ_SQL = """
+	fv.type = 'Quiz Arranged'
 """
 
 CO_CURRICULAR_SQL = """
@@ -157,6 +164,7 @@ def get_report_data(filters=None):
 				"overall_pct": row.get("overall_pct"),
 				"new_schools": _outcome_actual(row, "new_schools"),
 				"enrolment": _outcome_actual(row, "enrolment"),
+				"quiz": _outcome_actual(row, "quiz"),
 				"co_curricular": _outcome_actual(row, "co_curricular"),
 			}
 		)
@@ -357,6 +365,7 @@ def _enriched_actuals(from_date, to_date, staff, tokens):
 	workshop_children = _child_count(
 		"Field Visit Workshop Attendee", from_date, to_date, tokens
 	)
+	actuals["quiz"] = _visit_count(from_date, to_date, tokens, QUIZ_SQL)
 	actuals["co_curricular"] = _visit_count(from_date, to_date, tokens, CO_CURRICULAR_SQL)
 	actuals["new_schools"] = _distinct_schools(from_date, to_date, tokens, NEW_SCHOOL_SQL)
 	actuals["new_school_registration"] = actuals["new_schools"]

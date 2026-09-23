@@ -445,6 +445,7 @@ export const state = reactive({
 	liveTick: 0,
 	headerSearch: "",
 	lessonTitle: "",
+	lessonBody: "",
 	backStack: [],
 	docLoading: false,
 	displayName: "",
@@ -953,6 +954,51 @@ export function applyCatalog(programRows = [], trainerRows = [], sessionRows = [
 	state.catalogReady = true;
 }
 
+function applySavedCourses(rows = []) {
+	for (const row of rows) {
+		const id = row.courseId || slugId("c", row.name);
+		const mapped = {
+			id,
+			name: row.name,
+			code: row.code || id.replace(/^c-/, "").toUpperCase().slice(0, 16),
+			category: row.category || "Training",
+			description: row.description || "",
+			image: coverFor(row.name),
+			trainer: row.trainer || "",
+			duration: row.duration || "",
+			status: row.status || "Active",
+			color: row.color || "",
+			erpId: row.id,
+			sessionsCount: state.courses.find((c) => c.name === row.name)?.sessionsCount || 0,
+		};
+		const existing = state.courses.find((c) => c.name === row.name || c.id === id || c.erpId === row.id);
+		if (existing) Object.assign(existing, mapped);
+		else state.courses.unshift(mapped);
+	}
+}
+
+function applySavedLessons(rows = []) {
+	const byKey = {};
+	for (const lesson of rows) {
+		const courseId = lesson.courseId || slugId("c", lesson.courseName);
+		const moduleTitle = lesson.module || "Lessons";
+		const key = `${courseId}::${moduleTitle}`;
+		const bucket = byKey[key] || { id: key, courseId, title: moduleTitle, lessons: [] };
+		bucket.lessons.push({
+			id: lesson.id,
+			title: lesson.title,
+			content: lesson.content || "",
+			summary: lesson.summary || "",
+			duration: lesson.duration || 0,
+		});
+		byKey[key] = bucket;
+	}
+	const built = Object.values(byKey);
+	if (!built.length) return;
+	const keep = state.modules.filter((m) => !built.some((b) => b.courseId === m.courseId));
+	state.modules = [...keep, ...built];
+}
+
 export async function loadCatalog() {
 	restoreUi();
 	state.catalogLoading = true;
@@ -965,6 +1011,16 @@ export async function loadCatalog() {
 			]);
 			applyCatalog(programs?.rows || [], trainers?.rows || [], sessions?.rows || []);
 			state.catalogError = "";
+			try {
+				const [savedCourses, savedLessons] = await Promise.all([
+					apiGet(`${LMS_METHOD}.list_courses`),
+					apiGet(`${LMS_METHOD}.list_lessons`),
+				]);
+				applySavedCourses(savedCourses || []);
+				applySavedLessons(savedLessons || []);
+			} catch {
+				/* cards studio tables may not exist yet */
+			}
 		} catch (e) {
 			if (window.training_lms_boot?.user && window.training_lms_boot.user !== "Guest") {
 				state.catalogError = e.message || String(e);
@@ -1705,9 +1761,13 @@ export function toast(msg) {
 
 export async function addCourse(form) {
 	try {
-		await apiPost(`${METHOD}.create_link_record`, { key: "program", name: form.name });
+		await apiPost(`${LMS_METHOD}.save_course`, { payload: form });
 	} catch {
-		/* program may already exist */
+		try {
+			await apiPost(`${METHOD}.create_link_record`, { key: "program", name: form.name });
+		} catch {
+			/* program may already exist */
+		}
 	}
 	audit(role.value.name, "Course created", form.name);
 	toast("Program saved. Sessions can now be scheduled against it.");

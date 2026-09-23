@@ -42,10 +42,11 @@ METRIC_LABELS = {
 	"academic_task": _("Academic Task"),
 	"other_official": _("Other Official Tasks"),
 	"co_curricular": _("Co-curricular Activities"),
+	"quiz": _("Quiz Arranged"),
 	"new_school_registration": _("Registration of New Schools"),
 	"new_schools": _("New school visits (Marketing / M&E)"),
 	"workshop_registration": _("Workshop / Training sessions"),
-	"enrolment": _("Enrolment visits"),
+	"enrolment": _("Enrollment of Participants"),
 	"volunteers": _("Volunteer visits"),
 	"schools": _("Training visits (schools attended)"),
 	"participants": _("Training visits (participants)"),
@@ -67,6 +68,8 @@ TYPE_TO_METRIC = {
 	"Academic / Other Official Tasks": "academic",
 	"Academic Task": "academic_task",
 	"Other Official Tasks": "other_official",
+	"Co-curricular Activity": "co_curricular",
+	"Quiz Arranged": "quiz",
 	"Other": "other",
 }
 
@@ -168,6 +171,8 @@ def _metric_condition(metric: str, alias: str = "fv") -> str:
 			OR LOWER(IFNULL({a}.reference,'')) LIKE '%%out of station%%'
 			OR LOWER(IFNULL({a}.me_new_school_address,'')) LIKE '%%head%%office%%'
 		)"""
+	if m == "quiz":
+		return f"{a}.type = 'Quiz Arranged'"
 	if m == "co_curricular":
 		return f"""(
 			{a}.type = 'Co-curricular Activity'

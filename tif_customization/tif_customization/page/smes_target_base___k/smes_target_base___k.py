@@ -518,6 +518,17 @@ def _count_actuals(from_date, to_date, staff, staff_tokens=None, submitted_only=
 		staff_params,
 	)
 
+	counts["quiz"] = _scalar_count(
+		f"""
+		SELECT COUNT(*) FROM `tabField Visit` fv
+		WHERE {ds_fv}
+		AND fv.type = 'Quiz Arranged'
+		AND {visit_day} BETWEEN %(from_date)s AND %(to_date)s
+		{"AND " + staff_match if staff else ""}
+		""",
+		staff_params,
+	)
+
 	counts["co_curricular"] = _scalar_count(
 		f"""
 		SELECT COUNT(*) FROM `tabField Visit`

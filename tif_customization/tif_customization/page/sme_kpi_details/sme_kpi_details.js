@@ -195,6 +195,7 @@ frappe.tif_customization.SmeKpiDetails = class SmeKpiDetails {
 			const staff = $(e.currentTarget).attr("data-staff") || f.staff;
 			const outcome = {
 				enrolment: 1,
+				quiz: 1,
 				co_curricular: 1,
 				new_schools: 1,
 				workshop_registration: 1,

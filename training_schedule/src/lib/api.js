@@ -84,3 +84,4 @@ export async function apiUpload(method, args = {}, file) {
 }
 
 export const METHOD = "tif_customization.tif_customization.api.training_schedule";
+export const LMS_METHOD = "tif_customization.tif_customization.api.training_lms";
