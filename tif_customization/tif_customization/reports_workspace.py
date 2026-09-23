@@ -22,6 +22,13 @@ PORTAL_LINKS = {
 			"is_query_report": 0,
 			"highlight": True,
 		},
+		{
+			"label": "Training Card",
+			"link_type": "URL",
+			"link_to": "/app/training-card",
+			"is_query_report": 0,
+			"highlight": True,
+		},
 	],
 }
 
