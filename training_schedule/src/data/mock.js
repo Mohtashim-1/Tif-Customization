@@ -93,6 +93,48 @@ export function getTrainer(id) {
 	return TRAINERS.find((t) => t.id === id) || TRAINERS[0];
 }
 
-export function getCategory(key) {
-	return CATEGORIES.find((c) => c.key === key) || CATEGORIES[CATEGORIES.length - 1];
+const CATEGORY_PALETTE = [
+	"#3b82f6",
+	"#10b981",
+	"#8b5cf6",
+	"#eab308",
+	"#ec4899",
+	"#0ea5e9",
+	"#f59e0b",
+	"#14b8a6",
+	"#ef4444",
+	"#6366f1",
+];
+
+function hashKey(value) {
+	let h = 0;
+	for (const ch of String(value || "")) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+	return h;
+}
+
+function humanizeKey(key) {
+	return String(key || "Other")
+		.replace(/[-_]+/g, " ")
+		.replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+export function getCategory(key, session) {
+	const s = session && typeof session === "object" ? session : null;
+	const catKey = (s?.category || key || "other").toString();
+	const known = CATEGORIES.find((c) => c.key === catKey);
+	return {
+		key: catKey,
+		label: s?.categoryLabel || known?.label || humanizeKey(catKey),
+		color: s?.categoryColor || known?.color || CATEGORY_PALETTE[hashKey(catKey) % CATEGORY_PALETTE.length],
+	};
+}
+
+export function categoriesFromSessions(sessions) {
+	const map = {};
+	for (const row of sessions || []) {
+		const cat = getCategory(row.category, row);
+		if (!map[cat.key]) map[cat.key] = { ...cat, count: 0 };
+		map[cat.key].count += 1;
+	}
+	return Object.values(map).sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
 }

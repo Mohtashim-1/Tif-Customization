@@ -75,8 +75,8 @@ function openSession(s) {
 							:key="s.id || s.name"
 							class="session"
 							:style="{
-								'--cat': getCategory(s.category).color,
-								background: getCategory(s.category).color + '18',
+								'--cat': getCategory(s.category, s).color,
+								background: getCategory(s.category, s).color + '18',
 							}"
 							@click.stop="openSession(s)"
 						>
@@ -87,7 +87,7 @@ function openSession(s) {
 							<div class="meta">
 								<span
 									class="avatar"
-									:style="{ background: s.trainerColor || getCategory(s.category).color }"
+									:style="{ background: s.trainerColor || getCategory(s.category, s).color }"
 								>
 									{{ s.trainerInitials || "?" }}
 								</span>

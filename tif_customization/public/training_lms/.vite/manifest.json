@@ -1,0 +1,18 @@
+{
+  "index.html": {
+    "file": "assets/training_lms-BjvhjOxV.js",
+    "name": "index",
+    "src": "index.html",
+    "isEntry": true,
+    "css": [
+      "assets/training_lms-DrSa8sKc.css"
+    ],
+    "assets": [
+      "assets/training_lms-BUURe3w9.png"
+    ]
+  },
+  "src/assets/ilm-logo.png": {
+    "file": "assets/training_lms-BUURe3w9.png",
+    "src": "src/assets/ilm-logo.png"
+  }
+}

@@ -4,8 +4,10 @@ defineProps({
 	trainers: { type: Array, default: () => [] },
 	programs: { type: Array, default: () => [] },
 	showAdd: { type: Boolean, default: false },
+	fromDate: { type: String, default: "" },
+	toDate: { type: String, default: "" },
 });
-defineEmits(["prev", "next", "add", "export"]);
+defineEmits(["prev", "next", "add", "export", "from-date", "to-date"]);
 const trainer = defineModel("trainer", { type: String, default: "all" });
 const program = defineModel("program", { type: String, default: "all" });
 const status = defineModel("status", { type: String, default: "all" });
@@ -37,6 +39,17 @@ const views = [
 			<button type="button" class="nav" @click="$emit('prev')">‹</button>
 			<span>{{ rangeLabel }}</span>
 			<button type="button" class="nav" @click="$emit('next')">›</button>
+		</div>
+
+		<div class="dates">
+			<label>
+				From
+				<input :value="fromDate" type="date" @change="$emit('from-date', $event.target.value)" />
+			</label>
+			<label>
+				To
+				<input :value="toDate" type="date" @change="$emit('to-date', $event.target.value)" />
+			</label>
 		</div>
 
 		<div class="filters">
@@ -123,12 +136,30 @@ const views = [
 	gap: 8px;
 }
 
+.dates {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+}
+.dates label {
+	display: flex;
+	flex-direction: column;
+	font-size: 10px;
+	font-weight: 700;
+	color: #6b7280;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
+.dates input,
 select {
 	border: 1px solid var(--line);
 	background: #f9fafb;
 	border-radius: 10px;
 	padding: 8px 12px;
 	min-width: 140px;
+}
+.dates input {
+	min-width: 132px;
 }
 
 .actions {

@@ -5,6 +5,7 @@ import AppSidebar from "./components/AppSidebar.vue";
 import AppHeader from "./components/AppHeader.vue";
 import FilterBar from "./components/FilterBar.vue";
 import SummaryCards from "./components/SummaryCards.vue";
+import CardDetailPanel from "./components/CardDetailPanel.vue";
 import ScheduleGrid from "./components/ScheduleGrid.vue";
 import ScheduleLegend from "./components/ScheduleLegend.vue";
 import CalendarBoard from "./components/CalendarBoard.vue";
@@ -55,6 +56,8 @@ const dashboardLoading = ref(false);
 const formOpen = ref(false);
 const editingName = ref("");
 const formDefaults = ref({});
+const activeCard = ref(null);
+const customRange = ref(false);
 
 const pageMeta = computed(() => {
 	const map = {
@@ -112,6 +115,17 @@ const weekStart = computed(() => {
 });
 
 const weekDays = computed(() => {
+	if (customRange.value && periodStart.value && periodEnd.value) {
+		const start = new Date(`${periodStart.value}T00:00:00`);
+		const end = new Date(`${periodEnd.value}T00:00:00`);
+		const days = [];
+		const cursor = new Date(start);
+		while (cursor <= end && days.length < 31) {
+			days.push(new Date(cursor));
+			cursor.setDate(cursor.getDate() + 1);
+		}
+		return days.length ? days : [start];
+	}
 	if (plannerView.value === "day") {
 		return [weekStart.value];
 	}
@@ -124,7 +138,11 @@ const weekDays = computed(() => {
 
 const rangeLabel = computed(() => {
 	const start = periodStart.value ? new Date(`${periodStart.value}T00:00:00`) : weekDays.value[0];
-	const end = periodEnd.value ? new Date(`${periodEnd.value}T00:00:00`) : weekDays.value[6];
+	const end = periodEnd.value ? new Date(`${periodEnd.value}T00:00:00`) : weekDays.value[weekDays.value.length - 1];
+	const fmt = (d) => d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+	if (customRange.value) {
+		return `${fmt(start)} – ${fmt(end)}`;
+	}
 	if (plannerView.value === "day") {
 		return start.toLocaleDateString("en-US", {
 			weekday: "long",
@@ -141,8 +159,12 @@ const rangeLabel = computed(() => {
 		const b = end.toLocaleDateString("en-US", { month: "short", year: "numeric" });
 		return `Q${Math.floor(start.getMonth() / 3) + 1} ${a} – ${b}`;
 	}
-	const fmt = (d) => d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 	return `${fmt(start).replace(/,?\s*\d{4}$/, "")} – ${fmt(end)}`;
+});
+
+const useWeekGrid = computed(() => {
+	if (customRange.value) return (weekDays.value || []).length <= 7;
+	return plannerView.value === "day" || plannerView.value === "week";
 });
 
 const filteredSessions = computed(() => {
@@ -162,6 +184,20 @@ const filteredSessions = computed(() => {
 	});
 });
 
+const cardSummary = computed(() => {
+	const list = filteredSessions.value;
+	const rooms = new Set(list.map((s) => (s.room || "").trim()).filter(Boolean));
+	return {
+		total_sessions: list.length,
+		completed: list.filter((s) => s.status === "completed").length,
+		in_progress: list.filter((s) => s.status === "in_progress").length,
+		upcoming: list.filter((s) => s.status === "upcoming").length,
+		rooms_used: rooms.size,
+		rooms_total: summary.value.rooms_total || Math.max(rooms.size, 8),
+		total_trainers: summary.value.total_trainers || 0,
+	};
+});
+
 function showToast(msg) {
 	toast.value = msg;
 	setTimeout(() => {
@@ -170,6 +206,18 @@ function showToast(msg) {
 }
 
 function shiftPeriod(dir) {
+	if (customRange.value && periodStart.value && periodEnd.value) {
+		const start = new Date(`${periodStart.value}T00:00:00`);
+		const end = new Date(`${periodEnd.value}T00:00:00`);
+		const days = Math.max(1, Math.round((end - start) / 86400000) + 1);
+		start.setDate(start.getDate() + dir * days);
+		end.setDate(end.getDate() + dir * days);
+		periodStart.value = iso(start);
+		periodEnd.value = iso(end);
+		cursorIso.value = periodStart.value;
+		loadRange();
+		return;
+	}
 	const d = new Date(`${(cursorIso.value || periodStart.value || iso(new Date()))}T00:00:00`);
 	if (plannerView.value === "day") d.setDate(d.getDate() + dir);
 	else if (plannerView.value === "week") d.setDate(d.getDate() + dir * 7);
@@ -183,8 +231,13 @@ async function loadRange() {
 	loading.value = true;
 	error.value = "";
 	try {
-		const args = { view: plannerView.value };
-		if (cursorIso.value) args.anchor = cursorIso.value;
+		const args = { view: customRange.value ? "custom" : plannerView.value };
+		if (customRange.value && periodStart.value && periodEnd.value) {
+			args.from_date = periodStart.value;
+			args.to_date = periodEnd.value;
+		} else if (cursorIso.value) {
+			args.anchor = cursorIso.value;
+		}
 		const data = await apiGet(`${METHOD}.get_schedule_data`, args);
 		cursorIso.value = data.anchor || data.period_start || data.week_start;
 		periodStart.value = data.period_start || data.week_start || "";
@@ -363,6 +416,7 @@ function onExport() {
 }
 
 function onOpenDay(dateIso) {
+	customRange.value = false;
 	cursorIso.value = dateIso;
 	if (plannerView.value === "day") loadRange();
 	else plannerView.value = "day";
@@ -388,11 +442,38 @@ function onFilterRoom(name) {
 	loadDirectory("sessions");
 }
 
+function onCardSelect(card) {
+	if (activeCard.value && activeCard.value.key === card.key && activeCard.value.kind === card.kind) {
+		activeCard.value = null;
+		return;
+	}
+	activeCard.value = card;
+}
+
+function onCustomFrom(value) {
+	if (!value) return;
+	periodStart.value = value;
+	if (periodEnd.value && periodEnd.value < value) periodEnd.value = value;
+	customRange.value = true;
+	cursorIso.value = value;
+	loadRange();
+}
+
+function onCustomTo(value) {
+	if (!value) return;
+	periodEnd.value = value;
+	if (periodStart.value && periodStart.value > value) periodStart.value = value;
+	customRange.value = true;
+	cursorIso.value = periodStart.value || value;
+	loadRange();
+}
+
 onMounted(() => {
 	loadRange();
 });
 
 watch(plannerView, () => {
+	customRange.value = false;
 	loadRange();
 });
 </script>
@@ -439,20 +520,41 @@ watch(plannerView, () => {
 					:trainers="trainers"
 					:programs="programs"
 					:show-add="activeNav === 'dashboard'"
+					:from-date="periodStart"
+					:to-date="periodEnd"
 					v-model:view="plannerView"
 					v-model:trainer="trainerFilter"
 					v-model:program="programFilter"
 					v-model:status="statusFilter"
 					@prev="shiftPeriod(-1)"
 					@next="shiftPeriod(1)"
+					@from-date="onCustomFrom"
+					@to-date="onCustomTo"
 					@add="onAddSession"
 					@export="onExport"
 				/>
-				<SummaryCards v-if="activeNav === 'dashboard'" :summary="summary" />
+				<SummaryCards
+					v-if="activeNav === 'dashboard'"
+					:summary="cardSummary"
+					:sessions="filteredSessions"
+					:active-key="activeCard?.key || ''"
+					@select="onCardSelect"
+				/>
+				<CardDetailPanel
+					v-if="activeNav === 'dashboard' && activeCard"
+					:card="activeCard"
+					:sessions="filteredSessions"
+					:trainers="trainers"
+					:period-start="periodStart"
+					:period-end="periodEnd"
+					:trainer-filter="trainerFilter"
+					@close="activeCard = null"
+					@open="openEdit"
+				/>
 				<div v-if="loading" class="ts-loading">Loading planner…</div>
 				<template v-else>
 					<ScheduleGrid
-						v-if="plannerView === 'day' || plannerView === 'week'"
+						v-if="useWeekGrid"
 						:days="weekDays"
 						:sessions="filteredSessions"
 						:today-iso="todayIso"
@@ -461,7 +563,7 @@ watch(plannerView, () => {
 					/>
 					<CalendarBoard
 						v-else
-						:view="plannerView"
+						:view="customRange ? 'month' : plannerView"
 						:period-start="periodStart"
 						:period-end="periodEnd"
 						:sessions="filteredSessions"
@@ -470,7 +572,7 @@ watch(plannerView, () => {
 						@create="onCreateSlot"
 						@open-day="onOpenDay"
 					/>
-					<ScheduleLegend />
+					<ScheduleLegend :sessions="filteredSessions" />
 					<p class="ts-hint">
 						{{ rangeLabel }} · {{ filteredSessions.length }} session(s) · Daily / Weekly / Monthly / Quarterly
 					</p>

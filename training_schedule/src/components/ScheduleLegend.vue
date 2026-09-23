@@ -1,15 +1,20 @@
 <script setup>
-import { CATEGORIES } from "../data/mock";
+import { categoriesFromSessions } from "../data/mock";
+
+const props = defineProps({
+	sessions: { type: Array, default: () => [] },
+});
 </script>
 
 <template>
 	<footer class="legend">
 		<div class="block">
-			<span class="title">Categories</span>
-			<span v-for="c in CATEGORIES" :key="c.key" class="item">
+			<span class="title">Courses</span>
+			<span v-for="c in categoriesFromSessions(sessions)" :key="c.key" class="item">
 				<i :style="{ background: c.color }"></i>
 				{{ c.label }}
 			</span>
+			<span v-if="!sessions.length" class="item">No courses in this range</span>
 		</div>
 		<div class="block">
 			<span class="title">Status</span>
@@ -48,6 +53,7 @@ import { CATEGORIES } from "../data/mock";
 	display: inline-flex;
 	align-items: center;
 	gap: 6px;
+	max-width: 280px;
 }
 
 .item i {
@@ -55,6 +61,7 @@ import { CATEGORIES } from "../data/mock";
 	height: 10px;
 	border-radius: 999px;
 	display: inline-block;
+	flex: 0 0 auto;
 }
 
 .done {

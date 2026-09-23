@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 from datetime import time, timedelta
+import re
 
 import frappe
 from frappe import _
@@ -45,14 +46,6 @@ SLOT_DEFS = (
 	{"id": "s4", "label": "02:45 – 04:45", "start_hour": 14},
 	{"id": "s5", "label": "05:00 – 07:00", "start_hour": 17},
 )
-
-DEPT_CATEGORY = {
-	"tps": "technical",
-	"cee": "leadership",
-	"qps": "communication",
-	"tif": "management",
-	"t. training": "other",
-}
 
 
 def _require_login():
@@ -549,14 +542,15 @@ def _title_for_row(row) -> str:
 	)
 
 
-def _category_for_row(row) -> str:
-	dept = (row.get("department_training") or "").strip().lower()
-	if dept in DEPT_CATEGORY:
-		return DEPT_CATEGORY[dept]
-	typ = (row.get("type") or "").strip().lower()
-	if typ == "workshop":
-		return "marketing"
-	return "other"
+def _slug_category(text: str) -> str:
+	slug = re.sub(r"[^a-z0-9]+", "-", (text or "").strip().lower()).strip("-")
+	return slug[:80] or "other"
+
+
+def _category_for_row(row) -> tuple[str, str]:
+	"""Course / session title is the category (Storytelling, Action Research, …)."""
+	label = _title_for_row(row) or "Other"
+	return _slug_category(label), label
 
 
 def _venue_for_row(row) -> str:
@@ -592,6 +586,7 @@ def _row_to_session(row, today):
 	trainer = (row.trainer_name or "").strip() or _("Unassigned")
 	present = cint(row.get("attendance_present") or 0)
 	total = cint(row.get("attendance_total") or 0)
+	cat_key, cat_label = _category_for_row(row)
 	return {
 		"id": row.name,
 		"name": row.name,
@@ -606,7 +601,9 @@ def _row_to_session(row, today):
 		"trainerInitials": _initials(trainer),
 		"trainerColor": _color_for_name(trainer),
 		"room": _venue_for_row(row),
-		"category": _category_for_row(row),
+		"category": cat_key,
+		"categoryLabel": cat_label,
+		"categoryColor": _color_for_name(cat_key),
 		"status": _status_for_date(
 			row.training_date,
 			today,
@@ -706,7 +703,7 @@ def _period_for(view, pivot):
 
 
 @frappe.whitelist()
-def get_schedule_data(week_start=None, view="week", anchor=None):
+def get_schedule_data(week_start=None, view="week", anchor=None, from_date=None, to_date=None):
 	"""Schedule for day / week / month / quarter from Upcoming Training."""
 	_require_login()
 	if not frappe.has_permission(DOCTYPE, "read"):
@@ -714,19 +711,27 @@ def get_schedule_data(week_start=None, view="week", anchor=None):
 
 	today = getdate(nowdate())
 	view = (view or "week").strip().lower()
-	if view not in ("day", "week", "month", "quarter"):
+	if view not in ("day", "week", "month", "quarter", "custom"):
 		view = "week"
 
-	pivot = getdate(anchor or week_start or today)
-	if not anchor and not week_start:
-		start_guess, end_guess = _period_for(view, pivot)
-		has = frappe.db.exists(DOCTYPE, {"training_date": ["between", [start_guess, end_guess]]})
-		if not has:
-			latest = frappe.db.get_value(DOCTYPE, {}, "training_date", order_by="training_date desc")
-			if latest:
-				pivot = getdate(latest)
-
-	start, end = _period_for(view, pivot)
+	custom_start = getdate(from_date) if from_date else None
+	custom_end = getdate(to_date) if to_date else None
+	if custom_start and custom_end:
+		if custom_start > custom_end:
+			custom_start, custom_end = custom_end, custom_start
+		start, end = custom_start, custom_end
+		pivot = custom_start
+		view = "custom"
+	else:
+		pivot = getdate(anchor or week_start or today)
+		if not anchor and not week_start:
+			start_guess, end_guess = _period_for(view if view != "custom" else "week", pivot)
+			has = frappe.db.exists(DOCTYPE, {"training_date": ["between", [start_guess, end_guess]]})
+			if not has:
+				latest = frappe.db.get_value(DOCTYPE, {}, "training_date", order_by="training_date desc")
+				if latest:
+					pivot = getdate(latest)
+		start, end = _period_for(view if view != "custom" else "week", pivot)
 	rows = _fetch_rows(start, end)
 	sessions = _attach_attendance_counts([_row_to_session(r, today) for r in rows])
 

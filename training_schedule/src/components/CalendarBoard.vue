@@ -89,7 +89,7 @@ function onDay(d) {
 							:key="s.id"
 							type="button"
 							class="chip"
-							:style="{ '--cat': getCategory(s.category).color }"
+							:style="{ '--cat': getCategory(s.category, s).color }"
 							@click="$emit('open', s.name)"
 						>
 							<span>{{ s.time || "—" }}</span>
