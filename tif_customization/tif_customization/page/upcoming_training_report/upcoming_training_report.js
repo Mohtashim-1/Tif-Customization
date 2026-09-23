@@ -19,7 +19,15 @@ frappe.tif_customization.UpcomingTrainingReport = class UpcomingTrainingReport {
 	make() {
 		this.make_layout();
 		this.make_filters();
+		this.apply_route_options();
 		this.load_data();
+	}
+
+	apply_route_options() {
+		const opts = frappe.route_options || {};
+		if (opts.topic && this.topic) this.topic.set_value(opts.topic);
+		if (opts.type && this.type) this.type.set_value(opts.type);
+		frappe.route_options = null;
 	}
 
 	make_filters() {

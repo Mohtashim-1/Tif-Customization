@@ -40,16 +40,13 @@ frappe.tif_customization.TrainingCardStudio = class TrainingCardStudio {
 	}
 
 	render() {
-		const pal = this.palette
-			.map((c) => `<button type="button" class="tc-swatch" data-color="${c}" style="background:${c}"></button>`)
-			.join("");
 		$(this.page.body).html(`
 			<div class="tc-studio">
 				<p class="tc-crumb">Learning / <span>Courses &amp; lessons</span></p>
 				<div class="tc-head">
 					<div>
 						<h3 class="tc-title">Courses &amp; lessons</h3>
-						<p class="tc-sub">Shown in the weekly planner and in the LMS. Everything saves to ERP.</p>
+						<p class="tc-sub">Shown in the weekly planner and in the LMS. View only — nothing is saved from this page.</p>
 					</div>
 					<button type="button" class="tc-refresh">↻ Refresh</button>
 				</div>
@@ -79,7 +76,6 @@ frappe.tif_customization.TrainingCardStudio = class TrainingCardStudio {
 								<h4 class="tc-list-title">All courses</h4>
 								<p class="tc-list-count">0 of 0 courses</p>
 							</div>
-							<button type="button" class="tc-btn primary tc-new">+ New course</button>
 						</div>
 						<div class="tc-list-tools">
 							<div class="tc-search-wrap">
@@ -91,14 +87,14 @@ frappe.tif_customization.TrainingCardStudio = class TrainingCardStudio {
 						<div class="tc-cols">
 							<span>Course</span><span>Trainer</span><span>Status</span>
 						</div>
-						<div class="tc-empty" hidden>No cards yet. Create one on the right.</div>
+						<div class="tc-empty" hidden>No records to show.</div>
 						<div class="tc-rows"></div>
 					</div>
 					<aside class="tc-form-col">
 						<div class="tc-form-head">
 							<div>
-								<h4 class="tc-form-title">New course</h4>
-								<p>Card preview updates as you type</p>
+								<h4 class="tc-form-title">Course detail</h4>
+								<p>Session counts, participants, and reporting</p>
 							</div>
 						</div>
 						<div class="tc-preview">
@@ -113,70 +109,59 @@ frappe.tif_customization.TrainingCardStudio = class TrainingCardStudio {
 								<span class="tc-status preview-status"><i></i> Active</span>
 							</div>
 						</div>
-						<form class="tc-form" data-panel="course">
-							<label>Course name<input name="name" required placeholder="Storytelling"></label>
-							<label>Code<input name="code" placeholder="STORY"></label>
-							<label>Category
-								<select name="category">
-									<option>Training</option>
-									<option>Workshop</option>
-									<option>Leadership</option>
-									<option>Communication</option>
-									<option>Technical</option>
-									<option>Management</option>
-									<option>Other</option>
-								</select>
-							</label>
-							<label>Trainer<input name="trainer" list="tc-trainers" placeholder="Muhammad Ajmal"></label>
-							<label>Duration<input name="duration" placeholder="e.g. 2 hours"></label>
-							<label>Status
-								<select name="status">
-									<option>Active</option>
-									<option>Draft</option>
-								</select>
-							</label>
-							<label class="full">Description<textarea name="description" rows="3" placeholder="What this course covers"></textarea></label>
-							<div class="full"><span style="display:block;font-size:12px;font-weight:600;color:#334155;margin-bottom:8px">Card color</span>
-								<div class="tc-colors">${pal}</div>
+						<div class="tc-course-report">
+							<div class="tc-mini-kpis">
+								<div><span>Sessions performed</span><strong data-stat="sessions">0</strong></div>
+								<div><span>Participants</span><strong data-stat="participants">0</strong></div>
+								<div><span>Completed</span><strong data-stat="completed">0</strong></div>
 							</div>
+							<div class="tc-report-links">
+								<button type="button" class="tc-btn ghost tc-open-report">Open full report</button>
+								<button type="button" class="tc-btn ghost tc-open-planner">Weekly planner</button>
+							</div>
+							<div class="tc-sess-head">Session-wise detail</div>
+							<div class="tc-sess-empty">No sessions yet for this course.</div>
+							<div class="tc-sess-rows"></div>
+						</div>
+						<form class="tc-form tc-readonly" data-panel="course">
+							<label>Course name<input name="name" readonly></label>
+							<label>Code<input name="code" readonly></label>
+							<label>Category<input name="category" readonly></label>
+							<label>Trainer<input name="trainer" readonly></label>
+							<label>Duration<input name="duration" readonly></label>
+							<label>Status<input name="status" readonly></label>
+							<label class="full">Description<textarea name="description" rows="3" readonly></textarea></label>
 							<input type="hidden" name="color" value="#4f46e5">
 							<input type="hidden" name="id" value="">
 						</form>
-						<form class="tc-form" data-panel="session" hidden>
-							<label class="full">Course
-								<select name="training_type" class="tc-course-select"><option value="">Select course</option></select>
-							</label>
-							<label>Type<select name="type" class="tc-type-select"></select></label>
-							<label>Date<input name="training_date" type="date" required></label>
-							<label>Start<input name="training_time" type="time" value="10:00"></label>
-							<label>End<input name="training_end_time" type="time" value="12:00"></label>
-							<label>Trainer<input name="trainer_name" list="tc-trainers"></label>
-							<label>Mode<select name="mode_of_training" class="tc-mode-select"></select></label>
-							<label class="full">Venue / school<input name="school_name" placeholder="Room or school"></label>
+						<form class="tc-form tc-readonly" data-panel="session" hidden>
+							<label class="full">Course<input name="training_type" readonly></label>
+							<label>Type<input name="type" readonly></label>
+							<label>Date<input name="training_date" readonly></label>
+							<label>Start<input name="training_time" readonly></label>
+							<label>End<input name="training_end_time" readonly></label>
+							<label>Trainer<input name="trainer_name" readonly></label>
+							<label>Mode<input name="mode_of_training" readonly></label>
+							<label class="full">Venue / school<input name="school_name" readonly></label>
 							<input type="hidden" name="name" value="">
 							<input type="hidden" name="program" value="">
 						</form>
-						<form class="tc-form" data-panel="lesson" hidden>
-							<label class="full">Course
-								<select name="course" class="tc-course-select"><option value="">Select course</option></select>
-							</label>
-							<label class="full">Lesson title<input name="title" required placeholder="What is storytelling?"></label>
-							<label>Module<input name="module" placeholder="Module 1" value="Lessons"></label>
-							<label>Minutes<input name="duration" type="number" min="1" value="20"></label>
-							<label>Order<input name="order" type="number" min="0" value="0"></label>
-							<label class="tc-check"><input name="published" type="checkbox" checked> Published</label>
-							<label class="full">Summary<textarea name="summary" rows="2"></textarea></label>
-							<label class="full">Lesson body<textarea name="content" rows="5" placeholder="Students will see this in the LMS."></textarea></label>
+						<form class="tc-form tc-readonly" data-panel="lesson" hidden>
+							<label class="full">Course<input name="course" readonly></label>
+							<label class="full">Lesson title<input name="title" readonly></label>
+							<label>Module<input name="module" readonly></label>
+							<label>Minutes<input name="duration" readonly></label>
+							<label>Order<input name="order" readonly></label>
+							<label class="full">Summary<textarea name="summary" rows="2" readonly></textarea></label>
+							<label class="full">Lesson body<textarea name="content" rows="5" readonly></textarea></label>
 							<input type="hidden" name="id" value="">
+							<input type="hidden" name="published" value="1">
 						</form>
 						<div class="tc-actions">
-							<button type="button" class="tc-btn danger tc-delete" hidden>Delete</button>
-							<button type="button" class="tc-btn ghost tc-clear">Clear</button>
-							<button type="button" class="tc-btn primary tc-save">Create course</button>
+							<button type="button" class="tc-btn primary tc-open-doc" hidden>View details</button>
 						</div>
 					</aside>
 				</div>
-				<datalist id="tc-trainers"></datalist>
 			</div>
 		`);
 		this.$ = $(this.page.body).find(".tc-studio");
@@ -198,29 +183,26 @@ frappe.tif_customization.TrainingCardStudio = class TrainingCardStudio {
 			this.statusFilter = $(e.currentTarget).data("filter");
 			this.render_pills();
 			this.render_list();
+			const still = this.filtered().some((i) => String(i.id || i.name) === String(this.editingId));
+			if (!still) this.select_first();
 		});
-		$root.on("click", ".tc-new, .tc-clear", () => this.reset_forms());
-		$root.on("click", ".tc-save", () => this.save());
-		$root.on("click", ".tc-delete", () => this.remove_current());
 		$root.on("click", ".tc-row", (e) => {
 			const id = $(e.currentTarget).data("id");
 			this.pick(String(id));
 		});
-		$root.on("click", ".tc-swatch", (e) => {
-			const color = $(e.currentTarget).data("color");
-			this.form("course").find("[name=color]").val(color);
-			this.mark_swatch(color);
-			this.update_preview();
+		$root.on("click", ".tc-open-report", () => this.open_report());
+		$root.on("click", ".tc-open-planner", () => {
+			window.location.href = "/training-schedule";
 		});
-		$root.on("input change", "[data-panel=course] input, [data-panel=course] select, [data-panel=course] textarea", () =>
-			this.update_preview()
-		);
-		$root.on("input change", "[data-panel=session] input, [data-panel=session] select", () => this.update_preview());
-		$root.on("input change", "[data-panel=lesson] input, [data-panel=lesson] select, [data-panel=lesson] textarea", () =>
-			this.update_preview()
-		);
-		$root.on("change", "[data-panel=session] .tc-course-select", (e) => this.on_course_select(e.target.value, "session"));
-		$root.on("change", "[data-panel=lesson] .tc-course-select", (e) => this.on_course_select(e.target.value, "lesson"));
+		$root.on("click", ".tc-sess-row", (e) => {
+			const name = $(e.currentTarget).data("name");
+			if (name) this.open_session(name);
+		});
+		$root.on("click", ".tc-open-doc", (e) => {
+			e.preventDefault();
+			const name = this.form("session").find("[name=name]").val();
+			if (name) this.open_session(name);
+		});
 	}
 
 	form(kind) {
@@ -229,6 +211,15 @@ frappe.tif_customization.TrainingCardStudio = class TrainingCardStudio {
 
 	kind_label() {
 		return { course: "course", session: "session", lesson: "lesson" }[this.kind];
+	}
+
+	select_first() {
+		const items = this.filtered();
+		if (!items.length) {
+			this.reset_forms();
+			return;
+		}
+		this.pick(String(items[0].id || items[0].name));
 	}
 
 	set_kind(kind) {
@@ -240,11 +231,12 @@ frappe.tif_customization.TrainingCardStudio = class TrainingCardStudio {
 		this.$.find(".tc-form").prop("hidden", true);
 		this.form(kind).prop("hidden", false);
 		this.$.find(".tc-search").attr("placeholder", `Search ${this.kind_label()}s…`);
-		this.$.find(".tc-new").text(`+ New ${this.kind_label()}`);
 		this.$.find(".tc-list-title").text(`All ${this.kind_label()}s`);
+		this.$.find(".tc-course-report").prop("hidden", kind !== "course");
+		this.$.find(".tc-open-doc").prop("hidden", kind !== "session");
 		this.render_pills();
-		this.reset_forms();
 		this.render_list();
+		this.select_first();
 	}
 
 	render_pills() {
@@ -300,11 +292,11 @@ frappe.tif_customization.TrainingCardStudio = class TrainingCardStudio {
 		this.form("lesson").find("[name=order]").val(0);
 		this.form("lesson").find("[name=published]").prop("checked", true);
 
-		this.$.find(".tc-delete").prop("hidden", true);
-		this.$.find(".tc-save").text(`Create ${this.kind_label()}`);
-		this.$.find(".tc-form-title").text(`New ${this.kind_label()}`);
+		this.$.find(".tc-open-doc").prop("hidden", true);
+		this.$.find(".tc-form-title").text(`${this.kind_label().replace(/^./, (c) => c.toUpperCase())} detail`);
 		this.$.find(".tc-row").removeClass("on");
 		this.update_preview();
+		this.render_course_report();
 	}
 
 	mark_swatch(color) {
@@ -382,12 +374,12 @@ frappe.tif_customization.TrainingCardStudio = class TrainingCardStudio {
 		this.$.find(".tc-list-count").text(`${items.length} of ${total} ${this.kind_label()}s`);
 		this.$.find(".tc-empty").prop("hidden", !!items.length);
 		if (!items.length) {
-			this.$.find(".tc-empty").text(`No ${this.kind_label()}s yet. Create one on the right.`);
+			this.$.find(".tc-empty").text(`No ${this.kind_label()}s to show.`);
 		}
 		if (this.kind === "course") {
-			this.$.find(".tc-cols").html("<span>Course</span><span>Trainer</span><span>Status</span>");
+			this.$.find(".tc-cols").html("<span>Course</span><span>Sessions</span><span>Participants</span>");
 		} else if (this.kind === "session") {
-			this.$.find(".tc-cols").html("<span>Session</span><span>Trainer</span><span>When</span>");
+			this.$.find(".tc-cols").html("<span>Session</span><span>Participants</span><span>Status</span>");
 		} else {
 			this.$.find(".tc-cols").html("<span>Lesson</span><span>Course</span><span>Status</span>");
 		}
@@ -399,33 +391,34 @@ frappe.tif_customization.TrainingCardStudio = class TrainingCardStudio {
 					const title = item.name || "";
 					const color = item.color || this.palette[0];
 					const code = item.code || this.suggest_code(title);
-					const status = this.ui_status(item.status);
+					const stats = this.course_stats(item);
 					return `<button type="button" class="tc-row${on}" data-id="${this.esc(id)}">
 						<span class="tc-row-main">
 							<span class="tc-ava" style="background:${color}">${this.esc(this.initials(title))}</span>
 							<span>
 								<span class="tc-row-title">${this.esc(title)}</span>
-								<span class="tc-row-meta">${this.esc(code)} · ${this.esc(item.category || "Training")}</span>
+								<span class="tc-row-meta">${this.esc(code)} · ${this.esc(item.trainer || "Unassigned")}</span>
 							</span>
 						</span>
-						<span class="tc-row-trainer">${this.esc(item.trainer || "Unassigned")}</span>
-						<span class="tc-status${status === "Draft" ? " draft" : ""}"><i></i> ${status}</span>
+						<span class="tc-row-trainer">${stats.sessions}</span>
+						<span class="tc-status"><i></i> ${stats.participants}</span>
 					</button>`;
 				}
 				if (this.kind === "session") {
 					const title = item.title || item.program || item.name;
 					const color = item.trainerColor || this.palette[0];
 					const done = String(item.status || "").toLowerCase() === "completed";
+					const people = this.cint(item.attendance_present) || this.cint(item.attendance_total);
 					return `<button type="button" class="tc-row${on}" data-id="${this.esc(id)}">
 						<span class="tc-row-main">
 							<span class="tc-ava" style="background:${color}">${this.esc(this.initials(title))}</span>
 							<span>
 								<span class="tc-row-title">${this.esc(title)}</span>
-								<span class="tc-row-meta">${this.esc(item.room || item.school || "No venue")} · ${this.esc(item.type || "")}</span>
+								<span class="tc-row-meta">${this.esc(item.date || "")} · ${this.esc(item.start_time || "")} · ${this.esc(item.trainerName || "Unassigned")}</span>
 							</span>
 						</span>
-						<span class="tc-row-trainer">${this.esc(item.trainerName || "Unassigned")}</span>
-						<span class="tc-status${done ? " draft" : ""}"><i></i> ${this.esc(item.date || "")} ${this.esc(item.start_time || "")}</span>
+						<span class="tc-row-trainer">${people}</span>
+						<span class="tc-status${done ? " draft" : ""}"><i></i> ${this.esc(item.status || "upcoming")}</span>
 					</button>`;
 				}
 				const title = item.title || "";
@@ -446,28 +439,7 @@ frappe.tif_customization.TrainingCardStudio = class TrainingCardStudio {
 		this.$.find(".tc-rows").html(html);
 	}
 
-	fill_selects() {
-		const courseOpts = ['<option value="">Select course</option>']
-			.concat(this.courses.map((c) => `<option value="${this.esc(c.id || c.name)}">${this.esc(c.name)}</option>`))
-			.join("");
-		this.$.find(".tc-course-select").each((_, el) => {
-			const $el = $(el);
-			const prev = $el.val();
-			$el.html(courseOpts);
-			if (prev) $el.val(prev);
-		});
-		const types = (this.options.types || []).map((t) => `<option value="${this.esc(t)}">${this.esc(t)}</option>`).join("");
-		this.$.find(".tc-type-select").html(types);
-		const modes = (this.options.modes || []).map((t) => `<option value="${this.esc(t)}">${this.esc(t)}</option>`).join("");
-		this.$.find(".tc-mode-select").html(modes);
-		const trainers = this.trainers
-			.map((t) => {
-				const name = typeof t === "string" ? t : t.name || t.label || "";
-				return name ? `<option value="${this.esc(name)}">` : "";
-			})
-			.join("");
-		this.$.find("#tc-trainers").html(trainers);
-	}
+	fill_selects() {}
 
 	preview_data() {
 		if (this.kind === "course") {
@@ -521,6 +493,7 @@ frappe.tif_customization.TrainingCardStudio = class TrainingCardStudio {
 		this.$.find(".preview-status")
 			.toggleClass("draft", draft)
 			.html(`<i></i> ${this.esc(p.status)}`);
+		if (this.kind === "course") this.render_course_report();
 	}
 
 	vals(kind) {
@@ -551,6 +524,7 @@ frappe.tif_customization.TrainingCardStudio = class TrainingCardStudio {
 			$f.find("[name=description]").val(c.description || "");
 			$f.find("[name=color]").val(c.color || this.palette[0]);
 			this.mark_swatch(c.color || this.palette[0]);
+			this.render_course_report(c);
 		} else if (this.kind === "session") {
 			const s = this.sessions.find((x) => String(x.id || x.name) === String(id));
 			if (!s) return;
@@ -561,7 +535,7 @@ frappe.tif_customization.TrainingCardStudio = class TrainingCardStudio {
 			$f.find("[name=training_time]").val((s.start_time || "10:00").slice(0, 5));
 			$f.find("[name=training_end_time]").val((s.end_time || "12:00").slice(0, 5));
 			$f.find("[name=trainer_name]").val(s.trainerName || "");
-			$f.find("[name=training_type]").val(this.course_option_value(s.title || s.program));
+			$f.find("[name=training_type]").val(s.title || s.program || "");
 			$f.find("[name=program]").val(s.program || s.title || "");
 			$f.find("[name=mode_of_training]").val(s.mode || "In-person");
 			$f.find("[name=school_name]").val(s.room || s.school || "");
@@ -571,17 +545,16 @@ frappe.tif_customization.TrainingCardStudio = class TrainingCardStudio {
 			const $f = this.form("lesson");
 			$f.find("[name=id]").val(l.id || "");
 			$f.find("[name=title]").val(l.title || "");
-			$f.find("[name=course]").val(l.course || l.courseId || l.courseName || "");
+			$f.find("[name=course]").val(l.courseName || l.course || "");
 			$f.find("[name=module]").val(l.module || "Lessons");
 			$f.find("[name=duration]").val(l.duration || 20);
 			$f.find("[name=order]").val(l.order || 0);
-			$f.find("[name=published]").prop("checked", l.published !== 0);
+			$f.find("[name=published]").val(l.published ? "1" : "0");
 			$f.find("[name=summary]").val(l.summary || "");
 			$f.find("[name=content]").val(l.content || "");
 		}
-		this.$.find(".tc-save").text("Save changes");
-		this.$.find(".tc-form-title").text(`Edit ${this.kind_label()}`);
-		this.$.find(".tc-delete").prop("hidden", this.kind === "session");
+		this.$.find(".tc-form-title").text(`${this.kind_label().replace(/^./, (c) => c.toUpperCase())} detail`);
+		this.$.find(".tc-open-doc").prop("hidden", this.kind !== "session" || !id);
 		this.render_list();
 		this.update_preview();
 	}
@@ -599,6 +572,272 @@ frappe.tif_customization.TrainingCardStudio = class TrainingCardStudio {
 			if (c.trainer) this.form("session").find("[name=trainer_name]").val(c.trainer);
 		}
 		this.update_preview();
+	}
+
+	norm(v) {
+		return String(v || "")
+			.trim()
+			.toLowerCase();
+	}
+
+	cint(v) {
+		const n = parseInt(v, 10);
+		return Number.isFinite(n) ? n : 0;
+	}
+
+	sessions_for_course(course) {
+		const names = new Set(
+			[course && (course.name || course.title)]
+				.map((n) => this.norm(n))
+				.filter(Boolean)
+		);
+		if (!names.size) return [];
+		return this.sessions.filter(
+			(s) => names.has(this.norm(s.title)) || names.has(this.norm(s.program)) || names.has(this.norm(s.categoryLabel))
+		);
+	}
+
+	course_stats(course) {
+		const rows = this.sessions_for_course(course);
+		let present = 0;
+		let total = 0;
+		let completed = 0;
+		rows.forEach((s) => {
+			present += this.cint(s.attendance_present);
+			total += this.cint(s.attendance_total);
+			if (String(s.status || "").toLowerCase() === "completed") completed += 1;
+		});
+		return {
+			sessions: rows.length,
+			completed,
+			upcoming: rows.length - completed,
+			participants: present || total,
+			present,
+			total,
+			rows: rows.slice().sort((a, b) => String(b.date || "").localeCompare(String(a.date || ""))),
+		};
+	}
+
+	render_course_report(course) {
+		const $box = this.$.find(".tc-course-report");
+		if (this.kind !== "course") {
+			$box.prop("hidden", true);
+			return;
+		}
+		$box.prop("hidden", false);
+		if (!course) {
+			const name = this.vals("course").name;
+			course = this.courses.find((c) => c.name === name) || { name };
+		}
+		const stats = this.course_stats(course);
+		this.$.find("[data-stat=sessions]").text(stats.sessions);
+		this.$.find("[data-stat=participants]").text(stats.participants);
+		this.$.find("[data-stat=completed]").text(stats.completed);
+		this.$.find(".tc-sess-empty").prop("hidden", !!stats.rows.length);
+		const html = stats.rows
+			.map((s) => {
+				const present = this.cint(s.attendance_present);
+				const total = this.cint(s.attendance_total);
+				const people = total ? `${present}/${total}` : present || "—";
+				const st = String(s.status || "upcoming").replace("_", " ");
+				return `<button type="button" class="tc-sess-row" data-name="${this.esc(s.name)}">
+					<span>
+						<strong>${this.esc(s.date || "No date")} · ${this.esc(s.start_time || "")}</strong>
+						<small>${this.esc(s.trainerName || "Unassigned")} · ${this.esc(s.room || s.school || "No venue")}</small>
+					</span>
+					<span class="tc-sess-people">${this.esc(people)} present</span>
+					<span class="tc-sess-status">${this.esc(st)}</span>
+				</button>`;
+			})
+			.join("");
+		this.$.find(".tc-sess-rows").html(html);
+	}
+
+	open_session(name) {
+		if (!name) return;
+		frappe.dom.freeze(__("Loading session…"));
+		this.call(`${this.sched}.get_session`, { name })
+			.then((doc) => this.show_session_dialog(doc || {}))
+			.catch((e) => {
+				frappe.msgprint({
+					title: __("Could not load session"),
+					message: e.message || String(e),
+					indicator: "red",
+				});
+			})
+			.finally(() => frappe.dom.unfreeze());
+	}
+
+	show_session_dialog(d) {
+		const v = (x) => this.esc(x || "—");
+		const has = (x) => x !== undefined && x !== null && String(x).trim() !== "";
+		const topic = d.training_type || d.workshop_topic || d.program || d.name || "Session";
+		const status = d.schedule_status || "Upcoming";
+		const statusKey = String(status).toLowerCase().replace(/\s+/g, "-");
+		const trainer = d.trainer_name || "Unassigned";
+		const present = this.cint(d.attendance_present);
+		const total = this.cint(d.attendance_total);
+		const rate = total ? `${Math.round((present / total) * 100)}%` : "—";
+		const dateInfo = this.pretty_date(d.training_date);
+		const timeRange = [d.training_time, d.training_end_time].filter(has).join(" – ");
+		const duration = this.duration_label(d.training_time, d.training_end_time);
+		const daysAgo = this.days_since(d.training_date);
+		const showBanner = daysAgo > 0 && String(status).toLowerCase() === "upcoming" && total === 0;
+
+		const kv = (label, value) =>
+			`<div class="tc-dlg-kv"><span>${v(label)}</span><strong>${v(value)}</strong></div>`;
+
+		const files = d.attachments || [];
+		const attendance = d.attendance || [];
+
+		const filesHtml = files.length
+			? `<div class="tc-dlg-files">${files
+					.map((f) => {
+						const url = typeof f === "string" ? f : f.file_url || f.url || "";
+						const label = typeof f === "string" ? f.split("/").pop() : f.file_name || url;
+						return url
+							? `<a href="${this.esc(url)}" target="_blank" rel="noopener">${v(label)}</a>`
+							: `<span>${v(label)}</span>`;
+					})
+					.join("")}</div>`
+			: `<div class="tc-dlg-drop"><strong>No files attached</strong><span>Slides, handouts, or recordings will show here</span></div>`;
+
+		const attHtml = attendance.length
+			? `<div class="tc-dlg-table-wrap"><table class="tc-dlg-table">
+				<thead><tr><th>Participant</th><th>Email / phone</th><th>Status</th></tr></thead>
+				<tbody>${attendance
+					.map((a) => {
+						const st = a.attendance_status || "Present";
+						const tone = String(st).toLowerCase() === "present" ? "ok" : "muted";
+						return `<tr>
+							<td><strong>${v(a.participant_name)}</strong></td>
+							<td>${v(a.email || a.phone)}</td>
+							<td><span class="tc-dlg-badge ${tone}">${v(st)}</span></td>
+						</tr>`;
+					})
+					.join("")}</tbody></table></div>`
+			: `<div class="tc-dlg-empty">No attendance yet. Names appear after check-in or Zoom import.</div>`;
+
+		const html = `<div class="tc-dlg">
+			<div class="tc-dlg-top">
+				<div class="tc-dlg-date"><span>${v(dateInfo.month)}</span><strong>${v(dateInfo.day)}</strong></div>
+				<div class="tc-dlg-top-copy">
+					<div class="tc-dlg-chips">
+						<span class="tc-dlg-chip type">${v(d.type || "Training")}</span>
+						<span class="tc-dlg-chip ${statusKey}">${v(status)}</span>
+						${has(d.mode_of_training) ? `<span class="tc-dlg-chip mode">${v(d.mode_of_training)}</span>` : ""}
+					</div>
+					<h3>${v(topic)}</h3>
+					<p>
+						<span>${v(trainer)}</span>
+						${has(timeRange) ? `<span class="sep">·</span><span>${v(timeRange)}</span>` : ""}
+						${duration ? `<span class="sep">·</span><span>${v(duration)}</span>` : ""}
+						${has(d.name) ? `<span class="sep">·</span><code>${v(d.name)}</code>` : ""}
+					</p>
+				</div>
+				<div class="tc-dlg-top-actions">
+					${has(d.zoom_link) ? `<a class="tc-dlg-btn primary" href="${this.esc(d.zoom_link)}" target="_blank" rel="noopener">Open meeting link</a>` : ""}
+					<button type="button" class="tc-dlg-x" aria-label="Close">×</button>
+				</div>
+			</div>
+			${showBanner ? `<div class="tc-dlg-banner">Scheduled date passed ${daysAgo} day${daysAgo === 1 ? "" : "s"} ago — status is still ${v(status)} and no attendance is recorded.</div>` : ""}
+			<div class="tc-dlg-split">
+				<div class="tc-dlg-col">
+					<div class="tc-dlg-label">Schedule</div>
+					<div class="tc-dlg-kvs">
+						${kv("Date", dateInfo.pretty || d.training_date)}
+						${kv("Time", timeRange)}
+						${kv("Trainer", trainer)}
+					</div>
+					<div class="tc-dlg-label">Program</div>
+					<div class="tc-dlg-kvs">
+						${kv("Program", d.program)}
+						${kv("Course / topic", d.training_type || d.workshop_topic || topic)}
+						${kv("Department", d.department_training)}
+						${kv("Participants", d.participants_category)}
+						${kv("Type", d.type)}
+						${kv("Mode", d.mode_of_training)}
+					</div>
+					<div class="tc-dlg-label">Venue</div>
+					<div class="tc-dlg-kvs">
+						${kv("School", d.school_name)}
+						${kv("School type", d.school_type)}
+						${kv("City", d.city || d.area)}
+					</div>
+				</div>
+				<div class="tc-dlg-col">
+					<div class="tc-dlg-label">Attendance</div>
+					<div class="tc-dlg-stats">
+						<div><span>Present</span><strong>${present}</strong></div>
+						<div><span>Marked</span><strong>${total}</strong></div>
+						<div><span>Rate</span><strong>${v(rate)}</strong></div>
+					</div>
+					${attHtml}
+					<div class="tc-dlg-label">Attachments <em>${files.length} file${files.length === 1 ? "" : "s"}</em></div>
+					${filesHtml}
+				</div>
+			</div>
+			<div class="tc-dlg-foot"><button type="button" class="tc-dlg-close">Close</button></div>
+		</div>`;
+
+		const dialog = new frappe.ui.Dialog({
+			title: topic,
+			size: "extra-large",
+			fields: [{ fieldtype: "HTML", fieldname: "body", label: " " }],
+		});
+		dialog.$wrapper.addClass("tc-session-dialog");
+		dialog.fields_dict.body.$wrapper.html(html);
+		dialog.$wrapper.find(".modal-header, .modal-footer").hide();
+		dialog.$wrapper.on("click", ".tc-dlg-x, .tc-dlg-close", () => dialog.hide());
+		dialog.show();
+	}
+
+	pretty_date(iso) {
+		if (!iso) return { month: "—", day: "–", pretty: "" };
+		const dt = frappe.datetime.str_to_obj(iso) || new Date(iso);
+		if (!dt || isNaN(dt.getTime())) return { month: "—", day: "–", pretty: iso };
+		const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+		const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+		return {
+			month: months[dt.getMonth()].toUpperCase(),
+			day: String(dt.getDate()),
+			pretty: `${days[dt.getDay()]}, ${dt.getDate()} ${months[dt.getMonth()]} ${dt.getFullYear()}`,
+		};
+	}
+
+	days_since(iso) {
+		if (!iso) return 0;
+		const dt = frappe.datetime.str_to_obj(iso) || new Date(iso);
+		const today = frappe.datetime.str_to_obj(frappe.datetime.get_today()) || new Date();
+		if (!dt || isNaN(dt.getTime())) return 0;
+		const a = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()).getTime();
+		const b = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+		return Math.floor((b - a) / 86400000);
+	}
+
+	duration_label(start, end) {
+		const toMin = (t) => {
+			const p = String(t || "").split(":");
+			const h = parseInt(p[0], 10);
+			const m = parseInt(p[1] || "0", 10);
+			if (!Number.isFinite(h)) return null;
+			return h * 60 + (Number.isFinite(m) ? m : 0);
+		};
+		const a = toMin(start);
+		const b = toMin(end);
+		if (a == null || b == null || b <= a) return "";
+		const d = b - a;
+		const h = Math.floor(d / 60);
+		const m = d % 60;
+		if (h && m) return `${h} hr ${m} min`;
+		if (h) return h === 1 ? "1 hr" : `${h} hr`;
+		return `${m} min`;
+	}
+
+	open_report() {
+		const topic = (this.vals("course").name || "").trim();
+		frappe.route_options = { topic };
+		frappe.set_route("upcoming-training-report");
 	}
 
 	show_error(msg) {
@@ -656,109 +895,11 @@ frappe.tif_customization.TrainingCardStudio = class TrainingCardStudio {
 			this.fill_selects();
 			this.render_counts();
 			this.render_list();
-			this.update_preview();
+			this.select_first();
 		} catch (e) {
 			this.show_error(e.message || String(e));
 		} finally {
 			this.$.find(".tc-loading").prop("hidden", true);
-		}
-	}
-
-	async save() {
-		if (this.saving) return;
-		this.saving = true;
-		this.show_error("");
-		const keepId = this.editingId;
-		this.$.find(".tc-save").prop("disabled", true).text("Saving…");
-		try {
-			if (this.kind === "course") {
-				const f = this.vals("course");
-				if (!String(f.name || "").trim()) throw new Error("Course name is required.");
-				f.status = this.ui_status(f.status) === "Draft" ? "Inactive" : "Active";
-				if (!f.code) f.code = this.suggest_code(f.name);
-				await this.call(`${this.lms}.save_course`, { payload: f });
-				frappe.show_alert({ message: `Course saved: ${f.name}`, indicator: "green" });
-			} else if (this.kind === "session") {
-				const f = this.vals("session");
-				if (!f.training_date) throw new Error("Session date is required.");
-				const course = this.courses.find((c) => c.id === f.training_type || c.name === f.training_type);
-				const courseName = (course && course.name) || f.training_type || f.program;
-				if (!courseName) throw new Error("Pick a course for this session.");
-				await this.call(`${this.sched}.save_session`, {
-					values: {
-						name: f.name || undefined,
-						type: f.type,
-						training_date: f.training_date,
-						training_time: f.training_time,
-						training_end_time: f.training_end_time,
-						trainer_name: f.trainer_name,
-						training_type: courseName,
-						program: f.program || courseName,
-						mode_of_training: f.mode_of_training,
-						school_name: f.school_name,
-						schedule_status: "Upcoming",
-					},
-				});
-				frappe.show_alert({ message: "Session saved to Upcoming Training.", indicator: "green" });
-			} else {
-				const f = this.vals("lesson");
-				if (!String(f.title || "").trim()) throw new Error("Lesson title is required.");
-				const course = this.courses.find((c) => c.id === f.course || c.name === f.course);
-				if (!course && !f.course) throw new Error("Pick a course for this lesson.");
-				await this.call(`${this.lms}.save_lesson`, {
-					payload: {
-						id: f.id,
-						title: f.title,
-						course: (course && course.id) || "",
-						courseName: (course && course.name) || f.course,
-						module: f.module,
-						duration: f.duration,
-						order: f.order,
-						published: f.published,
-						summary: f.summary,
-						content: f.content,
-					},
-				});
-				frappe.show_alert({ message: "Lesson saved.", indicator: "green" });
-			}
-			await this.load();
-			if (keepId) this.pick(keepId);
-			else this.reset_forms();
-		} catch (e) {
-			this.show_error(e.message || e.exc || String(e));
-		} finally {
-			this.saving = false;
-			this.$.find(".tc-save")
-				.prop("disabled", false)
-				.text(this.editingId ? "Save changes" : `Create ${this.kind_label()}`);
-		}
-	}
-
-	async remove_current() {
-		if (!this.editingId) return;
-		if (this.kind === "session") {
-			frappe.msgprint("Sessions are deleted from Upcoming Training in ERP.");
-			return;
-		}
-		if (!confirm("Delete this card?")) return;
-		this.saving = true;
-		try {
-			if (this.kind === "course") {
-				const id = this.vals("course").id;
-				if (!id) throw new Error("This catalogue topic is not a saved LMS course yet. Save it first, or just edit the fields and save.");
-				await this.call(`${this.lms}.delete_course`, { name: id });
-			} else {
-				const id = this.vals("lesson").id;
-				if (!id) throw new Error("Lesson is not saved yet.");
-				await this.call(`${this.lms}.delete_lesson`, { name: id });
-			}
-			frappe.show_alert({ message: "Deleted.", indicator: "green" });
-			await this.load();
-			this.reset_forms();
-		} catch (e) {
-			this.show_error(e.message || String(e));
-		} finally {
-			this.saving = false;
 		}
 	}
 };
