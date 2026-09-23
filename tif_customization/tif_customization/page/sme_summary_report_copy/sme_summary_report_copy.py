@@ -44,14 +44,23 @@ from tif_customization.tif_customization.page.smes_target_base___k.smes_target_b
 SME_DESIGNATION = "School Marketing Executive"
 
 # Activity types that roll into the summary columns / visited days
+# "Visits" is the current school-visit form; "Marketing" is the legacy type.
 SUMMARY_TYPES = (
 	"Marketing",
+	"Visits",
+	"Registration of New Schools",
 	"Meeting",
 	"M&E",
 	"Training",
 	"Workshop",
+	"Workshop Arranged",
 	"Meeting with Ulama and Educationist",
 	"Teachers Training Meeting",
+	"Academic Task",
+	"Academic / Other Official Tasks",
+	"Other Official Tasks",
+	"Headoffice/ Regional Office/ Out of Station Visit",
+	"Co-curricular Activity",
 )
 
 # Activity (period) columns — aligned with SME KPI Details / Target Base KPI sheet
@@ -776,7 +785,7 @@ def _load_visit_stats(from_date, to_date, staff_rows):
 		bucket = stats[staff_key]
 		vtype = row.get("type") or ""
 
-		if vtype == "Marketing":
+		if vtype in ("Marketing", "Visits"):
 			cat = (row.get("marketing_visit_category") or "").strip()
 			if cat == "New":
 				bucket["new"] += 1
@@ -787,6 +796,8 @@ def _load_visit_stats(from_date, to_date, staff_rows):
 				bucket["followup"] += 1
 			else:
 				bucket["followup"] += 1
+		elif vtype == "Registration of New Schools":
+			bucket["new"] += 1
 		elif vtype in ("Meeting", "Meeting with Ulama and Educationist"):
 			bucket["meetings"] += 1
 		elif vtype == "M&E":
@@ -796,7 +807,7 @@ def _load_visit_stats(from_date, to_date, staff_rows):
 				bucket["active"] += 1
 			elif status == "inactive":
 				bucket["inactive"] += 1
-		elif vtype in ("Training", "Workshop", "Teachers Training Meeting"):
+		elif vtype in ("Training", "Workshop", "Workshop Arranged", "Teachers Training Meeting"):
 			bucket["schools"] += cint(row.get("schools") or 0)
 			bucket["participants"] += cint(row.get("participants") or 0)
 			bucket["trainings"] += 1
@@ -824,15 +835,21 @@ def _norm_me_status(value) -> str:
 def _resolve_staff_key(row, index):
 	vtype = row.get("type") or ""
 	candidates = []
-	if vtype == "Marketing":
+	if vtype in ("Marketing", "Visits", "Registration of New Schools"):
 		candidates.extend([row.get("visit_by"), row.get("owner")])
 	elif vtype == "M&E":
 		candidates.extend([row.get("me_visit_by"), row.get("visit_by"), row.get("owner")])
 	elif vtype == "Meeting":
 		candidates.extend([row.get("mt_visit_by"), row.get("owner")])
-	elif vtype == "Training":
+	elif vtype in ("Training", "Workshop", "Workshop Arranged", "Teachers Training Meeting"):
+		# Trainer first — SMEs often appear as trainer while another officer fills the form.
 		candidates.extend(
-			[row.get("training_entry_filled_by"), row.get("training_trainer_name"), row.get("owner")]
+			[
+				row.get("training_trainer_name"),
+				row.get("visit_by"),
+				row.get("training_entry_filled_by"),
+				row.get("owner"),
+			]
 		)
 	else:
 		candidates.extend(
@@ -840,6 +857,7 @@ def _resolve_staff_key(row, index):
 				row.get("visit_by"),
 				row.get("me_visit_by"),
 				row.get("mt_visit_by"),
+				row.get("training_trainer_name"),
 				row.get("training_entry_filled_by"),
 				row.get("owner"),
 			]

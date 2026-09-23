@@ -58,10 +58,15 @@ METRIC_LABELS = {
 
 TYPE_TO_METRIC = {
 	"Marketing": "marketing",
+	"Visits": "marketing",
 	"M&E": "me",
 	"Meeting": "meeting",
 	"Training": "training",
+	"Workshop": "training",
+	"Workshop Arranged": "training",
 	"Academic / Other Official Tasks": "academic",
+	"Academic Task": "academic_task",
+	"Other Official Tasks": "other_official",
 	"Other": "other",
 }
 
@@ -81,36 +86,40 @@ def _metric_condition(metric: str, alias: str = "fv") -> str:
 	if m in ("visits", "all", "total"):
 		return "1=1"
 	if m == "visited_days":
-		return f"{a}.type IN ('Marketing', 'Meeting', 'M&E', 'Training')"
+		return f"{a}.type IN ('Marketing', 'Visits', 'Meeting', 'M&E', 'Training', 'Workshop', 'Workshop Arranged', 'Academic Task', 'Other Official Tasks')"
 	if m in ("school_visits", "school_visit"):
-		return f"{a}.type IN ('Marketing', 'M&E')"
+		return f"{a}.type IN ('Marketing', 'Visits', 'M&E')"
 	if m == "marketing":
-		return f"{a}.type = 'Marketing'"
+		return f"{a}.type IN ('Marketing', 'Visits')"
 	if m in ("me", "monitoring"):
 		return f"{a}.type = 'M&E'"
 	if m == "meeting":
 		return f"{a}.type IN ('Meeting', 'Meeting with Ulama and Educationist')"
 	if m == "training":
-		return f"{a}.type IN ('Training', 'Workshop')"
+		return f"{a}.type IN ('Training', 'Workshop', 'Workshop Arranged')"
 	if m == "half_day_workshop":
-		return f"""{a}.type IN ('Training', 'Workshop') AND LOWER(IFNULL({a}.training_session_category,'')) LIKE '%%half%%'"""
+		return f"""{a}.type IN ('Training', 'Workshop', 'Workshop Arranged') AND LOWER(IFNULL({a}.training_session_category,'')) LIKE '%%half%%'"""
 	if m == "full_day_session":
-		return f"""{a}.type IN ('Training', 'Workshop') AND LOWER(IFNULL({a}.training_session_category,'')) NOT LIKE '%%half%%'"""
+		return f"""{a}.type IN ('Training', 'Workshop', 'Workshop Arranged') AND LOWER(IFNULL({a}.training_session_category,'')) NOT LIKE '%%half%%'"""
 	if m == "academic_task":
-		return f"{a}.type IN ('Academic', 'Academic / Other Official Tasks', 'Other')"
+		return f"{a}.type IN ('Academic Task', 'Academic', 'Academic / Other Official Tasks')"
 	if m == "other_official":
-		return f"{a}.type IN ('Other Official Tasks', 'Academic / Other Official Tasks', 'Other')"
+		return f"{a}.type = 'Other Official Tasks'"
 	if m in ("academic",):
-		return f"{a}.type IN ('Academic', 'Other Official Tasks', 'Academic / Other Official Tasks', 'Other')"
+		return f"{a}.type IN ('Academic Task', 'Academic', 'Other Official Tasks', 'Academic / Other Official Tasks', 'Other')"
 	if m == "other":
-		return f"{a}.type NOT IN ('Marketing', 'M&E', 'Training', 'Meeting')"
+		return f"{a}.type NOT IN ('Marketing', 'Visits', 'M&E', 'Training', 'Meeting')"
 	if m == "followup":
-		return f"{a}.type = 'Marketing' AND IFNULL({a}.marketing_visit_category, '') != 'New'"
+		return f"{a}.type IN ('Marketing', 'Visits') AND IFNULL({a}.marketing_visit_category, '') != 'New'"
 	if m == "new" or m == "new_school_registration":
-		return f"{a}.type = 'Marketing' AND {a}.marketing_visit_category = 'New'"
+		return f"""(
+			{a}.type = 'Registration of New Schools'
+			OR ({a}.type IN ('Marketing', 'Visits') AND {a}.marketing_visit_category = 'New')
+		)"""
 	if m in ("new_schools", "new_school"):
-		return f"""{a}.type IN ('Marketing', 'M&E', 'Joint Visit with SME') AND (
-			({a}.type = 'Marketing' AND {a}.marketing_visit_category = 'New')
+		return f"""{a}.type IN ('Marketing', 'Visits', 'M&E', 'Joint Visit with SME', 'Registration of New Schools') AND (
+			({a}.type IN ('Marketing', 'Visits') AND {a}.marketing_visit_category = 'New')
+			OR {a}.type = 'Registration of New Schools'
 			OR {a}.qps_affiliated = 'Yes - Newly Registered'
 			OR {a}.tps_affiliated = 'Yes - Newly Registered'
 			OR {a}.cee_affiliated = 'Yes - Newly Registered'
@@ -124,9 +133,9 @@ def _metric_condition(metric: str, alias: str = "fv") -> str:
 	if m == "me_inactive":
 		return f"""{a}.type = 'M&E' AND LOWER(REPLACE(REPLACE(IFNULL({a}.me_activity_status,''),'-',' '),'  ',' ')) IN ('inactive', 'in active')"""
 	if m == "grand_total":
-		return f"{a}.type IN ('Marketing', 'Meeting', 'M&E')"
+		return f"{a}.type IN ('Marketing', 'Visits', 'Meeting', 'M&E')"
 	if m in ("workshop_registration", "schools", "participants"):
-		return f"{a}.type IN ('Training', 'Workshop', 'Teachers Training Meeting')"
+		return f"{a}.type IN ('Training', 'Workshop', 'Workshop Arranged', 'Teachers Training Meeting')"
 	if m == "enrolment":
 		return f"""EXISTS (
 			SELECT 1 FROM `tabField Visit Enrolment Participant` ep
@@ -140,7 +149,7 @@ def _metric_condition(metric: str, alias: str = "fv") -> str:
 	if m == "meeting_ulama":
 		return f"""(
 			{a}.type = 'Meeting with Ulama and Educationist'
-			OR ({a}.type = 'Marketing' AND (
+			OR ({a}.type IN ('Marketing', 'Visits') AND (
 				LOWER(IFNULL({a}.meeting_with,'')) LIKE '%%ulama%%'
 				OR LOWER(IFNULL({a}.meeting_with,'')) LIKE '%%educationist%%'
 				OR LOWER(IFNULL({a}.designation,'')) LIKE '%%ulama%%'
@@ -162,7 +171,7 @@ def _metric_condition(metric: str, alias: str = "fv") -> str:
 	if m == "co_curricular":
 		return f"""(
 			{a}.type = 'Co-curricular Activity'
-			OR ({a}.type = 'Marketing' AND {a}.marketing_visit_category = 'TPS Visits')
+			OR ({a}.type IN ('Marketing', 'Visits') AND {a}.marketing_visit_category = 'TPS Visits')
 		)"""
 	return "1=0"
 

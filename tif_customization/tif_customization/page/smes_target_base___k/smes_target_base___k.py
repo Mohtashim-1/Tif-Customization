@@ -365,7 +365,7 @@ def _visit_date_expr(type_field):
 	if type_field == "M&E":
 		return "COALESCE(me_visit_date, me_starting_date, DATE(me_timestamp))"
 	if type_field == "Training":
-		return "COALESCE(training_date, DATE(training_timestamp))"
+		return "COALESCE(training_date, DATE(training_timestamp), visit_date, DATE(creation))"
 	return "COALESCE(modified, creation)"
 
 
@@ -401,10 +401,8 @@ def _count_actuals(from_date, to_date, staff, staff_tokens=None, submitted_only=
 	counts["half_day_workshop"] = _scalar_count(
 		f"""
 		SELECT COUNT(*) FROM `tabField Visit`
-		WHERE {ds} AND (
-			(type = 'Training' AND LOWER(COALESCE(training_session_category, '')) LIKE '%%half%%')
-			OR (type = 'Workshop' AND LOWER(COALESCE(training_session_category, '')) LIKE '%%half%%')
-		)
+		WHERE {ds} AND type IN ('Training', 'Workshop', 'Workshop Arranged')
+		AND LOWER(COALESCE(training_session_category, '')) LIKE '%%half%%'
 		AND {_visit_date_expr('Training')} BETWEEN %(from_date)s AND %(to_date)s
 		{staff_sql}
 		""",
@@ -414,10 +412,8 @@ def _count_actuals(from_date, to_date, staff, staff_tokens=None, submitted_only=
 	counts["full_day_session"] = _scalar_count(
 		f"""
 		SELECT COUNT(*) FROM `tabField Visit`
-		WHERE {ds} AND (
-			(type = 'Training' AND LOWER(COALESCE(training_session_category, '')) NOT LIKE '%%half%%')
-			OR (type = 'Workshop' AND LOWER(COALESCE(training_session_category, '')) NOT LIKE '%%half%%')
-		)
+		WHERE {ds} AND type IN ('Training', 'Workshop', 'Workshop Arranged')
+		AND LOWER(COALESCE(training_session_category, '')) NOT LIKE '%%half%%'
 		AND {_visit_date_expr('Training')} BETWEEN %(from_date)s AND %(to_date)s
 		{staff_sql}
 		""",
@@ -432,7 +428,7 @@ def _count_actuals(from_date, to_date, staff, staff_tokens=None, submitted_only=
 		AND (
 			fv.type = 'Meeting with Ulama and Educationist'
 			OR (
-				fv.type = 'Marketing'
+				fv.type IN ('Marketing', 'Visits')
 				AND (
 					LOWER(COALESCE(fv.meeting_with, '')) LIKE '%%ulama%%'
 					OR LOWER(COALESCE(fv.meeting_with, '')) LIKE '%%educationist%%'
@@ -480,20 +476,31 @@ def _count_actuals(from_date, to_date, staff, staff_tokens=None, submitted_only=
 		f"""
 		SELECT COUNT(*) FROM `tabField Visit` fv
 		WHERE {ds_fv}
-		AND fv.type IN ('Other', 'Academic / Other Official Tasks')
+		AND fv.type IN ('Academic Task', 'Academic', 'Academic / Other Official Tasks')
 		AND {visit_day} BETWEEN %(from_date)s AND %(to_date)s
 		{"AND " + staff_match if staff else ""}
 		""",
 		staff_params,
 	)
 
-	counts["other_official"] = 0
+	counts["other_official"] = _scalar_count(
+		f"""
+		SELECT COUNT(*) FROM `tabField Visit` fv
+		WHERE {ds_fv}
+		AND fv.type = 'Other Official Tasks'
+		AND {visit_day} BETWEEN %(from_date)s AND %(to_date)s
+		{"AND " + staff_match if staff else ""}
+		""",
+		staff_params,
+	)
 
 	counts["new_school_registration"] = _scalar_count(
 		f"""
 		SELECT COUNT(*) FROM `tabField Visit`
-		WHERE {ds} AND type = 'Marketing'
-		AND marketing_visit_category = 'New'
+		WHERE {ds} AND (
+			type = 'Registration of New Schools'
+			OR (type IN ('Marketing', 'Visits') AND marketing_visit_category = 'New')
+		)
 		AND {_visit_date_expr('Marketing')} BETWEEN %(from_date)s AND %(to_date)s
 		{staff_sql}
 		""",
@@ -504,7 +511,7 @@ def _count_actuals(from_date, to_date, staff, staff_tokens=None, submitted_only=
 		f"""
 		SELECT COALESCE(SUM(COALESCE(training_no_of_participants, 0)), 0)
 		FROM `tabField Visit`
-		WHERE {ds} AND type = 'Training'
+		WHERE {ds} AND type IN ('Training', 'Workshop', 'Workshop Arranged')
 		AND {_visit_date_expr('Training')} BETWEEN %(from_date)s AND %(to_date)s
 		{staff_sql}
 		""",
@@ -514,8 +521,10 @@ def _count_actuals(from_date, to_date, staff, staff_tokens=None, submitted_only=
 	counts["co_curricular"] = _scalar_count(
 		f"""
 		SELECT COUNT(*) FROM `tabField Visit`
-		WHERE {ds} AND type = 'Marketing'
-		AND marketing_visit_category = 'TPS Visits'
+		WHERE {ds} AND (
+			type = 'Co-curricular Activity'
+			OR (type IN ('Marketing', 'Visits') AND marketing_visit_category = 'TPS Visits')
+		)
 		AND {_visit_date_expr('Marketing')} BETWEEN %(from_date)s AND %(to_date)s
 		{staff_sql}
 		""",

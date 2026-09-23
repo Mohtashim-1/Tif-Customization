@@ -39,7 +39,7 @@ class FieldVisit(Document):
 
 	def get_visit_date(self):
 		t = (self.type or "").strip()
-		if t == "Marketing":
+		if t in ("Marketing", "Visits", "Registration of New Schools"):
 			return self.visit_date or (getdate(self.timestamp) if self.timestamp else None)
 		if t == "M&E":
 			return self.me_visit_date or self.me_starting_date or (

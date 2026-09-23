@@ -83,9 +83,10 @@ VISIT_DETAIL_PARTS = (
 )
 
 NEW_SCHOOL_SQL = """
-	fv.type IN ('Marketing', 'M&E', 'Joint Visit with SME')
+	fv.type IN ('Marketing', 'Visits', 'M&E', 'Joint Visit with SME', 'Registration of New Schools')
 	AND (
-		(fv.type = 'Marketing' AND fv.marketing_visit_category = 'New')
+		(fv.type IN ('Marketing', 'Visits') AND fv.marketing_visit_category = 'New')
+		OR fv.type = 'Registration of New Schools'
 		OR fv.qps_affiliated = 'Yes - Newly Registered'
 		OR fv.tps_affiliated = 'Yes - Newly Registered'
 		OR fv.cee_affiliated = 'Yes - Newly Registered'
@@ -95,7 +96,7 @@ NEW_SCHOOL_SQL = """
 CO_CURRICULAR_SQL = """
 	(
 		fv.type = 'Co-curricular Activity'
-		OR (fv.type = 'Marketing' AND fv.marketing_visit_category = 'TPS Visits')
+		OR (fv.type IN ('Marketing', 'Visits') AND fv.marketing_visit_category = 'TPS Visits')
 	)
 """
 

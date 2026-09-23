@@ -14,13 +14,14 @@ def visit_day_sql(alias: str = "fv") -> str:
 	a = alias
 	return f"""
 		CASE
-			WHEN {a}.type = 'Marketing' THEN COALESCE({a}.visit_date, DATE({a}.timestamp), DATE({a}.creation))
+			WHEN {a}.type IN ('Marketing', 'Visits', 'Registration of New Schools') THEN COALESCE({a}.visit_date, DATE({a}.timestamp), DATE({a}.creation))
 			WHEN {a}.type = 'M&E' THEN COALESCE({a}.me_visit_date, {a}.me_starting_date, DATE({a}.me_timestamp), DATE({a}.creation))
-			WHEN {a}.type IN ('Training', 'Workshop', 'Teachers Training Meeting') THEN COALESCE({a}.training_date, DATE({a}.training_timestamp), DATE({a}.creation))
+			WHEN {a}.type IN ('Training', 'Workshop', 'Workshop Arranged', 'Teachers Training Meeting') THEN COALESCE({a}.training_date, DATE({a}.training_timestamp), {a}.visit_date, DATE({a}.creation))
 			WHEN {a}.type IN ('Meeting', 'Meeting with Ulama and Educationist') THEN COALESCE({a}.mt_meeting_date, DATE({a}.mt_timestamp), DATE({a}.creation))
 			WHEN {a}.type IN (
 				'Academic / Other Official Tasks',
 				'Academic',
+				'Academic Task',
 				'Other Official Tasks',
 				'Headoffice/ Regional Office/ Out of Station Visit',
 				'Other'
