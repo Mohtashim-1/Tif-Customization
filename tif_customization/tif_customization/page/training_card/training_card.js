@@ -142,9 +142,11 @@ frappe.tif_customization.TrainingCardStudio = class TrainingCardStudio {
 							<label>End<input name="training_end_time" readonly></label>
 							<label>Trainer<input name="trainer_name" readonly></label>
 							<label>Mode<input name="mode_of_training" readonly></label>
+							<label>Participants<input name="participants_category" readonly></label>
+							<label>Present<input name="attendance_present" readonly></label>
+							<label>Program<input name="program" readonly></label>
 							<label class="full">Venue / school<input name="school_name" readonly></label>
 							<input type="hidden" name="name" value="">
-							<input type="hidden" name="program" value="">
 						</form>
 						<form class="tc-form tc-readonly" data-panel="lesson" hidden>
 							<label class="full">Course<input name="course" readonly></label>
@@ -408,7 +410,7 @@ frappe.tif_customization.TrainingCardStudio = class TrainingCardStudio {
 					const title = item.title || item.program || item.name;
 					const color = item.trainerColor || this.palette[0];
 					const done = String(item.status || "").toLowerCase() === "completed";
-					const people = this.cint(item.attendance_present) || this.cint(item.attendance_total);
+					const people = this.people_label(item);
 					return `<button type="button" class="tc-row${on}" data-id="${this.esc(id)}">
 						<span class="tc-row-main">
 							<span class="tc-ava" style="background:${color}">${this.esc(this.initials(title))}</span>
@@ -460,8 +462,8 @@ frappe.tif_customization.TrainingCardStudio = class TrainingCardStudio {
 			const title = (course && course.name) || f.training_type || f.program || "Session title";
 			return {
 				title,
-				meta: [f.trainer_name || "Unassigned", `${f.training_time || ""} – ${f.training_end_time || ""}`, f.school_name]
-					.filter(Boolean)
+				meta: [f.trainer_name || "Unassigned", `${f.training_time || ""} – ${f.training_end_time || ""}`, f.participants_category, f.school_name]
+					.filter((x) => x && x !== "—")
 					.join(" · "),
 				color: (course && course.color) || this.palette[0],
 				tag: f.training_date || "Session",
@@ -538,6 +540,8 @@ frappe.tif_customization.TrainingCardStudio = class TrainingCardStudio {
 			$f.find("[name=training_type]").val(s.title || s.program || "");
 			$f.find("[name=program]").val(s.program || s.title || "");
 			$f.find("[name=mode_of_training]").val(s.mode || "In-person");
+			$f.find("[name=participants_category]").val(s.participants_category || "—");
+			$f.find("[name=attendance_present]").val(this.present_label(s));
 			$f.find("[name=school_name]").val(s.room || s.school || "");
 		} else {
 			const l = this.lessons.find((x) => String(x.id) === String(id));
@@ -583,6 +587,25 @@ frappe.tif_customization.TrainingCardStudio = class TrainingCardStudio {
 	cint(v) {
 		const n = parseInt(v, 10);
 		return Number.isFinite(n) ? n : 0;
+	}
+
+	present_label(s) {
+		const present = this.cint(s && s.attendance_present);
+		const total = this.cint(s && s.attendance_total);
+		if (total) return `${present} / ${total}`;
+		if (present) return String(present);
+		return "—";
+	}
+
+	people_label(s) {
+		const present = this.cint(s && s.attendance_present);
+		const total = this.cint(s && s.attendance_total);
+		const n = total || present;
+		const cat = String((s && s.participants_category) || "").trim();
+		if (n && cat) return `${n} · ${cat}`;
+		if (n) return String(n);
+		if (cat) return cat;
+		return "—";
 	}
 
 	sessions_for_course(course) {
@@ -636,16 +659,14 @@ frappe.tif_customization.TrainingCardStudio = class TrainingCardStudio {
 		this.$.find(".tc-sess-empty").prop("hidden", !!stats.rows.length);
 		const html = stats.rows
 			.map((s) => {
-				const present = this.cint(s.attendance_present);
-				const total = this.cint(s.attendance_total);
-				const people = total ? `${present}/${total}` : present || "—";
+				const people = this.people_label(s);
 				const st = String(s.status || "upcoming").replace("_", " ");
 				return `<button type="button" class="tc-sess-row" data-name="${this.esc(s.name)}">
 					<span>
 						<strong>${this.esc(s.date || "No date")} · ${this.esc(s.start_time || "")}</strong>
 						<small>${this.esc(s.trainerName || "Unassigned")} · ${this.esc(s.room || s.school || "No venue")}</small>
 					</span>
-					<span class="tc-sess-people">${this.esc(people)} present</span>
+					<span class="tc-sess-people">${this.esc(people)}</span>
 					<span class="tc-sess-status">${this.esc(st)}</span>
 				</button>`;
 			})

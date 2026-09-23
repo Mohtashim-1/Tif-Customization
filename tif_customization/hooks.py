@@ -332,6 +332,7 @@ website_route_rules = [
 	{"from_route": "/field-visit-easy/<path:app_path>", "to_route": "field-visit-easy"},
 	{"from_route": "/training-lms/<path:app_path>", "to_route": "training-lms"},
 	{"from_route": "/school_opening_print", "to_route": "school-opening-print"},
+	{"from_route": "/feedback/<token>", "to_route": "feedback"},
 ]
 
 # Automatically update python controller files with type annotations for this app.

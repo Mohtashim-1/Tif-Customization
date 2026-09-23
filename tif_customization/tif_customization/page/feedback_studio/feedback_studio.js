@@ -15,6 +15,9 @@ frappe.tif_customization.FeedbackStudio = class FeedbackStudio {
 		this.page = page;
 		this.wrapper = wrapper;
 		this._id = Date.now();
+		this._ready = false;
+		this._syncTimer = null;
+		this._syncSeq = 0;
 		this.audMeta = [
 			{ id: "school", label: "School", hint: "Staff & administration", color: "#2f5bd3" },
 			{ id: "parent", label: "Parent", hint: "Parents & guardians", color: "#1f8a5b" },
@@ -139,7 +142,29 @@ frappe.tif_customization.FeedbackStudio = class FeedbackStudio {
 			errors: {},
 			submitted: false,
 			ratingScale: String(saved && saved.ratingScale) === "10" ? 10 : 5,
+			links: {},
+			shareOpen: false,
+			copied: false,
+			syncError: "",
 		};
+	}
+
+	readLocalRaw() {
+		try {
+			return JSON.parse(localStorage.getItem(this.storageKey()) || "null");
+		} catch (e) {
+			return null;
+		}
+	}
+
+	call(method, args, silent) {
+		return frappe
+			.call({
+				method: "tif_customization.tif_customization.api.feedback_studio." + method,
+				args: args || {},
+				silent: !!silent,
+			})
+			.then((r) => r && r.message);
 	}
 
 	persist() {
@@ -161,6 +186,113 @@ frappe.tif_customization.FeedbackStudio = class FeedbackStudio {
 		Object.assign(this.state, patch);
 		this.persist();
 		this.render();
+		this.queueSync();
+	}
+
+	queueSync() {
+		if (!this._ready) return;
+		clearTimeout(this._syncTimer);
+		this._syncTimer = setTimeout(() => this.flushSync(), 450);
+	}
+
+	flushSync() {
+		if (!this._ready) return Promise.resolve();
+		clearTimeout(this._syncTimer);
+		const seq = (this._syncSeq += 1);
+		return this.call(
+			"save_studio",
+			{
+				forms: JSON.stringify(this.state.forms),
+				rating_scale: this.state.ratingScale,
+			},
+			true
+		)
+			.then((data) => {
+				if (seq !== this._syncSeq || !data) return data;
+				if (data.links) this.state.links = data.links;
+				this.state.syncError = "";
+				const note = this.$.find(".fs-sync").get(0);
+				if (note) note.textContent = "";
+				const input = this.$.find(".fs-share-url").get(0);
+				const url = (this.state.links || {})[this.state.aud];
+				if (input && url) input.value = url;
+				return data;
+			})
+			.catch(() => {
+				this.state.syncError = "Could not save. The share link may be out of date.";
+				const note = this.$.find(".fs-sync").get(0);
+				if (note) note.textContent = this.state.syncError;
+			});
+	}
+
+	applyServer(data, shouldRender) {
+		const forms = this.defaults();
+		const incoming = (data && data.forms) || {};
+		this.audMeta.forEach((a) => {
+			const src = incoming[a.id];
+			if (!src) return;
+			forms[a.id] = {
+				title: src.title != null ? String(src.title) : forms[a.id].title,
+				intro: src.intro != null ? String(src.intro) : forms[a.id].intro,
+				questions: Array.isArray(src.questions)
+					? src.questions.map((q) => ({
+							id: q.id || this.uid(),
+							type: ["rating", "choice", "yesno", "text"].includes(q.type) ? q.type : "text",
+							text: q.text || "",
+							required: q.required !== false,
+							options: Array.isArray(q.options) ? q.options.map((o) => String(o)) : [],
+						}))
+					: forms[a.id].questions,
+			};
+		});
+		const responses = {};
+		this.audMeta.forEach((a) => {
+			const list = data && data.responses && data.responses[a.id];
+			responses[a.id] = Array.isArray(list) ? list : [];
+		});
+		this.state.forms = forms;
+		this.state.responses = responses;
+		this.state.ratingScale = Number(data && data.ratingScale) === 10 ? 10 : 5;
+		this.state.links = (data && data.links) || {};
+		this._ready = true;
+		this.persist();
+		if (shouldRender !== false) this.render();
+	}
+
+	pull() {
+		this.call("get_studio", {}, true)
+			.then((data) => {
+				if (!data) throw new Error("empty");
+				if (!data.fresh) return data;
+				const local = this.readLocalRaw();
+				return this.call(
+					"import_local",
+					{
+						forms: JSON.stringify((local && local.forms) || this.state.forms),
+						rating_scale: (local && local.ratingScale) || this.state.ratingScale || 5,
+						responses: JSON.stringify((local && local.responses) || {}),
+					},
+					true
+				);
+			})
+			.then((data) => {
+				if (data) this.applyServer(data);
+			})
+			.catch(() => {
+				this._ready = true;
+				this.state.syncError = "Could not reach the server. The share link is unavailable until this page can save.";
+				this.render();
+			});
+	}
+
+	refreshResponses() {
+		const mode = this.state.mode;
+		this.flushSync().then((saved) => {
+			if (!saved) return;
+			return this.call("get_studio", {}, true).then((data) => {
+				if (data && !data.fresh) this.applyServer(data, this.state.mode === mode);
+			});
+		});
 	}
 
 	h(value) {
@@ -204,7 +336,8 @@ frappe.tif_customization.FeedbackStudio = class FeedbackStudio {
 		this.$ = $('<div class="fs"></div>').appendTo(this.page.body);
 		this.$.on("click", "[data-act]", (e) => this.onClick(e));
 		this.$.on("input change", "[data-field]", (e) => this.onField(e));
-		this.render();
+		this.$.html('<main class="fs-main"><div class="fs-empty">Loading feedback…</div></main>');
+		this.pull();
 	}
 
 	onField(e) {
@@ -275,6 +408,32 @@ frappe.tif_customization.FeedbackStudio = class FeedbackStudio {
 			this.state.submitted = false;
 			this.state.errors = {};
 			this.render();
+			if (el.dataset.val === "resp") this.refreshResponses();
+			return;
+		}
+		if (act === "share") {
+			this.state.shareOpen = !this.state.shareOpen;
+			this.state.copied = false;
+			this.render();
+			if (this.state.shareOpen) this.flushSync();
+			return;
+		}
+		if (act === "copy") {
+			this.flushSync().then(() => this.copyLink((this.state.links || {})[this.state.aud] || ""));
+			return;
+		}
+		if (act === "rotate") {
+			frappe.confirm(
+				__("The current link will stop working. People will need the new link."),
+				() => {
+					this.call("rotate_link", { audience: this.state.aud }).then((url) => {
+						if (!url) return;
+						this.state.links[this.state.aud] = url;
+						this.state.copied = false;
+						this.render();
+					});
+				}
+			);
 			return;
 		}
 		if (act === "aud") {
@@ -371,9 +530,43 @@ frappe.tif_customization.FeedbackStudio = class FeedbackStudio {
 		}
 		if (act === "submit") this.submit();
 		if (act === "clear") {
-			const responses = Object.assign({}, this.state.responses);
-			responses[this.state.aud] = [];
-			this.save({ responses });
+			const aud = this.state.aud;
+			this.call("clear_responses", { audience: aud }).then(() => {
+				this.state.responses[aud] = [];
+				this.persist();
+				this.render();
+			});
+		}
+	}
+
+	copyLink(url) {
+		if (!url) return;
+		const done = () => {
+			this.state.copied = true;
+			this.render();
+			frappe.show_alert({ message: __("Link copied"), indicator: "green" });
+			setTimeout(() => {
+				this.state.copied = false;
+				if (this.state.shareOpen) this.render();
+			}, 1600);
+		};
+		if (navigator.clipboard && navigator.clipboard.writeText) {
+			navigator.clipboard.writeText(url).then(done).catch(() => this.copyFallback(done));
+			return;
+		}
+		this.copyFallback(done);
+	}
+
+	copyFallback(done) {
+		const input = this.$.find(".fs-share-url").get(0);
+		if (!input) return;
+		input.focus();
+		input.select();
+		try {
+			document.execCommand("copy");
+			done();
+		} catch (e) {
+			// The link stays selected so it can be copied manually.
 		}
 	}
 
@@ -401,10 +594,16 @@ frappe.tif_customization.FeedbackStudio = class FeedbackStudio {
 			if (bad) bad.scrollIntoView({ block: "center", behavior: "smooth" });
 			return;
 		}
-		const responses = Object.assign({}, this.state.responses);
-		const prev = responses[this.state.aud] || [];
-		responses[this.state.aud] = prev.concat([{ at: Date.now(), answers: Object.assign({}, answers) }]);
-		this.save({ responses, submitted: true, answers: {}, errors: {} });
+		const aud = this.state.aud;
+		this.call("submit_response", { audience: aud, answers: JSON.stringify(answers) }).then((rows) => {
+			if (!rows) return;
+			this.state.responses[aud] = rows;
+			this.state.submitted = true;
+			this.state.answers = {};
+			this.state.errors = {};
+			this.persist();
+			this.render();
+		});
 	}
 
 	scale() {
@@ -481,7 +680,9 @@ frappe.tif_customization.FeedbackStudio = class FeedbackStudio {
 		return (
 			'<header class="fs-header"><div class="fs-wrap"><div class="fs-top"><div><div class="fs-brand">Feedback Studio</div>' +
 			'<div class="fs-tag">Write, change and collect feedback for every group in your school.</div></div>' +
-			'<div class="fs-tools"><label class="fs-scale"><span>Rating scale</span><select data-field="scale" data-field-key="scale">' +
+			'<div class="fs-tools"><button type="button" class="fs-share-btn' +
+			(this.state.shareOpen ? " is-on" : "") +
+			'" data-act="share">Share link</button><label class="fs-scale"><span>Rating scale</span><select data-field="scale" data-field-key="scale">' +
 			'<option value="5"' +
 			(ratingScale === 5 ? " selected" : "") +
 			">1 – 5</option>" +
@@ -497,9 +698,38 @@ frappe.tif_customization.FeedbackStudio = class FeedbackStudio {
 	}
 
 	body() {
-		if (this.state.mode === "take") return this.takeView();
-		if (this.state.mode === "resp") return this.respView();
-		return this.editView();
+		const panel = this.sharePanel();
+		if (this.state.mode === "take") return panel + this.takeView();
+		if (this.state.mode === "resp") return panel + this.respView();
+		return panel + this.editView();
+	}
+
+	sharePanel() {
+		if (!this.state.shareOpen) return "";
+		const aud = this.current();
+		const url = (this.state.links || {})[aud.id] || "";
+		const field = url
+			? '<div class="fs-share-row"><input class="fs-share-url" readonly value="' +
+				this.h(url) +
+				'"><button type="button" class="fs-primary" data-act="copy">' +
+				(this.state.copied ? "Copied" : "Copy link") +
+				"</button></div>" +
+				'<div class="fs-share-actions"><a href="' +
+				this.h(url) +
+				'" target="_blank" rel="noopener">Open link</a>' +
+				'<button type="button" class="fs-mini" data-act="rotate">Create a new link</button></div>'
+			: '<div class="fs-note">Preparing the link…</div>';
+		return (
+			'<div class="fs-card accent fs-share"><div class="fs-kicker">Share link · ' +
+			this.h(aud.label) +
+			'</div><p class="fs-share-note">Anyone with this link can fill the ' +
+			this.h(aud.label) +
+			' form. They do not need an account. The link shows the latest saved questions.</p>' +
+			field +
+			'<div class="fs-sync">' +
+			this.h(this.state.syncError || "") +
+			"</div></div>"
+		);
 	}
 
 	editView() {
@@ -756,7 +986,7 @@ frappe.tif_customization.FeedbackStudio = class FeedbackStudio {
 			resp.length + (resp.length === 1 ? " response" : " responses");
 		const empty = resp.length
 			? ""
-			: '<div class="fs-empty">No responses yet. Open <strong>Answer</strong> to submit a test response.</div>';
+			: '<div class="fs-empty">No responses yet. Use <strong>Share link</strong> so people can respond, or open <strong>Answer</strong> to submit a test response.</div>';
 		const cards = form.questions
 			.map((q, i) => {
 				const vals = resp

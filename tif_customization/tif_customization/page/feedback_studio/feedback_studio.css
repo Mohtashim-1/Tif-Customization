@@ -714,6 +714,60 @@
 	color: var(--ink);
 	line-height: 1.45;
 }
+.page-feedback-studio .fs button.fs-share-btn {
+	border: 1px solid var(--line-strong);
+	background: #fff;
+	color: var(--ink);
+	border-radius: 9px;
+	padding: 8px 12px;
+	font-size: 13px;
+	font-weight: 600;
+	cursor: pointer;
+}
+.page-feedback-studio .fs button.fs-share-btn.is-on {
+	border-color: var(--accent);
+	color: var(--accent);
+}
+.page-feedback-studio .fs-share-note {
+	margin: 0;
+	font-size: 14px;
+	color: #4a4f5c;
+	line-height: 1.5;
+}
+.page-feedback-studio .fs-share-row {
+	display: flex;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+.page-feedback-studio .fs-share-url {
+	flex: 1;
+	min-width: 180px;
+	border: 1px solid var(--line-strong);
+	background: #fff;
+	border-radius: 9px;
+	padding: 10px 12px;
+	font-size: 13px;
+	color: var(--ink);
+	height: auto;
+}
+.page-feedback-studio .fs-share-actions {
+	display: flex;
+	gap: 12px;
+	align-items: center;
+	flex-wrap: wrap;
+}
+.page-feedback-studio .fs-share-actions a {
+	font-size: 13px;
+	font-weight: 600;
+}
+.page-feedback-studio .fs-sync:empty {
+	display: none;
+}
+.page-feedback-studio .fs-sync {
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--danger);
+}
 @media (max-width: 640px) {
 	.page-feedback-studio .fs-bar {
 		grid-template-columns: minmax(0, 96px) minmax(0, 1fr) 28px;

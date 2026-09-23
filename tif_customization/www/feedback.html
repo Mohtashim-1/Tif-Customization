@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>{{ title or "Feedback" }}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,500;6..72,600&display=swap" rel="stylesheet">
+<style>
+body { margin: 0; background: #f5f3ee; color: #1d2230; font-family: "Figtree", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+* { box-sizing: border-box; }
+button, input, textarea { font-family: inherit; }
+.wrap { max-width: 880px; margin: 0 auto; padding: 28px 24px 64px; }
+.card { background: #fffdf9; border: 1px solid #e6e1d6; border-radius: 14px; padding: 22px 24px; }
+.stack { display: flex; flex-direction: column; gap: 16px; }
+.accent { border-top: 4px solid var(--accent, #2f5bd3); }
+.kicker { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent, #2f5bd3); }
+h1 { margin: 8px 0 0; font-family: "Newsreader", Georgia, serif; font-size: 28px; font-weight: 600; line-height: 1.2; }
+.intro { margin: 8px 0 0; font-size: 15px; color: #4a4f5c; line-height: 1.5; }
+.q { background: #fffdf9; border: 1px solid #e6e1d6; border-radius: 14px; padding: 20px 22px; display: flex; flex-direction: column; gap: 14px; }
+.q.bad { border-color: #e3a08c; }
+.prompt { display: flex; gap: 10px; align-items: baseline; font-size: 16px; font-weight: 600; line-height: 1.4; }
+.num { font-size: 13px; font-weight: 700; color: #9a9ea8; }
+.star { color: #b3401f; }
+.rates, .yn { display: flex; gap: 6px; flex-wrap: wrap; }
+.rates button, .yn button { min-width: 44px; height: 44px; border-radius: 9px; border: 1px solid #d9d3c6; background: #fff; color: #1d2230; font-size: 15px; font-weight: 600; cursor: pointer; }
+.yn button { min-width: 96px; border-radius: 10px; font-size: 14px; }
+.rates button.on, .yn button.on { background: var(--accent, #2f5bd3); border-color: var(--accent, #2f5bd3); color: #fff; }
+.caption { font-size: 12px; color: #9a9ea8; }
+.choices { display: flex; flex-direction: column; gap: 8px; }
+.choices button { display: flex; align-items: center; gap: 12px; text-align: left; width: 100%; border: 1px solid #e6e1d6; background: #fff; border-radius: 10px; padding: 12px 14px; min-height: 44px; cursor: pointer; font-size: 14px; color: #1d2230; }
+.choices button.on { border-color: var(--accent, #2f5bd3); background: #fbfaf6; }
+.dot { width: 18px; height: 18px; border-radius: 50%; border: 2px solid #c9c2b3; box-shadow: inset 0 0 0 3px #fff; background: #fff; flex: none; }
+.choices button.on .dot { border-color: var(--accent, #2f5bd3); background: var(--accent, #2f5bd3); }
+textarea { width: 100%; border: 1px solid #d9d3c6; background: #fff; border-radius: 10px; padding: 12px 14px; font-size: 15px; line-height: 1.5; resize: vertical; }
+textarea:focus, button:focus-visible { outline: 2px solid var(--accent, #2f5bd3); outline-offset: 1px; }
+.err { font-size: 12px; font-weight: 600; color: #b3401f; }
+.row { display: flex; gap: 12px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
+.progress { font-size: 13px; color: #6b6f7a; }
+.submit { border: 0; background: var(--accent, #2f5bd3); color: #fff; border-radius: 10px; padding: 12px 22px; font-size: 14px; font-weight: 700; cursor: pointer; min-height: 44px; }
+.ghost { border: 1px solid #d9d3c6; background: #fff; color: #1d2230; border-radius: 9px; padding: 10px 16px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.thanks { text-align: center; padding: 48px 28px; }
+.thanks h2 { margin: 0; font-family: "Newsreader", Georgia, serif; font-size: 30px; font-weight: 600; }
+.thanks p { margin: 12px auto 0; max-width: 420px; color: #4a4f5c; line-height: 1.5; }
+.empty { border: 1px dashed #d0c9ba; border-radius: 14px; padding: 32px; text-align: center; color: #6b6f7a; }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script>
+const TOKEN = {{ token | tojson }};
+const CSRF = {{ csrf_token | tojson }};
+const app = document.getElementById("app");
+const state = { form: null, answers: {}, errors: {}, submitted: false, status: TOKEN ? "loading" : "missing" };
+
+function esc(value) {
+	return String(value == null ? "" : value)
+		.replace(/&/g, "&amp;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;")
+		.replace(/"/g, "&quot;");
+}
+
+function render() {
+	const active = document.activeElement;
+	let key = null, start = null, end = null;
+	if (active && app.contains(active) && active.dataset && active.dataset.key) {
+		key = active.dataset.key;
+		start = active.selectionStart;
+		end = active.selectionEnd;
+	}
+	if (state.status === "loading") {
+		app.innerHTML = '<div class="empty">Loading the form…</div>';
+		return;
+	}
+	if (state.status === "missing" || state.status === "invalid") {
+		app.innerHTML = '<div class="card"><h1>This link is not valid</h1><p class="intro">Ask the school for a new feedback link.</p></div>';
+		return;
+	}
+	const form = state.form;
+	app.style.setProperty("--accent", form.color || "#2f5bd3");
+	if (state.submitted) {
+		app.innerHTML = '<div class="card accent thanks"><h2>Thank you</h2><p>Your feedback has been recorded. It helps us improve.</p><div class="row" style="justify-content:center;margin-top:16px"><button type="button" class="ghost" id="again">Submit another</button></div></div>';
+		document.getElementById("again").onclick = function () {
+			state.submitted = false;
+			state.answers = {};
+			state.errors = {};
+			render();
+		};
+		return;
+	}
+	const scale = Number(form.ratingScale) === 10 ? 10 : 5;
+	const cards = (form.questions || []).map(function (q, i) {
+		const val = state.answers[q.id];
+		const bad = !!state.errors[q.id];
+		let control = "";
+		if (q.type === "rating") {
+			let buttons = "";
+			for (let n = 1; n <= scale; n++) {
+				buttons += '<button type="button" data-act="rate" data-id="' + esc(q.id) + '" data-val="' + n + '"' + (val === n ? ' class="on"' : "") + ">" + n + "</button>";
+			}
+			control = '<div class="rates">' + buttons + '</div><div class="caption">1 = Poor · ' + scale + " = Excellent</div>";
+		} else if (q.type === "choice") {
+			control = '<div class="choices">' + (q.options || []).map(function (o, j) {
+				return '<button type="button" data-act="choice" data-id="' + esc(q.id) + '" data-j="' + j + '"' + (val === o ? ' class="on"' : "") + '><span class="dot"></span><span>' + esc(o) + "</span></button>";
+			}).join("") + "</div>";
+		} else if (q.type === "yesno") {
+			control = '<div class="yn">' + ["Yes", "No"].map(function (o) {
+				return '<button type="button" data-act="yn" data-id="' + esc(q.id) + '" data-val="' + o + '"' + (val === o ? ' class="on"' : "") + ">" + o + "</button>";
+			}).join("") + "</div>";
+		} else {
+			control = '<textarea data-key="ans-' + esc(q.id) + '" data-id="' + esc(q.id) + '" rows="3" placeholder="Write your answer…">' + esc(val || "") + "</textarea>";
+		}
+		return '<div class="q' + (bad ? " bad" : "") + '"><div class="prompt"><span class="num">' + (i + 1) + '.</span><span>' + esc(q.text || "Untitled question") + (q.required ? '<span class="star"> *</span>' : "") + "</span></div>" + control + (bad ? '<div class="err">This question is required.</div>' : "") + "</div>";
+	}).join("");
+	const answered = (form.questions || []).filter(function (q) {
+		return state.answers[q.id] !== undefined && state.answers[q.id] !== "";
+	}).length;
+	const empty = (form.questions || []).length ? "" : '<div class="empty">This form has no questions yet.</div>';
+	app.innerHTML = '<div class="stack"><div class="card accent"><div class="kicker">' + esc(form.label) + ' feedback</div><h1>' + esc(form.title || "Feedback") + '</h1><p class="intro">' + esc(form.intro || "") + "</p></div>" + cards + empty + '<div class="row"><span class="progress">' + answered + " of " + (form.questions || []).length + ' answered</span><button type="button" class="submit" id="send">Submit feedback</button></div></div>';
+	app.querySelectorAll("[data-act]").forEach(function (btn) {
+		btn.addEventListener("click", onAct);
+	});
+	app.querySelectorAll("textarea").forEach(function (el) {
+		el.addEventListener("input", function () {
+			state.answers[el.dataset.id] = el.value;
+			delete state.errors[el.dataset.id];
+			const progress = app.querySelector(".progress");
+			if (progress) {
+				const n = (form.questions || []).filter(function (q) {
+					return state.answers[q.id] !== undefined && state.answers[q.id] !== "";
+				}).length;
+				progress.textContent = n + " of " + (form.questions || []).length + " answered";
+			}
+		});
+	});
+	document.getElementById("send").onclick = submit;
+	if (key) {
+		const el = app.querySelector('[data-key="' + CSS.escape(key) + '"]');
+		if (el) {
+			el.focus();
+			if (typeof start === "number" && el.setSelectionRange) {
+				try { el.setSelectionRange(start, end); } catch (e) {}
+			}
+		}
+	}
+}
+
+function onAct(e) {
+	const btn = e.currentTarget;
+	const q = (state.form.questions || []).find(function (item) { return item.id === btn.dataset.id; });
+	if (!q) return;
+	let value = btn.dataset.val;
+	if (btn.dataset.act === "rate") value = Number(value);
+	if (btn.dataset.act === "choice") value = (q.options || [])[Number(btn.dataset.j)];
+	state.answers[q.id] = value;
+	delete state.errors[q.id];
+	render();
+}
+
+function missing() {
+	const errs = {};
+	(state.form.questions || []).forEach(function (q) {
+		const val = state.answers[q.id];
+		if (q.required && (val === undefined || val === "")) errs[q.id] = true;
+	});
+	return errs;
+}
+
+async function submit() {
+	const errs = missing();
+	if (Object.keys(errs).length) {
+		state.errors = errs;
+		render();
+		const bad = app.querySelector(".bad");
+		if (bad) bad.scrollIntoView({ block: "center", behavior: "smooth" });
+		return;
+	}
+	const button = document.getElementById("send");
+	if (button) button.disabled = true;
+	try {
+		const res = await fetch("/api/method/tif_customization.tif_customization.api.feedback_studio.submit_public", {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				"Accept": "application/json",
+				"X-Frappe-CSRF-Token": CSRF || ""
+			},
+			body: JSON.stringify({ token: TOKEN, answers: state.answers })
+		});
+		const data = await res.json();
+		if (!res.ok || (data.exc && !data.message)) {
+			let message = "Could not submit. Please try again.";
+			if (data._server_messages) {
+				try {
+					const msgs = JSON.parse(data._server_messages).map(function (item) {
+						try { return JSON.parse(item).message || item; } catch (e) { return item; }
+					});
+					if (msgs.length) message = msgs.join(" ");
+				} catch (e) {}
+			}
+			window.alert(message);
+			if (button) button.disabled = false;
+			return;
+		}
+		state.submitted = true;
+		state.answers = {};
+		render();
+	} catch (e) {
+		window.alert("Could not submit. Please try again.");
+		if (button) button.disabled = false;
+	}
+}
+
+async function load() {
+	if (!TOKEN) {
+		render();
+		return;
+	}
+	render();
+	try {
+		const res = await fetch("/api/method/tif_customization.tif_customization.api.feedback_studio.get_public_form?token=" + encodeURIComponent(TOKEN), {
+			headers: { "Accept": "application/json" }
+		});
+		const data = await res.json();
+		if (!data.message || !data.message.ok) {
+			state.status = "invalid";
+			render();
+			return;
+		}
+		state.form = data.message;
+		state.status = "ready";
+		document.title = data.message.title || "Feedback";
+		render();
+	} catch (e) {
+		state.status = "invalid";
+		render();
+	}
+}
+
+load();
+</script>
+</body>
+</html>

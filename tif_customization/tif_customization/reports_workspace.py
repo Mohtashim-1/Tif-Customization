@@ -16,14 +16,7 @@ PORTAL_LINKS = {
 			"highlight": True,
 		},
 		{
-			"label": "Create Cards",
-			"link_type": "URL",
-			"link_to": "/training-schedule?view=cards",
-			"is_query_report": 0,
-			"highlight": True,
-		},
-		{
-			"label": "Training Card",
+			"label": "Training Report and Dashboard",
 			"link_type": "URL",
 			"link_to": "/app/training-card",
 			"is_query_report": 0,
