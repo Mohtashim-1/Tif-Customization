@@ -223,6 +223,24 @@ def get_visit_type_breakdown(from_date, to_date, staff="", submitted_only=False)
 	return {"total": total, "breakdown": breakdown}
 
 
+def _visit_remarks(row) -> str:
+	"""Prefer Remarks; fall back to academic / other-task detail for Academic Task rows."""
+	parts = []
+	for key in (
+		"ot_remarks",
+		"ot_academic_task_types",
+		"ot_academic_task_other",
+		"ot_other_official_task_detail",
+	):
+		val = (row.get(key) or "").strip()
+		if val and val not in parts:
+			parts.append(val)
+	task = (row.get("ot_type_of_task") or "").strip()
+	if task and task not in parts:
+		parts.insert(0, task)
+	return " — ".join(parts)
+
+
 def _school_sql(alias="fv"):
 	a = alias
 	return f"""COALESCE(
@@ -299,6 +317,11 @@ def get_visit_drilldown(filters=None, metric=None, staff=None):
 			fv.training_entry_filled_by,
 			fv.marketing_visit_category,
 			fv.me_activity_status,
+			fv.ot_remarks,
+			fv.ot_academic_task_types,
+			fv.ot_academic_task_other,
+			fv.ot_other_official_task_detail,
+			fv.ot_type_of_task,
 			{visit_day} AS visit_date,
 			{_school_sql("fv")} AS school
 		FROM `tabField Visit` fv
@@ -328,6 +351,7 @@ def get_visit_drilldown(filters=None, metric=None, staff=None):
 			category = _me_activity_bucket(r.me_activity_status)
 		else:
 			category = r.marketing_visit_category or r.me_activity_status or ""
+		remarks = _visit_remarks(r)
 		out.append(
 			{
 				"name": r.name,
@@ -337,6 +361,7 @@ def get_visit_drilldown(filters=None, metric=None, staff=None):
 				"officer": officer,
 				"status": status_map.get(r.docstatus, r.docstatus),
 				"category": category,
+				"remarks": remarks,
 				"url": f"/app/field-visit/{r.name}",
 			}
 		)

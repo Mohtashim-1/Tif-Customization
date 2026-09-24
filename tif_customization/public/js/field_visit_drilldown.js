@@ -43,6 +43,7 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 					"M&E category breakdown (Active vs In-Active):"
 				)}</p>`
 			: "";
+	const showRemarks = data.metric === "academic_task" || data.metric === "academic" || data.metric === "other_official";
 	const body = rows.length
 		? rows
 				.map(
@@ -54,10 +55,11 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 				<td>${frappe.utils.escape_html(row.officer || "")}</td>
 				<td>${frappe.utils.escape_html(row.status || "")}</td>
 				<td>${frappe.utils.escape_html(row.category || "")}</td>
+				${showRemarks ? `<td style="max-width:280px;white-space:normal;">${frappe.utils.escape_html(row.remarks || "—")}</td>` : ""}
 			</tr>`
 				)
 				.join("")
-		: `<tr><td colspan="7" class="text-muted text-center">${__("No Field Visits for this number.")}</td></tr>`;
+		: `<tr><td colspan="${showRemarks ? 8 : 7}" class="text-muted text-center">${__("No Field Visits for this number.")}</td></tr>`;
 
 	const d = new frappe.ui.Dialog({
 		title: data.title || __("Visit details"),
@@ -93,6 +95,7 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 						<th>${__("Officer")}</th>
 						<th>${__("Status")}</th>
 						<th>${__("Category")}</th>
+						${showRemarks ? `<th>${__("Remarks")}</th>` : ""}
 					</tr>
 				</thead>
 				<tbody>${body}</tbody>

@@ -371,10 +371,14 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		return cint(row.active) + cint(row.inactive);
 	}
 
-	/** Visits block: Marketing (New), Monitoring (M&E), Follow up, Other (Meetings). */
+	/** Visits block: Marketing (all), Monitoring (M&E), Follow up. */
 	visit_columns() {
 		return [
-			{ label: __("Marketing Visit"), metric: "new", value: (r) => r.new },
+			{
+				label: __("Marketing Visit"),
+				metric: "marketing",
+				value: (r) => cint(r.new) + cint(r.followup),
+			},
 			{ label: __("Monitoring Visit"), metric: "monitoring", value: (r) => this.me_visits(r), cellClass: "visit-mon-col" },
 			{ label: __("Follow up Visit"), metric: "followup", value: (r) => r.followup },
 			// { label: __("Meetings"), metric: "meeting", value: (r) => r.meetings },
@@ -515,11 +519,16 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 
 	kpi_card_groups(data) {
 		const k = data.kpis || {};
-		const expenseTotal = flt((data.totals || {}).expenses ?? k.expenses ?? 0);
 		const visitedDaysMax = this.max_visited_days(data);
 		const t = data.totals || {};
 		const activityCards = [
-			{ label: __("Marketing Visit"), value: this.fmt(k.new), style: "new", metric: "new" },
+			{
+				label: __("Marketing Visit"),
+				value: this.fmt(k.marketing != null ? k.marketing : cint(k.new) + cint(k.followup)),
+				style: "new",
+				metric: "marketing",
+				hint: __("All Marketing visits (New + Follow up)"),
+			},
 			{ label: __("Monitoring Visit"), value: this.fmt(k.me), style: "me", metric: "monitoring" },
 			{ label: __("Follow up Visit"), value: this.fmt(k.followup), style: "followup", metric: "followup" },
 			...this.activity_extra_columns(data).map((col) => ({
@@ -555,27 +564,34 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						cardKind: "sme_count",
 						hint: __("SMEs in this report"),
 					},
+					// {
+					// 	label: __("Total School Sum - SME Wise "),
+					// 	value: this.fmt(k.school_visits),
+					// 	style: "school",
+					// 	metric: "school_visits",
+					// 	hint: __("Total visit sum — SME wise (New + Follow up + Monitoring)"),
+					// },
 					{
-						label: __("Total School Visits"),
-						value: this.fmt(k.school_visits),
-						style: "school",
-						metric: "school_visits",
-						hint: __("Total visit sum — SME wise (New + Follow up + Monitoring)"),
-					},
-					{
-						label: __("SME School New"),
+						label: __("New School Sum - SME Wise "),
 						value: this.fmt(k.new),
 						style: "new",
 						metric: "new",
-						hint: __("New school visits — SME wise"),
+						hint: __("Only New-category school visits — not all Marketing"),
 					},
 					{
-						label: __("SME School Visit"),
+						label: __("Total Visit"),
 						value: this.fmt(k.followup),
 						style: "followup",
 						metric: "followup",
 						hint: __("Follow-up / existing school visits — SME wise"),
-					}
+					},
+					{
+						label: __("Field Emp Summary"),
+						value: this.fmt(this.field_emp_with_visits(data)),
+						style: "sme",
+						cardKind: "field_emp_summary",
+						hint: __("Field officer–wise Total Visit — click for breakdown"),
+					},
 				],
 			},
 			{
@@ -589,27 +605,6 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			{
 				title: __("Summary"),
 				cards: [
-					{
-						label: __("Model School A"),
-						value: this.fmt(k.model_school_a ?? t.outcome_model_school_a),
-						style: "outcome",
-						metric: "model_school_a",
-						useYtd: true,
-					},
-					{
-						label: __("Model School B"),
-						value: this.fmt(k.model_school_b ?? t.outcome_model_school_b),
-						style: "outcome",
-						metric: "model_school_b",
-						useYtd: true,
-					},
-					{
-						label: __("Expenses"),
-						value: this.fmt_cur(expenseTotal),
-						style: "expenses",
-						cardKind: "expenses",
-						hint: __("Recorded Field Visit travel cost plus Expense Claims. Blank KM is not estimated."),
-					},
 					{
 						label: __("Visited Days"),
 						value: this.fmt(visitedDaysMax),
@@ -863,6 +858,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			if (kind === "expenses") me.show_expense_detail();
 			else if (kind === "sme_count") me.show_sme_list();
 			else if (kind === "supervisor_list") me.show_supervisor_list();
+			else if (kind === "field_emp_summary") me.show_field_emp_summary();
 		});
 
 		$root.on("click.smeSumExpense", "[data-expense-detail]", function (e) {
@@ -936,27 +932,464 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		d.show();
 	}
 
-	show_sme_list() {
+	field_emp_with_visits(data) {
+		const rows = (data && data.rows) || [];
+		return rows.filter((r) => cint(r.followup) > 0 || cint(r.new) > 0 || cint(r.me) > 0).length;
+	}
+
+	show_field_emp_summary() {
 		const data = this.data || {};
-		const rows = [...(data.rows || [])].sort(
-			(a, b) => flt(b.percentage) - flt(a.percentage) || String(a.employee_name || "").localeCompare(String(b.employee_name || "")),
-		);
+		const k = data.kpis || {};
+		const rows = [...(data.rows || [])]
+			.map((r) => {
+				const neu = cint(r.new);
+				const followup = cint(r.followup);
+				const monitoring = this.me_visits(r);
+				return {
+					...r,
+					new_count: neu,
+					followup_count: followup,
+					monitoring_count: monitoring,
+					total_count: neu + followup + monitoring,
+				};
+			})
+			.filter((r) => r.total_count > 0)
+			.sort(
+				(a, b) =>
+					b.total_count - a.total_count ||
+					String(a.employee_name || "").localeCompare(String(b.employee_name || "")),
+			);
+
+		const sumTotal = rows.reduce((a, r) => a + r.total_count, 0);
+		const sumNew = rows.reduce((a, r) => a + r.new_count, 0);
+		const sumMon = rows.reduce((a, r) => a + r.monitoring_count, 0);
+		const sumFollow = rows.reduce((a, r) => a + r.followup_count, 0);
+
 		const body = rows.length
 			? rows
-					.map(
-						(r) => `<tr>
-				<td>${frappe.utils.escape_html(r.label || r.employee_name || "")}</td>
-				<td>${frappe.utils.escape_html(r.division || r.region_label || "—")}</td>
-				<td class="num">${this.fmt(r.grand_total)}</td>
-				<td class="num">${this.fmt_score(r.earned_points)}</td>
-				<td class="num">${this.fmt_pct(r.percentage)}</td>
-			</tr>`,
-					)
+					.map((r) => {
+						const staff = r.user_id || r.employee_name || r.employee || "";
+						return `<tr>
+				<td style="min-width:160px;position:sticky;left:0;background:#fff;z-index:1;">
+					<a href="#" class="sme-officer-link" data-officer-key="${frappe.utils.escape_html(
+						r.employee || staff,
+					)}">${frappe.utils.escape_html(r.label || r.employee_name || "")}</a>
+				</td>
+				<td class="num sme-click" data-visit-metric="school_visits" data-visit-staff="${frappe.utils.escape_html(
+					staff,
+				)}" title="${__("Total = New + Follow up + Monitoring")}"><strong>${this.fmt(
+					r.total_count,
+				)}</strong></td>
+				<td class="num sme-click" data-visit-metric="new" data-visit-staff="${frappe.utils.escape_html(
+					staff,
+				)}">${this.fmt(r.new_count)}</td>
+				<td class="num sme-click" data-visit-metric="monitoring" data-visit-staff="${frappe.utils.escape_html(
+					staff,
+				)}">${this.fmt(r.monitoring_count)}</td>
+				<td class="num sme-click" data-visit-metric="followup" data-visit-staff="${frappe.utils.escape_html(
+					staff,
+				)}">${this.fmt(r.followup_count)}</td>
+			</tr>`;
+					})
 					.join("")
-			: `<tr><td colspan="5" class="text-muted text-center">${__("No SMEs found")}</td></tr>`;
+			: `<tr><td colspan="5" class="text-muted text-center">${__("No field employee visits in this period")}</td></tr>`;
 
 		const d = new frappe.ui.Dialog({
+			title: __("Field Emp Summary"),
+			size: "extra-large",
+			fields: [{ fieldtype: "HTML", fieldname: "html" }],
+			primary_action_label: __("Close"),
+			primary_action: () => d.hide(),
+		});
+		d.fields_dict.html.$wrapper.html(`
+			<p class="text-muted" style="font-size:12px;margin-bottom:10px;">
+				${__("Visit Date")}: ${frappe.utils.escape_html(frappe.datetime.str_to_user(data.from_date || ""))}
+				– ${frappe.utils.escape_html(frappe.datetime.str_to_user(data.to_date || ""))}
+				&nbsp;·&nbsp; ${__("Field officers")}: <strong>${rows.length}</strong>
+			</p>
+			<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+				<div style="border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;min-width:110px;">
+					<div style="font-size:11px;color:#64748b;">${__("Total")}</div>
+					<div style="font-size:18px;font-weight:700;">${this.fmt(sumTotal)}</div>
+					<div style="font-size:10px;color:#94a3b8;">${__("New + Follow up + Monitoring")}</div>
+				</div>
+				<div style="border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;min-width:110px;">
+					<div style="font-size:11px;color:#64748b;">${__("New")}</div>
+					<div style="font-size:18px;font-weight:700;">${this.fmt(sumNew)}</div>
+				</div>
+				<div style="border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;min-width:110px;">
+					<div style="font-size:11px;color:#64748b;">${__("Monitoring")}</div>
+					<div style="font-size:18px;font-weight:700;">${this.fmt(sumMon)}</div>
+				</div>
+				<div style="border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;min-width:110px;">
+					<div style="font-size:11px;color:#64748b;">${__("Follow up")}</div>
+					<div style="font-size:18px;font-weight:700;">${this.fmt(sumFollow)}</div>
+				</div>
+			</div>
+			<p class="text-muted" style="font-size:12px;margin-bottom:10px;">
+				${__("Officer-wise Total, New, Monitoring and Follow up. Click a name for full KPI detail, or a number for documents.")}
+			</p>
+			<div class="table-responsive" style="max-height:420px;overflow:auto;">
+				<table class="table table-bordered table-hover" style="font-size:12px;margin:0;min-width:560px;">
+					<thead>
+						<tr>
+							<th style="position:sticky;left:0;background:#f8fafc;z-index:2;">${__("Field Officer / SME")}</th>
+							<th class="text-right">${__("Total")}</th>
+							<th class="text-right">${__("New")}</th>
+							<th class="text-right">${__("Monitoring")}</th>
+							<th class="text-right">${__("Follow up")}</th>
+						</tr>
+					</thead>
+					<tbody>${body}</tbody>
+					<tfoot>
+						<tr>
+							<th style="position:sticky;left:0;background:#f8fafc;">${__("Total")}</th>
+							<th class="text-right">${this.fmt(sumTotal)}</th>
+							<th class="text-right">${this.fmt(sumNew)}</th>
+							<th class="text-right">${this.fmt(sumMon)}</th>
+							<th class="text-right">${this.fmt(sumFollow)}</th>
+						</tr>
+					</tfoot>
+				</table>
+			</div>
+		`);
+		d.$wrapper.on("click", ".sme-officer-link", (e) => {
+			e.preventDefault();
+			const key = $(e.currentTarget).attr("data-officer-key");
+			if (key) this.show_officer_kpi_detail(key);
+		});
+		if (frappe.tif_customization && frappe.tif_customization.bind_clickable_numbers) {
+			frappe.tif_customization.bind_clickable_numbers(d.$wrapper, () => this.get_filters());
+		}
+		d.show();
+	}
+
+	show_sme_list() {
+		const data = this.data || {};
+		const rows = [...(data.rows || [])]
+			.map((r) => {
+				const neu = cint(r.new);
+				const followup = cint(r.followup);
+				const monitoring = this.me_visits(r);
+				return {
+					...r,
+					school_total: neu + followup + monitoring,
+					new_count: neu,
+					followup_count: followup,
+					monitoring_count: monitoring,
+				};
+			})
+			.sort(
+				(a, b) =>
+					b.school_total - a.school_total ||
+					String(a.employee_name || "").localeCompare(String(b.employee_name || "")),
+			);
+		const body = rows.length
+			? rows
+					.map((r) => {
+						const key = r.employee || r.user_id || r.employee_name || "";
+						const staff = r.user_id || r.employee_name || r.employee || "";
+						return `<tr>
+				<td><a href="#" class="sme-officer-link" data-officer-key="${frappe.utils.escape_html(
+					key,
+				)}">${frappe.utils.escape_html(r.label || r.employee_name || "")}</a></td>
+				<td>${frappe.utils.escape_html(r.division || r.region_label || "—")}</td>
+				<td class="num">
+					<a href="#" class="sme-school-count-link"
+						data-officer-key="${frappe.utils.escape_html(key)}"
+						data-visit-staff="${frappe.utils.escape_html(staff)}"
+						title="${__("Click for school visit detail")}">${this.fmt(r.school_total)}</a>
+				</td>
+				<td class="num">${this.fmt(r.new_count)}</td>
+				<td class="num">${this.fmt(r.monitoring_count)}</td>
+				<td class="num">${this.fmt(r.followup_count)}</td>
+			</tr>`;
+					})
+					.join("")
+			: `<tr><td colspan="6" class="text-muted text-center">${__("No SMEs found")}</td></tr>`;
+
+		const sumSchools = rows.reduce((a, r) => a + r.school_total, 0);
+		const d = new frappe.ui.Dialog({
 			title: __("SMEs in Report"),
+			size: "extra-large",
+			fields: [{ fieldtype: "HTML", fieldname: "html" }],
+			primary_action_label: __("Close"),
+			primary_action: () => d.hide(),
+		});
+		d.fields_dict.html.$wrapper.html(`
+			<p class="text-muted" style="font-size:12px;margin-bottom:10px;">
+				${__("Visit Date")}: ${frappe.utils.escape_html(frappe.datetime.str_to_user(data.from_date || ""))}
+				– ${frappe.utils.escape_html(frappe.datetime.str_to_user(data.to_date || ""))}
+				&nbsp;·&nbsp; ${__("SMEs")}: <strong>${rows.length}</strong>
+				&nbsp;·&nbsp; ${__("Total school visits")}: <strong>${this.fmt(sumSchools)}</strong>
+				<br>${__("Click SME name for full KPI. Click Total School Visits count for school visit detail.")}
+			</p>
+			<div class="table-responsive" style="max-height:420px;overflow:auto;">
+				<table class="table table-bordered table-hover" style="font-size:12px;margin:0;">
+					<thead>
+						<tr>
+							<th>${__("Name of SME")}</th>
+							<th>${__("Type / Division")}</th>
+							<th class="text-right">${__("Total School Visits")}</th>
+							<th class="text-right">${__("New")}</th>
+							<th class="text-right">${__("Monitoring")}</th>
+							<th class="text-right">${__("Follow up")}</th>
+						</tr>
+					</thead>
+					<tbody>${body}</tbody>
+					<tfoot>
+						<tr>
+							<th>${__("Total")}</th>
+							<th></th>
+							<th class="text-right">${this.fmt(sumSchools)}</th>
+							<th class="text-right">${this.fmt(rows.reduce((a, r) => a + r.new_count, 0))}</th>
+							<th class="text-right">${this.fmt(rows.reduce((a, r) => a + r.monitoring_count, 0))}</th>
+							<th class="text-right">${this.fmt(rows.reduce((a, r) => a + r.followup_count, 0))}</th>
+						</tr>
+					</tfoot>
+				</table>
+			</div>
+		`);
+		d.$wrapper.on("click", ".sme-officer-link", (e) => {
+			e.preventDefault();
+			const key = $(e.currentTarget).attr("data-officer-key");
+			if (key) this.show_officer_kpi_detail(key);
+		});
+		d.$wrapper.on("click", ".sme-school-count-link", (e) => {
+			e.preventDefault();
+			const key = $(e.currentTarget).attr("data-officer-key");
+			if (key) this.show_officer_school_detail(key);
+		});
+		d.show();
+	}
+
+	show_officer_school_detail(officerKey) {
+		const data = this.data || {};
+		const key = String(officerKey || "").trim();
+		const row = (data.rows || []).find(
+			(r) =>
+				String(r.employee || "") === key ||
+				String(r.user_id || "") === key ||
+				String(r.employee_name || "") === key,
+		);
+		if (!row) {
+			frappe.msgprint(__("No row found for this SME."));
+			return;
+		}
+		const staff = row.user_id || row.employee_name || row.employee || "";
+		const neu = cint(row.new);
+		const followup = cint(row.followup);
+		const monitoring = this.me_visits(row);
+		const total = neu + followup + monitoring;
+		const filters = this.get_filters();
+
+		frappe.call({
+			method: "tif_customization.tif_customization.api.field_visit_drilldown.get_visit_drilldown",
+			args: {
+				filters: {
+					from_date: filters.from_date,
+					to_date: filters.to_date,
+					staff,
+					metric: "school_visits",
+					submitted_only: filters.submitted_only || 1,
+				},
+				metric: "school_visits",
+				staff,
+			},
+			freeze: true,
+			freeze_message: __("Loading school visits…"),
+			callback: (r) => {
+				const detail = r.message || {};
+				const visits = detail.rows || [];
+				const bySchool = {};
+				visits.forEach((v) => {
+					const school = (v.school || "").trim() || __("— No school name —");
+					if (!bySchool[school]) {
+						bySchool[school] = { school, total: 0, new: 0, monitoring: 0, followup: 0, rows: [] };
+					}
+					bySchool[school].total += 1;
+					bySchool[school].rows.push(v);
+					const t = String(v.type || "");
+					const cat = String(v.category || "");
+					if (t === "M&E") bySchool[school].monitoring += 1;
+					else if (cat === "New" || t === "Registration of New Schools") bySchool[school].new += 1;
+					else bySchool[school].followup += 1;
+				});
+				const schoolRows = Object.values(bySchool).sort((a, b) => b.total - a.total || a.school.localeCompare(b.school));
+				const schoolBody = schoolRows.length
+					? schoolRows
+							.map(
+								(s) => `<tr>
+						<td>${frappe.utils.escape_html(s.school)}</td>
+						<td class="num">${this.fmt(s.total)}</td>
+						<td class="num">${this.fmt(s.new)}</td>
+						<td class="num">${this.fmt(s.monitoring)}</td>
+						<td class="num">${this.fmt(s.followup)}</td>
+					</tr>`,
+							)
+							.join("")
+					: `<tr><td colspan="5" class="text-muted text-center">${__("No school visits")}</td></tr>`;
+
+				const visitBody = visits.length
+					? visits
+							.map(
+								(v) => `<tr>
+						<td><a href="${frappe.utils.escape_html(v.url)}">${frappe.utils.escape_html(v.name)}</a></td>
+						<td>${frappe.utils.escape_html(v.visit_date || "")}</td>
+						<td>${frappe.utils.escape_html(v.type || "")}</td>
+						<td>${frappe.utils.escape_html(v.school || "—")}</td>
+						<td>${frappe.utils.escape_html(v.category || "")}</td>
+						<td>${frappe.utils.escape_html(v.status || "")}</td>
+					</tr>`,
+							)
+							.join("")
+					: `<tr><td colspan="6" class="text-muted text-center">${__("No documents")}</td></tr>`;
+
+				const d = new frappe.ui.Dialog({
+					title: __("School visits — {0}", [row.label || row.employee_name || ""]),
+					size: "extra-large",
+					fields: [{ fieldtype: "HTML", fieldname: "html" }],
+					primary_action_label: __("Close"),
+					primary_action: () => d.hide(),
+				});
+				d.fields_dict.html.$wrapper.html(`
+					<p class="text-muted" style="font-size:12px;margin-bottom:10px;">
+						${__("Total school visits")}: <strong>${this.fmt(total)}</strong>
+						&nbsp;·&nbsp; ${__("New")}: <strong>${this.fmt(neu)}</strong>
+						&nbsp;·&nbsp; ${__("Monitoring")}: <strong>${this.fmt(monitoring)}</strong>
+						&nbsp;·&nbsp; ${__("Follow up")}: <strong>${this.fmt(followup)}</strong>
+						&nbsp;·&nbsp; ${__("Distinct schools")}: <strong>${schoolRows.length}</strong>
+					</p>
+					<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+						<button type="button" class="btn btn-xs btn-default sme-open-metric" data-metric="school_visits">${__("All")} (${this.fmt(
+					total,
+				)})</button>
+						<button type="button" class="btn btn-xs btn-default sme-open-metric" data-metric="new">${__("New")} (${this.fmt(
+					neu,
+				)})</button>
+						<button type="button" class="btn btn-xs btn-default sme-open-metric" data-metric="monitoring">${__("Monitoring")} (${this.fmt(
+					monitoring,
+				)})</button>
+						<button type="button" class="btn btn-xs btn-default sme-open-metric" data-metric="followup">${__("Follow up")} (${this.fmt(
+					followup,
+				)})</button>
+					</div>
+					<h5 style="margin:8px 0;">${__("School-wise count")}</h5>
+					<div class="table-responsive" style="max-height:220px;overflow:auto;margin-bottom:14px;">
+						<table class="table table-bordered table-hover" style="font-size:12px;margin:0;">
+							<thead>
+								<tr>
+									<th>${__("School")}</th>
+									<th class="text-right">${__("Total")}</th>
+									<th class="text-right">${__("New")}</th>
+									<th class="text-right">${__("Monitoring")}</th>
+									<th class="text-right">${__("Follow up")}</th>
+								</tr>
+							</thead>
+							<tbody>${schoolBody}</tbody>
+						</table>
+					</div>
+					<h5 style="margin:8px 0;">${__("Visit documents")}</h5>
+					<div class="table-responsive" style="max-height:240px;overflow:auto;">
+						<table class="table table-bordered table-hover" style="font-size:12px;margin:0;">
+							<thead>
+								<tr>
+									<th>${__("Document No")}</th>
+									<th>${__("Visit Date")}</th>
+									<th>${__("Type")}</th>
+									<th>${__("School")}</th>
+									<th>${__("Category")}</th>
+									<th>${__("Status")}</th>
+								</tr>
+							</thead>
+							<tbody>${visitBody}</tbody>
+						</table>
+					</div>
+				`);
+				d.$wrapper.on("click", ".sme-open-metric", (e) => {
+					e.preventDefault();
+					const metric = $(e.currentTarget).attr("data-metric");
+					if (!metric || !frappe.tif_customization.open_visit_drilldown) return;
+					frappe.tif_customization.open_visit_drilldown({
+						from_date: filters.from_date,
+						to_date: filters.to_date,
+						staff,
+						metric,
+						submitted_only: filters.submitted_only || 1,
+					});
+				});
+				d.show();
+			},
+		});
+	}
+
+	officer_kpi_rows(row, data) {
+		const staff = row.user_id || row.employee_name || row.employee || "";
+		const items = [
+			{ group: __("Overview"), label: __("Total School Visits"), value: cint(row.new) + cint(row.followup) + this.me_visits(row), metric: "school_visits" },
+			{ group: __("Overview"), label: __("New School Sum"), value: row.new, metric: "new" },
+			{ group: __("Overview"), label: __("Total Visit"), value: row.followup, metric: "followup" },
+			{ group: __("Overview"), label: __("Visited Days"), value: row.visited_days, metric: "visited_days" },
+			...this.visit_columns().map((col) => ({
+				group: __("Activity (period)"),
+				label: col.label,
+				value: col.value ? col.value(row) : row[col.key],
+				metric: col.metric,
+			})),
+			...this.activity_extra_columns(data).map((col) => ({
+				group: __("Activity (period)"),
+				label: col.label,
+				value: col.key === "workshop"
+					? cint(row.workshop) || cint(row.half_day_workshop) + cint(row.full_day_session)
+					: row[col.key],
+				metric: col.metric || col.key,
+			})),
+			...this.outcome_period_columns(data).map((col) => ({
+				group: __("Outcomes"),
+				label: col.label,
+				value: row[col.key],
+				metric: col.metric || col.key,
+			})),
+			...this.outcome_ytd_columns(data).map((col) => ({
+				group: __("Outcomes (YTD)"),
+				label: col.label,
+				value: row[col.key],
+				metric: col.metric,
+				useYtd: true,
+			})),
+		];
+		return items.map((item) => ({ ...item, staff }));
+	}
+
+	show_officer_kpi_detail(officerKey) {
+		const data = this.data || {};
+		const key = String(officerKey || "").trim();
+		const row = (data.rows || []).find(
+			(r) =>
+				String(r.employee || "") === key ||
+				String(r.user_id || "") === key ||
+				String(r.employee_name || "") === key,
+		);
+		if (!row) {
+			frappe.msgprint(__("No KPI row found for this field officer."));
+			return;
+		}
+		const items = this.officer_kpi_rows(row, data);
+		const body = items
+			.map(
+				(item) => `<tr>
+				<td>${frappe.utils.escape_html(item.group)}</td>
+				<td>${frappe.utils.escape_html(item.label)}</td>
+				<td class="num sme-click" data-visit-metric="${frappe.utils.escape_html(item.metric || "")}"
+					data-visit-staff="${frappe.utils.escape_html(item.staff || "")}"
+					${item.useYtd ? 'data-use-ytd="1"' : ""}
+					title="${__("Click to see Field Visits")}">${this.fmt(item.value)}</td>
+			</tr>`,
+			)
+			.join("");
+
+		const d = new frappe.ui.Dialog({
+			title: row.label || row.employee_name || __("Field Officer KPI"),
 			size: "large",
 			fields: [{ fieldtype: "HTML", fieldname: "html" }],
 			primary_action_label: __("Close"),
@@ -966,23 +1399,32 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			<p class="text-muted" style="font-size:12px;margin-bottom:10px;">
 				${__("Visit Date")}: ${frappe.utils.escape_html(frappe.datetime.str_to_user(data.from_date || ""))}
 				– ${frappe.utils.escape_html(frappe.datetime.str_to_user(data.to_date || ""))}
-				&nbsp;·&nbsp; ${__("Total")}: <strong>${rows.length}</strong>
+				&nbsp;·&nbsp; ${__("Type / Division")}: <strong>${frappe.utils.escape_html(row.division || row.region_label || "—")}</strong>
+				&nbsp;·&nbsp; ${__("Earned")}: <strong>${this.fmt_score(row.earned_points)}</strong>
+				&nbsp;·&nbsp; ${__("Percentage")}: <strong>${this.fmt_pct(row.percentage)}</strong>
 			</p>
-			<div class="table-responsive" style="max-height:420px;overflow:auto;">
+			<p class="text-muted" style="font-size:12px;margin-bottom:10px;">
+				${__("KPI labels match the report cards. Click a count to open that officer’s Field Visits.")}
+			</p>
+			<div class="table-responsive" style="max-height:480px;overflow:auto;">
 				<table class="table table-bordered table-hover" style="font-size:12px;margin:0;">
 					<thead>
 						<tr>
-							<th>${__("Name")}</th>
-							<th>${__("Type / Division")}</th>
-							<th class="text-right">${__("Grand Total")}</th>
-							<th class="text-right">${__("Earned Points")}</th>
-							<th class="text-right">${__("Percentage")}</th>
+							<th>${__("Section")}</th>
+							<th>${__("KPI")}</th>
+							<th class="text-right">${__("Count")}</th>
 						</tr>
 					</thead>
 					<tbody>${body}</tbody>
 				</table>
 			</div>
 		`);
+		if (frappe.tif_customization && frappe.tif_customization.bind_clickable_numbers) {
+			frappe.tif_customization.bind_clickable_numbers(d.$wrapper, () => {
+				const f = this.get_filters();
+				return { ...f, staff: row.user_id || row.employee_name || row.employee || f.staff || "" };
+			});
+		}
 		d.show();
 	}
 
