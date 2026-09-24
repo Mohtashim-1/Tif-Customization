@@ -348,6 +348,7 @@ def get_report_data(filters=None):
 		stats = visit_stats.get(key) or {}
 		followup = cint(stats.get("followup") or 0)
 		new = cint(stats.get("new") or 0)
+		marketing = cint(stats.get("marketing") or 0)
 		meetings = cint(stats.get("meetings") or 0)
 		active = cint(stats.get("active") or 0)
 		inactive = cint(stats.get("inactive") or 0)
@@ -355,8 +356,8 @@ def get_report_data(filters=None):
 		schools = cint(stats.get("schools") or 0)
 		participants = cint(stats.get("participants") or 0)
 		visited_days = cint(stats.get("visited_days") or 0)
-		# Grand Total = Marketing + Meetings + all M&E visits (not training schools/participants)
-		grand_total = followup + new + meetings + me
+		# Grand Total = Visits New/Followup + Marketing type + Meetings + M&E
+		grand_total = followup + new + marketing + meetings + me
 		expense_amt = flt(expenses.get(key) or 0)
 		difference = visited_days - working_days
 
@@ -378,6 +379,7 @@ def get_report_data(filters=None):
 			"label": f"SME - {staff.get('employee_name') or staff.get('user_id') or staff.get('employee')}",
 			"followup": followup,
 			"new": new,
+			"marketing": marketing,
 			"meetings": meetings,
 			"active": active,
 			"inactive": inactive,
@@ -410,6 +412,7 @@ def get_report_data(filters=None):
 		for k in (
 			"followup",
 			"new",
+			"marketing",
 			"meetings",
 			"active",
 			"inactive",
@@ -506,11 +509,12 @@ def get_report_data(filters=None):
 			"other_official": cint(totals.get("other_official") or 0),
 			"quiz": cint(totals.get("quiz") or 0) or cint(totals.get("outcome_quiz") or 0),
 			"co_curricular": cint(totals.get("co_curricular") or 0),
-			"marketing": cint(totals.get("followup") or 0) + cint(totals.get("new") or 0),
+			"marketing": cint(totals.get("marketing") or 0),
 			"me": cint(totals.get("me") or 0),
 			"training": cint(totals.get("workshop") or 0),
 			"school_visits": cint(totals.get("followup") or 0)
 			+ cint(totals.get("new") or 0)
+			+ cint(totals.get("marketing") or 0)
 			+ cint(totals.get("me") or 0),
 			"total_points": flt(totals.get("total_points") or 0, 2),
 			"earned_points": flt(totals.get("earned_points") or 0, 2),
@@ -769,6 +773,7 @@ def _load_visit_stats(from_date, to_date, staff_rows):
 		s["key"]: {
 			"followup": 0,
 			"new": 0,
+			"marketing": 0,
 			"meetings": 0,
 			"active": 0,
 			"inactive": 0,
@@ -788,7 +793,10 @@ def _load_visit_stats(from_date, to_date, staff_rows):
 		bucket = stats[staff_key]
 		vtype = row.get("type") or ""
 
-		if vtype in ("Marketing", "Visits"):
+		# Marketing type → Marketing Visit only (do not mix into New School Sum).
+		if vtype == "Marketing":
+			bucket["marketing"] += 1
+		elif vtype == "Visits":
 			cat = (row.get("marketing_visit_category") or "").strip()
 			if cat == "New":
 				bucket["new"] += 1

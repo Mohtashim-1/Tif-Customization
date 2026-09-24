@@ -29,8 +29,8 @@ METRIC_LABELS = {
 	"training": _("Training Visits"),
 	"academic": _("Academic / Other"),
 	"other": _("Other Visits"),
-	"followup": _("Followup & Other Marketing Visits"),
-	"new": _("New Marketing Visits"),
+	"followup": _("Follow up Visits"),
+	"new": _("New School Visits"),
 	"me_active": _("M&E Active"),
 	"me_inactive": _("M&E Inactive"),
 	"grand_total": _("Grand Total (Marketing + Meetings + M&E)"),
@@ -43,7 +43,7 @@ METRIC_LABELS = {
 	"other_official": _("Other Official Tasks"),
 	"co_curricular": _("Co-curricular Activities"),
 	"quiz": _("Quiz Arranged"),
-	"new_school_registration": _("Registration of New Schools"),
+	"new_school_registration": _("New School Visits"),
 	"new_schools": _("New school visits (Marketing / M&E)"),
 	"workshop_registration": _("Workshop / Training sessions"),
 	"enrolment": _("Enrollment of Participants"),
@@ -93,7 +93,7 @@ def _metric_condition(metric: str, alias: str = "fv") -> str:
 	if m in ("school_visits", "school_visit"):
 		return f"{a}.type IN ('Marketing', 'Visits', 'M&E')"
 	if m == "marketing":
-		return f"{a}.type IN ('Marketing', 'Visits')"
+		return f"{a}.type = 'Marketing'"
 	if m in ("me", "monitoring"):
 		return f"{a}.type = 'M&E'"
 	if m == "meeting":
@@ -113,11 +113,11 @@ def _metric_condition(metric: str, alias: str = "fv") -> str:
 	if m == "other":
 		return f"{a}.type NOT IN ('Marketing', 'Visits', 'M&E', 'Training', 'Meeting')"
 	if m == "followup":
-		return f"{a}.type IN ('Marketing', 'Visits') AND IFNULL({a}.marketing_visit_category, '') != 'New'"
+		return f"{a}.type = 'Visits' AND IFNULL({a}.marketing_visit_category, '') != 'New'"
 	if m == "new" or m == "new_school_registration":
 		return f"""(
 			{a}.type = 'Registration of New Schools'
-			OR ({a}.type IN ('Marketing', 'Visits') AND {a}.marketing_visit_category = 'New')
+			OR ({a}.type = 'Visits' AND {a}.marketing_visit_category = 'New')
 		)"""
 	if m in ("new_schools", "new_school"):
 		return f"""{a}.type IN ('Marketing', 'Visits', 'M&E', 'Joint Visit with SME', 'Registration of New Schools') AND (

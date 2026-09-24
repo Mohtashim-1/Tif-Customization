@@ -377,7 +377,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			{
 				label: __("Marketing Visit"),
 				metric: "marketing",
-				value: (r) => cint(r.new) + cint(r.followup),
+				value: (r) => (r.marketing != null ? r.marketing : cint(r.new) + cint(r.followup)),
 			},
 			{ label: __("Monitoring Visit"), metric: "monitoring", value: (r) => this.me_visits(r), cellClass: "visit-mon-col" },
 			{ label: __("Follow up Visit"), metric: "followup", value: (r) => r.followup },
@@ -527,7 +527,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				value: this.fmt(k.marketing != null ? k.marketing : cint(k.new) + cint(k.followup)),
 				style: "new",
 				metric: "marketing",
-				hint: __("All Marketing visits (New + Follow up)"),
+				hint: __("Field Visit type = Marketing only"),
 			},
 			{ label: __("Monitoring Visit"), value: this.fmt(k.me), style: "me", metric: "monitoring" },
 			{ label: __("Follow up Visit"), value: this.fmt(k.followup), style: "followup", metric: "followup" },
@@ -576,7 +576,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						value: this.fmt(k.new),
 						style: "new",
 						metric: "new",
-						hint: __("Only New-category school visits — not all Marketing"),
+						hint: __("Only Visits type with category New (not Marketing type)"),
 					},
 					{
 						label: __("Total Visit"),
@@ -586,7 +586,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						hint: __("Follow-up / existing school visits — SME wise"),
 					},
 					{
-						label: __("Field Emp Summary"),
+						label: __("SME Summary"),
 						value: this.fmt(this.field_emp_with_visits(data)),
 						style: "sme",
 						cardKind: "field_emp_summary",
@@ -995,7 +995,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			: `<tr><td colspan="5" class="text-muted text-center">${__("No field employee visits in this period")}</td></tr>`;
 
 		const d = new frappe.ui.Dialog({
-			title: __("Field Emp Summary"),
+			title: __("SME Summary"),
 			size: "extra-large",
 			fields: [{ fieldtype: "HTML", fieldname: "html" }],
 			primary_action_label: __("Close"),
