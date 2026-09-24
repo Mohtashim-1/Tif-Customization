@@ -287,10 +287,22 @@ frappe.tif_customization.FeedbackStudio = class FeedbackStudio {
 
 	refreshResponses() {
 		const mode = this.state.mode;
-		this.flushSync().then((saved) => {
-			if (!saved) return;
+		Promise.resolve(this.flushSync()).then((saved) => {
 			return this.call("get_studio", {}, true).then((data) => {
-				if (data && !data.fresh) this.applyServer(data, this.state.mode === mode);
+				if (!data || data.fresh) return;
+				if (!saved) {
+					this.state.links = data.links || this.state.links;
+					const responses = {};
+					this.audMeta.forEach((a) => {
+						const list = data.responses && data.responses[a.id];
+						responses[a.id] = Array.isArray(list) ? list : [];
+					});
+					this.state.responses = responses;
+					this.persist();
+					if (this.state.mode === mode) this.render();
+					return;
+				}
+				this.applyServer(data, this.state.mode === mode);
 			});
 		});
 	}

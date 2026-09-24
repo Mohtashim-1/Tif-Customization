@@ -145,8 +145,8 @@ frappe.tif_customization.TrainingCardStudio = class TrainingCardStudio {
 							<label>Participants<input name="participants_category" readonly></label>
 							<label>Present<input name="attendance_present" readonly></label>
 							<label>Program<input name="program" readonly></label>
+							<label>Document<input name="name" readonly></label>
 							<label class="full">Venue / school<input name="school_name" readonly></label>
-							<input type="hidden" name="name" value="">
 						</form>
 						<form class="tc-form tc-readonly" data-panel="lesson" hidden>
 							<label class="full">Course<input name="course" readonly></label>
@@ -160,7 +160,7 @@ frappe.tif_customization.TrainingCardStudio = class TrainingCardStudio {
 							<input type="hidden" name="published" value="1">
 						</form>
 						<div class="tc-actions">
-							<button type="button" class="tc-btn primary tc-open-doc" hidden>View details</button>
+							<button type="button" class="tc-btn primary tc-open-doc" hidden>Open document</button>
 						</div>
 					</aside>
 				</div>
@@ -192,18 +192,23 @@ frappe.tif_customization.TrainingCardStudio = class TrainingCardStudio {
 			const id = $(e.currentTarget).data("id");
 			this.pick(String(id));
 		});
+		$root.on("dblclick", ".tc-row", (e) => {
+			if (this.kind !== "session") return;
+			const id = $(e.currentTarget).data("id");
+			if (id) this.open_document(String(id));
+		});
 		$root.on("click", ".tc-open-report", () => this.open_report());
 		$root.on("click", ".tc-open-planner", () => {
 			window.location.href = "/training-schedule";
 		});
 		$root.on("click", ".tc-sess-row", (e) => {
 			const name = $(e.currentTarget).data("name");
-			if (name) this.open_session(name);
+			if (name) this.open_document(name);
 		});
 		$root.on("click", ".tc-open-doc", (e) => {
 			e.preventDefault();
 			const name = this.form("session").find("[name=name]").val();
-			if (name) this.open_session(name);
+			if (name) this.open_document(name);
 		});
 	}
 
@@ -798,7 +803,10 @@ frappe.tif_customization.TrainingCardStudio = class TrainingCardStudio {
 					${filesHtml}
 				</div>
 			</div>
-			<div class="tc-dlg-foot"><button type="button" class="tc-dlg-close">Close</button></div>
+			<div class="tc-dlg-foot">
+				<button type="button" class="tc-dlg-open">Open document</button>
+				<button type="button" class="tc-dlg-close">Close</button>
+			</div>
 		</div>`;
 
 		const dialog = new frappe.ui.Dialog({
@@ -810,7 +818,16 @@ frappe.tif_customization.TrainingCardStudio = class TrainingCardStudio {
 		dialog.fields_dict.body.$wrapper.html(html);
 		dialog.$wrapper.find(".modal-header, .modal-footer").hide();
 		dialog.$wrapper.on("click", ".tc-dlg-x, .tc-dlg-close", () => dialog.hide());
+		dialog.$wrapper.on("click", ".tc-dlg-open", () => {
+			dialog.hide();
+			this.open_document(d.name);
+		});
 		dialog.show();
+	}
+
+	open_document(name) {
+		if (!name) return;
+		frappe.set_route("Form", "Upcoming Training", name);
 	}
 
 	pretty_date(iso) {

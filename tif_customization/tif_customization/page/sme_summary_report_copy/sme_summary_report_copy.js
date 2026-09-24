@@ -374,9 +374,9 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 	/** Visits block: Marketing (New), Monitoring (M&E), Follow up, Other (Meetings). */
 	visit_columns() {
 		return [
-			{ label: __("Marketing"), metric: "new", value: (r) => r.new },
-			{ label: __("Monitoring"), metric: "monitoring", value: (r) => this.me_visits(r), cellClass: "visit-mon-col" },
-			{ label: __("Follow up"), metric: "followup", value: (r) => r.followup },
+			{ label: __("Marketing Visit"), metric: "new", value: (r) => r.new },
+			{ label: __("Monitoring Visit"), metric: "monitoring", value: (r) => this.me_visits(r), cellClass: "visit-mon-col" },
+			{ label: __("Follow up Visit"), metric: "followup", value: (r) => r.followup },
 			// { label: __("Meetings"), metric: "meeting", value: (r) => r.meetings },
 		];
 	}
@@ -495,21 +495,53 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			.join("");
 	}
 
+	/** Period activity cards that belong under Outcomes on the paper layout. */
+	outcome_period_columns(data) {
+		const keys = new Set(["headoffice_visit", "academic_task", "other_official"]);
+		return this.kpi_columns(data).filter((col) => keys.has(col.key));
+	}
+
+	/** Workshop / Ulama / Teachers Training stay under Activity. */
+	activity_extra_columns(data) {
+		const keys = new Set(["workshop", "meeting_ulama", "teachers_training_meeting"]);
+		return this.kpi_columns(data).filter((col) => keys.has(col.key));
+	}
+
+	outcome_ytd_columns(data) {
+		return this.outcome_columns(data).filter(
+			(col) => !["model_school_a", "model_school_b"].includes(col.metric || "")
+		);
+	}
+
 	kpi_card_groups(data) {
 		const k = data.kpis || {};
 		const expenseTotal = flt((data.totals || {}).expenses ?? k.expenses ?? 0);
 		const visitedDaysMax = this.max_visited_days(data);
 		const t = data.totals || {};
 		const activityCards = [
-			{ label: __("Marketing"), value: this.fmt(k.new), style: "new", metric: "new" },
-			{ label: __("Monitoring"), value: this.fmt(k.me), style: "me", metric: "monitoring" },
-			{ label: __("Follow up"), value: this.fmt(k.followup), style: "followup", metric: "followup" },
-			// { label: __("Meetings"), value: this.fmt(k.meetings), style: "meeting", metric: "meeting" },
-			...this.kpi_columns(data).map((col) => ({
+			{ label: __("Marketing Visit"), value: this.fmt(k.new), style: "new", metric: "new" },
+			{ label: __("Monitoring Visit"), value: this.fmt(k.me), style: "me", metric: "monitoring" },
+			{ label: __("Follow up Visit"), value: this.fmt(k.followup), style: "followup", metric: "followup" },
+			...this.activity_extra_columns(data).map((col) => ({
 				label: col.label,
 				value: this.fmt(k[col.key]),
 				style: (col.key || "activity").replace(/_/g, "-"),
 				metric: col.metric || col.key,
+			})),
+		];
+		const outcomeCards = [
+			...this.outcome_period_columns(data).map((col) => ({
+				label: col.label,
+				value: this.fmt(k[col.key]),
+				style: (col.key || "activity").replace(/_/g, "-"),
+				metric: col.metric || col.key,
+			})),
+			...this.outcome_ytd_columns(data).map((col) => ({
+				label: col.label,
+				value: this.fmt(t[col.key]),
+				style: col.metric === "quiz" ? "quiz" : col.metric === "co_curricular" ? "co_curricular" : "outcome",
+				metric: col.metric,
+				useYtd: true,
 			})),
 		];
 		return [
@@ -528,21 +560,21 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						value: this.fmt(k.school_visits),
 						style: "school",
 						metric: "school_visits",
-						hint: __("Marketing + Monitoring in the visit period"),
+						hint: __("Total visit sum — SME wise (New + Follow up + Monitoring)"),
 					},
 					{
 						label: __("SME School New"),
 						value: this.fmt(k.new),
 						style: "new",
 						metric: "new",
-						hint: __("Marketing visits marked New"),
+						hint: __("New school visits — SME wise"),
 					},
 					{
 						label: __("SME School Visit"),
 						value: this.fmt(k.followup),
 						style: "followup",
 						metric: "followup",
-						hint: __("Marketing follow-up / existing school visits"),
+						hint: __("Follow-up / existing school visits — SME wise"),
 					}
 				],
 			},
@@ -552,17 +584,25 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			},
 			{
 				title: __("Outcomes (YTD vs yearly mins)"),
-				cards: this.outcome_columns(data).map((col) => ({
-					label: col.label,
-					value: this.fmt((data.totals || {})[col.key]),
-					style: col.metric === "quiz" ? "quiz" : col.metric === "co_curricular" ? "co_curricular" : "outcome",
-					metric: col.metric,
-					useYtd: true,
-				})),
+				cards: outcomeCards,
 			},
 			{
 				title: __("Summary"),
 				cards: [
+					{
+						label: __("Model School A"),
+						value: this.fmt(k.model_school_a ?? t.outcome_model_school_a),
+						style: "outcome",
+						metric: "model_school_a",
+						useYtd: true,
+					},
+					{
+						label: __("Model School B"),
+						value: this.fmt(k.model_school_b ?? t.outcome_model_school_b),
+						style: "outcome",
+						metric: "model_school_b",
+						useYtd: true,
+					},
 					{
 						label: __("Expenses"),
 						value: this.fmt_cur(expenseTotal),

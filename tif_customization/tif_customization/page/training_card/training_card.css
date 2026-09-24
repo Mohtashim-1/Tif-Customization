@@ -814,9 +814,19 @@
 .tc-session-dialog .tc-dlg-foot {
 	display: flex;
 	justify-content: flex-end;
+	gap: 8px;
 	padding-top: 16px;
 	margin-top: 8px;
 	border-top: 1px solid #eef2f7;
+}
+.tc-session-dialog .tc-dlg-open {
+	background: #2563eb;
+	color: #fff;
+	border: 0;
+	border-radius: 10px;
+	padding: 8px 16px;
+	font-weight: 700;
+	cursor: pointer;
 }
 .tc-session-dialog .tc-dlg-close {
 	border: 1px solid #e2e8f0;
