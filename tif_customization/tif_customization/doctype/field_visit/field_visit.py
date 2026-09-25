@@ -87,6 +87,7 @@ class FieldVisit(Document):
 	def validate(self):
 		sync_model_school_field(self)
 		sync_travel_cost(self)
+		self._sync_pending_school_name()
 		validate_supervisor_only_field_visit(self)
 		validate_farhan_only_field_visit(self)
 		if self.type in ("Training", "Workshop", "Teachers Training Meeting"):
@@ -105,6 +106,29 @@ class FieldVisit(Document):
 		if self.type in ("Training", "Workshop", "Teachers Training Meeting"):
 			self.send_training_feedback_invitations()
 
+	def _sync_pending_school_name(self):
+		"""Keep a readable school title when Customer link is still empty (School Opening)."""
+		if not self.meta.has_field("pending_school_name"):
+			return
+		if (self.school_name or "").strip():
+			return
+		if (self.pending_school_name or "").strip():
+			return
+		text = (self.school_additional_remarks or "").strip()
+		m = re.search(
+			r"Pending school \(School Opening\s+([^)]+)\):\s*(.+?)(?:\n|$)",
+			text,
+			flags=re.IGNORECASE,
+		)
+		if not m:
+			return
+		pending = (m.group(2) or "").strip()
+		if pending:
+			self.pending_school_name = pending[:500]
+		soa = (m.group(1) or "").strip()
+		if soa and not (self.reference or "").strip():
+			self.reference = soa
+
 	def _validate_training_attendees(self):
 		emails = set()
 		for row in self.training_attendees or []:
@@ -122,7 +146,9 @@ class FieldVisit(Document):
 		"""Fill attendee row training details from header when blank."""
 		for row in self.training_attendees or []:
 			if not row.school_organization:
-				row.school_organization = self.school_name or self.me_school_name
+				row.school_organization = (
+					self.school_name or self.pending_school_name or self.me_school_name
+				)
 			if not row.training_venue:
 				row.training_venue = self.training_venue_name
 			if not row.training_date:

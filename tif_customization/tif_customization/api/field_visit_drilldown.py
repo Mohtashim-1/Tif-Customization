@@ -43,10 +43,11 @@ METRIC_LABELS = {
 	"other_official": _("Other Official Tasks"),
 	"co_curricular": _("Co-curricular Activities"),
 	"quiz": _("Quiz Arranged"),
-	"new_school_registration": _("New School Visits"),
-	"new_schools": _("New school visits (Marketing / M&E)"),
+	"new_school_registration": _("Registration of New Schools"),
+	"new_schools": _("Registration of New Schools"),
+	"new_school": _("Registration of New Schools"),
 	"workshop_registration": _("Workshop / Training sessions"),
-	"enrolment": _("Enrollment of Participants"),
+	"enrolment": _("Enrollment of Participants in Online Course"),
 	"volunteers": _("Volunteer visits"),
 	"schools": _("Training visits (schools attended)"),
 	"participants": _("Training visits (participants)"),
@@ -254,6 +255,7 @@ def _school_sql(alias="fv"):
 	a = alias
 	return f"""COALESCE(
 		NULLIF(TRIM({a}.school_name), ''),
+		NULLIF(TRIM({a}.pending_school_name), ''),
 		NULLIF(TRIM({a}.me_school_name), ''),
 		NULLIF(TRIM({a}.mt_institute_or_organization_name), ''),
 		NULLIF(TRIM({a}.training_venue_name), '')

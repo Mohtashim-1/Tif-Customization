@@ -1349,8 +1349,6 @@ def submit_smes_activity(data):
 	if soa_doc:
 		pending_name = cstr(soa_doc.school_name or raw_school).strip()
 		fv_meta = frappe.get_meta("Field Visit")
-		if fv_meta.has_field("school_opening_application"):
-			doc.school_opening_application = soa_doc.name
 		if fv_meta.has_field("pending_school_name"):
 			doc.pending_school_name = pending_name
 		note = _("Pending school (School Opening {0}): {1}").format(soa_doc.name, pending_name)

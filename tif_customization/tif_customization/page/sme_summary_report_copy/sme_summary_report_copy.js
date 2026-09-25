@@ -404,13 +404,13 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 	outcome_columns(data) {
 		return (
 			(data && data.outcome_columns) || [
-				{ key: "outcome_enrolment", label: __("Enrollment of Participants"), short_label: __("Enrollment of Participants"), metric: "enrolment" },
+				{ key: "outcome_enrolment", label: __("Enrollment of Participants in Online Course"), short_label: __("Enrollment of Participants in Online Course"), metric: "enrolment" },
 				{ key: "outcome_quiz", label: __("Quiz Arranged"), short_label: __("Quiz Arranged"), metric: "quiz" },
 				{ key: "outcome_co_curricular", label: __("Activities (Events) Function"), short_label: __("Co-curricular Activities"), metric: "co_curricular" },
 				{
 					key: "outcome_new_schools",
-					label: __("New Schools"),
-					short_label: __("New Schools"),
+					label: __("Registration of New Schools"),
+					short_label: __("Registration of New Schools"),
 					metric: "new_schools",
 				},
 				{ key: "outcome_workshop_registration", label: __("Workshop Participants"), short_label: __("Workshop Participants"), metric: "workshop_registration" },
@@ -538,7 +538,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				metric: "marketing",
 				hint: __("Field Visit type = Marketing only"),
 			},
-			{ label: __("Monitoring Visit"), value: this.fmt(k.me), style: "me", metric: "monitoring" },
+			{ label: __("Monitoring Visit (M&E)"), value: this.fmt(k.me), style: "me", metric: "monitoring" },
 			{ label: __("Follow up Visit"), value: this.fmt(k.followup), style: "followup", metric: "followup" },
 			...this.activity_extra_columns(data).map((col) => ({
 				label: col.label,

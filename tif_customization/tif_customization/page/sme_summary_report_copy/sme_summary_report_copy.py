@@ -578,6 +578,7 @@ def _report_model_school_counts(staff_rows, from_date, to_date):
 	dept = department_count_sql("fv")
 	school = f"""LOWER(TRIM(COALESCE(
 		NULLIF(TRIM(fv.school_name), ''),
+		NULLIF(TRIM(fv.pending_school_name), ''),
 		NULLIF(TRIM(fv.me_school_name), ''),
 		NULLIF(TRIM(fv.training_venue_name), '')
 	)))"""

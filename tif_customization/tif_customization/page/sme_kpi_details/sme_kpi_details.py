@@ -46,13 +46,13 @@ OUTCOME_WEIGHT = 0.30
 
 # Yearly compulsory mins from KPI Details policy (all areas)
 OUTCOME_TARGETS = (
-	{"key": "enrolment", "label": _("Enrollment of Participants"), "short_label": _("Enrollment of Participants"), "target": 50, "metric": "enrolment"},
+	{"key": "enrolment", "label": _("Enrollment of Participants in Online Course"), "short_label": _("Enrollment of Participants in Online Course"), "target": 50, "metric": "enrolment"},
 	{"key": "quiz", "label": _("Quiz Arranged"), "short_label": _("Quiz Arranged"), "target": 1, "metric": "quiz"},
-	{"key": "co_curricular", "label": _("Co-curricular Activities"), "short_label": _("Co-curricular Activities"), "target": 1, "metric": "co_curricular"},
+	{"key": "co_curricular", "label": _("Activities (Events) Function"), "short_label": _("Activities (Events) Function"), "target": 1, "metric": "co_curricular"},
 	{
 		"key": "new_schools",
-		"label": _("New Schools (distinct, from school / field visits)"),
-		"short_label": _("New Schools"),
+		"label": _("Registration of New Schools"),
+		"short_label": _("Registration of New Schools"),
 		"target": 24,
 		"metric": "new_schools",
 	},
@@ -381,6 +381,7 @@ def _school_expr(alias="fv"):
 	a = alias
 	return f"""LOWER(TRIM(COALESCE(
 		NULLIF(TRIM({a}.school_name), ''),
+		NULLIF(TRIM({a}.pending_school_name), ''),
 		NULLIF(TRIM({a}.me_school_name), ''),
 		NULLIF(TRIM({a}.training_venue_name), '')
 	)))"""

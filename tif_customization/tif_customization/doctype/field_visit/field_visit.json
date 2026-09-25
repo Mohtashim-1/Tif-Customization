@@ -156,6 +156,7 @@
   "section_break_crph",
   "school_type",
   "school_name",
+  "pending_school_name",
   "contact_number",
   "column_break_mzrz",
   "meeting_with",
@@ -762,6 +763,14 @@
    "fieldtype": "Link",
    "label": "School Name",
    "options": "Customer"
+  },
+  {
+   "depends_on": "eval:in_list(['Marketing','Visits','Registration of New Schools','Enrolment of Volunteers','Model School A','Model School B','Books Demand (Quantity)','Joint Visit with SME'], doc.type) && !doc.school_name",
+   "description": "Shown when the school is not yet in Customer (from School Opening). Linked SOA is in Reference.",
+   "fieldname": "pending_school_name",
+   "fieldtype": "Small Text",
+   "label": "School Name (Pending)",
+   "read_only": 1
   },
   {
    "depends_on": "eval:in_list(['Marketing','Visits','Registration of New Schools','Enrolment of Volunteers','Model School A','Model School B','Books Demand (Quantity)','Joint Visit with SME'], doc.type)",

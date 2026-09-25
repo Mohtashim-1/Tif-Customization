@@ -275,6 +275,7 @@ function apply_field_visit_logic(frm) {
 		"province",
 		"school_type",
 		"school_name",
+		"pending_school_name",
 		"meeting_with",
 		"designation",
 		"designation_other",
@@ -527,6 +528,7 @@ function apply_field_visit_logic(frm) {
 				"area",
 				"province",
 				"school_name",
+				"pending_school_name",
 				"meeting_with",
 				"designation",
 				"designation_other",
@@ -843,6 +845,7 @@ function _training_feedback_defaults(frm, prev_row) {
 		school_organization:
 			(prev_row && prev_row.school_organization) ||
 			frm.doc.school_name ||
+			frm.doc.pending_school_name ||
 			frm.doc.me_school_name ||
 			"",
 		training_venue:
@@ -873,6 +876,7 @@ function _workshop_row_defaults(frm, prev_row) {
 		school_organization:
 			(prev_row && prev_row.school_organization) ||
 			frm.doc.school_name ||
+			frm.doc.pending_school_name ||
 			frm.doc.me_school_name ||
 			"",
 		training_venue:
