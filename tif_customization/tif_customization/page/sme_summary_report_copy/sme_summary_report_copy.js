@@ -459,7 +459,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			(data && data.kpi_columns) || [
 				{
 					key: "workshop",
-					label: __("Workshop"),
+					label: __("Workshop (Onsite)"),
 					metric: "training",
 					value: (r) =>
 						cint(r.workshop) ||
@@ -472,7 +472,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				},
 				{
 					key: "teachers_training_meeting",
-					label: __("Teachers Training Meeting"),
+					label: __("Teachers Training Meeting (Onsite School)"),
 					metric: "teachers_training_meeting",
 				},
 				{
@@ -523,7 +523,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		const t = data.totals || {};
 		const activityCards = [
 			{
-				label: __("Marketing Visit"),
+				label: __("Marketing Visit (New School)"),
 				value: this.fmt(k.marketing != null ? k.marketing : cint(k.new) + cint(k.followup)),
 				style: "new",
 				metric: "marketing",
@@ -572,25 +572,27 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					// 	hint: __("Total visit sum — SME wise (New + Follow up + Monitoring)"),
 					// },
 					{
-						label: __("New School Sum - SME Wise "),
+						label: __("New School Visit"),
 						value: this.fmt(k.new),
 						style: "new",
 						metric: "new",
 						hint: __("Only Visits type with category New (not Marketing type)"),
 					},
 					{
-						label: __("Total Visit"),
+						label: __("Number of School Visit"),
 						value: this.fmt(k.followup),
 						style: "followup",
 						metric: "followup",
 						hint: __("Follow-up / existing school visits — SME wise"),
 					},
 					{
-						label: __("SME Summary"),
-						value: this.fmt(this.field_emp_with_visits(data)),
+						label: __("Total School Visit"),
+						value: this.fmt(
+							cint(k.marketing != null ? k.marketing : 0) + cint(k.followup),
+						),
 						style: "sme",
 						cardKind: "field_emp_summary",
-						hint: __("Field officer–wise Total Visit — click for breakdown"),
+						hint: __("Marketing Visit + Follow up Visit — click for field officer breakdown"),
 					},
 				],
 			},
@@ -1098,14 +1100,10 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				<td><a ${linkAttrs}>${frappe.utils.escape_html(r.label || r.employee_name || "")}</a></td>
 				<td><a ${linkAttrs}>${frappe.utils.escape_html(r.province || "—")}</a></td>
 				<td><a ${linkAttrs}>${frappe.utils.escape_html(r.area || "—")}</a></td>
-				<td class="num"><a ${linkAttrs}>${this.fmt(r.school_total)}</a></td>
-				<td class="num">${this.fmt(r.new_count)}</td>
-				<td class="num">${this.fmt(r.monitoring_count)}</td>
-				<td class="num">${this.fmt(r.followup_count)}</td>
 			</tr>`;
 					})
 					.join("")
-			: `<tr><td colspan="7" class="text-muted text-center">${__("No SMEs found")}</td></tr>`;
+			: `<tr><td colspan="3" class="text-muted text-center">${__("No SMEs found")}</td></tr>`;
 
 		const sumSchools = rows.reduce((a, r) => a + r.school_total, 0);
 		const d = new frappe.ui.Dialog({
@@ -1121,7 +1119,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				– ${frappe.utils.escape_html(frappe.datetime.str_to_user(data.to_date || ""))}
 				&nbsp;·&nbsp; ${__("SMEs")}: <strong>${rows.length}</strong>
 				&nbsp;·&nbsp; ${__("Total school visits")}: <strong>${this.fmt(sumSchools)}</strong>
-				<br>${__("Click Name, Province, Area, or Total School Visits for school visit detail.")}
+				<br>${__("Click Name, Province, or Area for school visit detail.")}
 			</p>
 			<div class="table-responsive" style="max-height:420px;overflow:auto;">
 				<table class="table table-bordered table-hover" style="font-size:12px;margin:0;">
@@ -1130,24 +1128,9 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 							<th>${__("Name of SME")}</th>
 							<th>${__("Province")}</th>
 							<th>${__("Area")}</th>
-							<th class="text-right">${__("Total School Visits")}</th>
-							<th class="text-right">${__("New")}</th>
-							<th class="text-right">${__("Monitoring")}</th>
-							<th class="text-right">${__("Follow up")}</th>
 						</tr>
 					</thead>
 					<tbody>${body}</tbody>
-					<tfoot>
-						<tr>
-							<th>${__("Total")}</th>
-							<th></th>
-							<th></th>
-							<th class="text-right">${this.fmt(sumSchools)}</th>
-							<th class="text-right">${this.fmt(rows.reduce((a, r) => a + r.new_count, 0))}</th>
-							<th class="text-right">${this.fmt(rows.reduce((a, r) => a + r.monitoring_count, 0))}</th>
-							<th class="text-right">${this.fmt(rows.reduce((a, r) => a + r.followup_count, 0))}</th>
-						</tr>
-					</tfoot>
 				</table>
 			</div>
 		`);
