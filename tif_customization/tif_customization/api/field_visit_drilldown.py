@@ -26,7 +26,7 @@ METRIC_LABELS = {
 	"monitoring": _("Monitoring (M&E) Visits"),
 	"me": _("M&E Visits"),
 	"meeting": _("Meetings"),
-	"training": _("Training Visits"),
+	"training": _("Workshop (Onsite)"),
 	"academic": _("Academic / Other"),
 	"other": _("Other Visits"),
 	"followup": _("Follow up Visits"),
