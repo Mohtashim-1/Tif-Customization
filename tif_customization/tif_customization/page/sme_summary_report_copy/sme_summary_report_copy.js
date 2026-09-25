@@ -379,9 +379,10 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				label: __("Marketing Visit"),
 				metric: "marketing",
 				value: (r) => (r.marketing != null ? r.marketing : cint(r.new) + cint(r.followup)),
-			},
-			{ label: __("Monitoring Visit"), metric: "monitoring", value: (r) => this.me_visits(r), cellClass: "visit-mon-col" },
+			},			
 			{ label: __("Follow up Visit"), metric: "followup", value: (r) => r.followup },
+
+			{ label: __("Monitoring Visit (M&E)"), metric: "monitoring", value: (r) => this.me_visits(r), cellClass: "visit-mon-col" },
 			// { label: __("Meetings"), metric: "meeting", value: (r) => r.meetings },
 		];
 	}
