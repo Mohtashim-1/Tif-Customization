@@ -18,8 +18,10 @@ from tif_customization.tif_customization.field_visit_permissions import (
 	expand_staff_tokens,
 	get_team_employee_rows,
 	get_team_match_values,
+	staff_match_sql,
 	visit_day_sql as _visit_day_sql,
 )
+from tif_customization.tif_customization.model_school import department_count_sql
 from tif_customization.tif_customization.field_visit_travel_cost import (
 	DEFAULT_PER_KM_FUEL,
 	aggregate_visit_expenses_by_staff,
@@ -467,6 +469,15 @@ def get_report_data(filters=None):
 	expense_total = flt(sum(flt(r.get("expenses") or 0) for r in rows), 2)
 	totals_out["expenses"] = expense_total
 
+	outcome_fy = _report_outcome_fy_totals(staff_rows, ytd_from, to_date)
+	# Prefer report-scope FY totals on Outcomes cards (avoids double-count on distinct schools).
+	for cfg in OUTCOME_TARGETS:
+		okey = f"outcome_{cfg['key']}"
+		if cfg["key"] in outcome_fy:
+			totals_out[okey] = outcome_fy[cfg["key"]]["actual"]
+
+	model_counts = _report_model_school_counts(staff_rows, from_date, to_date)
+
 	return {
 		"from_date": str(from_date),
 		"to_date": str(to_date),
@@ -490,6 +501,7 @@ def get_report_data(filters=None):
 		],
 		"rows": rows,
 		"totals": totals_out,
+		"outcome_fy": outcome_fy,
 		"kpi_columns": list(KPI_COLUMNS),
 		"outcome_columns": list(OUTCOME_COLUMNS),
 		"kpis": {
@@ -526,12 +538,103 @@ def get_report_data(filters=None):
 			"sme_count": len(rows),
 			"supervisor_count": cint(supervisor_stats.get("total") or 0),
 			"sme_supervisor_count": cint(supervisor_stats.get("sme_supervisors") or 0),
+			"model_a": cint(model_counts.get("model_a") or 0),
+			"model_b": cint(model_counts.get("model_b") or 0),
+			"model_c": cint(model_counts.get("model_c") or 0),
 			"model_school_a": cint(totals.get("outcome_model_school_a") or 0),
 			"model_school_b": cint(totals.get("outcome_model_school_b") or 0),
 			"new_schools": cint(totals.get("outcome_new_schools") or 0),
 		},
 		"regions": [{"key": rk, "label": REGION_LABELS[rk]} for rk in REGION_KEYS],
 	}
+
+
+def _staff_token_list(staff_rows):
+	tokens = set()
+	for staff in staff_rows or []:
+		staff_token = (
+			staff.get("user_id") or staff.get("employee_name") or staff.get("employee") or ""
+		).strip()
+		for v in staff.get("match_values") or []:
+			if v:
+				tokens.add(str(v).strip())
+		if staff_token:
+			tokens.update(expand_staff_tokens(staff_token))
+		if staff.get("employee"):
+			tokens.update(expand_staff_tokens(staff["employee"]))
+	return list(tokens)
+
+
+def _report_model_school_counts(staff_rows, from_date, to_date):
+	"""Distinct schools by TIF department affiliation count (QPS/TPS/CEE).
+
+	Model A = 1 department, Model B = 2, Model C = 3.
+	"""
+	tokens = _staff_token_list(staff_rows)
+	if not tokens:
+		return {"model_a": 0, "model_b": 0, "model_c": 0}
+
+	visit_day = _visit_day_sql("fv")
+	dept = department_count_sql("fv")
+	school = f"""LOWER(TRIM(COALESCE(
+		NULLIF(TRIM(fv.school_name), ''),
+		NULLIF(TRIM(fv.me_school_name), ''),
+		NULLIF(TRIM(fv.training_venue_name), '')
+	)))"""
+	params = {
+		"from_date": from_date,
+		"to_date": to_date,
+		"staff_tokens": tuple(t.lower() for t in tokens) or ("__none__",),
+	}
+	staff_sql = staff_match_sql("fv", "staff_tokens")
+
+	def _count(dept_cond: str) -> int:
+		return cint(
+			frappe.db.sql(
+				f"""
+				SELECT COUNT(*) FROM (
+					SELECT {school} AS school
+					FROM `tabField Visit` fv
+					WHERE fv.docstatus = 1
+					  AND {visit_day} BETWEEN %(from_date)s AND %(to_date)s
+					  AND {staff_sql}
+					  AND ({dept_cond})
+					  AND {school} IS NOT NULL
+					  AND {school} != ''
+					GROUP BY 1
+				) t
+				""",
+				params,
+			)[0][0]
+			or 0
+		)
+
+	return {
+		"model_a": _count(f"{dept} = 1"),
+		"model_b": _count(f"{dept} = 2"),
+		"model_c": _count(f"{dept} >= 3"),
+	}
+
+
+def _report_outcome_fy_totals(staff_rows, ytd_from, to_date):
+	"""Single FY YTD outcome totals for all SMEs in the report (current fiscal year → to_date)."""
+	token_list = _staff_token_list(staff_rows)
+	actuals = (
+		_enriched_actuals(ytd_from, to_date, "", token_list)
+		if token_list
+		else {}
+	)
+	out = {}
+	for cfg in OUTCOME_TARGETS:
+		key = cfg["key"]
+		actual = flt(actuals.get(key, 0))
+		out[key] = {
+			"actual": flt(actual, 2) if key == "workshop_registration" else cint(actual),
+			"yearly_min": cint(cfg.get("target") or 0),
+			"metric": cfg.get("metric") or key,
+			"label": cfg.get("label") or key,
+		}
+	return out
 
 
 def _outcome_row_fields(staff, ytd_from, to_date):

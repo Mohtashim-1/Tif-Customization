@@ -121,6 +121,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					.sme-sum-kpi--outcome{border-top-color:#ca8a04}
 					.sme-sum-kpi--model-a{border-top-color:#b45309}
 					.sme-sum-kpi--model-b{border-top-color:#c2410c}
+					.sme-sum-kpi--model-c{border-top-color:#9a3412}
 					@media print{
 						@page{size:A4 landscape;margin:8mm}
 						html,body{width:100%!important;height:auto!important;overflow:visible!important;background:#fff!important}
@@ -404,10 +405,10 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			(data && data.outcome_columns) || [
 				{ key: "outcome_enrolment", label: __("Enrollment of Participants"), short_label: __("Enrollment of Participants"), metric: "enrolment" },
 				{ key: "outcome_quiz", label: __("Quiz Arranged"), short_label: __("Quiz Arranged"), metric: "quiz" },
-				{ key: "outcome_co_curricular", label: __("Co-curricular Activities"), short_label: __("Co-curricular Activities"), metric: "co_curricular" },
+				{ key: "outcome_co_curricular", label: __("Activities (Events) Function"), short_label: __("Co-curricular Activities"), metric: "co_curricular" },
 				{
 					key: "outcome_new_schools",
-					label: __("New Schools (distinct, from school / field visits)"),
+					label: __("New Schools"),
 					short_label: __("New Schools"),
 					metric: "new_schools",
 				},
@@ -499,15 +500,22 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			.join("");
 	}
 
-	/** Period activity cards that belong under Outcomes on the paper layout. */
+	/** Period cards that stay under Outcomes (none currently — HO/Academic/Other moved to Activity). */
 	outcome_period_columns(data) {
-		const keys = new Set(["headoffice_visit", "academic_task", "other_official"]);
+		const keys = new Set([]);
 		return this.kpi_columns(data).filter((col) => keys.has(col.key));
 	}
 
-	/** Workshop / Ulama / Teachers Training stay under Activity. */
+	/** Workshop / Ulama / Teachers Training / Head Office / Academic / Other Official under Activity. */
 	activity_extra_columns(data) {
-		const keys = new Set(["workshop", "meeting_ulama", "teachers_training_meeting"]);
+		const keys = new Set([
+			"workshop",
+			"meeting_ulama",
+			"teachers_training_meeting",
+			"headoffice_visit",
+			"academic_task",
+			"other_official",
+		]);
 		return this.kpi_columns(data).filter((col) => keys.has(col.key));
 	}
 
@@ -545,13 +553,25 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				style: (col.key || "activity").replace(/_/g, "-"),
 				metric: col.metric || col.key,
 			})),
-			...this.outcome_ytd_columns(data).map((col) => ({
-				label: col.label,
-				value: this.fmt(t[col.key]),
-				style: col.metric === "quiz" ? "quiz" : col.metric === "co_curricular" ? "co_curricular" : "outcome",
-				metric: col.metric,
-				useYtd: true,
-			})),
+			...this.outcome_ytd_columns(data).map((col) => {
+				const fyKey = (col.metric || col.key || "").replace(/^outcome_/, "");
+				const fy = (data.outcome_fy || {})[fyKey] || {};
+				const actual = fy.actual != null ? fy.actual : t[col.key];
+				const fyLabel = data.fiscal_year_label || "";
+				return {
+					label: col.label,
+					value: this.fmt(actual),
+					style:
+						col.metric === "quiz"
+							? "quiz"
+							: col.metric === "co_curricular"
+								? "co_curricular"
+								: "outcome",
+					metric: col.metric,
+					useYtd: true,
+					hint: __("FY {0} YTD total — click for fiscal year detail", [fyLabel || "—"]),
+				};
+			}),
 		];
 		return [
 			{
@@ -601,14 +621,14 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				cards: activityCards,
 			},
 			{
-				title: __("Outcomes (YTD vs yearly mins)"),
+				title: __("Outcomes (current fiscal year)"),
 				cards: outcomeCards,
 			},
 			{
 				title: __("Summary"),
 				cards: [
 					{
-						label: __("Visited Days"),
+						label: __("Working Days"),
 						value: this.fmt(visitedDaysMax),
 						style: "visited",
 						metric: "visited_days",
@@ -620,6 +640,27 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						style: "supervisor",
 						cardKind: "supervisor_list",
 						hint: __("Field Officers who manage other Field Officers"),
+					},
+					{
+						label: __("Model A"),
+						value: this.fmt(k.model_a),
+						style: "model-a",
+						metric: "model_a",
+						hint: __("School enrolled in 1 TIF department (QPS / TPS / CEE)"),
+					},
+					{
+						label: __("Model B"),
+						value: this.fmt(k.model_b),
+						style: "model-b",
+						metric: "model_b",
+						hint: __("School enrolled in 2 TIF departments"),
+					},
+					{
+						label: __("Model C"),
+						value: this.fmt(k.model_c),
+						style: "model-c",
+						metric: "model_c",
+						hint: __("School enrolled in 3 TIF departments"),
 					},
 				],
 			},
@@ -732,7 +773,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 							<th rowspan="3" class="left">${__("Name")}</th>
 							<th rowspan="3">${__("Type / Division")}</th>
 							<th colspan="${activityCols.length}" class="group activity-group">${__("Activity (period)")}</th>
-							<th colspan="${outcomeCols.length}" class="group outcome-group">${__("Outcomes (YTD vs yearly mins)")}</th>
+							<th colspan="${outcomeCols.length}" class="group outcome-group">${__("Outcomes (current fiscal year)")}</th>
 							<th colspan="2" class="group">${__("Totals")}</th>
 							<th colspan="3" class="group">${__("KPI Points")}</th>
 						</tr>
