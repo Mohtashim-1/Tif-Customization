@@ -323,7 +323,10 @@ def get_visit_drilldown(filters=None, metric=None, staff=None):
 			fv.ot_other_official_task_detail,
 			fv.ot_type_of_task,
 			{visit_day} AS visit_date,
-			{_school_sql("fv")} AS school
+			{_school_sql("fv")} AS school,
+			COALESCE(NULLIF(TRIM(fv.province), ''), NULLIF(TRIM(fv.me_province), '')) AS province,
+			COALESCE(NULLIF(TRIM(fv.area), ''), NULLIF(TRIM(fv.me_area), '')) AS area,
+			COALESCE(NULLIF(TRIM(fv.city), ''), NULLIF(TRIM(fv.me_city), '')) AS city
 		FROM `tabField Visit` fv
 		WHERE {where_sql}
 		ORDER BY visit_date DESC, fv.creation DESC
@@ -358,6 +361,9 @@ def get_visit_drilldown(filters=None, metric=None, staff=None):
 				"type": vtype,
 				"visit_date": str(r.visit_date) if r.visit_date else "",
 				"school": r.school or "",
+				"province": r.province or "",
+				"area": r.area or "",
+				"city": r.city or "",
 				"officer": officer,
 				"status": status_map.get(r.docstatus, r.docstatus),
 				"category": category,

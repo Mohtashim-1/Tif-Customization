@@ -356,6 +356,8 @@ def get_report_data(filters=None):
 		schools = cint(stats.get("schools") or 0)
 		participants = cint(stats.get("participants") or 0)
 		visited_days = cint(stats.get("visited_days") or 0)
+		province = (stats.get("province") or "").strip()
+		area = (stats.get("area") or "").strip()
 		# Grand Total = Visits New/Followup + Marketing type + Meetings + M&E
 		grand_total = followup + new + marketing + meetings + me
 		expense_amt = flt(expenses.get(key) or 0)
@@ -375,6 +377,8 @@ def get_report_data(filters=None):
 			"division": staff.get("division") or "",
 			"region": staff_region,
 			"region_label": REGION_LABELS.get(staff_region, staff_region),
+			"province": province,
+			"area": area,
 			"user_id": staff.get("user_id"),
 			"label": f"SME - {staff.get('employee_name') or staff.get('user_id') or staff.get('employee')}",
 			"followup": followup,
@@ -758,6 +762,8 @@ def _load_visit_stats(from_date, to_date, staff_rows):
 			fv.me_activity_status,
 			COALESCE(fv.training_no_of_schools_attended, 0) AS schools,
 			COALESCE(fv.training_no_of_participants, 0) AS participants,
+			COALESCE(NULLIF(TRIM(fv.province), ''), NULLIF(TRIM(fv.me_province), '')) AS province,
+			COALESCE(NULLIF(TRIM(fv.area), ''), NULLIF(TRIM(fv.me_area), '')) AS area,
 			{visit_day} AS visit_day
 		FROM `tabField Visit` fv
 		WHERE fv.docstatus = 1
@@ -781,7 +787,11 @@ def _load_visit_stats(from_date, to_date, staff_rows):
 			"schools": 0,
 			"participants": 0,
 			"trainings": 0,
+			"province": "",
+			"area": "",
 			"_days": set(),
+			"_province_counts": {},
+			"_area_counts": {},
 		}
 		for s in staff_rows
 	}
@@ -823,11 +833,23 @@ def _load_visit_stats(from_date, to_date, staff_rows):
 			bucket["participants"] += cint(row.get("participants") or 0)
 			bucket["trainings"] += 1
 
+		if vtype in ("Marketing", "Visits", "M&E", "Registration of New Schools"):
+			prov = (row.get("province") or "").strip()
+			area = (row.get("area") or "").strip()
+			if prov:
+				bucket["_province_counts"][prov] = bucket["_province_counts"].get(prov, 0) + 1
+			if area:
+				bucket["_area_counts"][area] = bucket["_area_counts"].get(area, 0) + 1
+
 		if row.get("visit_day"):
 			bucket["_days"].add(str(row.visit_day))
 
 	for key, bucket in stats.items():
 		bucket["visited_days"] = len(bucket.pop("_days"))
+		p_counts = bucket.pop("_province_counts")
+		a_counts = bucket.pop("_area_counts")
+		bucket["province"] = max(p_counts, key=p_counts.get) if p_counts else ""
+		bucket["area"] = max(a_counts, key=a_counts.get) if a_counts else ""
 
 	return stats
 

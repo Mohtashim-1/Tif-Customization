@@ -1089,24 +1089,23 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					.map((r) => {
 						const key = r.employee || r.user_id || r.employee_name || "";
 						const staff = r.user_id || r.employee_name || r.employee || "";
+						const linkAttrs = `href="#" class="sme-school-count-link" data-officer-key="${frappe.utils.escape_html(
+							key,
+						)}" data-visit-staff="${frappe.utils.escape_html(staff)}" title="${__(
+							"Click for school visit detail",
+						)}"`;
 						return `<tr>
-				<td><a href="#" class="sme-officer-link" data-officer-key="${frappe.utils.escape_html(
-					key,
-				)}">${frappe.utils.escape_html(r.label || r.employee_name || "")}</a></td>
-				<td>${frappe.utils.escape_html(r.division || r.region_label || "—")}</td>
-				<td class="num">
-					<a href="#" class="sme-school-count-link"
-						data-officer-key="${frappe.utils.escape_html(key)}"
-						data-visit-staff="${frappe.utils.escape_html(staff)}"
-						title="${__("Click for school visit detail")}">${this.fmt(r.school_total)}</a>
-				</td>
+				<td><a ${linkAttrs}>${frappe.utils.escape_html(r.label || r.employee_name || "")}</a></td>
+				<td><a ${linkAttrs}>${frappe.utils.escape_html(r.province || "—")}</a></td>
+				<td><a ${linkAttrs}>${frappe.utils.escape_html(r.area || "—")}</a></td>
+				<td class="num"><a ${linkAttrs}>${this.fmt(r.school_total)}</a></td>
 				<td class="num">${this.fmt(r.new_count)}</td>
 				<td class="num">${this.fmt(r.monitoring_count)}</td>
 				<td class="num">${this.fmt(r.followup_count)}</td>
 			</tr>`;
 					})
 					.join("")
-			: `<tr><td colspan="6" class="text-muted text-center">${__("No SMEs found")}</td></tr>`;
+			: `<tr><td colspan="7" class="text-muted text-center">${__("No SMEs found")}</td></tr>`;
 
 		const sumSchools = rows.reduce((a, r) => a + r.school_total, 0);
 		const d = new frappe.ui.Dialog({
@@ -1122,14 +1121,15 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				– ${frappe.utils.escape_html(frappe.datetime.str_to_user(data.to_date || ""))}
 				&nbsp;·&nbsp; ${__("SMEs")}: <strong>${rows.length}</strong>
 				&nbsp;·&nbsp; ${__("Total school visits")}: <strong>${this.fmt(sumSchools)}</strong>
-				<br>${__("Click SME name for full KPI. Click Total School Visits count for school visit detail.")}
+				<br>${__("Click Name, Province, Area, or Total School Visits for school visit detail.")}
 			</p>
 			<div class="table-responsive" style="max-height:420px;overflow:auto;">
 				<table class="table table-bordered table-hover" style="font-size:12px;margin:0;">
 					<thead>
 						<tr>
 							<th>${__("Name of SME")}</th>
-							<th>${__("Type / Division")}</th>
+							<th>${__("Province")}</th>
+							<th>${__("Area")}</th>
 							<th class="text-right">${__("Total School Visits")}</th>
 							<th class="text-right">${__("New")}</th>
 							<th class="text-right">${__("Monitoring")}</th>
@@ -1141,6 +1141,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						<tr>
 							<th>${__("Total")}</th>
 							<th></th>
+							<th></th>
 							<th class="text-right">${this.fmt(sumSchools)}</th>
 							<th class="text-right">${this.fmt(rows.reduce((a, r) => a + r.new_count, 0))}</th>
 							<th class="text-right">${this.fmt(rows.reduce((a, r) => a + r.monitoring_count, 0))}</th>
@@ -1150,11 +1151,6 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				</table>
 			</div>
 		`);
-		d.$wrapper.on("click", ".sme-officer-link", (e) => {
-			e.preventDefault();
-			const key = $(e.currentTarget).attr("data-officer-key");
-			if (key) this.show_officer_kpi_detail(key);
-		});
 		d.$wrapper.on("click", ".sme-school-count-link", (e) => {
 			e.preventDefault();
 			const key = $(e.currentTarget).attr("data-officer-key");
@@ -1204,16 +1200,28 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				const bySchool = {};
 				visits.forEach((v) => {
 					const school = (v.school || "").trim() || __("— No school name —");
-					if (!bySchool[school]) {
-						bySchool[school] = { school, total: 0, new: 0, monitoring: 0, followup: 0, rows: [] };
+					const province = (v.province || "").trim();
+					const area = (v.area || "").trim();
+					const key = `${school}||${province}||${area}`;
+					if (!bySchool[key]) {
+						bySchool[key] = {
+							school,
+							province,
+							area,
+							total: 0,
+							new: 0,
+							monitoring: 0,
+							followup: 0,
+							rows: [],
+						};
 					}
-					bySchool[school].total += 1;
-					bySchool[school].rows.push(v);
+					bySchool[key].total += 1;
+					bySchool[key].rows.push(v);
 					const t = String(v.type || "");
 					const cat = String(v.category || "");
-					if (t === "M&E") bySchool[school].monitoring += 1;
-					else if (cat === "New" || t === "Registration of New Schools") bySchool[school].new += 1;
-					else bySchool[school].followup += 1;
+					if (t === "M&E") bySchool[key].monitoring += 1;
+					else if (cat === "New" || t === "Registration of New Schools") bySchool[key].new += 1;
+					else bySchool[key].followup += 1;
 				});
 				const schoolRows = Object.values(bySchool).sort((a, b) => b.total - a.total || a.school.localeCompare(b.school));
 				const schoolBody = schoolRows.length
@@ -1221,6 +1229,8 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 							.map(
 								(s) => `<tr>
 						<td>${frappe.utils.escape_html(s.school)}</td>
+						<td>${frappe.utils.escape_html(s.province || "—")}</td>
+						<td>${frappe.utils.escape_html(s.area || "—")}</td>
 						<td class="num">${this.fmt(s.total)}</td>
 						<td class="num">${this.fmt(s.new)}</td>
 						<td class="num">${this.fmt(s.monitoring)}</td>
@@ -1228,7 +1238,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					</tr>`,
 							)
 							.join("")
-					: `<tr><td colspan="5" class="text-muted text-center">${__("No school visits")}</td></tr>`;
+					: `<tr><td colspan="7" class="text-muted text-center">${__("No school visits")}</td></tr>`;
 
 				const visitBody = visits.length
 					? visits
@@ -1238,12 +1248,14 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						<td>${frappe.utils.escape_html(v.visit_date || "")}</td>
 						<td>${frappe.utils.escape_html(v.type || "")}</td>
 						<td>${frappe.utils.escape_html(v.school || "—")}</td>
+						<td>${frappe.utils.escape_html(v.province || "—")}</td>
+						<td>${frappe.utils.escape_html(v.area || "—")}</td>
 						<td>${frappe.utils.escape_html(v.category || "")}</td>
 						<td>${frappe.utils.escape_html(v.status || "")}</td>
 					</tr>`,
 							)
 							.join("")
-					: `<tr><td colspan="6" class="text-muted text-center">${__("No documents")}</td></tr>`;
+					: `<tr><td colspan="8" class="text-muted text-center">${__("No documents")}</td></tr>`;
 
 				const d = new frappe.ui.Dialog({
 					title: __("School visits — {0}", [row.label || row.employee_name || ""]),
@@ -1259,6 +1271,16 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						&nbsp;·&nbsp; ${__("Monitoring")}: <strong>${this.fmt(monitoring)}</strong>
 						&nbsp;·&nbsp; ${__("Follow up")}: <strong>${this.fmt(followup)}</strong>
 						&nbsp;·&nbsp; ${__("Distinct schools")}: <strong>${schoolRows.length}</strong>
+						${
+							row.province
+								? `&nbsp;·&nbsp; ${__("Province")}: <strong>${frappe.utils.escape_html(row.province)}</strong>`
+								: ""
+						}
+						${
+							row.area
+								? `&nbsp;·&nbsp; ${__("Area")}: <strong>${frappe.utils.escape_html(row.area)}</strong>`
+								: ""
+						}
 					</p>
 					<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
 						<button type="button" class="btn btn-xs btn-default sme-open-metric" data-metric="school_visits">${__("All")} (${this.fmt(
@@ -1280,6 +1302,8 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 							<thead>
 								<tr>
 									<th>${__("School")}</th>
+									<th>${__("Province")}</th>
+									<th>${__("Area")}</th>
 									<th class="text-right">${__("Total")}</th>
 									<th class="text-right">${__("New")}</th>
 									<th class="text-right">${__("Monitoring")}</th>
@@ -1298,6 +1322,8 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 									<th>${__("Visit Date")}</th>
 									<th>${__("Type")}</th>
 									<th>${__("School")}</th>
+									<th>${__("Province")}</th>
+									<th>${__("Area")}</th>
 									<th>${__("Category")}</th>
 									<th>${__("Status")}</th>
 								</tr>
@@ -1327,8 +1353,8 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		const staff = row.user_id || row.employee_name || row.employee || "";
 		const items = [
 			{ group: __("Overview"), label: __("Total School Visits"), value: cint(row.new) + cint(row.followup) + this.me_visits(row), metric: "school_visits" },
-			{ group: __("Overview"), label: __("New School Sum"), value: row.new, metric: "new" },
-			{ group: __("Overview"), label: __("Total Visit"), value: row.followup, metric: "followup" },
+			{ group: __("Overview"), label: __("New School Visit"), value: row.new, metric: "new" },
+			{ group: __("Overview"), label: __("Number of School Visit"), value: row.followup, metric: "followup" },
 			{ group: __("Overview"), label: __("Visited Days"), value: row.visited_days, metric: "visited_days" },
 			...this.visit_columns().map((col) => ({
 				group: __("Activity (period)"),
