@@ -30,6 +30,8 @@ METRIC_LABELS = {
 	"academic": _("Academic / Other"),
 	"other": _("Other Visits"),
 	"followup": _("Follow up Visits"),
+	"followup_other": _("Followup & Other Visits"),
+	"followup_and_other": _("Followup & Other Visits"),
 	"new": _("New School Visits"),
 	"me_active": _("M&E Active"),
 	"me_inactive": _("M&E Inactive"),
@@ -118,6 +120,11 @@ def _metric_condition(metric: str, alias: str = "fv") -> str:
 		return f"{a}.type NOT IN ('Marketing', 'Visits', 'M&E', 'Training', 'Meeting')"
 	if m == "followup":
 		return f"{a}.type = 'Visits' AND IFNULL({a}.marketing_visit_category, '') != 'New'"
+	if m in ("followup_other", "followup_and_other"):
+		return f"""(
+			{a}.type = 'Marketing'
+			OR ({a}.type = 'Visits' AND IFNULL({a}.marketing_visit_category, '') != 'New')
+		)"""
 	if m == "new" or m == "new_school_registration":
 		return f"""(
 			{a}.type = 'Registration of New Schools'

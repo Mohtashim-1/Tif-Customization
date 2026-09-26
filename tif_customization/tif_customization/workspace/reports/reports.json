@@ -563,10 +563,20 @@
    "link_type": "Page",
    "onboard": 0,
    "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "SME ERP Summary",
+   "link_count": 0,
+   "link_to": "sme-erp-summary",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
   }
  ],
- "modified": "2026-09-18 14:36:50.358223",
- "modified_by": "farhan.hussain@tif.edu.pk",
+ "modified": "2026-09-26 12:43:46.802831",
+ "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Reports",
  "number_cards": [],
