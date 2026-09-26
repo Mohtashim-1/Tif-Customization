@@ -426,7 +426,7 @@ def _count_actuals(from_date, to_date, staff, staff_tokens=None, submitted_only=
 		WHERE {ds_fv}
 		AND {visit_day} BETWEEN %(from_date)s AND %(to_date)s
 		AND (
-			fv.type = 'Meeting with Ulama and Educationist'
+			fv.type IN ('Meeting', 'Meeting with Ulama and Educationist')
 			OR (
 				fv.type IN ('Marketing', 'Visits')
 				AND (

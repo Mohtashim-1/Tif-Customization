@@ -36,7 +36,7 @@ METRIC_LABELS = {
 	"grand_total": _("Grand Total (Marketing + Meetings + M&E)"),
 	"half_day_workshop": _("Half Day Workshop"),
 	"full_day_session": _("Full Day Session"),
-	"meeting_ulama": _("Meeting with Ulama / Educationist"),
+	"meeting_ulama": _("Meeting / Ulama and Educationist"),
 	"teachers_training_meeting": _("Teachers Training Meeting"),
 	"headoffice_visit": _("Head office / Regional / Out of station"),
 	"academic_task": _("Academic Task"),
@@ -161,7 +161,7 @@ def _metric_condition(metric: str, alias: str = "fv") -> str:
 		)"""
 	if m == "meeting_ulama":
 		return f"""(
-			{a}.type = 'Meeting with Ulama and Educationist'
+			{a}.type IN ('Meeting', 'Meeting with Ulama and Educationist')
 			OR ({a}.type IN ('Marketing', 'Visits') AND (
 				LOWER(IFNULL({a}.meeting_with,'')) LIKE '%%ulama%%'
 				OR LOWER(IFNULL({a}.meeting_with,'')) LIKE '%%educationist%%'

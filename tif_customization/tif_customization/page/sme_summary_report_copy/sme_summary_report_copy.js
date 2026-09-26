@@ -404,7 +404,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 	outcome_columns(data) {
 		return (
 			(data && data.outcome_columns) || [
-				{ key: "outcome_enrolment", label: __("Enrollment of Participants in Online Course"), short_label: __("Enrollment of Participants in Online Course"), metric: "enrolment" },
+				{ key: "outcome_enrolment", label: __("Enrollment of Participants in Mutal e quran Course"), short_label: __("Enrollment of Participants in Multi-media Course"), metric: "enrolment" },
 				{ key: "outcome_quiz", label: __("Quiz Arranged"), short_label: __("Quiz Arranged"), metric: "quiz" },
 				{ key: "outcome_co_curricular", label: __("Activities (Events) Function"), short_label: __("Co-curricular Activities"), metric: "co_curricular" },
 				{
@@ -469,7 +469,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				},
 				{
 					key: "meeting_ulama",
-					label: __("Meeting with Ulama and Educationist"),
+					label: __("Meeting / Ulama and Educationist"),
 					metric: "meeting_ulama",
 				},
 				{

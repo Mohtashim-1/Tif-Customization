@@ -12,12 +12,14 @@ from tif_customization.tif_customization.doctype.school.school_customer import (
 
 def create_customer_from_application(app):
 	if app.customer and frappe.db.exists("Customer", app.customer):
+		_link_field_visits_to_customer(app, app.customer)
 		return app.customer
 
 	existing = frappe.db.get_value("Customer", {"customer_name": app.school_name}, "name")
 	if existing:
 		app.db_set("customer", existing, update_modified=False)
 		app.db_set("erp_school_code", existing, update_modified=False)
+		_link_field_visits_to_customer(app, existing)
 		return existing
 
 	customer = frappe.new_doc("Customer")
@@ -88,7 +90,77 @@ def create_customer_from_application(app):
 		indicator="green",
 		title=_("School Opening Approved"),
 	)
+	_link_field_visits_to_customer(app, customer.name)
 	return customer.name
+
+
+def _link_field_visits_to_customer(app, customer_name):
+	"""Fill School Name on Field Visits that were saved against this pending School Opening."""
+	if not customer_name or not frappe.db.exists("DocType", "Field Visit"):
+		return
+	soa = (app.name or "").strip()
+	school_title = (app.school_name or "").strip()
+	if not soa:
+		return
+
+	has_pending = frappe.db.has_column("Field Visit", "pending_school_name")
+	conditions = [
+		"IFNULL(school_name, '') = ''",
+		"(school_additional_remarks LIKE %(soa_note)s OR reference = %(soa)s)",
+	]
+	params = {
+		"soa": soa,
+		"soa_note": f"%Pending school (School Opening {soa}):%",
+		"customer": customer_name,
+	}
+	rows = frappe.db.sql(
+		f"""
+		SELECT name
+		FROM `tabField Visit`
+		WHERE {' AND '.join(conditions)}
+		""",
+		params,
+		as_dict=True,
+	)
+	linked_names = set()
+	for row in rows:
+		vals = {"school_name": customer_name}
+		if has_pending:
+			vals["pending_school_name"] = ""
+		frappe.db.set_value("Field Visit", row.name, vals, update_modified=False)
+		linked_names.add(row.name)
+
+	# Also match by pending school title when SOA id was not stored in reference
+	if has_pending and school_title:
+		extra = frappe.db.sql(
+			"""
+			SELECT name
+			FROM `tabField Visit`
+			WHERE IFNULL(school_name, '') = ''
+			  AND pending_school_name = %(title)s
+			""",
+			{"title": school_title},
+			as_dict=True,
+		)
+		for row in extra:
+			if row.name in linked_names:
+				continue
+			frappe.db.set_value(
+				"Field Visit",
+				row.name,
+				{"school_name": customer_name, "pending_school_name": ""},
+				update_modified=False,
+			)
+			linked_names.add(row.name)
+
+	if linked_names:
+		frappe.msgprint(
+			_("Linked {0} Field Visit(s) to school {1}.").format(
+				len(linked_names), frappe.utils.get_link_to_form("Customer", customer_name)
+			),
+			indicator="blue",
+			alert=True,
+		)
 
 
 def _summarize_services(app):
