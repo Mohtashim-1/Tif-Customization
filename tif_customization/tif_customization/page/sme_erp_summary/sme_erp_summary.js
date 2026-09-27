@@ -39,19 +39,17 @@ frappe.tif_customization.SMEErpSummary = class SMEErpSummary {
 						border:1px solid #cbd5e1;border-radius:6px;background:#fff;
 					}
 					.sme-erp-table{
-						width:100%;border-collapse:separate;border-spacing:0;
-						font-size:12px;min-width:1100px;
+						width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;
+						font-size:12px;min-width:1040px;
 					}
 					.sme-erp-table th,.sme-erp-table td{
 						padding:6px 8px;border:1px solid #94a3b8;vertical-align:middle;
+						overflow:hidden;text-overflow:ellipsis;
 					}
 					.sme-erp-table thead th{
-						position:sticky;background:#e2e8f0;text-align:center;font-weight:700;
+						background:#e2e8f0;text-align:center;font-weight:700;
 						line-height:1.25;box-shadow:0 1px 0 #94a3b8;
 					}
-					.sme-erp-table thead tr:first-child th{top:0;z-index:4}
-					.sme-erp-table thead tr:nth-child(2) th{top:var(--sme-erp-h1,36px);z-index:3}
-					.sme-erp-table thead tr:first-child th[rowspan="2"]{z-index:5}
 					.sme-erp-table .group{background:#cbd5e1}
 					.sme-erp-table .mkt{background:#ccfbf1}
 					.sme-erp-table .me{background:#ede9fe}
@@ -62,7 +60,6 @@ frappe.tif_customization.SMEErpSummary = class SMEErpSummary {
 					.sme-erp-table .sme-click{cursor:pointer;color:#0f766e;text-decoration:underline}
 					.sme-erp-table .sme-click:hover{background:#ecfdf5}
 					.sme-erp-table tfoot th{background:#f1f5f9;font-weight:700}
-					.sme-erp-table .diff-neg{color:#b91c1c;font-weight:600}
 					@media print{
 						@page{size:A4 landscape;margin:8mm}
 						.navbar,.page-head,.page-actions,.sme-erp-filters,.no-print{display:none!important}
@@ -75,7 +72,7 @@ frappe.tif_customization.SMEErpSummary = class SMEErpSummary {
 				<div class="sme-erp-filters" style="margin-bottom:12px;"></div>
 				<p class="sme-erp-note no-print">
 					${__(
-						"Paper-style Summary sheet: Marketing (Followup & Other / New), Meetings, M&E Active / Inactive, Training schools & participants, Grand Total from ERP, Expenses, Visited Days, Difference (Visited Days − Working Days). Click a number to open Field Visits."
+						"Paper-style Summary sheet: Marketing (Followup & Other / New), Meetings, M&E Active / Inactive, Training schools & participants, Grand Total from ERP, Expenses, and Visited Days. Click a number to open Field Visits."
 					)}
 				</p>
 				<div id="sme-erp-body"></div>
@@ -202,7 +199,6 @@ frappe.tif_customization.SMEErpSummary = class SMEErpSummary {
 			? rows
 					.map((r, idx) => {
 						const staff = r.employee_name || r.user_id || "";
-						const diffCls = cint(r.difference) < 0 ? "diff-neg" : "";
 						return `<tr>
 					<td class="num">${idx + 1}</td>
 					<td class="left">${frappe.utils.escape_html(r.label || "")}</td>
@@ -216,11 +212,10 @@ frappe.tif_customization.SMEErpSummary = class SMEErpSummary {
 					<td class="num">${this.fmt(r.grand_total)}</td>
 					<td class="num">${this.fmt_cur(r.expenses)}</td>
 					${this.click_td(r.visited_days, "visited_days", staff)}
-					<td class="num ${diffCls}">${this.fmt(r.difference)}</td>
 				</tr>`;
 					})
 					.join("")
-			: `<tr><td colspan="13" class="text-center text-muted">${__("No SMEs found")}</td></tr>`;
+			: `<tr><td colspan="12" class="text-center text-muted">${__("No SMEs found")}</td></tr>`;
 
 		$("#sme-erp-body").html(`
 			<div class="sme-erp-title">${__("Summary")} (${fromLabel} ${__("to")} ${toLabel})</div>
@@ -237,6 +232,20 @@ frappe.tif_customization.SMEErpSummary = class SMEErpSummary {
 			</div>
 			<div class="sme-erp-wrap">
 				<table class="sme-erp-table">
+					<colgroup>
+						<col style="width:56px">
+						<col style="width:275px">
+						<col style="width:182px">
+						<col style="width:52px">
+						<col style="width:86px">
+						<col style="width:64px">
+						<col style="width:74px">
+						<col style="width:190px">
+						<col style="width:148px">
+						<col style="width:168px">
+						<col style="width:88px">
+						<col style="width:108px">
+					</colgroup>
 					<thead>
 						<tr>
 							<th rowspan="2">${__("S.NO")}</th>
@@ -245,7 +254,7 @@ frappe.tif_customization.SMEErpSummary = class SMEErpSummary {
 							<th rowspan="2" class="group">${__("Meetings")}</th>
 							<th colspan="2" class="group me">${__("M&E Visits")}</th>
 							<th colspan="2" class="group trn">${__("Training Sessions")}</th>
-							<th colspan="4" class="group tot">${__("Total")}</th>
+							<th colspan="3" class="group tot">${__("Total")}</th>
 						</tr>
 						<tr>
 							<th class="mkt">${__("Followup & Other Visits")}</th>
@@ -257,7 +266,6 @@ frappe.tif_customization.SMEErpSummary = class SMEErpSummary {
 							<th class="tot">${__("Grand Total from ERP")}</th>
 							<th class="tot">${__("Expenses")}</th>
 							<th class="tot">${__("visited Days")}</th>
-							<th class="tot">${__("Difference")}</th>
 						</tr>
 					</thead>
 					<tbody>${body}</tbody>
@@ -275,16 +283,11 @@ frappe.tif_customization.SMEErpSummary = class SMEErpSummary {
 							<th class="num">${this.fmt(t.grand_total)}</th>
 							<th class="num">${this.fmt_cur(t.expenses)}</th>
 							${this.click_td(t.visited_days, "visited_days", "")}
-							<th class="num ${cint(t.difference) < 0 ? "diff-neg" : ""}">${this.fmt(t.difference)}</th>
 						</tr>
 					</tfoot>
 				</table>
 			</div>
 		`);
-
-		const $wrap = $(".sme-erp-wrap");
-		const h1 = $wrap.find("thead tr:first-child th").first().outerHeight() || 36;
-		$wrap.find(".sme-erp-table").css("--sme-erp-h1", `${h1}px`);
 	}
 
 	bind_interactions() {
@@ -329,7 +332,6 @@ frappe.tif_customization.SMEErpSummary = class SMEErpSummary {
 			"Grand Total from ERP",
 			"Expenses",
 			"visited Days",
-			"Difference",
 		];
 		const lines = [headers.join(",")];
 		rows.forEach((r, i) => {
@@ -347,7 +349,6 @@ frappe.tif_customization.SMEErpSummary = class SMEErpSummary {
 					r.grand_total || 0,
 					r.expenses || 0,
 					r.visited_days || 0,
-					r.difference || 0,
 				].join(",")
 			);
 		});
