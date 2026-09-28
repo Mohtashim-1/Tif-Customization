@@ -841,6 +841,11 @@
 	font-size: 13px;
 	color: var(--muted);
 }
+.page-feedback-studio .fs-ac-wrap input {
+	direction: ltr !important;
+	text-align: left !important;
+	unicode-bidi: plaintext;
+}
 .page-feedback-studio .fs-ac-wrap {
 	position: relative;
 }

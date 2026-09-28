@@ -73,6 +73,7 @@ textarea:focus, button:focus-visible, input:focus, select:focus { outline: 2px s
 <script>
 const TOKEN = {{ token | tojson }};
 const CSRF = {{ csrf_token | tojson }};
+const SME_BOOTSTRAP = {{ sme_bootstrap | tojson }};
 const API = "/api/method/tif_customization.tif_customization.api.feedback_studio.";
 const app = document.getElementById("app");
 const state = {
@@ -116,7 +117,12 @@ function esc(value) {
 }
 
 function isSme() {
-	return state.form && state.form.audience === "sme";
+	if (SME_BOOTSTRAP) return true;
+	return !!(state.form && state.form.audience === "sme");
+}
+
+function smeData() {
+	return (state.form && state.form.sme) || SME_BOOTSTRAP || {};
 }
 
 function qrImg(url) {
@@ -156,11 +162,11 @@ function clientMeta() {
 }
 
 function smeMetaHtml() {
-	const sme = (state.form && state.form.sme) || {};
+	const sme = smeData();
 	const officers = sme.staff_options || [];
-	const smeOpts = '<option value="">Select Field Officer (SME)…</option>' + officers.map(function (o) {
+	const smeOpts = '<option value="">Select Field Officer (SME)...</option>' + officers.map(function (o) {
 		const value = o.value || o.employee_name || "";
-		const label = value + (o.division ? " · " + o.division : "");
+		const label = value + (o.division ? " - " + o.division : "");
 		return '<option value="' + esc(value) + '"' + (state.smeName === value ? " selected" : "") + ">" + esc(label) + "</option>";
 	}).join("");
 	const provinces = (sme.provinces || []).map(function (p) {
@@ -171,7 +177,7 @@ function smeMetaHtml() {
 	const acList = state.schoolOpen
 		? '<div class="ac-list" id="schoolList">' +
 			(state.schoolSearching
-				? '<div class="ac-empty">Searching Customer…</div>'
+				? '<div class="ac-empty">Searching Customer...</div>'
 				: hits.length
 					? hits.map(function (c, i) {
 						const value = c.value || "";
@@ -184,11 +190,11 @@ function smeMetaHtml() {
 			"</div>"
 		: "";
 	const createPanel = state.createSchool
-		? '<div class="soa"><div class="soa-title">School Opening — create school</div><p class="note">School is not in Customer yet. This creates a School Opening request (same as Easy Form).</p><div class="meta-grid">' +
+		? '<div class="soa"><div class="soa-title">School Opening - create school</div><p class="note">School is not in Customer yet. This creates a School Opening request (same as Easy Form).</p><div class="meta-grid">' +
 			'<label class="field' + (state.metaErrors.school_name ? " bad" : "") + '"><span>Name of School *</span><input type="text" data-key="soa-school_name" data-soa="school_name" value="' + esc(soa.school_name || "") + '"></label>' +
 			'<label class="field"><span>City</span><input type="text" data-key="soa-city" data-soa="city" value="' + esc(soa.city || "") + '"></label>' +
 			'<label class="field"><span>Area</span><input type="text" data-key="soa-area" data-soa="area" value="' + esc(soa.area || "") + '"></label>' +
-			'<label class="field"><span>Province</span><select data-soa="province"><option value="">Select…</option>' + provinces + "</select></label>" +
+			'<label class="field"><span>Province</span><select data-soa="province"><option value="">Select...</option>' + provinces + "</select></label>" +
 			'<label class="field span2"><span>Address</span><input type="text" data-key="soa-address" data-soa="address" value="' + esc(soa.address || "") + '"></label>' +
 			'<label class="field"><span>School mobile</span><input type="text" data-key="soa-mobile" data-soa="school_mobile" value="' + esc(soa.school_mobile || "") + '"></label>' +
 			'<label class="field"><span>School email</span><input type="text" data-key="soa-email" data-soa="school_email" value="' + esc(soa.school_email || "") + '"></label>' +
@@ -196,12 +202,15 @@ function smeMetaHtml() {
 			'<label class="field"><span>Principal cell</span><input type="text" data-key="soa-pcell" data-soa="principal_cell" value="' + esc(soa.principal_cell || "") + '"></label>' +
 			"</div></div>"
 		: "";
-	return '<div class="card"><div class="kicker">SME visit details</div><p class="note">SME list is from <strong>Field Officer</strong>. School is linked to <strong>Customer</strong>.</p><div class="meta-grid">' +
+	return '<div class="card" id="smeMetaCard" style="border:2px solid #7a4cc2"><div class="kicker">SME + School (required)</div>' +
+		'<p class="note">SME list = <strong>Field Officer</strong>. School = <strong>Customer</strong> link. Type 2+ letters and pick a school.</p><div class="meta-grid">' +
 		'<label class="field' + (state.metaErrors.smeName ? " bad" : "") + '"><span>SME name (Field Officer) *</span><select id="smeName">' + smeOpts + "</select>" +
-		(state.metaErrors.smeName ? '<div class="err">Required</div>' : "") + "</label>" +
+		(state.metaErrors.smeName ? '<div class="err">Required</div>' : "") +
+		(officers.length ? "" : '<div class="err">No active Field Officers found</div>') +
+		"</label>" +
 		'<label class="field span2' + (state.metaErrors.customer ? " bad" : "") + '"><span>Customer / school *</span>' +
-		'<div class="ac-wrap"><input type="text" id="customerQuery" data-key="customerQuery" placeholder="Search Customer by school name…" value="' +
-		esc(state.customerQuery || "") + '" autocomplete="off"' + (state.createSchool ? " disabled" : "") + ">" + acList + "</div>" +
+		'<div class="ac-wrap"><input type="text" id="customerQuery" data-key="customerQuery" dir="ltr" inputmode="text" autocomplete="off" spellcheck="false" placeholder="Search Customer by school name..." value="' +
+		esc(state.customerQuery || "") + '"' + (state.createSchool ? " disabled" : "") + ">" + acList + "</div>" +
 		(state.customer && !state.createSchool ? '<div class="picked">Selected: ' + esc(state.customerLabel || state.customer) + "</div>" : "") +
 		(state.metaErrors.customer ? '<div class="err">Select a Customer from the list, or create one below</div>' : "") +
 		"</label></div>" +
@@ -329,6 +338,12 @@ function render() {
 		end = active.selectionEnd;
 	}
 	if (state.status === "loading") {
+		if (isSme()) {
+			app.style.setProperty("--accent", "#7a4cc2");
+			app.innerHTML = '<div class="stack">' + smeMetaHtml() + '<div class="empty">Loading questions...</div></div>';
+			bindSmeMeta();
+			return;
+		}
 		app.innerHTML = '<div class="empty">Loading the form…</div>';
 		return;
 	}
@@ -559,8 +574,9 @@ async function load() {
 			return;
 		}
 		state.form = data.message;
-		if (data.message.sme && data.message.sme.default_sme) {
-			state.smeName = data.message.sme.default_sme;
+		if (!state.form.sme && SME_BOOTSTRAP) state.form.sme = SME_BOOTSTRAP;
+		if (state.form.sme && state.form.sme.default_sme && !state.smeName) {
+			state.smeName = state.form.sme.default_sme;
 		}
 		state.status = "ready";
 		document.title = data.message.title || "Feedback";

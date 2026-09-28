@@ -1369,9 +1369,9 @@ frappe.tif_customization.FeedbackStudio = class FeedbackStudio {
 			smeOpts +
 			"</select></label>" +
 			'<label class="fs-field fs-span2"><span>Customer / school *</span>' +
-			'<div class="fs-ac-wrap"><input data-field="customerQuery" data-field-key="customerQuery" placeholder="Search Customer by school name…" value="' +
+			'<div class="fs-ac-wrap"><input data-field="customerQuery" data-field-key="customerQuery" dir="ltr" inputmode="text" autocomplete="off" spellcheck="false" placeholder="Search Customer by school name…" value="' +
 			this.h(this.state.customerQuery || "") +
-			'" autocomplete="off"' +
+			'"' +
 			(this.state.createSchool ? " disabled" : "") +
 			">" +
 			acList +
