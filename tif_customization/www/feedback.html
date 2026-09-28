@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" dir="ltr">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,9 +8,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,500;6..72,600&display=swap" rel="stylesheet">
 <style>
+html, body { direction: ltr; text-align: left; }
 body { margin: 0; background: #f5f3ee; color: #1d2230; font-family: "Figtree", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
 * { box-sizing: border-box; }
-button, input, textarea, select { font-family: inherit; }
+button, input, textarea, select { font-family: inherit; direction: ltr; text-align: left; unicode-bidi: isolate; }
 .wrap { max-width: 880px; margin: 0 auto; padding: 28px 24px 64px; }
 .card { background: #fffdf9; border: 1px solid #e6e1d6; border-radius: 14px; padding: 22px 24px; }
 .stack { display: flex; flex-direction: column; gap: 16px; }
@@ -33,7 +34,8 @@ h1 { margin: 8px 0 0; font-family: "Newsreader", Georgia, serif; font-size: 28px
 .choices button.on { border-color: var(--accent, #2f5bd3); background: #fbfaf6; }
 .dot { width: 18px; height: 18px; border-radius: 50%; border: 2px solid #c9c2b3; box-shadow: inset 0 0 0 3px #fff; background: #fff; flex: none; }
 .choices button.on .dot { border-color: var(--accent, #2f5bd3); background: var(--accent, #2f5bd3); }
-textarea, input[type=text], select { width: 100%; border: 1px solid #d9d3c6; background: #fff; border-radius: 10px; padding: 12px 14px; font-size: 15px; line-height: 1.5; }
+textarea, input[type=text], select { width: 100%; border: 1px solid #d9d3c6; background: #fff; border-radius: 10px; padding: 12px 14px; font-size: 15px; line-height: 1.5; direction: ltr !important; text-align: left !important; unicode-bidi: plaintext; }
+#customerQuery { direction: ltr !important; text-align: left !important; unicode-bidi: plaintext; }
 textarea { resize: vertical; }
 textarea:focus, button:focus-visible, input:focus, select:focus { outline: 2px solid var(--accent, #2f5bd3); outline-offset: 1px; }
 .err { font-size: 12px; font-weight: 600; color: #b3401f; }
