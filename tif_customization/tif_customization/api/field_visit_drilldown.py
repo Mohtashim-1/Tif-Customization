@@ -402,6 +402,7 @@ def get_visit_drilldown(filters=None, metric=None, staff=None):
 				"visit_date": str(r.visit_date) if r.visit_date else "",
 				"school": r.school or "",
 				"school_unapproved": cint(r.school_unapproved),
+				"school_missing": 0 if (r.school or "").strip() else 1,
 				"province": r.province or "",
 				"area": r.area or "",
 				"city": r.city or "",

@@ -80,7 +80,8 @@ def get_report_data(filters=None):
 			{_category_sql("fv")} AS category,
 			{_province_sql("fv")} AS province,
 			{_remarks_sql("fv")} AS remarks,
-			{_school_unapproved_sql("fv")} AS school_unapproved
+			{_school_unapproved_sql("fv")} AS school_unapproved,
+			CASE WHEN {_school_sql("fv")} IS NULL THEN 1 ELSE 0 END AS school_missing
 		FROM `tabField Visit` fv
 		WHERE {where_clause}
 		ORDER BY visit_date DESC, fv.modified DESC

@@ -1222,12 +1222,16 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			callback: (r) => {
 				const detail = r.message || {};
 				const visits = detail.rows || [];
-				const unapprovedBadge = () =>
-					`<span style="display:inline-block;margin-left:6px;padding:1px 6px;border:1px solid #dc2626;border-radius:999px;background:#fef2f2;color:#b91c1c;font-size:11px;font-weight:700;white-space:nowrap;">${__(
-						"Un Approved",
-					)}</span>`;
-				const schoolCell = (school, unapproved) =>
-					`${frappe.utils.escape_html(school || "—")}${unapproved ? unapprovedBadge() : ""}`;
+				const schoolBadge = (label) =>
+					`<span style="display:inline-block;margin-left:6px;padding:1px 6px;border:1px solid #dc2626;border-radius:999px;background:#fef2f2;color:#b91c1c;font-size:11px;font-weight:700;white-space:nowrap;">${label}</span>`;
+				const schoolCell = (school, unapproved, missing) => {
+					const badge = unapproved
+						? schoolBadge(__("Un Approved"))
+						: missing
+						? schoolBadge(__("School Detail Missing"))
+						: "";
+					return `${frappe.utils.escape_html(school || "—")}${badge}`;
+				};
 				const bySchool = {};
 				visits.forEach((v) => {
 					const school = (v.school || "").trim() || __("— No school name —");
@@ -1244,11 +1248,13 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 							monitoring: 0,
 							followup: 0,
 							unapproved: 0,
+							missing: 0,
 							rows: [],
 						};
 					}
 					bySchool[key].total += 1;
 					if (cint(v.school_unapproved)) bySchool[key].unapproved = 1;
+					if (cint(v.school_missing)) bySchool[key].missing = 1;
 					bySchool[key].rows.push(v);
 					const t = String(v.type || "");
 					const cat = String(v.category || "");
@@ -1261,7 +1267,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					? schoolRows
 							.map(
 								(s) => `<tr>
-						<td>${schoolCell(s.school, s.unapproved)}</td>
+						<td>${schoolCell(s.school, s.unapproved, s.missing)}</td>
 						<td>${frappe.utils.escape_html(s.province || "—")}</td>
 						<td>${frappe.utils.escape_html(s.area || "—")}</td>
 						<td class="num">${this.fmt(s.total)}</td>
@@ -1280,7 +1286,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						<td><a href="${frappe.utils.escape_html(v.url)}">${frappe.utils.escape_html(v.name)}</a></td>
 						<td>${frappe.utils.escape_html(v.visit_date || "")}</td>
 						<td>${frappe.utils.escape_html(v.type || "")}</td>
-						<td>${schoolCell(v.school, cint(v.school_unapproved))}</td>
+						<td>${schoolCell(v.school, cint(v.school_unapproved), cint(v.school_missing))}</td>
 						<td>${frappe.utils.escape_html(v.province || "—")}</td>
 						<td>${frappe.utils.escape_html(v.area || "—")}</td>
 						<td>${frappe.utils.escape_html(v.category || "")}</td>

@@ -46,10 +46,14 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 	const showRemarks = data.metric === "academic_task" || data.metric === "academic" || data.metric === "other_official";
 	const schoolCell = (row) => {
 		const school = frappe.utils.escape_html(row.school || "—");
-		const badge = cint(row.school_unapproved)
-			? `<span style="display:inline-block;margin-left:6px;padding:1px 6px;border:1px solid #dc2626;border-radius:999px;background:#fef2f2;color:#b91c1c;font-size:11px;font-weight:700;white-space:nowrap;">${__(
-					"Un Approved"
-			  )}</span>`
+		let badge = "";
+		if (cint(row.school_unapproved)) {
+			badge = __("Un Approved");
+		} else if (cint(row.school_missing)) {
+			badge = __("School Detail Missing");
+		}
+		badge = badge
+			? `<span style="display:inline-block;margin-left:6px;padding:1px 6px;border:1px solid #dc2626;border-radius:999px;background:#fef2f2;color:#b91c1c;font-size:11px;font-weight:700;white-space:nowrap;">${badge}</span>`
 			: "";
 		return `${school}${badge}`;
 	};

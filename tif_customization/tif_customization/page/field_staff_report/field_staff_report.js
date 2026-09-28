@@ -399,9 +399,13 @@ class FieldStaffReportPage {
 							const school = frappe.utils.escape_html(
 								value == null || value === "" ? "-" : String(value)
 							);
-							const badge = cint(row.school_unapproved)
-								? `<span class="fsr-unapproved">${__("Un Approved")}</span>`
-								: "";
+							let badge = "";
+							if (cint(row.school_unapproved)) {
+								badge = __("Un Approved");
+							} else if (cint(row.school_missing)) {
+								badge = __("School Detail Missing");
+							}
+							badge = badge ? `<span class="fsr-unapproved">${badge}</span>` : "";
 							return `<td>${school}${badge}</td>`;
 						}
 						return `<td${cls}>${frappe.utils.escape_html(
