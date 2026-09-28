@@ -1,7 +1,7 @@
 frappe.pages["training-card"].on_page_load = function (wrapper) {
 	const page = frappe.ui.make_app_page({
 		parent: wrapper,
-		title: __("Training Dashboard"),
+		title: __("Training Report and Dashboard (UAT)"),
 		single_column: true,
 	});
 	frappe.tif_customization = frappe.tif_customization || {};

@@ -16,11 +16,11 @@ PORTAL_LINKS = {
 			"highlight": True,
 		},
 		{
-			"label": "Training Report and Dashboard",
+			"label": "Training Report and Dashboard (UAT)",
 			"link_type": "URL",
 			"link_to": "/app/training-card",
 			"is_query_report": 0,
-			"highlight": True,
+			"highlight": False,
 		},
 	],
 }
