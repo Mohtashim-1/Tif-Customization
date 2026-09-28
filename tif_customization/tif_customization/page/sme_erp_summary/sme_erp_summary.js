@@ -22,7 +22,7 @@ frappe.tif_customization.SMEErpSummary = class SMEErpSummary {
 		this.make_filters();
 		this.page.set_primary_action(__("Refresh"), () => this.load_data(), "refresh");
 		this.page.add_action_item(__("Export CSV"), () => this.export_csv());
-		this.page.add_action_item(__("Print"), () => window.print());
+		this.page.add_action_item(__("Print"), () => this.print_report());
 		this.bind_interactions();
 		this.load_data();
 	}
@@ -61,11 +61,15 @@ frappe.tif_customization.SMEErpSummary = class SMEErpSummary {
 					.sme-erp-table .sme-click:hover{background:#ecfdf5}
 					.sme-erp-table tfoot th{background:#f1f5f9;font-weight:700}
 					@media print{
-						@page{size:A4 landscape;margin:8mm}
-						.navbar,.page-head,.page-actions,.sme-erp-filters,.no-print{display:none!important}
-						.sme-erp-wrap{overflow:visible!important;max-height:none!important;border:none}
-						.sme-erp-table{font-size:8px;min-width:0!important}
-						.sme-erp-table th,.sme-erp-table td{padding:3px 4px}
+						@page{size:A4 landscape;margin:6mm}
+						html,body,.layout-main-section,.page-content,.page-body{margin:0!important;padding:0!important;width:100%!important}
+						.navbar,.page-head,.layout-side-section,.desk-sidebar,.page-actions,.page-form-actions,.sme-erp-filters,.sme-erp-note,.no-print{display:none!important}
+						.sme-erp{padding:0!important}
+						.sme-erp-title{font-size:11px;margin:0 0 2px}
+						.sme-erp-meta{font-size:8px;margin:0 0 5px}
+						.sme-erp-wrap{overflow:visible!important;max-height:none!important;border:none;border-radius:0}
+						.sme-erp-table{width:100%!important;min-width:0!important;font-size:7px;table-layout:fixed;border-collapse:collapse}
+						.sme-erp-table th,.sme-erp-table td{padding:2px 3px;line-height:1.15;white-space:normal}
 						.sme-click{color:#000!important;text-decoration:none!important}
 					}
 				</style>
@@ -288,6 +292,61 @@ frappe.tif_customization.SMEErpSummary = class SMEErpSummary {
 				</table>
 			</div>
 		`);
+	}
+
+	print_report() {
+		const $report = $(this.page.body).find("#sme-erp-body");
+		if (!$report.find(".sme-erp-table").length) {
+			frappe.msgprint(__("Nothing to print."));
+			return;
+		}
+
+		const w = window.open("", "_blank");
+		if (!w) {
+			frappe.msgprint(__("Please allow pop-ups to print."));
+			return;
+		}
+
+		w.document.write(`<!doctype html>
+			<html>
+				<head>
+					<meta charset="utf-8">
+					<title>${__("SME ERP Summary")}</title>
+					<style>
+						@page{size:A4 landscape;margin:6mm}
+						*{box-sizing:border-box}
+						body{margin:0;font-family:Arial,sans-serif;color:#000;background:#fff}
+						.sme-erp-title{text-align:center;font-size:11px;font-weight:700;margin:0 0 2px}
+						.sme-erp-meta{text-align:center;font-size:8px;margin:0 0 5px;color:#000}
+						.sme-erp-wrap{overflow:visible;border:0}
+						table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:7px}
+						col:nth-child(1){width:4%!important}
+						col:nth-child(2){width:19%!important}
+						col:nth-child(3){width:12%!important}
+						col:nth-child(4){width:4%!important}
+						col:nth-child(5){width:6%!important}
+						col:nth-child(6){width:6%!important}
+						col:nth-child(7){width:5%!important}
+						col:nth-child(8){width:13%!important}
+						col:nth-child(9){width:10%!important}
+						col:nth-child(10){width:11%!important}
+						col:nth-child(11){width:6%!important}
+						col:nth-child(12){width:4%!important}
+						th,td{border:1px solid #555;padding:2px 3px;line-height:1.15;vertical-align:middle;overflow:hidden;text-overflow:clip}
+						th{text-align:center;font-weight:700}
+						.left{text-align:left}
+						.num{text-align:right;font-variant-numeric:tabular-nums}
+						.sme-click{color:#000;text-decoration:none}
+						thead{display:table-header-group}
+						tfoot{display:table-row-group}
+						tr{break-inside:avoid;page-break-inside:avoid}
+					</style>
+				</head>
+				<body>${$report.html()}</body>
+			</html>`);
+		w.document.close();
+		w.focus();
+		setTimeout(() => w.print(), 250);
 	}
 
 	bind_interactions() {
