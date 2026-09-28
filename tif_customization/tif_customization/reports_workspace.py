@@ -9,11 +9,11 @@ CARD_ORDER = ["HR", "Supply Chain", "Purchase", "Accounts", "Program", "SME", "B
 PORTAL_LINKS = {
 	"Program": [
 		{
-			"label": "Training Schedule",
+			"label": "Training Schedule (UAT)",
 			"link_type": "URL",
 			"link_to": "/training-schedule",
 			"is_query_report": 0,
-			"highlight": True,
+			"highlight": False,
 		},
 		{
 			"label": "Training Report and Dashboard (UAT)",
