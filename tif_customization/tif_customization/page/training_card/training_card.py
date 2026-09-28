@@ -95,16 +95,38 @@ def _attendance(names):
 	return {row.parent: row for row in rows}
 
 
+def _as_dict(value):
+	if isinstance(value, str):
+		value = value.strip()
+		if not value:
+			return {}
+		try:
+			value = frappe.parse_json(value)
+		except Exception:
+			return {}
+	return value if isinstance(value, dict) else {}
+
+
 @frappe.whitelist()
-def get_dashboard(year=None):
+def get_dashboard(from_date=None, to_date=None, program=None, trainer=None, mode=None, status=None, filters=None):
 	_check()
 	today = getdate(nowdate())
-	year = cint(year) or today.year
+	extra = _as_dict(filters)
+	from_date = from_date or extra.get("from_date") or f"{today.year}-01-01"
+	to_date = to_date or extra.get("to_date") or f"{today.year}-12-31"
+	program = (program or extra.get("program") or "").strip()
+	trainer = (trainer or extra.get("trainer") or "").strip()
+	mode = (mode or extra.get("mode") or "").strip()
+	status = (status or extra.get("status") or "").strip().lower()
+	start = getdate(from_date)
+	end = getdate(to_date)
+	if start > end:
+		start, end = end, start
 	rows = frappe.get_list(
 		"Upcoming Training",
 		filters={
 			"docstatus": ["<", 2],
-			"training_date": ["between", [f"{year}-01-01", f"{year}-12-31"]],
+			"training_date": ["between", [start, end]],
 		},
 		fields=[
 			"name",
@@ -128,10 +150,34 @@ def get_dashboard(year=None):
 		limit_page_length=5000,
 	)
 	marks = _attendance([row.name for row in rows])
+	options = {"programs": set(), "trainers": set(), "modes": set()}
+	for row in rows:
+		if _program(row):
+			options["programs"].add(_program(row))
+		if (row.trainer_name or "").strip():
+			options["trainers"].add(row.trainer_name.strip())
+		if (row.mode_of_training or "").strip():
+			options["modes"].add(row.mode_of_training.strip())
+
 	groups = {}
 	months = {}
 
 	for row in rows:
+		row_program = _program(row)
+		row_trainer = (row.trainer_name or "").strip()
+		row_mode = (row.mode_of_training or "").strip()
+		row_status = _status(row, today)
+		if program == "__none__":
+			if row_program:
+				continue
+		elif program and row_program != program:
+			continue
+		if trainer and row_trainer != trainer:
+			continue
+		if mode and row_mode != mode:
+			continue
+		if status and row_status != status:
+			continue
 		title = _title(row)
 		kind = _kind(row)
 		program = _program(row) if kind == "course" else ""
@@ -140,7 +186,7 @@ def get_dashboard(year=None):
 			key,
 			{"id": key, "title": title, "kind": kind, "program": program, "sessions": []},
 		)
-		status = _status(row, today)
+		status = row_status
 		stats = marks.get(row.name)
 		present = cint(stats.present) if stats else cint(row.attendance_count)
 		total = cint(stats.total) if stats else 0
@@ -192,7 +238,14 @@ def get_dashboard(year=None):
 
 	month_keys = sorted(months)
 	return {
-		"year": year,
+		"year": start.year,
+		"from_date": str(start),
+		"to_date": str(end),
+		"options": {
+			"programs": sorted(options["programs"], key=str.lower),
+			"trainers": sorted(options["trainers"], key=str.lower),
+			"modes": sorted(options["modes"], key=str.lower),
+		},
 		"months": [
 			{"key": key, "course": months[key]["course"], "workshop": months[key]["workshop"]}
 			for key in month_keys

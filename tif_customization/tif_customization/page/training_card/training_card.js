@@ -66,6 +66,25 @@ frappe.tif_customization.TrainingDashboard = class TrainingDashboard {
 						<button type="button" class="td-icon" data-settings title="${__("Settings")}">⚙</button>
 					</div>
 				</div>
+				<div class="td-filters">
+					<label>${__("From")}<input type="date" data-filter="from_date"></label>
+					<label>${__("To")}<input type="date" data-filter="to_date"></label>
+					<div class="td-ranges">
+						<button type="button" data-range="year">${__("This year")}</button>
+						<button type="button" data-range="month">${__("This month")}</button>
+						<button type="button" data-range="90">${__("Last 90 days")}</button>
+					</div>
+					<label>${__("Program")}<select data-filter="program"><option value="">${__("All programs")}</option></select></label>
+					<label>${__("Trainer")}<select data-filter="trainer"><option value="">${__("All trainers")}</option></select></label>
+					<label>${__("Mode")}<select data-filter="mode"><option value="">${__("All modes")}</option></select></label>
+					<label>${__("Status")}<select data-filter="status">
+						<option value="">${__("All statuses")}</option>
+						<option value="completed">${__("Completed")}</option>
+						<option value="upcoming">${__("Upcoming")}</option>
+						<option value="in_progress">${__("In progress")}</option>
+					</select></label>
+					<button type="button" class="td-clear">${__("Clear")}</button>
+				</div>
 				<div class="td-pop" hidden>
 					<label>${__("Opens on")}</label>
 					<select data-set="view">
@@ -105,6 +124,9 @@ frappe.tif_customization.TrainingDashboard = class TrainingDashboard {
 		this.$.find('[data-set="view"]').val(this.settings.view);
 		this.$.find('[data-set="strong"]').val(this.settings.strong);
 		this.$.find("[data-strong-label]").text(this.settings.strong + "%");
+		const year = frappe.datetime.get_today().slice(0, 4);
+		this.$.find('[data-filter="from_date"]').val(`${year}-01-01`);
+		this.$.find('[data-filter="to_date"]').val(`${year}-12-31`);
 		this.mark_view();
 	}
 
@@ -134,12 +156,18 @@ frappe.tif_customization.TrainingDashboard = class TrainingDashboard {
 			this.sort = $(event.currentTarget).attr("data-sort");
 			this.paint();
 		});
+		this.$.on("change", "[data-filter]", () => this.load());
+		this.$.on("click", "[data-range]", (event) => this.apply_range($(event.currentTarget).attr("data-range")));
+		this.$.on("click", ".td-clear", () => this.clear_filters());
 		this.$.on("click", ".td-prog", (event) => {
 			const name = $(event.currentTarget).attr("data-program") || "";
+			const current = this.$.find('[data-filter="program"]').val() || "";
+			const next = current === name ? "" : name;
 			this.view = "course";
-			this.programFilter = this.programFilter === name ? "" : name;
+			this.programFilter = next;
+			this.$.find('[data-filter="program"]').val(next);
 			this.mark_view();
-			this.paint();
+			this.load();
 		});
 		this.$.on("input", ".td-search", (event) => {
 			this.query = event.target.value || "";
@@ -165,13 +193,76 @@ frappe.tif_customization.TrainingDashboard = class TrainingDashboard {
 		this.$.find(`[data-sort="${this.sort}"]`).addClass("on");
 	}
 
+	filter_values() {
+		const read = (name) => this.$.find(`[data-filter="${name}"]`).val() || "";
+		return {
+			from_date: read("from_date"),
+			to_date: read("to_date"),
+			program: read("program"),
+			trainer: read("trainer"),
+			mode: read("mode"),
+			status: read("status"),
+		};
+	}
+
+	apply_range(range) {
+		const today = frappe.datetime.get_today();
+		let from = today;
+		let to = today;
+		if (range === "year") {
+			from = today.slice(0, 4) + "-01-01";
+			to = today.slice(0, 4) + "-12-31";
+		} else if (range === "month") {
+			from = today.slice(0, 7) + "-01";
+			to = today;
+		} else if (range === "90") {
+			from = frappe.datetime.add_days(today, -89);
+			to = today;
+		}
+		this.$.find('[data-filter="from_date"]').val(from);
+		this.$.find('[data-filter="to_date"]').val(to);
+		this.load();
+	}
+
+	clear_filters() {
+		const year = frappe.datetime.get_today().slice(0, 4);
+		this.$.find('[data-filter="from_date"]').val(`${year}-01-01`);
+		this.$.find('[data-filter="to_date"]').val(`${year}-12-31`);
+		this.$.find('[data-filter="program"], [data-filter="trainer"], [data-filter="mode"], [data-filter="status"]').val("");
+		this.programFilter = "";
+		this.view = "all";
+		this.mark_view();
+		this.load();
+	}
+
+	fill_select(name, values, placeholder) {
+		const select = this.$.find(`[data-filter="${name}"]`);
+		const current = select.val() || "";
+		const items = (values || []).map((value) =>
+			typeof value === "string" ? { value, label: value } : value
+		);
+		select.html(`<option value="">${this.esc(placeholder)}</option>`);
+		items.forEach((item) => {
+			select.append(`<option value="${this.esc(item.value)}">${this.esc(item.label)}</option>`);
+		});
+		if (current && items.some((item) => item.value === current)) select.val(current);
+	}
+
 	load() {
+		this.programFilter = (this.filter_values().program || "");
 		frappe.call({
 			method: "tif_customization.tif_customization.page.training_card.training_card.get_dashboard",
+			args: { filters: this.filter_values() },
 			callback: (r) => {
-				this.data = (r && r.message) || { trainings: [], months: [], year: "" };
-				if (!this.selected && (this.data.trainings || []).length) {
-					this.selected = this.filtered()[0] && this.filtered()[0].id;
+				this.data = (r && r.message) || { trainings: [], months: [], year: "", options: {} };
+				const options = this.data.options || {};
+				const programs = (options.programs || []).map((value) => ({ value, label: value }));
+				programs.push({ value: "__none__", label: __("No program") });
+				this.fill_select("program", programs, __("All programs"));
+				this.fill_select("trainer", options.trainers, __("All trainers"));
+				this.fill_select("mode", options.modes, __("All modes"));
+				if (!this.selected || !(this.data.trainings || []).some((row) => row.id === this.selected)) {
+					this.selected = (this.filtered()[0] && this.filtered()[0].id) || "";
 				}
 				this.paint();
 			},
@@ -198,7 +289,7 @@ frappe.tif_customization.TrainingDashboard = class TrainingDashboard {
 		const q = (this.query || "").trim().toLowerCase();
 		let rows = this.filtered();
 		if (this.programFilter) {
-			rows = rows.filter((row) => ((row.program || "").trim() || __("No program")) === this.programFilter);
+			rows = rows.filter((row) => ((row.program || "").trim() || "__none__") === this.programFilter);
 		}
 		if (q) {
 			rows = rows.filter((row) => `${row.title || ""} ${row.program || ""}`.toLowerCase().includes(q));
@@ -320,13 +411,14 @@ frappe.tif_customization.TrainingDashboard = class TrainingDashboard {
 		((this.data && this.data.trainings) || [])
 			.filter((row) => row.kind === "course")
 			.forEach((row) => {
-				const name = (row.program || "").trim() || __("No program");
-				const bucket = buckets[name] || { name, courses: 0, conducted: 0, teachers: 0, students: 0 };
+				const key = (row.program || "").trim() || "__none__";
+				const name = key === "__none__" ? __("No program") : key;
+				const bucket = buckets[key] || { key, name, courses: 0, conducted: 0, teachers: 0, students: 0 };
 				bucket.courses += 1;
 				bucket.conducted += row.conducted;
 				bucket.teachers += row.teachers;
 				bucket.students += row.students;
-				buckets[name] = bucket;
+				buckets[key] = bucket;
 			});
 		return Object.values(buckets).sort((a, b) => b.conducted - a.conducted || a.name.localeCompare(b.name));
 	}
@@ -359,7 +451,7 @@ frappe.tif_customization.TrainingDashboard = class TrainingDashboard {
 		const programs = this.program_rows()
 			.map((row) => {
 				const width = Math.max(4, Math.round((100 * row.conducted) / maxProgram));
-				return `<button type="button" class="td-prog ${this.programFilter === row.name ? "on" : ""}" data-program="${this.esc(row.name)}">
+				return `<button type="button" class="td-prog ${this.programFilter === row.key ? "on" : ""}" data-program="${this.esc(row.key)}">
 					<span>${this.esc(row.name)}</span>
 					<span class="td-prog-track"><i style="width:${width}%"></i></span>
 					<b>${this.fmt(row.conducted)}</b>
