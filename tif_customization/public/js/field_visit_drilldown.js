@@ -44,6 +44,15 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 				)}</p>`
 			: "";
 	const showRemarks = data.metric === "academic_task" || data.metric === "academic" || data.metric === "other_official";
+	const schoolCell = (row) => {
+		const school = frappe.utils.escape_html(row.school || "—");
+		const badge = cint(row.school_unapproved)
+			? `<span style="display:inline-block;margin-left:6px;padding:1px 6px;border:1px solid #dc2626;border-radius:999px;background:#fef2f2;color:#b91c1c;font-size:11px;font-weight:700;white-space:nowrap;">${__(
+					"Un Approved"
+			  )}</span>`
+			: "";
+		return `${school}${badge}`;
+	};
 	const body = rows.length
 		? rows
 				.map(
@@ -51,7 +60,7 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 				<td><a href="${frappe.utils.escape_html(row.url)}">${frappe.utils.escape_html(row.name)}</a></td>
 				<td>${frappe.utils.escape_html(row.visit_date || "")}</td>
 				<td>${frappe.utils.escape_html(row.type || "")}</td>
-				<td>${frappe.utils.escape_html(row.school || "—")}</td>
+				<td>${schoolCell(row)}</td>
 				<td>${frappe.utils.escape_html(row.officer || "")}</td>
 				<td>${frappe.utils.escape_html(row.status || "")}</td>
 				<td>${frappe.utils.escape_html(row.category || "")}</td>

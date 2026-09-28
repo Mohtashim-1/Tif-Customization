@@ -265,8 +265,29 @@ def _school_sql(alias="fv"):
 		NULLIF(TRIM({a}.pending_school_name), ''),
 		NULLIF(TRIM({a}.me_school_name), ''),
 		NULLIF(TRIM({a}.mt_institute_or_organization_name), ''),
-		NULLIF(TRIM({a}.training_venue_name), '')
+		NULLIF(TRIM({a}.training_venue_name), ''),
+		(
+			SELECT NULLIF(TRIM(soa.school_name), '')
+			FROM `tabSchool Opening Application` soa
+			WHERE soa.name = {a}.reference
+			LIMIT 1
+		)
 	)"""
+
+
+def _school_unapproved_sql(alias="fv"):
+	a = alias
+	return f"""CASE
+		WHEN NULLIF(TRIM({a}.school_name), '') IS NOT NULL THEN 0
+		WHEN NULLIF(TRIM({a}.pending_school_name), '') IS NOT NULL THEN 1
+		WHEN EXISTS (
+			SELECT 1
+			FROM `tabSchool Opening Application` soa
+			WHERE soa.name = {a}.reference
+			LIMIT 1
+		) THEN 1
+		ELSE 0
+	END"""
 
 
 def _me_activity_bucket(status: str | None) -> str:
@@ -342,6 +363,7 @@ def get_visit_drilldown(filters=None, metric=None, staff=None):
 			fv.ot_type_of_task,
 			{visit_day} AS visit_date,
 			{_school_sql("fv")} AS school,
+			{_school_unapproved_sql("fv")} AS school_unapproved,
 			COALESCE(NULLIF(TRIM(fv.province), ''), NULLIF(TRIM(fv.me_province), '')) AS province,
 			COALESCE(NULLIF(TRIM(fv.area), ''), NULLIF(TRIM(fv.me_area), '')) AS area,
 			COALESCE(NULLIF(TRIM(fv.city), ''), NULLIF(TRIM(fv.me_city), '')) AS city
@@ -379,6 +401,7 @@ def get_visit_drilldown(filters=None, metric=None, staff=None):
 				"type": vtype,
 				"visit_date": str(r.visit_date) if r.visit_date else "",
 				"school": r.school or "",
+				"school_unapproved": cint(r.school_unapproved),
 				"province": r.province or "",
 				"area": r.area or "",
 				"city": r.city or "",
