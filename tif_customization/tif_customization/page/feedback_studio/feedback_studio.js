@@ -150,6 +150,10 @@ frappe.tif_customization.FeedbackStudio = class FeedbackStudio {
 			customer: "",
 			customerLabel: "",
 			customerQuery: "",
+			schoolHits: [],
+			schoolOpen: false,
+			schoolSearching: false,
+			schoolTimer: null,
 			createSchool: false,
 			schoolOpening: {
 				school_name: "",
@@ -485,6 +489,12 @@ frappe.tif_customization.FeedbackStudio = class FeedbackStudio {
 		}
 		if (field === "customerQuery") {
 			this.state.customerQuery = el.value;
+			if (this.state.customer && el.value !== this.state.customerLabel) {
+				this.state.customer = "";
+				this.state.customerLabel = "";
+			}
+			this.state.schoolOpen = true;
+			this.queueSchoolSearch(el.value);
 			this.render();
 			return;
 		}
@@ -557,10 +567,23 @@ frappe.tif_customization.FeedbackStudio = class FeedbackStudio {
 			if (this.state.createSchool) {
 				this.state.customer = "";
 				this.state.customerLabel = "";
+				this.state.schoolOpen = false;
 				if (!this.state.schoolOpening.school_name && this.state.customerQuery) {
 					this.state.schoolOpening.school_name = this.state.customerQuery;
 				}
 			}
+			this.render();
+			return;
+		}
+		if (act === "pick-school") {
+			const hit = (this.state.schoolHits || [])[Number(el.dataset.i)];
+			if (!hit) return;
+			this.state.customer = hit.value || "";
+			this.state.customerLabel = hit.label || hit.value || "";
+			this.state.customerQuery = this.state.customerLabel;
+			this.state.schoolHits = [];
+			this.state.schoolOpen = false;
+			this.state.createSchool = false;
 			this.render();
 			return;
 		}
@@ -1217,64 +1240,93 @@ frappe.tif_customization.FeedbackStudio = class FeedbackStudio {
 		);
 	}
 
+	queueSchoolSearch(txt) {
+		const q = (txt || "").trim();
+		clearTimeout(this.state.schoolTimer);
+		if (q.length < 2) {
+			this.state.schoolHits = [];
+			this.state.schoolSearching = false;
+			return;
+		}
+		this.state.schoolSearching = true;
+		this.state.schoolTimer = setTimeout(() => {
+			this.call("search_customers", { txt: q, limit: 40 }, true)
+				.then((rows) => {
+					this.state.schoolHits = Array.isArray(rows) ? rows : [];
+					this.state.schoolSearching = false;
+					this.state.schoolOpen = true;
+					if (this.state.mode === "take" && this.state.aud === "sme") this.render();
+				})
+				.catch(() => {
+					this.state.schoolHits = [];
+					this.state.schoolSearching = false;
+					if (this.state.mode === "take" && this.state.aud === "sme") this.render();
+				});
+		}, 280);
+	}
+
 	smeMetaPanel() {
 		const ctx = this.state.smeContext || {};
-		const staff = ctx.staff_names || [];
-		const customers = ctx.customers || [];
-		const q = (this.state.customerQuery || "").trim().toLowerCase();
-		const filtered = customers
-			.filter((c) => {
-				if (!q) return true;
-				const label = String(c.label || c.value || "").toLowerCase();
-				const value = String(c.value || "").toLowerCase();
-				return label.indexOf(q) !== -1 || value.indexOf(q) !== -1;
-			})
-			.slice(0, 80);
+		const officers = ctx.staff_options || [];
 		const smeOpts =
-			'<option value="">Select SME…</option>' +
-			staff
-				.map((name) => {
-					return (
-						'<option value="' +
-						this.h(name) +
-						'"' +
-						(this.state.smeName === name ? " selected" : "") +
-						">" +
-						this.h(name) +
-						"</option>"
-					);
-				})
-				.join("");
-		const custOpts =
-			'<option value="">Select school / customer…</option>' +
-			filtered
-				.map((c) => {
-					const value = c.value || "";
-					const label = c.label || value;
-					const desc = c.description ? " — " + c.description : "";
+			'<option value="">Select Field Officer (SME)…</option>' +
+			officers
+				.map((o) => {
+					const value = o.value || o.employee_name || "";
+					const label = value + (o.division ? " · " + o.division : "");
 					return (
 						'<option value="' +
 						this.h(value) +
 						'"' +
-						(this.state.customer === value ? " selected" : "") +
+						(this.state.smeName === value ? " selected" : "") +
 						">" +
-						this.h(label + desc) +
+						this.h(label) +
 						"</option>"
 					);
 				})
 				.join("");
-		const provinces = (ctx.provinces || []).map((p) => {
-			return (
-				'<option value="' +
-				this.h(p) +
-				'"' +
-				(this.state.schoolOpening.province === p ? " selected" : "") +
-				">" +
-				this.h(p) +
-				"</option>"
-			);
-		}).join("");
+		const provinces = (ctx.provinces || [])
+			.map((p) => {
+				return (
+					'<option value="' +
+					this.h(p) +
+					'"' +
+					(this.state.schoolOpening.province === p ? " selected" : "") +
+					">" +
+					this.h(p) +
+					"</option>"
+				);
+			})
+			.join("");
 		const soa = this.state.schoolOpening;
+		const hits = this.state.schoolHits || [];
+		const acList = this.state.schoolOpen
+			? '<div class="fs-ac-list">' +
+				(this.state.schoolSearching
+					? '<div class="fs-ac-empty">Searching Customer…</div>'
+					: hits.length
+						? hits
+								.map((c, i) => {
+									const label = c.label || c.value || "";
+									const desc = c.description || c.city || "";
+									return (
+										'<button type="button" class="fs-ac-item" data-act="pick-school" data-i="' +
+										i +
+										'"><div class="fs-ac-label">' +
+										this.h(label) +
+										"</div>" +
+										(desc ? '<div class="fs-ac-desc">' + this.h(desc) + "</div>" : "") +
+										"</button>"
+									);
+								})
+								.join("")
+						: '<div class="fs-ac-empty">' +
+							((this.state.customerQuery || "").trim().length < 2
+								? "Type at least 2 letters to search Customer."
+								: "No Customer found. Create with School Opening.") +
+							"</div>") +
+				"</div>"
+			: "";
 		const createPanel = this.state.createSchool
 			? '<div class="fs-soa">' +
 				'<div class="fs-soa-title">School Opening — create school</div>' +
@@ -1311,18 +1363,23 @@ frappe.tif_customization.FeedbackStudio = class FeedbackStudio {
 			: "";
 		return (
 			'<div class="fs-card fs-sme-meta"><div class="fs-kicker">SME visit details</div>' +
+			'<p class="fs-share-note">SME list is from <strong>Field Officer</strong>. School is linked to <strong>Customer</strong>.</p>' +
 			'<div class="fs-soa-grid">' +
-			'<label class="fs-field"><span>SME name *</span><select class="fs-select" data-field="smeName" data-field-key="smeName">' +
+			'<label class="fs-field"><span>SME name (Field Officer) *</span><select class="fs-select" data-field="smeName" data-field-key="smeName">' +
 			smeOpts +
 			"</select></label>" +
-			'<label class="fs-field"><span>Search school</span><input data-field="customerQuery" data-field-key="customerQuery" placeholder="Type to filter…" value="' +
+			'<label class="fs-field fs-span2"><span>Customer / school *</span>' +
+			'<div class="fs-ac-wrap"><input data-field="customerQuery" data-field-key="customerQuery" placeholder="Search Customer by school name…" value="' +
 			this.h(this.state.customerQuery || "") +
-			'"></label>' +
-			'<label class="fs-field fs-span2"><span>Customer / school *</span><select class="fs-select" data-field="customer" data-field-key="customer"' +
+			'" autocomplete="off"' +
 			(this.state.createSchool ? " disabled" : "") +
 			">" +
-			custOpts +
-			"</select></label></div>" +
+			acList +
+			"</div>" +
+			(this.state.customer && !this.state.createSchool
+				? '<div class="fs-picked">Selected: ' + this.h(this.state.customerLabel || this.state.customer) + "</div>"
+				: "") +
+			"</label></div>" +
 			'<div class="fs-share-actions" style="margin-top:12px">' +
 			'<button type="button" class="fs-mini' +
 			(this.state.createSchool ? " is-on" : "") +

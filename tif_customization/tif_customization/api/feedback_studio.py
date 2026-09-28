@@ -428,19 +428,114 @@ def _share_url(token):
 	return get_url("/feedback-share/" + token)
 
 
-def _resolve_staff_name(sme_name):
-	from tif_customization.tif_customization.page.smes_activity_form.smes_activity_form import (
-		get_active_field_officer_staff,
-	)
+def _field_officer_options():
+	"""Active Field Officer rows for SME name select."""
+	if not frappe.db.exists("DocType", "Field Officer"):
+		from tif_customization.tif_customization.page.smes_activity_form.smes_activity_form import (
+			get_active_field_officer_staff,
+		)
 
+		return [
+			{
+				"value": s["employee_name"],
+				"label": s["employee_name"],
+				"field_officer": "",
+				"employee": s.get("employee") or "",
+				"employee_name": s["employee_name"],
+				"division": s.get("division") or "",
+			}
+			for s in get_active_field_officer_staff()
+		]
+
+	rows = frappe.get_all(
+		"Field Officer",
+		filters={"status": "Active"},
+		fields=["name", "name1", "employee", "user", "division"],
+		order_by="name1 asc",
+		ignore_permissions=True,
+	)
+	out = []
+	seen = set()
+	for row in rows:
+		label = (row.name1 or row.name or "").strip()
+		if not label or label in seen:
+			continue
+		seen.add(label)
+		emp_name = ""
+		if row.employee:
+			emp_name = frappe.db.get_value("Employee", row.employee, "employee_name") or ""
+		out.append(
+			{
+				"value": label,
+				"label": label,
+				"field_officer": row.name,
+				"employee": row.employee or "",
+				"employee_name": emp_name or label,
+				"division": row.division or "",
+			}
+		)
+	return out
+
+
+def _sme_lookup_payload(default_sme=""):
+	officers = _field_officer_options()
+	staff_names = [o["value"] for o in officers]
+	return {
+		"staff_options": officers,
+		"staff_names": staff_names,
+		"default_sme": default_sme if default_sme in staff_names else "",
+		"provinces": [
+			"Sindh",
+			"Punjab",
+			"KPK",
+			"Balochistan",
+			"Gilgit-Baltistan",
+			"Azad Jammu & Kashmir",
+		],
+	}
+
+
+def _resolve_staff_name(sme_name):
 	sme_name = (sme_name or "").strip()
 	if not sme_name:
 		frappe.throw(_("Please select the SME name."))
-	staff = get_active_field_officer_staff()
-	by_name = {s["employee_name"]: s for s in staff}
-	if sme_name not in by_name:
-		frappe.throw(_("SME name must be an active field staff member."))
-	return by_name[sme_name]
+
+	officers = _field_officer_options()
+	by_value = {o["value"]: o for o in officers}
+	if sme_name in by_value:
+		row = by_value[sme_name]
+		return {
+			"employee": row.get("employee") or "",
+			"employee_name": row.get("employee_name") or row["value"],
+			"field_officer": row.get("field_officer") or "",
+			"display_name": row["value"],
+		}
+
+	# Fallback: Field Officer name / name1 direct match
+	if frappe.db.exists("DocType", "Field Officer"):
+		fo = frappe.db.get_value(
+			"Field Officer",
+			{"status": "Active", "name1": sme_name},
+			["name", "name1", "employee"],
+			as_dict=True,
+		) or frappe.db.get_value(
+			"Field Officer",
+			{"status": "Active", "name": sme_name},
+			["name", "name1", "employee"],
+			as_dict=True,
+		)
+		if fo:
+			emp_name = ""
+			if fo.employee:
+				emp_name = frappe.db.get_value("Employee", fo.employee, "employee_name") or ""
+			return {
+				"employee": fo.employee or "",
+				"employee_name": emp_name or fo.name1 or fo.name,
+				"field_officer": fo.name,
+				"display_name": fo.name1 or fo.name,
+			}
+
+	frappe.throw(_("SME name must be an active Field Officer."))
 
 
 def _resolve_customer(customer):
@@ -473,6 +568,70 @@ def _create_school_opening(school_opening, sme_name):
 	return soa
 
 
+def _create_sme_session_and_response(doc, answers, sme_name, customer=None, school_opening=None, client_meta=None):
+	staff = _resolve_staff_name(sme_name)
+	sme_name = staff.get("display_name") or staff["employee_name"]
+	customer_name = None
+	school_label = ""
+	soa_name = None
+
+	customer = (customer or "").strip() or None
+	soa_payload = _as_obj(school_opening)
+
+	if customer:
+		customer_name, school_label = _resolve_customer(customer)
+	elif soa_payload:
+		soa = _create_school_opening(soa_payload, sme_name)
+		soa_name = soa.name
+		school_label = soa.school_name
+	else:
+		frappe.throw(_("Select a Customer / school, or create one with the School Opening form."))
+
+	response = _store(
+		"sme",
+		answers,
+		doc,
+		extra={
+			"sme_name": sme_name,
+			"customer": customer_name,
+			"school_name": school_label,
+			"school_opening": soa_name,
+		},
+		client_meta=client_meta,
+	)
+
+	token = frappe.generate_hash(length=32)
+	session = frappe.get_doc(
+		{
+			"doctype": "Feedback Studio Session",
+			"share_token": token,
+			"status": "Open",
+			"sme_name": sme_name,
+			"sme_employee": staff.get("employee"),
+			"customer": customer_name,
+			"school_name": school_label,
+			"school_opening": soa_name,
+			"sme_response": response.name,
+			"submitted_on": now_datetime(),
+		}
+	)
+	session.insert(ignore_permissions=True)
+	if frappe.get_meta("Feedback Studio Response").has_field("session"):
+		response.db_set("session", session.name, update_modified=False)
+
+	return {
+		"ok": True,
+		"session": session.name,
+		"share_token": token,
+		"share_url": _share_url(token),
+		"customer": customer_name,
+		"school_name": school_label,
+		"school_opening": soa_name,
+		"sme_name": sme_name,
+		"response": response.name,
+	}
+
+
 @frappe.whitelist()
 def get_studio():
 	_desk()
@@ -492,41 +651,42 @@ def get_studio():
 def get_sme_context():
 	"""Staff + school lookups for the SME answer form."""
 	_desk()
-	from tif_customization.tif_customization.page.smes_activity_form.smes_activity_form import (
-		get_active_field_officer_staff,
-		_customer_link_options,
-	)
-
-	staff = get_active_field_officer_staff()
 	current_emp = frappe.db.get_value(
 		"Employee",
 		{"user_id": frappe.session.user, "status": "Active"},
 		["name", "employee_name"],
 		as_dict=True,
 	)
-	staff_names = [s["employee_name"] for s in staff]
 	default_sme = ""
-	if current_emp and current_emp.employee_name in staff_names:
-		default_sme = current_emp.employee_name
-	return {
-		"staff_options": staff,
-		"staff_names": staff_names,
-		"default_sme": default_sme,
-		"customers": _customer_link_options(limit=3000),
-		"provinces": [
-			"Sindh",
-			"Punjab",
-			"KPK",
-			"Balochistan",
-			"Gilgit-Baltistan",
-			"Azad Jammu & Kashmir",
-		],
-	}
+	if current_emp:
+		# Prefer Field Officer name1 matching this employee
+		fo_name = frappe.db.get_value(
+			"Field Officer",
+			{"employee": current_emp.name, "status": "Active"},
+			"name1",
+		)
+		default_sme = fo_name or current_emp.employee_name or ""
+	payload = _sme_lookup_payload(default_sme=default_sme)
+	return payload
 
 
 @frappe.whitelist()
 def search_customers(txt=None, limit=40):
 	_desk()
+	from tif_customization.tif_customization.page.smes_activity_form.smes_activity_form import (
+		_customer_link_options,
+	)
+
+	return _customer_link_options(txt=txt, limit=max(1, min(cint(limit) or 40, 100)))
+
+
+@frappe.whitelist(allow_guest=True, methods=["GET"])
+@rate_limit(limit=60, seconds=600)
+def search_public_customers(token, txt=None, limit=40):
+	"""Customer typeahead for the public SME feedback link."""
+	found = _find(token)
+	if not found or found[0] != "sme":
+		frappe.throw(_("This link is not valid."))
 	from tif_customization.tif_customization.page.smes_activity_form.smes_activity_form import (
 		_customer_link_options,
 	)
@@ -589,66 +749,16 @@ def submit_sme_response(answers, sme_name, customer=None, school_opening=None, c
 	"""SME desk submit: require name + Customer (or create School Opening), then share QR/URL."""
 	_desk()
 	doc = _settings()
-	staff = _resolve_staff_name(sme_name)
-	sme_name = staff["employee_name"]
-	customer_name = None
-	school_label = ""
-	soa_name = None
-
-	customer = (customer or "").strip() or None
-	soa_payload = _as_obj(school_opening)
-
-	if customer:
-		customer_name, school_label = _resolve_customer(customer)
-	elif soa_payload:
-		soa = _create_school_opening(soa_payload, sme_name)
-		soa_name = soa.name
-		school_label = soa.school_name
-	else:
-		frappe.throw(_("Select a Customer / school, or create one with the School Opening form."))
-
-	response = _store(
-		"sme",
-		answers,
+	result = _create_sme_session_and_response(
 		doc,
-		extra={
-			"sme_name": sme_name,
-			"customer": customer_name,
-			"school_name": school_label,
-			"school_opening": soa_name,
-		},
+		answers,
+		sme_name,
+		customer=customer,
+		school_opening=school_opening,
 		client_meta=client_meta,
 	)
-
-	token = frappe.generate_hash(length=32)
-	session = frappe.get_doc(
-		{
-			"doctype": "Feedback Studio Session",
-			"share_token": token,
-			"status": "Open",
-			"sme_name": sme_name,
-			"sme_employee": staff.get("employee"),
-			"customer": customer_name,
-			"school_name": school_label,
-			"school_opening": soa_name,
-			"sme_response": response.name,
-			"submitted_on": now_datetime(),
-		}
-	)
-	session.insert(ignore_permissions=True)
-	if frappe.get_meta("Feedback Studio Response").has_field("session"):
-		response.db_set("session", session.name, update_modified=False)
-
-	return {
-		"responses": _responses()["sme"],
-		"session": session.name,
-		"share_token": token,
-		"share_url": _share_url(token),
-		"customer": customer_name,
-		"school_name": school_label,
-		"school_opening": soa_name,
-		"sme_name": sme_name,
-	}
+	result["responses"] = _responses()["sme"]
+	return result
 
 
 @frappe.whitelist()
@@ -677,7 +787,7 @@ def get_public_form(token):
 	audience, doc = found
 	forms = _forms(doc) or _default_forms()
 	form = forms[audience]
-	return {
+	payload = {
 		"ok": True,
 		"audience": audience,
 		"label": LABELS[audience],
@@ -687,15 +797,27 @@ def get_public_form(token):
 		"questions": form["questions"],
 		"ratingScale": _scale(doc.rating_scale),
 	}
+	if audience == "sme":
+		payload["sme"] = _sme_lookup_payload()
+	return payload
 
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])
 @rate_limit(limit=30, seconds=600)
-def submit_public(token, answers, client_meta=None):
+def submit_public(token, answers, client_meta=None, sme_name=None, customer=None, school_opening=None):
 	found = _find(token)
 	if not found:
 		frappe.throw(_("This link is not valid."))
 	audience, doc = found
+	if audience == "sme":
+		return _create_sme_session_and_response(
+			doc,
+			answers,
+			sme_name,
+			customer=customer,
+			school_opening=school_opening,
+			client_meta=client_meta,
+		)
 	_store(audience, answers, doc, client_meta=client_meta)
 	return {"ok": True}
 

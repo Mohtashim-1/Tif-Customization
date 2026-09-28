@@ -10,7 +10,7 @@
 <style>
 body { margin: 0; background: #f5f3ee; color: #1d2230; font-family: "Figtree", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
 * { box-sizing: border-box; }
-button, input, textarea { font-family: inherit; }
+button, input, textarea, select { font-family: inherit; }
 .wrap { max-width: 880px; margin: 0 auto; padding: 28px 24px 64px; }
 .card { background: #fffdf9; border: 1px solid #e6e1d6; border-radius: 14px; padding: 22px 24px; }
 .stack { display: flex; flex-direction: column; gap: 16px; }
@@ -33,8 +33,9 @@ h1 { margin: 8px 0 0; font-family: "Newsreader", Georgia, serif; font-size: 28px
 .choices button.on { border-color: var(--accent, #2f5bd3); background: #fbfaf6; }
 .dot { width: 18px; height: 18px; border-radius: 50%; border: 2px solid #c9c2b3; box-shadow: inset 0 0 0 3px #fff; background: #fff; flex: none; }
 .choices button.on .dot { border-color: var(--accent, #2f5bd3); background: var(--accent, #2f5bd3); }
-textarea { width: 100%; border: 1px solid #d9d3c6; background: #fff; border-radius: 10px; padding: 12px 14px; font-size: 15px; line-height: 1.5; resize: vertical; }
-textarea:focus, button:focus-visible { outline: 2px solid var(--accent, #2f5bd3); outline-offset: 1px; }
+textarea, input[type=text], select { width: 100%; border: 1px solid #d9d3c6; background: #fff; border-radius: 10px; padding: 12px 14px; font-size: 15px; line-height: 1.5; }
+textarea { resize: vertical; }
+textarea:focus, button:focus-visible, input:focus, select:focus { outline: 2px solid var(--accent, #2f5bd3); outline-offset: 1px; }
 .err { font-size: 12px; font-weight: 600; color: #b3401f; }
 .row { display: flex; gap: 12px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
 .progress { font-size: 13px; color: #6b6f7a; }
@@ -42,8 +43,29 @@ textarea:focus, button:focus-visible { outline: 2px solid var(--accent, #2f5bd3)
 .ghost { border: 1px solid #d9d3c6; background: #fff; color: #1d2230; border-radius: 9px; padding: 10px 16px; font-size: 13px; font-weight: 600; cursor: pointer; }
 .thanks { text-align: center; padding: 48px 28px; }
 .thanks h2 { margin: 0; font-family: "Newsreader", Georgia, serif; font-size: 30px; font-weight: 600; }
-.thanks p { margin: 12px auto 0; max-width: 420px; color: #4a4f5c; line-height: 1.5; }
+.thanks p { margin: 12px auto 0; max-width: 480px; color: #4a4f5c; line-height: 1.5; }
 .empty { border: 1px dashed #d0c9ba; border-radius: 14px; padding: 32px; text-align: center; color: #6b6f7a; }
+.meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; margin-top: 14px; }
+.field { display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 600; color: #6b6f7a; }
+.field.span2 { grid-column: 1 / -1; }
+.field.bad input, .field.bad select { border-color: #e3a08c; }
+.linkish { border: 0; background: none; color: var(--accent, #7a4cc2); font-size: 13px; font-weight: 700; cursor: pointer; padding: 0; text-align: left; }
+.soa { margin-top: 14px; padding-top: 14px; border-top: 1px solid #e6e1d6; }
+.soa-title { font-size: 14px; font-weight: 700; color: #1d2230; margin-bottom: 4px; }
+.note { font-size: 13px; color: #6b6f7a; line-height: 1.45; margin: 0 0 10px; }
+.qr-wrap { display: flex; flex-direction: column; align-items: center; gap: 14px; margin-top: 18px; }
+.qr { width: 220px; height: 220px; border-radius: 12px; border: 1px solid #e6e1d6; background: #fff; padding: 8px; }
+.share-row { display: flex; gap: 8px; width: 100%; max-width: 520px; }
+.share-row input { flex: 1; }
+.ac-wrap { position: relative; }
+.ac-list { position: absolute; z-index: 30; left: 0; right: 0; top: calc(100% + 4px); background: #fff; border: 1px solid #e6e1d6; border-radius: 10px; max-height: 260px; overflow: auto; box-shadow: 0 10px 28px rgba(29,34,48,.12); }
+.ac-item { display: block; width: 100%; text-align: left; border: 0; background: #fff; padding: 11px 14px; cursor: pointer; border-bottom: 1px solid #f0ebe3; color: inherit; }
+.ac-item:hover, .ac-item:focus { background: #fbfaf6; outline: none; }
+.ac-label { font-size: 14px; font-weight: 600; color: #1d2230; }
+.ac-desc { font-size: 12px; color: #6b6f7a; margin-top: 2px; }
+.ac-empty { padding: 12px 14px; font-size: 13px; color: #6b6f7a; }
+.picked { margin-top: 8px; font-size: 13px; color: #1f8a5b; font-weight: 600; }
+@media (max-width: 640px) { .meta-grid { grid-template-columns: 1fr; } .share-row { flex-direction: column; } }
 </style>
 </head>
 <body>
@@ -51,8 +73,39 @@ textarea:focus, button:focus-visible { outline: 2px solid var(--accent, #2f5bd3)
 <script>
 const TOKEN = {{ token | tojson }};
 const CSRF = {{ csrf_token | tojson }};
+const API = "/api/method/tif_customization.tif_customization.api.feedback_studio.";
 const app = document.getElementById("app");
-const state = { form: null, answers: {}, errors: {}, submitted: false, status: TOKEN ? "loading" : "missing" };
+const state = {
+	form: null,
+	answers: {},
+	errors: {},
+	metaErrors: {},
+	submitted: false,
+	status: TOKEN ? "loading" : "missing",
+	smeName: "",
+	customer: "",
+	customerLabel: "",
+	customerQuery: "",
+	schoolHits: [],
+	schoolOpen: false,
+	schoolSearching: false,
+	schoolTimer: null,
+	createSchool: false,
+	schoolOpening: {
+		school_name: "",
+		city: "",
+		area: "",
+		province: "",
+		address: "",
+		school_mobile: "",
+		school_email: "",
+		principal_name: "",
+		principal_cell: "",
+		visit_type: "Visit with enrollment"
+	},
+	shareResult: null,
+	shareCopied: false
+};
 
 function esc(value) {
 	return String(value == null ? "" : value)
@@ -62,110 +115,12 @@ function esc(value) {
 		.replace(/"/g, "&quot;");
 }
 
-function render() {
-	const active = document.activeElement;
-	let key = null, start = null, end = null;
-	if (active && app.contains(active) && active.dataset && active.dataset.key) {
-		key = active.dataset.key;
-		start = active.selectionStart;
-		end = active.selectionEnd;
-	}
-	if (state.status === "loading") {
-		app.innerHTML = '<div class="empty">Loading the form…</div>';
-		return;
-	}
-	if (state.status === "missing" || state.status === "invalid") {
-		app.innerHTML = '<div class="card"><h1>This link is not valid</h1><p class="intro">Ask the school for a new feedback link.</p></div>';
-		return;
-	}
-	const form = state.form;
-	app.style.setProperty("--accent", form.color || "#2f5bd3");
-	if (state.submitted) {
-		app.innerHTML = '<div class="card accent thanks"><h2>Thank you</h2><p>Your feedback has been recorded. It helps us improve.</p><div class="row" style="justify-content:center;margin-top:16px"><button type="button" class="ghost" id="again">Submit another</button></div></div>';
-		document.getElementById("again").onclick = function () {
-			state.submitted = false;
-			state.answers = {};
-			state.errors = {};
-			render();
-		};
-		return;
-	}
-	const scale = Number(form.ratingScale) === 10 ? 10 : 5;
-	const cards = (form.questions || []).map(function (q, i) {
-		const val = state.answers[q.id];
-		const bad = !!state.errors[q.id];
-		let control = "";
-		if (q.type === "rating") {
-			let buttons = "";
-			for (let n = 1; n <= scale; n++) {
-				buttons += '<button type="button" data-act="rate" data-id="' + esc(q.id) + '" data-val="' + n + '"' + (val === n ? ' class="on"' : "") + ">" + n + "</button>";
-			}
-			control = '<div class="rates">' + buttons + '</div><div class="caption">1 = Poor · ' + scale + " = Excellent</div>";
-		} else if (q.type === "choice") {
-			control = '<div class="choices">' + (q.options || []).map(function (o, j) {
-				return '<button type="button" data-act="choice" data-id="' + esc(q.id) + '" data-j="' + j + '"' + (val === o ? ' class="on"' : "") + '><span class="dot"></span><span>' + esc(o) + "</span></button>";
-			}).join("") + "</div>";
-		} else if (q.type === "yesno") {
-			control = '<div class="yn">' + ["Yes", "No"].map(function (o) {
-				return '<button type="button" data-act="yn" data-id="' + esc(q.id) + '" data-val="' + o + '"' + (val === o ? ' class="on"' : "") + ">" + o + "</button>";
-			}).join("") + "</div>";
-		} else {
-			control = '<textarea data-key="ans-' + esc(q.id) + '" data-id="' + esc(q.id) + '" rows="3" placeholder="Write your answer…">' + esc(val || "") + "</textarea>";
-		}
-		return '<div class="q' + (bad ? " bad" : "") + '"><div class="prompt"><span class="num">' + (i + 1) + '.</span><span>' + esc(q.text || "Untitled question") + (q.required ? '<span class="star"> *</span>' : "") + "</span></div>" + control + (bad ? '<div class="err">This question is required.</div>' : "") + "</div>";
-	}).join("");
-	const answered = (form.questions || []).filter(function (q) {
-		return state.answers[q.id] !== undefined && state.answers[q.id] !== "";
-	}).length;
-	const empty = (form.questions || []).length ? "" : '<div class="empty">This form has no questions yet.</div>';
-	app.innerHTML = '<div class="stack"><div class="card accent"><div class="kicker">' + esc(form.label) + ' feedback</div><h1>' + esc(form.title || "Feedback") + '</h1><p class="intro">' + esc(form.intro || "") + "</p></div>" + cards + empty + '<div class="row"><span class="progress">' + answered + " of " + (form.questions || []).length + ' answered</span><button type="button" class="submit" id="send">Submit feedback</button></div></div>';
-	app.querySelectorAll("[data-act]").forEach(function (btn) {
-		btn.addEventListener("click", onAct);
-	});
-	app.querySelectorAll("textarea").forEach(function (el) {
-		el.addEventListener("input", function () {
-			state.answers[el.dataset.id] = el.value;
-			delete state.errors[el.dataset.id];
-			const progress = app.querySelector(".progress");
-			if (progress) {
-				const n = (form.questions || []).filter(function (q) {
-					return state.answers[q.id] !== undefined && state.answers[q.id] !== "";
-				}).length;
-				progress.textContent = n + " of " + (form.questions || []).length + " answered";
-			}
-		});
-	});
-	document.getElementById("send").onclick = submit;
-	if (key) {
-		const el = app.querySelector('[data-key="' + CSS.escape(key) + '"]');
-		if (el) {
-			el.focus();
-			if (typeof start === "number" && el.setSelectionRange) {
-				try { el.setSelectionRange(start, end); } catch (e) {}
-			}
-		}
-	}
+function isSme() {
+	return state.form && state.form.audience === "sme";
 }
 
-function onAct(e) {
-	const btn = e.currentTarget;
-	const q = (state.form.questions || []).find(function (item) { return item.id === btn.dataset.id; });
-	if (!q) return;
-	let value = btn.dataset.val;
-	if (btn.dataset.act === "rate") value = Number(value);
-	if (btn.dataset.act === "choice") value = (q.options || [])[Number(btn.dataset.j)];
-	state.answers[q.id] = value;
-	delete state.errors[q.id];
-	render();
-}
-
-function missing() {
-	const errs = {};
-	(state.form.questions || []).forEach(function (q) {
-		const val = state.answers[q.id];
-		if (q.required && (val === undefined || val === "")) errs[q.id] = true;
-	});
-	return errs;
+function qrImg(url) {
+	return "https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=" + encodeURIComponent(url || "");
 }
 
 function clientMeta() {
@@ -200,44 +155,386 @@ function clientMeta() {
 	};
 }
 
+function smeMetaHtml() {
+	const sme = (state.form && state.form.sme) || {};
+	const officers = sme.staff_options || [];
+	const smeOpts = '<option value="">Select Field Officer (SME)…</option>' + officers.map(function (o) {
+		const value = o.value || o.employee_name || "";
+		const label = value + (o.division ? " · " + o.division : "");
+		return '<option value="' + esc(value) + '"' + (state.smeName === value ? " selected" : "") + ">" + esc(label) + "</option>";
+	}).join("");
+	const provinces = (sme.provinces || []).map(function (p) {
+		return '<option value="' + esc(p) + '"' + (state.schoolOpening.province === p ? " selected" : "") + ">" + esc(p) + "</option>";
+	}).join("");
+	const soa = state.schoolOpening;
+	const hits = state.schoolHits || [];
+	const acList = state.schoolOpen
+		? '<div class="ac-list" id="schoolList">' +
+			(state.schoolSearching
+				? '<div class="ac-empty">Searching Customer…</div>'
+				: hits.length
+					? hits.map(function (c, i) {
+						const value = c.value || "";
+						const label = c.label || value;
+						const desc = c.description || c.city || "";
+						return '<button type="button" class="ac-item" data-pick="' + i + '"><div class="ac-label">' + esc(label) + '</div>' +
+							(desc ? '<div class="ac-desc">' + esc(desc) + "</div>" : "") + "</button>";
+					}).join("")
+					: '<div class="ac-empty">' + (state.customerQuery.trim().length < 2 ? "Type at least 2 letters to search Customer." : "No Customer found. Create with School Opening.") + "</div>") +
+			"</div>"
+		: "";
+	const createPanel = state.createSchool
+		? '<div class="soa"><div class="soa-title">School Opening — create school</div><p class="note">School is not in Customer yet. This creates a School Opening request (same as Easy Form).</p><div class="meta-grid">' +
+			'<label class="field' + (state.metaErrors.school_name ? " bad" : "") + '"><span>Name of School *</span><input type="text" data-key="soa-school_name" data-soa="school_name" value="' + esc(soa.school_name || "") + '"></label>' +
+			'<label class="field"><span>City</span><input type="text" data-key="soa-city" data-soa="city" value="' + esc(soa.city || "") + '"></label>' +
+			'<label class="field"><span>Area</span><input type="text" data-key="soa-area" data-soa="area" value="' + esc(soa.area || "") + '"></label>' +
+			'<label class="field"><span>Province</span><select data-soa="province"><option value="">Select…</option>' + provinces + "</select></label>" +
+			'<label class="field span2"><span>Address</span><input type="text" data-key="soa-address" data-soa="address" value="' + esc(soa.address || "") + '"></label>' +
+			'<label class="field"><span>School mobile</span><input type="text" data-key="soa-mobile" data-soa="school_mobile" value="' + esc(soa.school_mobile || "") + '"></label>' +
+			'<label class="field"><span>School email</span><input type="text" data-key="soa-email" data-soa="school_email" value="' + esc(soa.school_email || "") + '"></label>' +
+			'<label class="field"><span>Principal name</span><input type="text" data-key="soa-pname" data-soa="principal_name" value="' + esc(soa.principal_name || "") + '"></label>' +
+			'<label class="field"><span>Principal cell</span><input type="text" data-key="soa-pcell" data-soa="principal_cell" value="' + esc(soa.principal_cell || "") + '"></label>' +
+			"</div></div>"
+		: "";
+	return '<div class="card"><div class="kicker">SME visit details</div><p class="note">SME list is from <strong>Field Officer</strong>. School is linked to <strong>Customer</strong>.</p><div class="meta-grid">' +
+		'<label class="field' + (state.metaErrors.smeName ? " bad" : "") + '"><span>SME name (Field Officer) *</span><select id="smeName">' + smeOpts + "</select>" +
+		(state.metaErrors.smeName ? '<div class="err">Required</div>' : "") + "</label>" +
+		'<label class="field span2' + (state.metaErrors.customer ? " bad" : "") + '"><span>Customer / school *</span>' +
+		'<div class="ac-wrap"><input type="text" id="customerQuery" data-key="customerQuery" placeholder="Search Customer by school name…" value="' +
+		esc(state.customerQuery || "") + '" autocomplete="off"' + (state.createSchool ? " disabled" : "") + ">" + acList + "</div>" +
+		(state.customer && !state.createSchool ? '<div class="picked">Selected: ' + esc(state.customerLabel || state.customer) + "</div>" : "") +
+		(state.metaErrors.customer ? '<div class="err">Select a Customer from the list, or create one below</div>' : "") +
+		"</label></div>" +
+		'<div style="margin-top:12px"><button type="button" class="linkish" id="toggleCreate">' +
+		(state.createSchool ? "Cancel new school" : "School not listed? Create with School Opening") +
+		"</button></div>" + createPanel + "</div>";
+}
+
+function searchCustomers(txt) {
+	const q = (txt || "").trim();
+	state.customerQuery = txt;
+	state.schoolOpen = true;
+	if (state.customer && state.customerLabel && q === state.customerLabel) {
+		state.schoolHits = [];
+		render();
+		return;
+	}
+	// Typing again clears previous Customer pick until a new row is chosen
+	if (state.customer && q !== state.customerLabel) {
+		state.customer = "";
+		state.customerLabel = "";
+	}
+	if (q.length < 2) {
+		state.schoolHits = [];
+		state.schoolSearching = false;
+		render();
+		return;
+	}
+	state.schoolSearching = true;
+	render();
+	clearTimeout(state.schoolTimer);
+	state.schoolTimer = setTimeout(async function () {
+		try {
+			const res = await fetch(
+				API + "search_public_customers?token=" + encodeURIComponent(TOKEN) +
+				"&txt=" + encodeURIComponent(q) + "&limit=40",
+				{ headers: { "Accept": "application/json" } }
+			);
+			const data = await res.json();
+			state.schoolHits = Array.isArray(data.message) ? data.message : [];
+		} catch (e) {
+			state.schoolHits = [];
+		}
+		state.schoolSearching = false;
+		state.schoolOpen = true;
+		render();
+	}, 280);
+}
+
+function bindSmeMeta() {
+	const smeName = document.getElementById("smeName");
+	if (smeName) smeName.onchange = function () {
+		state.smeName = smeName.value;
+		delete state.metaErrors.smeName;
+	};
+	const query = document.getElementById("customerQuery");
+	if (query) {
+		query.oninput = function () {
+			searchCustomers(query.value);
+		};
+		query.onfocus = function () {
+			state.schoolOpen = true;
+			if ((state.customerQuery || "").trim().length >= 2 && !(state.schoolHits || []).length) {
+				searchCustomers(state.customerQuery);
+			} else {
+				render();
+			}
+		};
+	}
+	app.querySelectorAll("[data-pick]").forEach(function (btn) {
+		btn.onclick = function () {
+			const hit = state.schoolHits[Number(btn.dataset.pick)];
+			if (!hit) return;
+			state.customer = hit.value || "";
+			state.customerLabel = hit.label || hit.value || "";
+			state.customerQuery = state.customerLabel;
+			state.schoolHits = [];
+			state.schoolOpen = false;
+			state.createSchool = false;
+			delete state.metaErrors.customer;
+			render();
+		};
+	});
+	const toggle = document.getElementById("toggleCreate");
+	if (toggle) toggle.onclick = function () {
+		state.createSchool = !state.createSchool;
+		if (state.createSchool) {
+			state.customer = "";
+			state.customerLabel = "";
+			state.schoolOpen = false;
+			if (!state.schoolOpening.school_name && state.customerQuery) {
+				state.schoolOpening.school_name = state.customerQuery;
+			}
+			delete state.metaErrors.customer;
+		}
+		render();
+	};
+	app.querySelectorAll("[data-soa]").forEach(function (el) {
+		const apply = function () {
+			state.schoolOpening[el.dataset.soa] = el.value;
+			if (el.dataset.soa === "school_name") delete state.metaErrors.school_name;
+		};
+		el.addEventListener(el.tagName === "SELECT" ? "change" : "input", apply);
+	});
+	document.addEventListener("click", onDocClickClose, { once: true });
+}
+
+function onDocClickClose(e) {
+	if (!state.schoolOpen) return;
+	const wrap = app.querySelector(".ac-wrap");
+	if (wrap && wrap.contains(e.target)) {
+		document.addEventListener("click", onDocClickClose, { once: true });
+		return;
+	}
+	state.schoolOpen = false;
+	render();
+}
+
+function render() {
+	const active = document.activeElement;
+	let key = null, start = null, end = null;
+	if (active && app.contains(active) && active.dataset && active.dataset.key) {
+		key = active.dataset.key;
+		start = active.selectionStart;
+		end = active.selectionEnd;
+	}
+	if (state.status === "loading") {
+		app.innerHTML = '<div class="empty">Loading the form…</div>';
+		return;
+	}
+	if (state.status === "missing" || state.status === "invalid") {
+		app.innerHTML = '<div class="card"><h1>This link is not valid</h1><p class="intro">Ask the school for a new feedback link.</p></div>';
+		return;
+	}
+	const form = state.form;
+	app.style.setProperty("--accent", form.color || "#2f5bd3");
+	if (state.submitted) {
+		if (isSme() && state.shareResult && state.shareResult.share_url) {
+			const share = state.shareResult;
+			const url = share.share_url;
+			app.innerHTML = '<div class="card accent thanks"><h2>Thank you</h2><p>Your SME feedback is saved. Share this QR or link with parents, the school, or students.</p>' +
+				(share.school_name ? '<p class="note">School: <strong>' + esc(share.school_name) + "</strong></p>" : "") +
+				(share.school_opening ? '<p class="note">School Opening created: ' + esc(share.school_opening) + "</p>" : "") +
+				'<div class="qr-wrap"><img class="qr" src="' + esc(qrImg(url)) + '" width="220" height="220" alt="QR">' +
+				'<div class="share-row"><input id="shareUrl" readonly value="' + esc(url) + '"><button type="button" class="submit" id="copyShare">' + (state.shareCopied ? "Copied" : "Copy link") + "</button></div>" +
+				'<a class="linkish" href="' + esc(url) + '" target="_blank" rel="noopener">Open link</a></div>' +
+				'<div class="row" style="justify-content:center;margin-top:16px"><button type="button" class="ghost" id="again">Submit another</button></div></div>';
+			document.getElementById("again").onclick = resetForm;
+			document.getElementById("copyShare").onclick = function () {
+				const input = document.getElementById("shareUrl");
+				const done = function () {
+					state.shareCopied = true;
+					render();
+					setTimeout(function () { state.shareCopied = false; if (state.submitted) render(); }, 1400);
+				};
+				if (navigator.clipboard && navigator.clipboard.writeText) {
+					navigator.clipboard.writeText(url).then(done).catch(function () {
+						if (input) { input.focus(); input.select(); try { document.execCommand("copy"); done(); } catch (e) {} }
+					});
+				} else if (input) {
+					input.focus(); input.select();
+					try { document.execCommand("copy"); done(); } catch (e) {}
+				}
+			};
+			return;
+		}
+		app.innerHTML = '<div class="card accent thanks"><h2>Thank you</h2><p>Your feedback has been recorded. It helps us improve.</p><div class="row" style="justify-content:center;margin-top:16px"><button type="button" class="ghost" id="again">Submit another</button></div></div>';
+		document.getElementById("again").onclick = resetForm;
+		return;
+	}
+	const scale = Number(form.ratingScale) === 10 ? 10 : 5;
+	const cards = (form.questions || []).map(function (q, i) {
+		const val = state.answers[q.id];
+		const bad = !!state.errors[q.id];
+		let control = "";
+		if (q.type === "rating") {
+			let buttons = "";
+			for (let n = 1; n <= scale; n++) {
+				buttons += '<button type="button" data-act="rate" data-id="' + esc(q.id) + '" data-val="' + n + '"' + (val === n ? ' class="on"' : "") + ">" + n + "</button>";
+			}
+			control = '<div class="rates">' + buttons + '</div><div class="caption">1 = Poor · ' + scale + " = Excellent</div>";
+		} else if (q.type === "choice") {
+			control = '<div class="choices">' + (q.options || []).map(function (o, j) {
+				return '<button type="button" data-act="choice" data-id="' + esc(q.id) + '" data-j="' + j + '"' + (val === o ? ' class="on"' : "") + '><span class="dot"></span><span>' + esc(o) + "</span></button>";
+			}).join("") + "</div>";
+		} else if (q.type === "yesno") {
+			control = '<div class="yn">' + ["Yes", "No"].map(function (o) {
+				return '<button type="button" data-act="yn" data-id="' + esc(q.id) + '" data-val="' + o + '"' + (val === o ? ' class="on"' : "") + ">" + o + "</button>";
+			}).join("") + "</div>";
+		} else {
+			control = '<textarea data-key="ans-' + esc(q.id) + '" data-id="' + esc(q.id) + '" rows="3" placeholder="Write your answer…">' + esc(val || "") + "</textarea>";
+		}
+		return '<div class="q' + (bad ? " bad" : "") + '"><div class="prompt"><span class="num">' + (i + 1) + '.</span><span>' + esc(q.text || "Untitled question") + (q.required ? '<span class="star"> *</span>' : "") + "</span></div>" + control + (bad ? '<div class="err">This question is required.</div>' : "") + "</div>";
+	}).join("");
+	const answered = (form.questions || []).filter(function (q) {
+		return state.answers[q.id] !== undefined && state.answers[q.id] !== "";
+	}).length;
+	const empty = (form.questions || []).length ? "" : '<div class="empty">This form has no questions yet.</div>';
+	const meta = isSme() ? smeMetaHtml() : "";
+	app.innerHTML = '<div class="stack"><div class="card accent"><div class="kicker">' + esc(form.label) + ' feedback</div><h1>' + esc(form.title || "Feedback") + '</h1><p class="intro">' + esc(form.intro || "") + "</p></div>" + meta + cards + empty + '<div class="row"><span class="progress">' + answered + " of " + (form.questions || []).length + ' answered</span><button type="button" class="submit" id="send">Submit feedback</button></div></div>';
+	if (isSme()) bindSmeMeta();
+	app.querySelectorAll("[data-act]").forEach(function (btn) {
+		btn.addEventListener("click", onAct);
+	});
+	app.querySelectorAll("textarea[data-id]").forEach(function (el) {
+		el.addEventListener("input", function () {
+			state.answers[el.dataset.id] = el.value;
+			delete state.errors[el.dataset.id];
+			const progress = app.querySelector(".progress");
+			if (progress) {
+				const n = (form.questions || []).filter(function (q) {
+					return state.answers[q.id] !== undefined && state.answers[q.id] !== "";
+				}).length;
+				progress.textContent = n + " of " + (form.questions || []).length + " answered";
+			}
+		});
+	});
+	document.getElementById("send").onclick = submit;
+	if (key) {
+		const el = app.querySelector('[data-key="' + CSS.escape(key) + '"]');
+		if (el) {
+			el.focus();
+			if (typeof start === "number" && el.setSelectionRange) {
+				try { el.setSelectionRange(start, end); } catch (e) {}
+			}
+		}
+	}
+}
+
+function resetForm() {
+	state.submitted = false;
+	state.answers = {};
+	state.errors = {};
+	state.metaErrors = {};
+	state.shareResult = null;
+	state.shareCopied = false;
+	render();
+}
+
+function onAct(e) {
+	const btn = e.currentTarget;
+	const q = (state.form.questions || []).find(function (item) { return item.id === btn.dataset.id; });
+	if (!q) return;
+	let value = btn.dataset.val;
+	if (btn.dataset.act === "rate") value = Number(value);
+	if (btn.dataset.act === "choice") value = (q.options || [])[Number(btn.dataset.j)];
+	state.answers[q.id] = value;
+	delete state.errors[q.id];
+	render();
+}
+
+function missing() {
+	const errs = {};
+	(state.form.questions || []).forEach(function (q) {
+		const val = state.answers[q.id];
+		if (q.required && (val === undefined || val === "")) errs[q.id] = true;
+	});
+	return errs;
+}
+
+function missingMeta() {
+	const errs = {};
+	if (!isSme()) return errs;
+	if (!(state.smeName || "").trim()) errs.smeName = true;
+	if (state.createSchool) {
+		if (!(state.schoolOpening.school_name || "").trim()) errs.school_name = true;
+	} else if (!(state.customer || "").trim()) {
+		errs.customer = true;
+	}
+	return errs;
+}
+
+function serverMessage(data) {
+	let message = "Could not submit. Please try again.";
+	if (data && data._server_messages) {
+		try {
+			const msgs = JSON.parse(data._server_messages).map(function (item) {
+				try { return JSON.parse(item).message || item; } catch (e) { return item; }
+			});
+			if (msgs.length) message = msgs.join(" ");
+		} catch (e) {}
+	}
+	return message;
+}
+
 async function submit() {
+	const metaErrs = missingMeta();
 	const errs = missing();
-	if (Object.keys(errs).length) {
+	if (Object.keys(metaErrs).length || Object.keys(errs).length) {
+		state.metaErrors = metaErrs;
 		state.errors = errs;
 		render();
-		const bad = app.querySelector(".bad");
+		const bad = app.querySelector(".bad, .field.bad");
 		if (bad) bad.scrollIntoView({ block: "center", behavior: "smooth" });
 		return;
 	}
 	const button = document.getElementById("send");
 	if (button) button.disabled = true;
+	const body = { token: TOKEN, answers: state.answers, client_meta: clientMeta() };
+	if (isSme()) {
+		body.sme_name = state.smeName;
+		if (state.createSchool) {
+			const soa = Object.assign({}, state.schoolOpening);
+			soa.tif_representative = state.smeName;
+			soa.key_contacts = {
+				Principal: { name: soa.principal_name || "", cell: soa.principal_cell || "" }
+			};
+			body.school_opening = soa;
+		} else {
+			body.customer = state.customer;
+		}
+	}
 	try {
-		const res = await fetch("/api/method/tif_customization.tif_customization.api.feedback_studio.submit_public", {
+		const res = await fetch(API + "submit_public", {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
 				"Accept": "application/json",
 				"X-Frappe-CSRF-Token": CSRF || ""
 			},
-			body: JSON.stringify({ token: TOKEN, answers: state.answers, client_meta: clientMeta() })
+			body: JSON.stringify(body)
 		});
 		const data = await res.json();
 		if (!res.ok || (data.exc && !data.message)) {
-			let message = "Could not submit. Please try again.";
-			if (data._server_messages) {
-				try {
-					const msgs = JSON.parse(data._server_messages).map(function (item) {
-						try { return JSON.parse(item).message || item; } catch (e) { return item; }
-					});
-					if (msgs.length) message = msgs.join(" ");
-				} catch (e) {}
-			}
-			window.alert(message);
+			window.alert(serverMessage(data));
 			if (button) button.disabled = false;
 			return;
 		}
 		state.submitted = true;
+		state.shareResult = data.message || null;
 		state.answers = {};
+		state.errors = {};
+		state.metaErrors = {};
 		render();
 	} catch (e) {
 		window.alert("Could not submit. Please try again.");
@@ -252,7 +549,7 @@ async function load() {
 	}
 	render();
 	try {
-		const res = await fetch("/api/method/tif_customization.tif_customization.api.feedback_studio.get_public_form?token=" + encodeURIComponent(TOKEN), {
+		const res = await fetch(API + "get_public_form?token=" + encodeURIComponent(TOKEN), {
 			headers: { "Accept": "application/json" }
 		});
 		const data = await res.json();
@@ -262,6 +559,9 @@ async function load() {
 			return;
 		}
 		state.form = data.message;
+		if (data.message.sme && data.message.sme.default_sme) {
+			state.smeName = data.message.sme.default_sme;
+		}
 		state.status = "ready";
 		document.title = data.message.title || "Feedback";
 		render();
