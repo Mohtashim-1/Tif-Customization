@@ -1,943 +1,517 @@
 frappe.pages["training-card"].on_page_load = function (wrapper) {
 	const page = frappe.ui.make_app_page({
 		parent: wrapper,
-		title: __("Courses & lessons"),
+		title: __("Training Dashboard"),
 		single_column: true,
 	});
 	frappe.tif_customization = frappe.tif_customization || {};
-	new frappe.tif_customization.TrainingCardStudio(page).make();
+	new frappe.tif_customization.TrainingDashboard(page).make();
 };
 
 frappe.tif_customization = frappe.tif_customization || {};
 
-frappe.tif_customization.TrainingCardStudio = class TrainingCardStudio {
+frappe.tif_customization.TrainingDashboard = class TrainingDashboard {
 	constructor(page) {
 		this.page = page;
-		frappe.tif_customization._training_card = this;
-		this.kind = "course";
-		this.search = "";
-		this.statusFilter = "All";
-		this.editingId = "";
-		this.saving = false;
-		this.courses = [];
-		this.sessions = [];
-		this.lessons = [];
-		this.trainers = [];
-		this.options = { modes: ["In-person", "Online", "Onsite"], types: ["Training", "Workshop"] };
-		this.palette = ["#4f46e5", "#334155", "#0d9488", "#16a34a", "#ea580c", "#e11d48", "#9333ea"];
-		this.lms = "tif_customization.tif_customization.api.training_lms";
-		this.sched = "tif_customization.tif_customization.api.training_schedule";
+		this.data = null;
+		this.settings = this.load_settings();
+		this.view = this.settings.view || "all";
+		this.sort = "run";
+		this.query = "";
+		this.programFilter = "";
+		this.selected = "";
+		this.settingsOpen = false;
 	}
 
 	make() {
 		$(this.page.wrapper).addClass("page-training-card");
 		this.page.clear_primary_action();
-		$(this.page.wrapper).find(".page-head").hide();
-		this.render();
+		this.page.set_primary_action(__("Refresh"), () => this.load(), "refresh");
+		this.render_shell();
 		this.bind();
-		this.reset_forms();
 		this.load();
 	}
 
-	render() {
+	load_settings() {
+		try {
+			const saved = JSON.parse(localStorage.getItem("training-dashboard-settings") || "{}");
+			return {
+				view: ["all", "course", "workshop"].includes(saved.view) ? saved.view : "all",
+				strong: Number(saved.strong) >= 50 && Number(saved.strong) <= 95 ? Number(saved.strong) : 80,
+			};
+		} catch (e) {
+			return { view: "all", strong: 80 };
+		}
+	}
+
+	save_settings() {
+		localStorage.setItem("training-dashboard-settings", JSON.stringify(this.settings));
+	}
+
+	render_shell() {
 		$(this.page.body).html(`
-			<div class="tc-studio">
-				<p class="tc-crumb">Learning / <span>Courses &amp; lessons</span></p>
-				<div class="tc-head">
+			<div class="td">
+				<p class="td-crumb">Learning / <b>${__("Training overview")}</b></p>
+				<div class="td-head">
 					<div>
-						<h3 class="tc-title">Courses &amp; lessons</h3>
-						<p class="tc-sub">Shown in the weekly planner and in the LMS. View only — nothing is saved from this page.</p>
+						<h1>${__("Training overview")}</h1>
+						<p class="td-sub"></p>
 					</div>
-					<button type="button" class="tc-refresh">↻ Refresh</button>
-				</div>
-				<div class="tc-kpis">
-					<button type="button" class="tc-kpi on" data-kind="course">
-						<div class="tc-kpi-top"><span class="tc-kpi-label">Courses</span><span class="tc-kpi-badge">Catalogue</span></div>
-						<strong data-count="course">0</strong>
-						<div class="tc-kpi-hint">Topics offered (Storytelling, Mindset…)</div>
-					</button>
-					<button type="button" class="tc-kpi" data-kind="session">
-						<div class="tc-kpi-top"><span class="tc-kpi-label">Sessions</span><span class="tc-kpi-badge">Planner</span></div>
-						<strong data-count="session">0</strong>
-						<div class="tc-kpi-hint">Scheduled cards on the weekly planner</div>
-					</button>
-					<button type="button" class="tc-kpi" data-kind="lesson">
-						<div class="tc-kpi-top"><span class="tc-kpi-label">Lessons</span><span class="tc-kpi-badge">LMS</span></div>
-						<strong data-count="lesson">0</strong>
-						<div class="tc-kpi-hint">Learning material inside a course</div>
-					</button>
-				</div>
-				<div class="tc-err" hidden></div>
-				<p class="tc-muted tc-loading" hidden>Loading cards…</p>
-				<div class="tc-layout">
-					<div class="tc-list">
-						<div class="tc-list-head">
-							<div>
-								<h4 class="tc-list-title">All courses</h4>
-								<p class="tc-list-count">0 of 0 courses</p>
-							</div>
+					<div class="td-tools">
+						<div class="td-seg">
+							<button type="button" data-view="all">${__("All")}</button>
+							<button type="button" data-view="course">${__("Courses")}</button>
+							<button type="button" data-view="workshop">${__("Workshops")}</button>
 						</div>
-						<div class="tc-list-tools">
-							<div class="tc-search-wrap">
-								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3-3"/></svg>
-								<input type="search" class="tc-search" placeholder="Search courses…">
-							</div>
-							<div class="tc-pills"></div>
-						</div>
-						<div class="tc-cols">
-							<span>Course</span><span>Trainer</span><span>Status</span>
-						</div>
-						<div class="tc-empty" hidden>No records to show.</div>
-						<div class="tc-rows"></div>
+						<button type="button" class="td-icon" data-settings title="${__("Settings")}">⚙</button>
 					</div>
-					<aside class="tc-form-col">
-						<div class="tc-form-head">
-							<div>
-								<h4 class="tc-form-title">Course detail</h4>
-								<p>Session counts, participants, and reporting</p>
+				</div>
+				<div class="td-pop" hidden>
+					<label>${__("Opens on")}</label>
+					<select data-set="view">
+						<option value="all">${__("All")}</option>
+						<option value="course">${__("Courses")}</option>
+						<option value="workshop">${__("Workshops")}</option>
+					</select>
+					<label>${__("Strong at")} <b data-strong-label></b></label>
+					<input data-set="strong" type="range" min="50" max="95" step="1">
+					<p class="td-empty">${__("Result is the attendance rate: people marked present out of people marked. Strong uses the percentage above.")}</p>
+				</div>
+				<div class="td-kpis"></div>
+				<div class="td-grid">
+					<div class="td-card"><div class="td-card-h"><div><h2>${__("Courses vs workshops")}</h2><div class="sub">${__("What we offered and who it reached")}</div></div></div><div class="td-compare body"></div></div>
+					<div class="td-card"><div class="td-card-h"><div><h2>${__("Sessions conducted by month")}</h2><div class="sub td-month-sub"></div></div><div class="td-legend"><span><i class="course"></i>${__("Courses")}</span><span><i class="workshop"></i>${__("Workshops")}</span></div></div><div class="td-months body"></div></div>
+				</div>
+				<div class="td-split">
+					<div class="td-card">
+						<div class="td-card-h"><div><h2>${__("Summary report")}</h2><div class="sub td-sum-sub"></div></div></div>
+						<div class="td-tools-row">
+							<input class="td-search" type="search" placeholder="${__("Search trainings…")}">
+							<div class="td-sort">
+								<button type="button" data-sort="run">${__("Most run")}</button>
+								<button type="button" data-sort="reach">${__("Most reach")}</button>
+								<button type="button" data-sort="score">${__("Best result")}</button>
 							</div>
 						</div>
-						<div class="tc-preview">
-							<div class="tc-preview-bar"></div>
-							<div class="tc-preview-body">
-								<span class="tc-ava tc-preview-ava">T</span>
-								<div class="tc-preview-copy">
-									<div class="tc-preview-tag">Training</div>
-									<strong class="tc-preview-title">Course title</strong>
-									<span class="tc-preview-text">Trainer · Duration not set</span>
-								</div>
-								<span class="tc-status preview-status"><i></i> Active</span>
-							</div>
-						</div>
-						<div class="tc-course-report">
-							<div class="tc-mini-kpis">
-								<div><span>Sessions performed</span><strong data-stat="sessions">0</strong></div>
-								<div><span>Participants</span><strong data-stat="participants">0</strong></div>
-								<div><span>Completed</span><strong data-stat="completed">0</strong></div>
-							</div>
-							<div class="tc-report-links">
-								<button type="button" class="tc-btn ghost tc-open-report">Open full report</button>
-								<button type="button" class="tc-btn ghost tc-open-planner">Weekly planner</button>
-							</div>
-							<div class="tc-sess-head">Session-wise detail</div>
-							<div class="tc-sess-empty">No sessions yet for this course.</div>
-							<div class="tc-sess-rows"></div>
-						</div>
-						<form class="tc-form tc-readonly" data-panel="course">
-							<label>Course name<input name="name" readonly></label>
-							<label>Code<input name="code" readonly></label>
-							<label>Category<input name="category" readonly></label>
-							<label>Trainer<input name="trainer" readonly></label>
-							<label>Duration<input name="duration" readonly></label>
-							<label>Status<input name="status" readonly></label>
-							<label class="full">Description<textarea name="description" rows="3" readonly></textarea></label>
-							<input type="hidden" name="color" value="#4f46e5">
-							<input type="hidden" name="id" value="">
-						</form>
-						<form class="tc-form tc-readonly" data-panel="session" hidden>
-							<label class="full">Course<input name="training_type" readonly></label>
-							<label>Type<input name="type" readonly></label>
-							<label>Date<input name="training_date" readonly></label>
-							<label>Start<input name="training_time" readonly></label>
-							<label>End<input name="training_end_time" readonly></label>
-							<label>Trainer<input name="trainer_name" readonly></label>
-							<label>Mode<input name="mode_of_training" readonly></label>
-							<label>Participants<input name="participants_category" readonly></label>
-							<label>Present<input name="attendance_present" readonly></label>
-							<label>Program<input name="program" readonly></label>
-							<label>Document<input name="name" readonly></label>
-							<label class="full">Venue / school<input name="school_name" readonly></label>
-						</form>
-						<form class="tc-form tc-readonly" data-panel="lesson" hidden>
-							<label class="full">Course<input name="course" readonly></label>
-							<label class="full">Lesson title<input name="title" readonly></label>
-							<label>Module<input name="module" readonly></label>
-							<label>Minutes<input name="duration" readonly></label>
-							<label>Order<input name="order" readonly></label>
-							<label class="full">Summary<textarea name="summary" rows="2" readonly></textarea></label>
-							<label class="full">Lesson body<textarea name="content" rows="5" readonly></textarea></label>
-							<input type="hidden" name="id" value="">
-							<input type="hidden" name="published" value="1">
-						</form>
-						<div class="tc-actions">
-							<button type="button" class="tc-btn primary tc-open-doc" hidden>Open document</button>
-						</div>
-					</aside>
+						<div class="td-table-wrap"><table class="td-table"><thead><tr>
+							<th>${__("Training")}</th><th class="num">${__("Conducted")}</th><th class="num">${__("Teachers")}</th><th class="num">${__("Students")}</th><th class="num">${__("Score")}</th><th>${__("Result")}</th>
+						</tr></thead><tbody class="td-rows"></tbody></table></div>
+					</div>
+					<div class="td-card td-detail"></div>
 				</div>
 			</div>
 		`);
-		this.$ = $(this.page.body).find(".tc-studio");
-		this.render_pills();
+		this.$ = $(this.page.body).find(".td");
+		this.$.find('[data-set="view"]').val(this.settings.view);
+		this.$.find('[data-set="strong"]').val(this.settings.strong);
+		this.$.find("[data-strong-label]").text(this.settings.strong + "%");
+		this.mark_view();
 	}
 
 	bind() {
-		const $root = this.$;
-		$root.on("click", ".tc-kpi", (e) => {
-			const kind = $(e.currentTarget).data("kind");
-			if (kind) this.set_kind(kind);
+		this.$.on("click", "[data-view]", (event) => {
+			this.view = $(event.currentTarget).attr("data-view");
+			this.mark_view();
+			this.paint();
 		});
-		$root.on("click", ".tc-refresh", () => this.load());
-		$root.on("input", ".tc-search", (e) => {
-			this.search = e.target.value || "";
-			this.render_list();
+		this.$.on("click", "[data-settings]", () => {
+			this.settingsOpen = !this.settingsOpen;
+			this.$.find(".td-pop").prop("hidden", !this.settingsOpen);
 		});
-		$root.on("click", ".tc-pills button", (e) => {
-			this.statusFilter = $(e.currentTarget).data("filter");
-			this.render_pills();
-			this.render_list();
-			const still = this.filtered().some((i) => String(i.id || i.name) === String(this.editingId));
-			if (!still) this.select_first();
+		this.$.on("change input", "[data-set]", (event) => {
+			const key = $(event.currentTarget).attr("data-set");
+			if (key === "strong") this.settings.strong = Number(event.target.value) || 80;
+			if (key === "view") {
+				this.settings.view = event.target.value;
+				this.view = this.settings.view;
+				this.mark_view();
+			}
+			this.$.find("[data-strong-label]").text(this.settings.strong + "%");
+			this.save_settings();
+			this.paint();
 		});
-		$root.on("click", ".tc-row", (e) => {
-			const id = $(e.currentTarget).data("id");
-			this.pick(String(id));
+		this.$.on("click", "[data-sort]", (event) => {
+			this.sort = $(event.currentTarget).attr("data-sort");
+			this.paint();
 		});
-		$root.on("dblclick", ".tc-row", (e) => {
-			if (this.kind !== "session") return;
-			const id = $(e.currentTarget).data("id");
-			if (id) this.open_document(String(id));
+		this.$.on("click", ".td-prog", (event) => {
+			const name = $(event.currentTarget).attr("data-program") || "";
+			this.view = "course";
+			this.programFilter = this.programFilter === name ? "" : name;
+			this.mark_view();
+			this.paint();
 		});
-		$root.on("click", ".tc-open-report", () => this.open_report());
-		$root.on("click", ".tc-open-planner", () => {
-			window.location.href = "/training-schedule";
+		this.$.on("input", ".td-search", (event) => {
+			this.query = event.target.value || "";
+			this.programFilter = "";
+			this.paint_table();
+			this.paint_detail();
 		});
-		$root.on("click", ".tc-sess-row", (e) => {
-			const name = $(e.currentTarget).data("name");
-			if (name) this.open_document(name);
+		this.$.on("click", ".td-pick", (event) => {
+			this.selected = $(event.currentTarget).attr("data-id");
+			this.paint_table();
+			this.paint_detail();
 		});
-		$root.on("click", ".tc-open-doc", (e) => {
-			e.preventDefault();
-			const name = this.form("session").find("[name=name]").val();
-			if (name) this.open_document(name);
+		this.$.on("click", ".td-open", (event) => {
+			const name = $(event.currentTarget).attr("data-name");
+			if (name) frappe.set_route("Form", "Upcoming Training", name);
 		});
 	}
 
-	form(kind) {
-		return this.$.find(`[data-panel="${kind || this.kind}"]`);
+	mark_view() {
+		this.$.find("[data-view]").removeClass("on");
+		this.$.find(`[data-view="${this.view}"]`).addClass("on");
+		this.$.find("[data-sort]").removeClass("on");
+		this.$.find(`[data-sort="${this.sort}"]`).addClass("on");
 	}
 
-	kind_label() {
-		return { course: "course", session: "session", lesson: "lesson" }[this.kind];
+	load() {
+		frappe.call({
+			method: "tif_customization.tif_customization.page.training_card.training_card.get_dashboard",
+			callback: (r) => {
+				this.data = (r && r.message) || { trainings: [], months: [], year: "" };
+				if (!this.selected && (this.data.trainings || []).length) {
+					this.selected = this.filtered()[0] && this.filtered()[0].id;
+				}
+				this.paint();
+			},
+		});
 	}
 
-	select_first() {
-		const items = this.filtered();
-		if (!items.length) {
-			this.reset_forms();
-			return;
+	esc(value) {
+		return frappe.utils.escape_html(value == null ? "" : String(value));
+	}
+
+	fmt(value) {
+		const num = Number(value) || 0;
+		return num.toLocaleString("en-US");
+	}
+
+	filtered() {
+		const rows = (this.data && this.data.trainings) || [];
+		if (this.view === "course") return rows.filter((row) => row.kind === "course");
+		if (this.view === "workshop") return rows.filter((row) => row.kind === "workshop");
+		return rows.slice();
+	}
+
+	listed() {
+		const q = (this.query || "").trim().toLowerCase();
+		let rows = this.filtered();
+		if (this.programFilter) {
+			rows = rows.filter((row) => ((row.program || "").trim() || __("No program")) === this.programFilter);
 		}
-		this.pick(String(items[0].id || items[0].name));
+		if (q) {
+			rows = rows.filter((row) => `${row.title || ""} ${row.program || ""}`.toLowerCase().includes(q));
+		}
+		const strong = this.settings.strong;
+		rows.sort((a, b) => {
+			if (this.sort === "reach") return b.teachers + b.students - (a.teachers + a.students);
+			if (this.sort === "score") return (b.score == null ? -1 : b.score) - (a.score == null ? -1 : a.score);
+			return b.conducted - a.conducted || (a.title || "").localeCompare(b.title || "");
+		});
+		return rows;
 	}
 
-	set_kind(kind) {
-		this.kind = kind;
-		this.search = "";
-		this.statusFilter = "All";
-		this.$.find(".tc-search").val("");
-		this.$.find(".tc-kpi").removeClass("on").filter(`[data-kind="${kind}"]`).addClass("on");
-		this.$.find(".tc-form").prop("hidden", true);
-		this.form(kind).prop("hidden", false);
-		this.$.find(".tc-search").attr("placeholder", `Search ${this.kind_label()}s…`);
-		this.$.find(".tc-list-title").text(`All ${this.kind_label()}s`);
-		this.$.find(".tc-course-report").prop("hidden", kind !== "course");
-		this.$.find(".tc-open-doc").prop("hidden", kind !== "session");
-		this.render_pills();
-		this.render_list();
-		this.select_first();
+	band(score) {
+		if (score == null) return null;
+		const strong = this.settings.strong;
+		if (score >= strong) return "strong";
+		if (score >= Math.max(50, strong - 15)) return "track";
+		return "low";
 	}
 
-	render_pills() {
-		let filters = ["All", "Active", "Draft"];
-		if (this.kind === "session") filters = ["All", "Upcoming", "Completed"];
-		if (this.kind === "lesson") filters = ["All", "Published", "Draft"];
-		if (!filters.includes(this.statusFilter)) this.statusFilter = "All";
-		this.$.find(".tc-pills").html(
-			filters
+	band_label(score) {
+		const band = this.band(score);
+		if (band === "strong") return __("Strong");
+		if (band === "track") return __("On track");
+		if (band === "low") return __("Needs attention");
+		return "";
+	}
+
+	initials(title) {
+		const parts = String(title || "")
+			.split(/\s+/)
+			.filter(Boolean);
+		if (!parts.length) return "TR";
+		if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+		return (parts[0][0] + parts[1][0]).toUpperCase();
+	}
+
+	color(kind, title) {
+		if (kind === "workshop") return "#0f9f6e";
+		const palette = ["#5b4bdb", "#7c3aed", "#4f46e5", "#6d28d9", "#4338ca"];
+		const n = String(title || "")
+			.split("")
+			.reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
+		return palette[n % palette.length];
+	}
+
+	stats(rows) {
+		const conducted = rows.reduce((sum, row) => sum + row.conducted, 0);
+		const upcoming = rows.reduce((sum, row) => sum + row.upcoming, 0);
+		const teachers = rows.reduce((sum, row) => sum + row.teachers, 0);
+		const students = rows.reduce((sum, row) => sum + row.students, 0);
+		const scored = rows.filter((row) => row.score != null);
+		const weight = scored.reduce((sum, row) => sum + row.conducted, 0) || scored.length;
+		const score = weight
+			? Math.round(scored.reduce((sum, row) => sum + row.score * (row.conducted || 1), 0) / weight)
+			: null;
+		return { offered: rows.length, conducted, upcoming, teachers, students, score };
+	}
+
+	paint() {
+		const all = (this.data && this.data.trainings) || [];
+		const courses = all.filter((row) => row.kind === "course");
+		const workshops = all.filter((row) => row.kind === "workshop");
+		const viewRows = this.filtered();
+		const viewStats = this.stats(viewRows);
+		const year = (this.data && this.data.year) || "";
+		const months = (this.data && this.data.months) || [];
+		const span = months.length
+			? `${this.month_name(months[0].key)} – ${this.month_name(months[months.length - 1].key)} ${year}`
+			: String(year);
+		this.$.find(".td-sub").text(
+			`${__("Courses and workshops delivered, who they reached, and how they went.")} ${span}. ${__("Result is attendance rate.")}`
+		);
+		const shownCourses = this.view === "workshop" ? 0 : courses.length;
+		const shownWorkshops = this.view === "course" ? 0 : workshops.length;
+		this.paint_kpis(viewStats, shownCourses, shownWorkshops);
+		this.paint_compare(this.stats(courses), this.stats(workshops));
+		this.paint_months(months);
+		this.$.find(".td-month-sub").text(`${__("Completed sessions")}, ${span}`);
+		this.$.find(".td-sum-sub").text(
+			`${this.listed().length} ${__("of")} ${viewRows.length} ${__("trainings · select a training to see every session")}`
+		);
+		if (!viewRows.some((row) => row.id === this.selected)) {
+			this.selected = (this.listed()[0] && this.listed()[0].id) || "";
+		}
+		this.mark_view();
+		this.paint_table();
+		this.paint_detail();
+	}
+
+	month_name(key) {
+		const names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+		const month = Number(String(key || "").slice(5, 7));
+		return names[month - 1] || key;
+	}
+
+	paint_kpis(stats, courseCount, workshopCount) {
+		const score = stats.score == null ? "—" : stats.score + "%";
+		const cards = [
+			[__("Trainings offered"), __("CATALOGUE"), this.fmt(stats.offered), `${courseCount} ${__("courses")} · ${workshopCount} ${__("workshops")}`],
+			[__("Times conducted"), __("SESSIONS"), this.fmt(stats.conducted), stats.upcoming ? `${this.fmt(stats.upcoming)} ${__("more scheduled")}` : __("None still scheduled")],
+			[__("Teachers trained"), __("REACH"), this.fmt(stats.teachers), __("Attendance on teacher sessions")],
+			[__("Students reached"), __("REACH"), this.fmt(stats.students), __("Attendance on student sessions")],
+			[__("Average result"), __("OUTCOME"), score, __("Attendance rate where attendance was marked")],
+		];
+		this.$.find(".td-kpis").html(
+			cards
 				.map(
-					(f) =>
-						`<button type="button" data-filter="${f}" class="${f === this.statusFilter ? "on" : ""}">${f}</button>`
+					([label, tag, value, hint]) =>
+						`<div class="td-kpi"><div class="tag">${this.esc(tag)}</div><div class="label">${this.esc(label)}</div><strong>${this.esc(value)}</strong><span class="hint">${this.esc(hint)}</span></div>`
 				)
 				.join("")
 		);
 	}
 
-	blank_session_date() {
-		return frappe.datetime.get_today();
-	}
-
-	ui_status(raw) {
-		const s = String(raw || "Active");
-		if (["Inactive", "Draft", "0"].includes(s)) return "Draft";
-		return "Active";
-	}
-
-	reset_forms() {
-		this.editingId = "";
-		const $c = this.form("course")[0];
-		if ($c) $c.reset();
-		this.form("course").find("[name=id]").val("");
-		this.form("course").find("[name=color]").val(this.palette[0]);
-		this.form("course").find("[name=category]").val("Training");
-		this.form("course").find("[name=status]").val("Active");
-		this.mark_swatch(this.palette[0]);
-
-		const $s = this.form("session")[0];
-		if ($s) $s.reset();
-		this.form("session").find("[name=name]").val("");
-		this.form("session").find("[name=program]").val("");
-		this.form("session").find("[name=training_date]").val(this.blank_session_date());
-		this.form("session").find("[name=training_time]").val("10:00");
-		this.form("session").find("[name=training_end_time]").val("12:00");
-		this.form("session").find("[name=type]").val(this.options.types[0] || "Training");
-		this.form("session").find("[name=mode_of_training]").val(this.options.modes[0] || "In-person");
-
-		const $l = this.form("lesson")[0];
-		if ($l) $l.reset();
-		this.form("lesson").find("[name=id]").val("");
-		this.form("lesson").find("[name=module]").val("Lessons");
-		this.form("lesson").find("[name=duration]").val(20);
-		this.form("lesson").find("[name=order]").val(0);
-		this.form("lesson").find("[name=published]").prop("checked", true);
-
-		this.$.find(".tc-open-doc").prop("hidden", true);
-		this.$.find(".tc-form-title").text(`${this.kind_label().replace(/^./, (c) => c.toUpperCase())} detail`);
-		this.$.find(".tc-row").removeClass("on");
-		this.update_preview();
-		this.render_course_report();
-	}
-
-	mark_swatch(color) {
-		this.$.find(".tc-swatch").removeClass("on");
-		this.$.find(`.tc-swatch[data-color="${color}"]`).addClass("on");
-	}
-
-	esc(v) {
-		return frappe.utils.escape_html(v == null ? "" : String(v));
-	}
-
-	initials(name) {
-		const parts = String(name || "?")
-			.replace(/[^A-Za-z0-9\s]/g, " ")
-			.split(/\s+/)
-			.filter(Boolean);
-		if (!parts.length) return "?";
-		if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-		return (parts[0][0] + parts[1][0]).toUpperCase();
-	}
-
-	suggest_code(name) {
-		const words = String(name || "")
-			.replace(/[^A-Za-z0-9]+/g, " ")
-			.trim()
-			.split(/\s+/)
-			.filter(Boolean);
-		if (!words.length) return "";
-		if (words.length === 1) return words[0].slice(0, 6).toUpperCase();
-		return words
-			.map((w) => w.slice(0, 2))
-			.join("")
-			.slice(0, 8)
-			.toUpperCase();
-	}
-
-	filtered() {
-		const q = (this.search || "").trim().toLowerCase();
-		const f = this.statusFilter;
-		if (this.kind === "course") {
-			return this.courses.filter((c) => {
-				const status = this.ui_status(c.status);
-				if (f === "Active" && status !== "Active") return false;
-				if (f === "Draft" && status !== "Draft") return false;
-				return !q || `${c.name} ${c.trainer || ""} ${c.category || ""} ${c.code || ""}`.toLowerCase().includes(q);
+	program_rows() {
+		const buckets = {};
+		((this.data && this.data.trainings) || [])
+			.filter((row) => row.kind === "course")
+			.forEach((row) => {
+				const name = (row.program || "").trim() || __("No program");
+				const bucket = buckets[name] || { name, courses: 0, conducted: 0, teachers: 0, students: 0 };
+				bucket.courses += 1;
+				bucket.conducted += row.conducted;
+				bucket.teachers += row.teachers;
+				bucket.students += row.students;
+				buckets[name] = bucket;
 			});
-		}
-		if (this.kind === "session") {
-			return this.sessions.filter((s) => {
-				const st = String(s.status || "").toLowerCase();
-				if (f === "Upcoming" && !["upcoming", "in_progress"].includes(st)) return false;
-				if (f === "Completed" && st !== "completed") return false;
-				return (
-					!q ||
-					`${s.title || ""} ${s.trainerName || ""} ${s.program || ""} ${s.room || ""}`.toLowerCase().includes(q)
-				);
-			});
-		}
-		return this.lessons.filter((l) => {
-			if (f === "Published" && !l.published) return false;
-			if (f === "Draft" && l.published) return false;
-			return !q || `${l.title || ""} ${l.courseName || ""} ${l.module || ""}`.toLowerCase().includes(q);
-		});
+		return Object.values(buckets).sort((a, b) => b.conducted - a.conducted || a.name.localeCompare(b.name));
 	}
 
-	render_counts() {
-		this.$.find("[data-count=course]").text(this.courses.length);
-		this.$.find("[data-count=session]").text(this.sessions.length);
-		this.$.find("[data-count=lesson]").text(this.lessons.length);
-	}
-
-	render_list() {
-		const items = this.filtered();
-		const total = this.kind === "course" ? this.courses.length : this.kind === "session" ? this.sessions.length : this.lessons.length;
-		this.$.find(".tc-list-count").text(`${items.length} of ${total} ${this.kind_label()}s`);
-		this.$.find(".tc-empty").prop("hidden", !!items.length);
-		if (!items.length) {
-			this.$.find(".tc-empty").text(`No ${this.kind_label()}s to show.`);
-		}
-		if (this.kind === "course") {
-			this.$.find(".tc-cols").html("<span>Course</span><span>Sessions</span><span>Participants</span>");
-		} else if (this.kind === "session") {
-			this.$.find(".tc-cols").html("<span>Session</span><span>Participants</span><span>Status</span>");
-		} else {
-			this.$.find(".tc-cols").html("<span>Lesson</span><span>Course</span><span>Status</span>");
-		}
-		const html = items
-			.map((item) => {
-				const id = item.id || item.name;
-				const on = this.editingId && String(this.editingId) === String(id) ? " on" : "";
-				if (this.kind === "course") {
-					const title = item.name || "";
-					const color = item.color || this.palette[0];
-					const code = item.code || this.suggest_code(title);
-					const stats = this.course_stats(item);
-					return `<button type="button" class="tc-row${on}" data-id="${this.esc(id)}">
-						<span class="tc-row-main">
-							<span class="tc-ava" style="background:${color}">${this.esc(this.initials(title))}</span>
-							<span>
-								<span class="tc-row-title">${this.esc(title)}</span>
-								<span class="tc-row-meta">${this.esc(code)} · ${this.esc(item.trainer || "Unassigned")}</span>
-							</span>
-						</span>
-						<span class="tc-row-trainer">${stats.sessions}</span>
-						<span class="tc-status"><i></i> ${stats.participants}</span>
-					</button>`;
-				}
-				if (this.kind === "session") {
-					const title = item.title || item.program || item.name;
-					const color = item.trainerColor || this.palette[0];
-					const done = String(item.status || "").toLowerCase() === "completed";
-					const people = this.people_label(item);
-					return `<button type="button" class="tc-row${on}" data-id="${this.esc(id)}">
-						<span class="tc-row-main">
-							<span class="tc-ava" style="background:${color}">${this.esc(this.initials(title))}</span>
-							<span>
-								<span class="tc-row-title">${this.esc(title)}</span>
-								<span class="tc-row-meta">${this.esc(item.date || "")} · ${this.esc(item.start_time || "")} · ${this.esc(item.trainerName || "Unassigned")}</span>
-							</span>
-						</span>
-						<span class="tc-row-trainer">${people}</span>
-						<span class="tc-status${done ? " draft" : ""}"><i></i> ${this.esc(item.status || "upcoming")}</span>
-					</button>`;
-				}
-				const title = item.title || "";
-				const published = !!item.published;
-				return `<button type="button" class="tc-row${on}" data-id="${this.esc(id)}">
-					<span class="tc-row-main">
-						<span class="tc-ava" style="background:#0ea5e9">${this.esc(this.initials(title))}</span>
-						<span>
-							<span class="tc-row-title">${this.esc(title)}</span>
-							<span class="tc-row-meta">${this.esc(item.module || "Lesson")} · ${item.duration || 0} min</span>
-						</span>
-					</span>
-					<span class="tc-row-trainer">${this.esc(item.courseName || "Course")}</span>
-					<span class="tc-status${published ? "" : " draft"}"><i></i> ${published ? "Published" : "Draft"}</span>
+	paint_compare(courses, workshops) {
+		const total = courses.conducted + workshops.conducted || 1;
+		const courseShare = Math.round((100 * courses.conducted) / total);
+		const workshopShare = 100 - courseShare;
+		const metrics = [
+			[__("Offered"), courses.offered, workshops.offered],
+			[__("Conducted"), courses.conducted, workshops.conducted],
+			[__("Teachers"), courses.teachers, workshops.teachers],
+			[__("Students"), courses.students, workshops.students],
+		];
+		const peak = Math.max(1, ...metrics.flatMap((row) => [row[1], row[2]]));
+		const bars = metrics
+			.map(([label, course, workshop]) => {
+				const cw = Math.round((100 * course) / peak);
+				const ww = Math.round((100 * workshop) / peak);
+				return `<div class="td-crow">
+					<span>${this.esc(label)}</span>
+					<div class="td-ctrack"><i class="course" style="width:${cw}%"></i></div>
+					<b>${this.fmt(course)}</b>
+					<div class="td-ctrack"><i class="workshop" style="width:${ww}%"></i></div>
+					<b>${this.fmt(workshop)}</b>
+				</div>`;
+			})
+			.join("");
+		const maxProgram = Math.max(1, ...this.program_rows().map((row) => row.conducted));
+		const programs = this.program_rows()
+			.map((row) => {
+				const width = Math.max(4, Math.round((100 * row.conducted) / maxProgram));
+				return `<button type="button" class="td-prog ${this.programFilter === row.name ? "on" : ""}" data-program="${this.esc(row.name)}">
+					<span>${this.esc(row.name)}</span>
+					<span class="td-prog-track"><i style="width:${width}%"></i></span>
+					<b>${this.fmt(row.conducted)}</b>
+					<small>${this.fmt(row.courses)} ${__("courses")}</small>
 				</button>`;
 			})
 			.join("");
-		this.$.find(".tc-rows").html(html);
+		const courseScore = courses.score == null ? "—" : courses.score + "%";
+		const workshopScore = workshops.score == null ? "—" : workshops.score + "%";
+		this.$.find(".td-compare").html(`
+			<div class="td-donut-wrap">
+				<div class="td-donut" style="background:conic-gradient(#5b4bdb 0 ${courseShare}%, #0f9f6e ${courseShare}% 100%)">
+					<div class="td-donut-hole"><strong>${courseShare}%</strong><span>${__("courses")}</span></div>
+				</div>
+				<div class="td-share-key">
+					<div><i class="course"></i><span>${__("Courses")}</span><b>${this.fmt(courses.conducted)}</b><small>${courseShare}% · ${this.esc(courseScore)}</small></div>
+					<div><i class="workshop"></i><span>${__("Workshops")}</span><b>${this.fmt(workshops.conducted)}</b><small>${workshopShare}% · ${this.esc(workshopScore)}</small></div>
+				</div>
+			</div>
+			<div class="td-cchart">
+				<div class="td-cchart-h"><span></span><span>${__("Courses")}</span><span></span><span>${__("Workshops")}</span><span></span></div>
+				${bars}
+			</div>
+			<div class="td-progs">
+				<div class="td-prog-label">${__("Courses by program")}</div>
+				${programs || `<div class="td-empty">${__("No course programs.")}</div>`}
+			</div>
+		`);
 	}
 
-	fill_selects() {}
-
-	preview_data() {
-		if (this.kind === "course") {
-			const f = this.vals("course");
-			const status = this.ui_status(f.status);
-			return {
-				title: f.name || "Course title",
-				meta: [f.trainer || "Unassigned", f.duration || "Duration not set"].join(" · "),
-				color: f.color || this.palette[0],
-				tag: f.category || "Training",
-				status,
-				initials: this.initials(f.name || "C"),
-			};
-		}
-		if (this.kind === "session") {
-			const f = this.vals("session");
-			const course = this.courses.find((c) => c.name === f.training_type || c.id === f.training_type);
-			const title = (course && course.name) || f.training_type || f.program || "Session title";
-			return {
-				title,
-				meta: [f.trainer_name || "Unassigned", `${f.training_time || ""} – ${f.training_end_time || ""}`, f.participants_category, f.school_name]
-					.filter((x) => x && x !== "—")
-					.join(" · "),
-				color: (course && course.color) || this.palette[0],
-				tag: f.training_date || "Session",
-				status: "Active",
-				initials: this.initials(title),
-			};
-		}
-		const f = this.vals("lesson");
-		const course = this.courses.find((c) => c.id === f.course || c.name === f.course);
-		const title = f.title || "Lesson title";
-		return {
-			title,
-			meta: [(course && course.name) || "Course", `${f.duration || 0} min`].join(" · "),
-			color: (course && course.color) || "#0ea5e9",
-			tag: f.module || "Lesson",
-			status: f.published ? "Published" : "Draft",
-			initials: this.initials(title),
-		};
-	}
-
-	update_preview() {
-		const p = this.preview_data();
-		this.$.find(".tc-preview-bar").css("background", p.color);
-		this.$.find(".tc-preview-tag").text(p.tag);
-		this.$.find(".tc-preview-title").text(p.title);
-		this.$.find(".tc-preview-text").text(p.meta);
-		this.$.find(".tc-preview-ava").text(p.initials).css("background", p.color);
-		const draft = p.status === "Draft";
-		this.$.find(".preview-status")
-			.toggleClass("draft", draft)
-			.html(`<i></i> ${this.esc(p.status)}`);
-		if (this.kind === "course") this.render_course_report();
-	}
-
-	vals(kind) {
-		const out = {};
-		this.form(kind)
-			.find("input, select, textarea")
-			.each((_, el) => {
-				if (!el.name) return;
-				if (el.type === "checkbox") out[el.name] = el.checked ? 1 : 0;
-				else out[el.name] = el.value;
-			});
-		return out;
-	}
-
-	pick(id) {
-		this.editingId = id;
-		if (this.kind === "course") {
-			const c = this.courses.find((x) => String(x.id || x.name) === String(id));
-			if (!c) return;
-			const $f = this.form("course");
-			$f.find("[name=id]").val(c.id || "");
-			$f.find("[name=name]").val(c.name || "");
-			$f.find("[name=code]").val(c.code || this.suggest_code(c.name));
-			$f.find("[name=category]").val(c.category || "Training");
-			$f.find("[name=trainer]").val(c.trainer || "");
-			$f.find("[name=duration]").val(c.duration || "");
-			$f.find("[name=status]").val(this.ui_status(c.status));
-			$f.find("[name=description]").val(c.description || "");
-			$f.find("[name=color]").val(c.color || this.palette[0]);
-			this.mark_swatch(c.color || this.palette[0]);
-			this.render_course_report(c);
-		} else if (this.kind === "session") {
-			const s = this.sessions.find((x) => String(x.id || x.name) === String(id));
-			if (!s) return;
-			const $f = this.form("session");
-			$f.find("[name=name]").val(s.name || "");
-			$f.find("[name=type]").val(s.type || "Training");
-			$f.find("[name=training_date]").val(s.date || "");
-			$f.find("[name=training_time]").val((s.start_time || "10:00").slice(0, 5));
-			$f.find("[name=training_end_time]").val((s.end_time || "12:00").slice(0, 5));
-			$f.find("[name=trainer_name]").val(s.trainerName || "");
-			$f.find("[name=training_type]").val(s.title || s.program || "");
-			$f.find("[name=program]").val(s.program || s.title || "");
-			$f.find("[name=mode_of_training]").val(s.mode || "In-person");
-			$f.find("[name=participants_category]").val(s.participants_category || "—");
-			$f.find("[name=attendance_present]").val(this.present_label(s));
-			$f.find("[name=school_name]").val(s.room || s.school || "");
-		} else {
-			const l = this.lessons.find((x) => String(x.id) === String(id));
-			if (!l) return;
-			const $f = this.form("lesson");
-			$f.find("[name=id]").val(l.id || "");
-			$f.find("[name=title]").val(l.title || "");
-			$f.find("[name=course]").val(l.courseName || l.course || "");
-			$f.find("[name=module]").val(l.module || "Lessons");
-			$f.find("[name=duration]").val(l.duration || 20);
-			$f.find("[name=order]").val(l.order || 0);
-			$f.find("[name=published]").val(l.published ? "1" : "0");
-			$f.find("[name=summary]").val(l.summary || "");
-			$f.find("[name=content]").val(l.content || "");
-		}
-		this.$.find(".tc-form-title").text(`${this.kind_label().replace(/^./, (c) => c.toUpperCase())} detail`);
-		this.$.find(".tc-open-doc").prop("hidden", this.kind !== "session" || !id);
-		this.render_list();
-		this.update_preview();
-	}
-
-	course_option_value(name) {
-		const c = this.courses.find((x) => x.name === name || x.id === name);
-		return c ? c.id || c.name : name || "";
-	}
-
-	on_course_select(value, kind) {
-		const c = this.courses.find((x) => x.id === value || x.name === value);
-		if (!c) return;
-		if (kind === "session") {
-			this.form("session").find("[name=program]").val(c.name);
-			if (c.trainer) this.form("session").find("[name=trainer_name]").val(c.trainer);
-		}
-		this.update_preview();
-	}
-
-	norm(v) {
-		return String(v || "")
-			.trim()
-			.toLowerCase();
-	}
-
-	cint(v) {
-		const n = parseInt(v, 10);
-		return Number.isFinite(n) ? n : 0;
-	}
-
-	present_label(s) {
-		const present = this.cint(s && s.attendance_present);
-		const total = this.cint(s && s.attendance_total);
-		if (total) return `${present} / ${total}`;
-		if (present) return String(present);
-		return "—";
-	}
-
-	people_label(s) {
-		const present = this.cint(s && s.attendance_present);
-		const total = this.cint(s && s.attendance_total);
-		const n = total || present;
-		const cat = String((s && s.participants_category) || "").trim();
-		if (n && cat) return `${n} · ${cat}`;
-		if (n) return String(n);
-		if (cat) return cat;
-		return "—";
-	}
-
-	sessions_for_course(course) {
-		const names = new Set(
-			[course && (course.name || course.title)]
-				.map((n) => this.norm(n))
-				.filter(Boolean)
-		);
-		if (!names.size) return [];
-		return this.sessions.filter(
-			(s) => names.has(this.norm(s.title)) || names.has(this.norm(s.program)) || names.has(this.norm(s.categoryLabel))
-		);
-	}
-
-	course_stats(course) {
-		const rows = this.sessions_for_course(course);
-		let present = 0;
-		let total = 0;
-		let completed = 0;
-		rows.forEach((s) => {
-			present += this.cint(s.attendance_present);
-			total += this.cint(s.attendance_total);
-			if (String(s.status || "").toLowerCase() === "completed") completed += 1;
-		});
-		return {
-			sessions: rows.length,
-			completed,
-			upcoming: rows.length - completed,
-			participants: present || total,
-			present,
-			total,
-			rows: rows.slice().sort((a, b) => String(b.date || "").localeCompare(String(a.date || ""))),
-		};
-	}
-
-	render_course_report(course) {
-		const $box = this.$.find(".tc-course-report");
-		if (this.kind !== "course") {
-			$box.prop("hidden", true);
+	paint_months(months) {
+		if (!months.length) {
+			this.$.find(".td-months").html(`<div class="td-empty">${__("No conducted sessions this year.")}</div>`);
 			return;
 		}
-		$box.prop("hidden", false);
-		if (!course) {
-			const name = this.vals("course").name;
-			course = this.courses.find((c) => c.name === name) || { name };
+		const max = Math.max(1, ...months.map((month) => (this.view === "workshop" ? 0 : month.course) + (this.view === "course" ? 0 : month.workshop)));
+		this.$.find(".td-months").html(
+			months
+				.map((month) => {
+					const course = this.view === "workshop" ? 0 : month.course;
+					const workshop = this.view === "course" ? 0 : month.workshop;
+					const ch = Math.round((120 * course) / max);
+					const wh = Math.round((120 * workshop) / max);
+					return `<div class="td-month"><div class="td-stack" title="${this.esc(this.month_name(month.key))}: ${course + workshop}">
+						<i class="course" style="height:${ch}px"></i><i class="workshop" style="height:${wh}px"></i>
+					</div><em>${this.esc(this.month_name(month.key))}</em></div>`;
+				})
+				.join("")
+		);
+	}
+
+	paint_table() {
+		const rows = this.listed();
+		this.$.find(".td-sum-sub").text(
+			`${rows.length} ${__("of")} ${this.filtered().length} ${__("trainings · select a training to see every session")}`
+		);
+		if (!rows.length) {
+			this.$.find(".td-rows").html(`<tr><td colspan="6" class="td-empty">${__("No trainings in this view.")}</td></tr>`);
+			return;
 		}
-		const stats = this.course_stats(course);
-		this.$.find("[data-stat=sessions]").text(stats.sessions);
-		this.$.find("[data-stat=participants]").text(stats.participants);
-		this.$.find("[data-stat=completed]").text(stats.completed);
-		this.$.find(".tc-sess-empty").prop("hidden", !!stats.rows.length);
-		const html = stats.rows
-			.map((s) => {
-				const people = this.people_label(s);
-				const st = String(s.status || "upcoming").replace("_", " ");
-				return `<button type="button" class="tc-sess-row" data-name="${this.esc(s.name)}">
-					<span>
-						<strong>${this.esc(s.date || "No date")} · ${this.esc(s.start_time || "")}</strong>
-						<small>${this.esc(s.trainerName || "Unassigned")} · ${this.esc(s.room || s.school || "No venue")}</small>
-					</span>
-					<span class="tc-sess-people">${this.esc(people)}</span>
-					<span class="tc-sess-status">${this.esc(st)}</span>
-				</button>`;
-			})
-			.join("");
-		this.$.find(".tc-sess-rows").html(html);
+		this.$.find(".td-rows").html(
+			rows
+				.map((row) => {
+					const band = this.band(row.score);
+					const badge = band ? `<span class="td-badge ${band}">${this.esc(this.band_label(row.score))}</span>` : "—";
+					const plus = row.upcoming ? ` <span class="td-plus">+${this.esc(row.upcoming)}</span>` : "";
+					const kind = row.kind === "workshop" ? __("Workshop") : row.program || __("No program");
+					return `<tr class="td-pick ${row.id === this.selected ? "on" : ""}" data-id="${this.esc(row.id)}">
+						<td><div class="td-name"><span class="td-ava" style="background:${this.color(row.kind, row.title)}">${this.esc(this.initials(row.title))}</span><span><b>${this.esc(row.title)}</b><small>${this.esc(kind)}</small></span></div></td>
+						<td class="num">${this.fmt(row.conducted)}${plus}</td>
+						<td class="num">${this.fmt(row.teachers)}</td>
+						<td class="num">${this.fmt(row.students)}</td>
+						<td class="num">${row.score == null ? "—" : this.esc(row.score + "%")}</td>
+						<td>${badge}</td>
+					</tr>`;
+				})
+				.join("")
+		);
 	}
 
-	open_session(name) {
-		if (!name) return;
-		frappe.dom.freeze(__("Loading session…"));
-		this.call(`${this.sched}.get_session`, { name })
-			.then((doc) => this.show_session_dialog(doc || {}))
-			.catch((e) => {
-				frappe.msgprint({
-					title: __("Could not load session"),
-					message: e.message || String(e),
-					indicator: "red",
-				});
-			})
-			.finally(() => frappe.dom.unfreeze());
-	}
-
-	show_session_dialog(d) {
-		const v = (x) => this.esc(x || "—");
-		const has = (x) => x !== undefined && x !== null && String(x).trim() !== "";
-		const topic = d.training_type || d.workshop_topic || d.program || d.name || "Session";
-		const status = d.schedule_status || "Upcoming";
-		const statusKey = String(status).toLowerCase().replace(/\s+/g, "-");
-		const trainer = d.trainer_name || "Unassigned";
-		const present = this.cint(d.attendance_present);
-		const total = this.cint(d.attendance_total);
-		const rate = total ? `${Math.round((present / total) * 100)}%` : "—";
-		const dateInfo = this.pretty_date(d.training_date);
-		const timeRange = [d.training_time, d.training_end_time].filter(has).join(" – ");
-		const duration = this.duration_label(d.training_time, d.training_end_time);
-		const daysAgo = this.days_since(d.training_date);
-		const showBanner = daysAgo > 0 && String(status).toLowerCase() === "upcoming" && total === 0;
-
-		const kv = (label, value) =>
-			`<div class="tc-dlg-kv"><span>${v(label)}</span><strong>${v(value)}</strong></div>`;
-
-		const files = d.attachments || [];
-		const attendance = d.attendance || [];
-
-		const filesHtml = files.length
-			? `<div class="tc-dlg-files">${files
-					.map((f) => {
-						const url = typeof f === "string" ? f : f.file_url || f.url || "";
-						const label = typeof f === "string" ? f.split("/").pop() : f.file_name || url;
-						return url
-							? `<a href="${this.esc(url)}" target="_blank" rel="noopener">${v(label)}</a>`
-							: `<span>${v(label)}</span>`;
+	paint_detail() {
+		const row = ((this.data && this.data.trainings) || []).find((item) => item.id === this.selected);
+		const host = this.$.find(".td-detail");
+		if (!row) {
+			host.html(`<div class="body"><h2>${__("Training detail")}</h2><p class="td-empty">${__("Select a training to see every time it ran.")}</p></div>`);
+			return;
+		}
+		const band = this.band(row.score);
+		const done = row.conducted + row.upcoming;
+		const completion = done ? Math.round((100 * row.conducted) / done) : 0;
+		const bars = (row.sessions || [])
+			.filter((session) => session.status !== "upcoming" && session.score != null)
+			.slice()
+			.reverse();
+		const barHtml = bars.length
+			? `<div class="td-bars">${bars
+					.map((session) => {
+						const height = Math.max(6, Math.round((64 * session.score) / 100));
+						const color = this.band(session.score) === "strong" ? "#12b76a" : this.band(session.score) === "track" ? "#f79009" : "#f04438";
+						return `<i style="height:${height}px;background:${color}" title="${this.esc(session.date)} ${session.score}%"></i>`;
 					})
 					.join("")}</div>`
-			: `<div class="tc-dlg-drop"><strong>No files attached</strong><span>Slides, handouts, or recordings will show here</span></div>`;
-
-		const attHtml = attendance.length
-			? `<div class="tc-dlg-table-wrap"><table class="tc-dlg-table">
-				<thead><tr><th>Participant</th><th>Email / phone</th><th>Status</th></tr></thead>
-				<tbody>${attendance
-					.map((a) => {
-						const st = a.attendance_status || "Present";
-						const tone = String(st).toLowerCase() === "present" ? "ok" : "muted";
-						return `<tr>
-							<td><strong>${v(a.participant_name)}</strong></td>
-							<td>${v(a.email || a.phone)}</td>
-							<td><span class="tc-dlg-badge ${tone}">${v(st)}</span></td>
-						</tr>`;
-					})
-					.join("")}</tbody></table></div>`
-			: `<div class="tc-dlg-empty">No attendance yet. Names appear after check-in or Zoom import.</div>`;
-
-		const html = `<div class="tc-dlg">
-			<div class="tc-dlg-top">
-				<div class="tc-dlg-date"><span>${v(dateInfo.month)}</span><strong>${v(dateInfo.day)}</strong></div>
-				<div class="tc-dlg-top-copy">
-					<div class="tc-dlg-chips">
-						<span class="tc-dlg-chip type">${v(d.type || "Training")}</span>
-						<span class="tc-dlg-chip ${statusKey}">${v(status)}</span>
-						${has(d.mode_of_training) ? `<span class="tc-dlg-chip mode">${v(d.mode_of_training)}</span>` : ""}
+			: `<p class="td-empty">${__("No attendance rate yet. Sessions appear here after people are marked present.")}</p>`;
+		const sessions = (row.sessions || [])
+			.map((session) => {
+				const upcoming = session.status === "upcoming";
+				const badge = upcoming
+					? `<span class="td-badge up">${__("Upcoming")}</span>`
+					: this.band(session.score)
+						? `<span class="td-badge ${this.band(session.score)}">${session.score}%</span>`
+						: "";
+				const people = session.present
+					? `${this.fmt(session.present)} ${session.audience === "students" ? __("students") : __("teachers")}`
+					: __("Attendance not marked");
+				return `<div class="td-sess">
+					<div class="td-sess-top"><div class="when">${this.esc(this.pretty(session))}</div>${badge}</div>
+					<div class="meta">${this.esc(session.trainer || __("Trainer not set"))} · ${this.esc(session.mode || __("Mode not set"))}${session.school ? " · " + this.esc(session.school) : ""}</div>
+					<div class="meta">${this.esc(people)}${upcoming ? " · " + __("Scheduled") : ""} · <button type="button" class="td-open" data-name="${this.esc(session.name)}">${__("Open")}</button></div>
+				</div>`;
+			})
+			.join("");
+		host.html(`
+			<div class="body">
+				<div class="td-detail-h">
+					<div class="td-name">
+						<span class="td-ava" style="background:${this.color(row.kind, row.title)}">${this.esc(this.initials(row.title))}</span>
+						<span><b>${this.esc(row.title)}</b><small>${this.esc(row.kind === "workshop" ? __("Workshop") : row.program || __("No program"))}</small></span>
 					</div>
-					<h3>${v(topic)}</h3>
-					<p>
-						<span>${v(trainer)}</span>
-						${has(timeRange) ? `<span class="sep">·</span><span>${v(timeRange)}</span>` : ""}
-						${duration ? `<span class="sep">·</span><span>${v(duration)}</span>` : ""}
-						${has(d.name) ? `<span class="sep">·</span><code>${v(d.name)}</code>` : ""}
-					</p>
+					${band ? `<span class="td-badge ${band}">${this.esc(this.band_label(row.score))}</span>` : ""}
 				</div>
-				<div class="tc-dlg-top-actions">
-					${has(d.zoom_link) ? `<a class="tc-dlg-btn primary" href="${this.esc(d.zoom_link)}" target="_blank" rel="noopener">Open meeting link</a>` : ""}
-					<button type="button" class="tc-dlg-x" aria-label="Close">×</button>
+				<p class="sub">${__("Every time it ran, and how it went")}</p>
+				<div class="td-mini">
+					<div><span>${__("Times conducted")}</span><b>${this.fmt(row.conducted)}</b></div>
+					<div><span>${__("Upcoming")}</span><b>${this.fmt(row.upcoming)}</b></div>
+					<div><span>${__("Avg result")}</span><b>${row.score == null ? "—" : this.esc(row.score + "%")}</b></div>
+					<div><span>${__("Teachers")}</span><b>${this.fmt(row.teachers)}</b></div>
+					<div><span>${__("Students")}</span><b>${this.fmt(row.students)}</b></div>
+					<div><span>${__("Completion")}</span><b>${completion}%</b></div>
 				</div>
+				<div class="sub">${__("Score by session")}</div>
+				${barHtml}
+				<div class="sub">${__("Session-wise detail")}</div>
+				<div class="td-sess-list">${sessions || `<p class="td-empty">${__("No sessions.")}</p>`}</div>
 			</div>
-			${showBanner ? `<div class="tc-dlg-banner">Scheduled date passed ${daysAgo} day${daysAgo === 1 ? "" : "s"} ago — status is still ${v(status)} and no attendance is recorded.</div>` : ""}
-			<div class="tc-dlg-split">
-				<div class="tc-dlg-col">
-					<div class="tc-dlg-label">Schedule</div>
-					<div class="tc-dlg-kvs">
-						${kv("Date", dateInfo.pretty || d.training_date)}
-						${kv("Time", timeRange)}
-						${kv("Trainer", trainer)}
-					</div>
-					<div class="tc-dlg-label">Program</div>
-					<div class="tc-dlg-kvs">
-						${kv("Program", d.program)}
-						${kv("Course / topic", d.training_type || d.workshop_topic || topic)}
-						${kv("Department", d.department_training)}
-						${kv("Participants", d.participants_category)}
-						${kv("Type", d.type)}
-						${kv("Mode", d.mode_of_training)}
-					</div>
-					<div class="tc-dlg-label">Venue</div>
-					<div class="tc-dlg-kvs">
-						${kv("School", d.school_name)}
-						${kv("School type", d.school_type)}
-						${kv("City", d.city || d.area)}
-					</div>
-				</div>
-				<div class="tc-dlg-col">
-					<div class="tc-dlg-label">Attendance</div>
-					<div class="tc-dlg-stats">
-						<div><span>Present</span><strong>${present}</strong></div>
-						<div><span>Marked</span><strong>${total}</strong></div>
-						<div><span>Rate</span><strong>${v(rate)}</strong></div>
-					</div>
-					${attHtml}
-					<div class="tc-dlg-label">Attachments <em>${files.length} file${files.length === 1 ? "" : "s"}</em></div>
-					${filesHtml}
-				</div>
-			</div>
-			<div class="tc-dlg-foot">
-				<button type="button" class="tc-dlg-open">Open document</button>
-				<button type="button" class="tc-dlg-close">Close</button>
-			</div>
-		</div>`;
-
-		const dialog = new frappe.ui.Dialog({
-			title: topic,
-			size: "extra-large",
-			fields: [{ fieldtype: "HTML", fieldname: "body", label: " " }],
-		});
-		dialog.$wrapper.addClass("tc-session-dialog");
-		dialog.fields_dict.body.$wrapper.html(html);
-		dialog.$wrapper.find(".modal-header, .modal-footer").hide();
-		dialog.$wrapper.on("click", ".tc-dlg-x, .tc-dlg-close", () => dialog.hide());
-		dialog.$wrapper.on("click", ".tc-dlg-open", () => {
-			dialog.hide();
-			this.open_document(d.name);
-		});
-		dialog.show();
+		`);
 	}
 
-	open_document(name) {
-		if (!name) return;
-		frappe.set_route("Form", "Upcoming Training", name);
-	}
-
-	pretty_date(iso) {
-		if (!iso) return { month: "—", day: "–", pretty: "" };
-		const dt = frappe.datetime.str_to_obj(iso) || new Date(iso);
-		if (!dt || isNaN(dt.getTime())) return { month: "—", day: "–", pretty: iso };
+	pretty(session) {
+		if (!session.date) return session.time || "";
+		const dt = frappe.datetime.str_to_obj(session.date);
+		if (!dt) return session.date;
 		const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-		const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-		return {
-			month: months[dt.getMonth()].toUpperCase(),
-			day: String(dt.getDate()),
-			pretty: `${days[dt.getDay()]}, ${dt.getDate()} ${months[dt.getMonth()]} ${dt.getFullYear()}`,
-		};
-	}
-
-	days_since(iso) {
-		if (!iso) return 0;
-		const dt = frappe.datetime.str_to_obj(iso) || new Date(iso);
-		const today = frappe.datetime.str_to_obj(frappe.datetime.get_today()) || new Date();
-		if (!dt || isNaN(dt.getTime())) return 0;
-		const a = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()).getTime();
-		const b = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
-		return Math.floor((b - a) / 86400000);
-	}
-
-	duration_label(start, end) {
-		const toMin = (t) => {
-			const p = String(t || "").split(":");
-			const h = parseInt(p[0], 10);
-			const m = parseInt(p[1] || "0", 10);
-			if (!Number.isFinite(h)) return null;
-			return h * 60 + (Number.isFinite(m) ? m : 0);
-		};
-		const a = toMin(start);
-		const b = toMin(end);
-		if (a == null || b == null || b <= a) return "";
-		const d = b - a;
-		const h = Math.floor(d / 60);
-		const m = d % 60;
-		if (h && m) return `${h} hr ${m} min`;
-		if (h) return h === 1 ? "1 hr" : `${h} hr`;
-		return `${m} min`;
-	}
-
-	open_report() {
-		const topic = (this.vals("course").name || "").trim();
-		frappe.route_options = { topic };
-		frappe.set_route("upcoming-training-report");
-	}
-
-	show_error(msg) {
-		const $e = this.$.find(".tc-err");
-		if (!msg) {
-			$e.prop("hidden", true).text("");
-			return;
-		}
-		$e.prop("hidden", false).text(msg);
-	}
-
-	async call(method, args) {
-		const r = await frappe.call({ method, args: args || {}, freeze: false });
-		return r.message;
-	}
-
-	async load() {
-		this.show_error("");
-		this.$.find(".tc-loading").prop("hidden", false);
-		try {
-			const [courseRows, lessonRows, sessionDir, formOpts] = await Promise.all([
-				this.call(`${this.lms}.list_courses`).catch(() => []),
-				this.call(`${this.lms}.list_lessons`).catch(() => []),
-				this.call(`${this.sched}.get_directory`, {
-					view: "sessions",
-					from_date: "2020-01-01",
-					to_date: "2028-12-31",
-				}).catch(() => ({ rows: [] })),
-				this.call(`${this.sched}.get_form_options`).catch(() => ({})),
-			]);
-			this.courses = Array.isArray(courseRows) ? courseRows : [];
-			this.lessons = Array.isArray(lessonRows) ? lessonRows : [];
-			this.sessions = (sessionDir && sessionDir.rows) || [];
-			this.trainers = (formOpts && formOpts.trainers) || [];
-			this.options = {
-				modes: (formOpts && formOpts.modes) || this.options.modes,
-				types: (formOpts && formOpts.types) || this.options.types,
-			};
-			const fromPrograms = (formOpts && (formOpts.training_types || formOpts.programs)) || [];
-			fromPrograms.forEach((name) => {
-				if (name && !this.courses.some((c) => c.name === name)) {
-					this.courses.push({
-						id: "",
-						name,
-						code: this.suggest_code(name),
-						category: "Training",
-						trainer: "",
-						color: this.palette[this.courses.length % this.palette.length],
-						status: "Active",
-						description: "",
-					});
-				}
-			});
-			this.courses.sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
-			this.fill_selects();
-			this.render_counts();
-			this.render_list();
-			this.select_first();
-		} catch (e) {
-			this.show_error(e.message || String(e));
-		} finally {
-			this.$.find(".tc-loading").prop("hidden", true);
-		}
+		return `${dt.getDate()} ${months[dt.getMonth()]} ${dt.getFullYear()}${session.time ? " · " + session.time : ""}`;
 	}
 };
