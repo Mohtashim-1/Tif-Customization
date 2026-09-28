@@ -378,18 +378,35 @@ class FieldStaffReportPage {
 
 		const safeColumns = columns.length ? columns : Object.keys(rows[0] || {});
 		const head = safeColumns
-			.map((col) => `<th>${frappe.utils.escape_html(labels[col] || col)}</th>`)
+			.map(
+				(col) =>
+					`<th class="${col === "remarks" ? "fsr-col-remarks" : ""}">${frappe.utils.escape_html(
+						labels[col] || col
+					)}</th>`
+			)
 			.join("");
 		const body = rows
 			.map((row) => {
 				const tds = safeColumns
 					.map((col) => {
 						const value = row[col];
+						const cls = col === "remarks" ? ' class="fsr-col-remarks"' : "";
 						if (col === "name") {
 							const id = frappe.utils.escape_html(value || "");
-							return `<td><a href="/app/field-visit/${id}">${id}</a></td>`;
+							return `<td${cls}><a href="/app/field-visit/${id}">${id}</a></td>`;
 						}
-						return `<td>${frappe.utils.escape_html(value == null || value === "" ? "-" : String(value))}</td>`;
+						if (col === "school") {
+							const school = frappe.utils.escape_html(
+								value == null || value === "" ? "-" : String(value)
+							);
+							const badge = cint(row.school_unapproved)
+								? `<span class="fsr-unapproved">${__("Un Approved")}</span>`
+								: "";
+							return `<td>${school}${badge}</td>`;
+						}
+						return `<td${cls}>${frappe.utils.escape_html(
+							value == null || value === "" ? "-" : String(value)
+						)}</td>`;
 					})
 					.join("");
 				return `<tr>${tds}</tr>`;

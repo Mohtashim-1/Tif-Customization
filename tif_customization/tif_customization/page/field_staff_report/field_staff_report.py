@@ -18,6 +18,7 @@ DISPLAY_COLUMNS = [
 	"officer",
 	"category",
 	"province",
+	"remarks",
 	"docstatus",
 	"owner",
 ]
@@ -29,6 +30,7 @@ DISPLAY_LABELS = {
 	"officer": "Field Staff",
 	"category": "Category",
 	"province": "Province",
+	"remarks": "Remarks",
 	"docstatus": "Status",
 	"owner": "Owner",
 }
@@ -76,7 +78,9 @@ def get_report_data(filters=None):
 			{_school_sql("fv")} AS school,
 			{_officer_sql("fv")} AS officer,
 			{_category_sql("fv")} AS category,
-			{_province_sql("fv")} AS province
+			{_province_sql("fv")} AS province,
+			{_remarks_sql("fv")} AS remarks,
+			{_school_unapproved_sql("fv")} AS school_unapproved
 		FROM `tabField Visit` fv
 		WHERE {where_clause}
 		ORDER BY visit_date DESC, fv.modified DESC
@@ -193,9 +197,16 @@ def _school_sql(alias="fv"):
 	a = alias
 	return f"""COALESCE(
 		NULLIF(TRIM({a}.school_name), ''),
+		NULLIF(TRIM({a}.pending_school_name), ''),
 		NULLIF(TRIM({a}.me_school_name), ''),
 		NULLIF(TRIM({a}.mt_institute_or_organization_name), ''),
-		NULLIF(TRIM({a}.training_venue_name), '')
+		NULLIF(TRIM({a}.training_venue_name), ''),
+		(
+			SELECT NULLIF(TRIM(soa.school_name), '')
+			FROM `tabSchool Opening Application` soa
+			WHERE soa.name = {a}.reference
+			LIMIT 1
+		)
 	)"""
 
 
@@ -227,6 +238,32 @@ def _category_sql(alias="fv"):
 		NULLIF(TRIM({a}.me_activity_status), ''),
 		NULLIF(TRIM({a}.training_session_category), '')
 	)"""
+
+
+def _remarks_sql(alias="fv"):
+	a = alias
+	return f"""CONCAT_WS(' | ',
+		NULLIF(TRIM({a}.mt_remarks), ''),
+		NULLIF(TRIM({a}.ot_remarks), ''),
+		NULLIF(TRIM({a}.school_remarks_follow_up), ''),
+		NULLIF(TRIM({a}.school_additional_remarks), ''),
+		NULLIF(TRIM({a}.travel_remarks), '')
+	)"""
+
+
+def _school_unapproved_sql(alias="fv"):
+	a = alias
+	return f"""CASE
+		WHEN NULLIF(TRIM({a}.school_name), '') IS NOT NULL THEN 0
+		WHEN NULLIF(TRIM({a}.pending_school_name), '') IS NOT NULL THEN 1
+		WHEN EXISTS (
+			SELECT 1
+			FROM `tabSchool Opening Application` soa
+			WHERE soa.name = {a}.reference
+			LIMIT 1
+		) THEN 1
+		ELSE 0
+	END"""
 
 
 def _sql_summary(where_clause, params):
