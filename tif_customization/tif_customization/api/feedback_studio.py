@@ -681,17 +681,62 @@ def search_customers(txt=None, limit=40):
 
 
 @frappe.whitelist(allow_guest=True, methods=["GET"])
-@rate_limit(limit=60, seconds=600)
+@rate_limit(limit=120, seconds=600)
 def search_public_customers(token, txt=None, limit=40):
 	"""Customer typeahead for the public SME feedback link."""
+	return search_public_link(token=token, doctype="Customer", txt=txt, limit=limit)
+
+
+@frappe.whitelist(allow_guest=True, methods=["GET"])
+@rate_limit(limit=120, seconds=600)
+def search_public_link(token, doctype=None, txt=None, limit=40):
+	"""Frappe Link-style search for guest SME form (Customer / Field Officer)."""
 	found = _find(token)
 	if not found or found[0] != "sme":
 		frappe.throw(_("This link is not valid."))
-	from tif_customization.tif_customization.page.smes_activity_form.smes_activity_form import (
-		_customer_link_options,
-	)
+	doctype = (doctype or "").strip()
+	limit = max(1, min(cint(limit) or 40, 100))
+	txt = (txt or "").strip()
 
-	return _customer_link_options(txt=txt, limit=max(1, min(cint(limit) or 40, 100)))
+	if doctype == "Customer":
+		from tif_customization.tif_customization.page.smes_activity_form.smes_activity_form import (
+			_customer_link_options,
+		)
+
+		rows = _customer_link_options(txt=txt, limit=limit)
+		# Frappe Link expects value + description
+		return [
+			{
+				"value": r.get("value"),
+				"label": r.get("label") or r.get("value"),
+				"description": r.get("description") or "",
+			}
+			for r in rows
+			if r.get("value")
+		]
+
+	if doctype == "Field Officer":
+		q = txt.lower()
+		out = []
+		for row in _field_officer_options():
+			value = row.get("value") or ""
+			label = row.get("label") or value
+			division = row.get("division") or ""
+			hay = f"{value} {label} {division}".lower()
+			if q and q not in hay:
+				continue
+			out.append(
+				{
+					"value": value,
+					"label": label,
+					"description": division,
+				}
+			)
+			if len(out) >= limit:
+				break
+		return out
+
+	frappe.throw(_("Unsupported link doctype."))
 
 
 @frappe.whitelist()

@@ -7,7 +7,7 @@ from __future__ import annotations
 import json
 
 import frappe
-from frappe.utils import add_days, cint, now_datetime
+from frappe.utils import add_days, cint, date_diff, getdate, now_datetime
 
 AUDIENCES = ("sme", "school", "parent", "student")
 LABELS = {
@@ -29,7 +29,30 @@ ROLES = (
 	"Staff Reporting Manager",
 	"SME Manager",
 )
-# Fallback labels when a saved form definition is not available.
+# Used when a saved answer id is not in Feedback Studio Settings.
+# Order matches the default field forms.
+DEFAULT_QUESTIONS = {
+	"school": [
+		{"type": "rating", "text": "How well does leadership communicate school priorities?"},
+		{"type": "choice", "text": "Which area needs the most support?"},
+		{"type": "text", "text": "What one change would make your work easier?"},
+	],
+	"parent": [
+		{"type": "rating", "text": "How satisfied are you with communication from the school?"},
+		{"type": "yesno", "text": "Do you feel informed about your child’s progress?"},
+		{"type": "text", "text": "Anything else you would like us to know?"},
+	],
+	"student": [
+		{"type": "rating", "text": "How much do you enjoy your lessons?"},
+		{"type": "choice", "text": "How do you learn best?"},
+		{"type": "yesno", "text": "Do you feel safe at school?"},
+	],
+	"sme": [
+		{"type": "rating", "text": "How accurate and current is the curriculum content?"},
+		{"type": "choice", "text": "Overall recommendation"},
+		{"type": "text", "text": "Specific content recommendations"},
+	],
+}
 KNOWN_CHOICES = {
 	"Resources",
 	"Training",
@@ -76,6 +99,7 @@ def _filters(filters):
 		"audience": data.get("audience") if data.get("audience") in AUDIENCES else "",
 		"sme_name": (data.get("sme_name") or "").strip(),
 		"customer": data.get("customer") or "",
+		"school_key": (data.get("school_key") or "").strip(),
 	}
 
 
@@ -85,6 +109,24 @@ def _scale():
 		if str(value) == "10":
 			return 10
 	return 5
+
+
+def _scale_from_rows(rows, fallback):
+	"""Use 10 when a submitted rating is above 5 and settings do not say otherwise."""
+	if fallback == 10:
+		return 10
+	peak = 0
+	for row in rows:
+		for value in _as_dict(row.answers_json).values():
+			if isinstance(value, bool):
+				continue
+			try:
+				num = int(value)
+			except (TypeError, ValueError):
+				continue
+			if num > peak:
+				peak = num
+	return 10 if peak > 5 else fallback
 
 
 def _question_catalog():
@@ -149,6 +191,20 @@ def _fields():
 	return [field for field in wanted if field == "name" or meta.has_field(field)]
 
 
+def _form_questions(aud, catalog, order):
+	saved = [catalog[aud][qid] for qid in order.get(aud, []) if qid in catalog.get(aud, {})]
+	return saved or list(DEFAULT_QUESTIONS.get(aud) or [])
+
+
+def _match_question(aud, qid, index, catalog, form_questions):
+	meta = (catalog.get(aud) or {}).get(qid)
+	if meta:
+		return meta
+	if index < len(form_questions):
+		return form_questions[index]
+	return {}
+
+
 def _infer_type(value):
 	if isinstance(value, bool):
 		return "text"
@@ -189,11 +245,11 @@ def _customer_names(rows):
 
 def _school_label(row, customers):
 	if row.get("school_name"):
-		return row.school_name
+		return " ".join(str(row.school_name).split())
 	if row.get("customer"):
-		return customers.get(row.customer) or row.customer
+		return " ".join(str(customers.get(row.customer) or row.customer).split())
 	if row.get("school_opening"):
-		return row.school_opening
+		return " ".join(str(row.school_opening).split())
 	return "Not linked to a school"
 
 
@@ -212,6 +268,78 @@ def _session_count(filters):
 	return frappe.db.count("Feedback Studio Session", filters=clauses or None)
 
 
+def _visit_counts(filters):
+	if not frappe.db.table_exists("Feedback Studio Session"):
+		return {}
+	clauses = []
+	if filters["from_date"]:
+		clauses.append(["creation", ">=", filters["from_date"]])
+	if filters["to_date"]:
+		clauses.append(["creation", "<", add_days(filters["to_date"], 1)])
+	if filters["sme_name"]:
+		clauses.append(["sme_name", "like", f"%{filters['sme_name']}%"])
+	if filters["customer"]:
+		clauses.append(["customer", "=", filters["customer"]])
+	rows = frappe.get_all(
+		"Feedback Studio Session",
+		filters=clauses,
+		fields=["customer", "school_name", "school_opening"],
+		limit_page_length=5000,
+		ignore_permissions=True,
+	)
+	counts = {}
+	for row in rows:
+		if filters["school_key"] and (_school_key(row) or "__none__") != filters["school_key"]:
+			continue
+		key = _school_key(row) or "__none__"
+		counts[key] = counts.get(key, 0) + 1
+	return counts
+
+
+def _days(rows):
+	counts = {}
+	for row in rows:
+		if not row.submitted_on:
+			continue
+		day = str(getdate(row.submitted_on))
+		counts[day] = counts.get(day, 0) + 1
+	if not counts:
+		return []
+	start = min(counts)
+	end = max(counts)
+	if date_diff(end, start) > 44:
+		start = str(getdate(add_days(end, -44)))
+	out = []
+	day = start
+	while day <= end:
+		out.append({"date": day, "count": counts.get(day, 0)})
+		day = str(getdate(add_days(day, 1)))
+	return out
+
+
+def _options():
+	if not frappe.db.table_exists("Feedback Studio Response"):
+		return {"smes": [], "schools": []}
+	rows = frappe.get_all(
+		"Feedback Studio Response",
+		fields=["sme_name", "customer", "school_name", "school_opening"],
+		limit_page_length=5000,
+		ignore_permissions=True,
+	)
+	customers = _customer_names(rows)
+	smes = sorted({(row.sme_name or "").strip() for row in rows if (row.sme_name or "").strip()})
+	schools = []
+	seen = set()
+	for row in rows:
+		key = _school_key(row) or "__none__"
+		if key in seen:
+			continue
+		seen.add(key)
+		schools.append({"key": key, "label": _school_label(row, customers) or "Not linked to a school"})
+	schools.sort(key=lambda item: item["label"].lower())
+	return {"smes": smes, "schools": schools}
+
+
 def _empty(scale):
 	return {
 		"scale": scale,
@@ -221,6 +349,9 @@ def _empty(scale):
 		"schools": [],
 		"comments": [],
 		"submissions": [],
+		"days": [],
+		"options": {"smes": [], "schools": []},
+		"total_all": 0,
 		"generated_on": _when(now_datetime()),
 	}
 
@@ -242,7 +373,11 @@ def get_report_data(filters=None):
 		limit_page_length=5000,
 		ignore_permissions=True,
 	)
+	if filters["school_key"]:
+		rows = [row for row in rows if (_school_key(row) or "__none__") == filters["school_key"]]
+	scale = _scale_from_rows(rows, scale)
 	customers = _customer_names(rows)
+	visits = _visit_counts(filters)
 
 	audience_counts = {aud: 0 for aud in AUDIENCES}
 	rating_sum = 0.0
@@ -287,8 +422,11 @@ def get_report_data(filters=None):
 
 		answer_rows = []
 		summary_bits = []
-		for qid, raw in answers.items():
-			meta = (catalog.get(aud) or {}).get(qid) or {}
+		pending_comments = []
+		row_rating = None
+		form_questions = _form_questions(aud, catalog, order)
+		for index, (qid, raw) in enumerate(answers.items()):
+			meta = _match_question(aud, qid, index, catalog, form_questions)
 			qtype = meta.get("type") or _infer_type(raw)
 			text = meta.get("text") or ""
 			stat = question_stats.setdefault(
@@ -314,19 +452,36 @@ def get_report_data(filters=None):
 				try:
 					num = int(raw)
 				except (TypeError, ValueError):
-					continue
-				if num < 1 or num > scale:
-					continue
-				stat["count"] += 1
-				rating_sum += num
-				rating_count += 1
-				school["rating_sum"] += num
-				school["rating_count"] += 1
-				if (num / scale) >= 0.8:
-					positive += 1
-				stat["rating_sum"] += num
-				stat["buckets"][str(num)] = stat["buckets"].get(str(num), 0) + 1
-				display = f"{num}/{scale}"
+					num = None
+				if num is None or num < 1 or num > scale:
+					val = str(raw or "").strip()
+					if val:
+						display = val
+						pending_comments.append(
+							{
+								"at": submitted,
+								"audience": aud,
+								"audience_label": LABELS.get(aud, aud or "Other"),
+								"school": school["school"] or "Not linked to a school",
+								"school_key": school["key"],
+								"sme_name": row.get("sme_name") or "",
+								"question": text or "Comment",
+								"text": val[:2000],
+							}
+						)
+				else:
+					stat["count"] += 1
+					rating_sum += num
+					rating_count += 1
+					school["rating_sum"] += num
+					school["rating_count"] += 1
+					if (num / scale) >= 0.8:
+						positive += 1
+					stat["rating_sum"] += num
+					stat["buckets"][str(num)] = stat["buckets"].get(str(num), 0) + 1
+					if row_rating is None:
+						row_rating = num
+					display = f"{num} out of {scale}"
 			elif qtype == "yesno":
 				val = "Yes" if str(raw) == "Yes" else "No"
 				stat["count"] += 1
@@ -348,12 +503,12 @@ def get_report_data(filters=None):
 					continue
 				stat["count"] += 1
 				display = val
-				comments.append(
+				pending_comments.append(
 					{
 						"at": submitted,
 						"audience": aud,
 						"audience_label": LABELS.get(aud, aud or "Other"),
-						"school": school["school"],
+						"school": school["school"] or "Not linked to a school",
 						"school_key": school["key"],
 						"sme_name": row.get("sme_name") or "",
 						"question": text or "Comment",
@@ -371,6 +526,10 @@ def get_report_data(filters=None):
 				if qtype != "text":
 					summary_bits.append(display)
 
+		for comment in pending_comments:
+			comment["rating"] = row_rating
+			comments.append(comment)
+
 		submissions.append(
 			{
 				"name": row.name,
@@ -382,6 +541,7 @@ def get_report_data(filters=None):
 				"sme_name": row.get("sme_name") or "",
 				"customer": row.get("customer") or "",
 				"summary": " · ".join(summary_bits[:4]),
+				"rating": row_rating,
 				"answers": answer_rows,
 			}
 		)
@@ -400,6 +560,7 @@ def get_report_data(filters=None):
 				"by_audience": school["by_audience"],
 				"avg_rating": round(avg, 1) if avg is not None else None,
 				"impact": impact,
+				"visits": visits.get(school["key"]) or None,
 				"last_on": school["last_on"],
 			}
 		)
@@ -445,8 +606,11 @@ def get_report_data(filters=None):
 		],
 		"questions": questions,
 		"schools": school_rows,
-		"comments": comments[:40],
+		"comments": comments[:300],
 		"submissions": submissions[:500],
+		"days": _days(rows),
+		"options": _options(),
+		"total_all": frappe.db.count("Feedback Studio Response"),
 		"generated_on": _when(now_datetime()),
 	}
 

@@ -492,10 +492,13 @@ frappe.tif_customization.FeedbackStudio = class FeedbackStudio {
 			if (this.state.customer && el.value !== this.state.customerLabel) {
 				this.state.customer = "";
 				this.state.customerLabel = "";
+				const picked = this.$.find(".fs-picked").get(0);
+				if (picked) picked.style.display = "none";
 			}
 			this.state.schoolOpen = true;
 			this.queueSchoolSearch(el.value);
-			this.render();
+			// Do not full-render — remounting reverses typed characters.
+			this.updateSchoolDropdown();
 			return;
 		}
 		if (field === "customer") {
@@ -776,8 +779,12 @@ frappe.tif_customization.FeedbackStudio = class FeedbackStudio {
 		const aud = this.state.aud;
 		const meta = this.clientMeta();
 		if (aud === "sme") {
+			if (this._smeLinkControl) this.state.smeName = this._smeLinkControl.get_value() || this.state.smeName;
+			if (this._customerLinkControl && !this.state.createSchool) {
+				this.state.customer = this._customerLinkControl.get_value() || this.state.customer;
+			}
 			if (!(this.state.smeName || "").trim()) {
-				frappe.msgprint(__("Please select your SME name."));
+				frappe.msgprint(__("Please select your SME name (Field Officer)."));
 				return;
 			}
 			if (!this.state.createSchool && !(this.state.customer || "").trim()) {
@@ -853,6 +860,7 @@ frappe.tif_customization.FeedbackStudio = class FeedbackStudio {
 		const aud = this.current();
 		this.$.attr("style", "--accent:" + aud.color);
 		this.$.html(this.header() + '<main class="fs-main">' + this.body() + "</main>");
+		this.mountSmeLinkControls();
 		if (!field) return;
 		const el = this.$.find('[data-field-key="' + CSS.escape(field) + '"]').get(0);
 		if (!el) return;
@@ -1246,45 +1254,74 @@ frappe.tif_customization.FeedbackStudio = class FeedbackStudio {
 		if (q.length < 2) {
 			this.state.schoolHits = [];
 			this.state.schoolSearching = false;
+			this.updateSchoolDropdown();
 			return;
 		}
 		this.state.schoolSearching = true;
+		this.updateSchoolDropdown();
+		const seq = (this.state.schoolSeq = (this.state.schoolSeq || 0) + 1);
 		this.state.schoolTimer = setTimeout(() => {
 			this.call("search_customers", { txt: q, limit: 40 }, true)
 				.then((rows) => {
+					if (seq !== this.state.schoolSeq) return;
 					this.state.schoolHits = Array.isArray(rows) ? rows : [];
 					this.state.schoolSearching = false;
 					this.state.schoolOpen = true;
-					if (this.state.mode === "take" && this.state.aud === "sme") this.render();
+					this.updateSchoolDropdown();
 				})
 				.catch(() => {
+					if (seq !== this.state.schoolSeq) return;
 					this.state.schoolHits = [];
 					this.state.schoolSearching = false;
-					if (this.state.mode === "take" && this.state.aud === "sme") this.render();
+					this.updateSchoolDropdown();
 				});
-		}, 280);
+		}, 250);
+	}
+
+	updateSchoolDropdown() {
+		const list = this.$.find(".fs-ac-list").get(0);
+		if (!list) return;
+		const hits = this.state.schoolHits || [];
+		const q = (this.state.customerQuery || "").trim();
+		let html = "";
+		if (this.state.schoolSearching) {
+			html = '<div class="fs-ac-empty">Searching Customer…</div>';
+		} else if (hits.length) {
+			html = hits
+				.map((c, i) => {
+					const label = c.label || c.value || "";
+					const desc = c.description || c.city || "";
+					return (
+						'<button type="button" class="fs-ac-item" data-act="pick-school" data-i="' +
+						i +
+						'"><div class="fs-ac-label">' +
+						this.h(label) +
+						"</div>" +
+						(desc ? '<div class="fs-ac-desc">' + this.h(desc) + "</div>" : "") +
+						"</button>"
+					);
+				})
+				.join("");
+		} else {
+			html =
+				'<div class="fs-ac-empty">' +
+				(q.length < 2
+					? "Type at least 2 letters to search Customer."
+					: "No Customer found. Create with School Opening.") +
+				"</div>";
+		}
+		list.innerHTML = html;
+		list.style.display = this.state.schoolOpen && !this.state.createSchool ? "block" : "none";
+		const picked = this.$.find(".fs-picked").get(0);
+		if (picked) {
+			picked.style.display = this.state.customer && !this.state.createSchool ? "flex" : "none";
+			const label = picked.querySelector(".fs-picked-label");
+			if (label) label.textContent = "Selected: " + (this.state.customerLabel || this.state.customer || "");
+		}
 	}
 
 	smeMetaPanel() {
 		const ctx = this.state.smeContext || {};
-		const officers = ctx.staff_options || [];
-		const smeOpts =
-			'<option value="">Select Field Officer (SME)…</option>' +
-			officers
-				.map((o) => {
-					const value = o.value || o.employee_name || "";
-					const label = value + (o.division ? " · " + o.division : "");
-					return (
-						'<option value="' +
-						this.h(value) +
-						'"' +
-						(this.state.smeName === value ? " selected" : "") +
-						">" +
-						this.h(label) +
-						"</option>"
-					);
-				})
-				.join("");
 		const provinces = (ctx.provinces || [])
 			.map((p) => {
 				return (
@@ -1299,87 +1336,46 @@ frappe.tif_customization.FeedbackStudio = class FeedbackStudio {
 			})
 			.join("");
 		const soa = this.state.schoolOpening;
-		const hits = this.state.schoolHits || [];
-		const acList = this.state.schoolOpen
-			? '<div class="fs-ac-list">' +
-				(this.state.schoolSearching
-					? '<div class="fs-ac-empty">Searching Customer…</div>'
-					: hits.length
-						? hits
-								.map((c, i) => {
-									const label = c.label || c.value || "";
-									const desc = c.description || c.city || "";
-									return (
-										'<button type="button" class="fs-ac-item" data-act="pick-school" data-i="' +
-										i +
-										'"><div class="fs-ac-label">' +
-										this.h(label) +
-										"</div>" +
-										(desc ? '<div class="fs-ac-desc">' + this.h(desc) + "</div>" : "") +
-										"</button>"
-									);
-								})
-								.join("")
-						: '<div class="fs-ac-empty">' +
-							((this.state.customerQuery || "").trim().length < 2
-								? "Type at least 2 letters to search Customer."
-								: "No Customer found. Create with School Opening.") +
-							"</div>") +
-				"</div>"
-			: "";
 		const createPanel = this.state.createSchool
 			? '<div class="fs-soa">' +
 				'<div class="fs-soa-title">School Opening — create school</div>' +
 				'<p class="fs-share-note">School is not in Customer yet. Save a School Opening request (same as Easy Form). After approval it becomes a Customer.</p>' +
 				'<div class="fs-soa-grid">' +
-				'<label class="fs-field"><span>Name of School *</span><input data-field="soa" data-key="school_name" data-field-key="soa-school_name" value="' +
+				'<label class="fs-field"><span>Name of School *</span><input data-field="soa" data-key="school_name" data-field-key="soa-school_name" dir="ltr" value="' +
 				this.h(soa.school_name || "") +
 				'"></label>' +
-				'<label class="fs-field"><span>City</span><input data-field="soa" data-key="city" data-field-key="soa-city" value="' +
+				'<label class="fs-field"><span>City</span><input data-field="soa" data-key="city" data-field-key="soa-city" dir="ltr" value="' +
 				this.h(soa.city || "") +
 				'"></label>' +
-				'<label class="fs-field"><span>Area</span><input data-field="soa" data-key="area" data-field-key="soa-area" value="' +
+				'<label class="fs-field"><span>Area</span><input data-field="soa" data-key="area" data-field-key="soa-area" dir="ltr" value="' +
 				this.h(soa.area || "") +
 				'"></label>' +
 				'<label class="fs-field"><span>Province</span><select data-field="soa" data-key="province" data-field-key="soa-province"><option value="">Select…</option>' +
 				provinces +
 				"</select></label>" +
-				'<label class="fs-field fs-span2"><span>Address</span><input data-field="soa" data-key="address" data-field-key="soa-address" value="' +
+				'<label class="fs-field fs-span2"><span>Address</span><input data-field="soa" data-key="address" data-field-key="soa-address" dir="ltr" value="' +
 				this.h(soa.address || "") +
 				'"></label>' +
-				'<label class="fs-field"><span>School mobile</span><input data-field="soa" data-key="school_mobile" data-field-key="soa-mobile" value="' +
+				'<label class="fs-field"><span>School mobile</span><input data-field="soa" data-key="school_mobile" data-field-key="soa-mobile" dir="ltr" value="' +
 				this.h(soa.school_mobile || "") +
 				'"></label>' +
-				'<label class="fs-field"><span>School email</span><input data-field="soa" data-key="school_email" data-field-key="soa-email" value="' +
+				'<label class="fs-field"><span>School email</span><input data-field="soa" data-key="school_email" data-field-key="soa-email" dir="ltr" value="' +
 				this.h(soa.school_email || "") +
 				'"></label>' +
-				'<label class="fs-field"><span>Principal name</span><input data-field="soa" data-key="principal_name" data-field-key="soa-pname" value="' +
+				'<label class="fs-field"><span>Principal name</span><input data-field="soa" data-key="principal_name" data-field-key="soa-pname" dir="ltr" value="' +
 				this.h(soa.principal_name || "") +
 				'"></label>' +
-				'<label class="fs-field"><span>Principal cell</span><input data-field="soa" data-key="principal_cell" data-field-key="soa-pcell" value="' +
+				'<label class="fs-field"><span>Principal cell</span><input data-field="soa" data-key="principal_cell" data-field-key="soa-pcell" dir="ltr" value="' +
 				this.h(soa.principal_cell || "") +
 				'"></label>' +
 				"</div></div>"
 			: "";
 		return (
 			'<div class="fs-card fs-sme-meta"><div class="fs-kicker">SME visit details</div>' +
-			'<p class="fs-share-note">SME list is from <strong>Field Officer</strong>. School is linked to <strong>Customer</strong>.</p>' +
+			'<p class="fs-share-note">Uses Frappe <strong>Link</strong> fields: SME → <strong>Field Officer</strong>, School → <strong>Customer</strong>.</p>' +
 			'<div class="fs-soa-grid">' +
-			'<label class="fs-field"><span>SME name (Field Officer) *</span><select class="fs-select" data-field="smeName" data-field-key="smeName">' +
-			smeOpts +
-			"</select></label>" +
-			'<label class="fs-field fs-span2"><span>Customer / school *</span>' +
-			'<div class="fs-ac-wrap"><input data-field="customerQuery" data-field-key="customerQuery" dir="ltr" inputmode="text" autocomplete="off" spellcheck="false" placeholder="Search Customer by school name…" value="' +
-			this.h(this.state.customerQuery || "") +
-			'"' +
-			(this.state.createSchool ? " disabled" : "") +
-			">" +
-			acList +
-			"</div>" +
-			(this.state.customer && !this.state.createSchool
-				? '<div class="fs-picked">Selected: ' + this.h(this.state.customerLabel || this.state.customer) + "</div>"
-				: "") +
-			"</label></div>" +
+			'<label class="fs-field"><span>SME name (Field Officer) *</span><div class="fs-link-mount" data-link="sme"></div></label>' +
+			'<label class="fs-field fs-span2"><span>Customer / school *</span><div class="fs-link-mount" data-link="customer"></div></label></div>' +
 			'<div class="fs-share-actions" style="margin-top:12px">' +
 			'<button type="button" class="fs-mini' +
 			(this.state.createSchool ? " is-on" : "") +
@@ -1393,6 +1389,79 @@ frappe.tif_customization.FeedbackStudio = class FeedbackStudio {
 			createPanel +
 			"</div>"
 		);
+	}
+
+	mountSmeLinkControls() {
+		if (this.state.mode !== "take" || this.state.aud !== "sme" || this.state.submitted) return;
+		const smeMount = this.$.find('[data-link="sme"]').get(0);
+		const custMount = this.$.find('[data-link="customer"]').get(0);
+		if (!smeMount || !custMount || !frappe.ui.form.make_control) return;
+
+		if (this._smeLinkControl) {
+			try {
+				this._smeLinkControl.$wrapper.remove();
+			} catch (e) {}
+			this._smeLinkControl = null;
+		}
+		if (this._customerLinkControl) {
+			try {
+				this._customerLinkControl.$wrapper.remove();
+			} catch (e) {}
+			this._customerLinkControl = null;
+		}
+
+		this._smeLinkControl = frappe.ui.form.make_control({
+			df: {
+				fieldtype: "Link",
+				options: "Field Officer",
+				fieldname: "sme_field_officer",
+				label: "Field Officer",
+				reqd: 1,
+				get_query: () => ({ filters: { status: "Active" } }),
+			},
+			parent: smeMount,
+			render_input: true,
+		});
+		this._smeLinkControl.refresh();
+		if (this.state.smeName) this._smeLinkControl.set_value(this.state.smeName);
+		const syncSme = () => {
+			this.state.smeName = this._smeLinkControl.get_value() || "";
+		};
+		this._smeLinkControl.$input.on("awesomplete-selectcomplete change blur", syncSme);
+
+		this._customerLinkControl = frappe.ui.form.make_control({
+			df: {
+				fieldtype: "Link",
+				options: "Customer",
+				fieldname: "sme_customer",
+				label: "Customer",
+				reqd: 1,
+				get_query: () => {
+					const filters = {};
+					try {
+						if (frappe.get_meta("Customer").has_field("disabled")) filters.disabled = 0;
+					} catch (e) {}
+					return { filters };
+				},
+			},
+			parent: custMount,
+			render_input: true,
+		});
+		this._customerLinkControl.refresh();
+		if (this.state.customer && !this.state.createSchool) {
+			this._customerLinkControl.set_value(this.state.customer);
+		}
+		if (this.state.createSchool) {
+			this._customerLinkControl.$input.prop("disabled", true);
+		}
+		const syncCust = () => {
+			const val = this._customerLinkControl.get_value() || "";
+			this.state.customer = val;
+			this.state.customerLabel = val;
+			this.state.customerQuery = val;
+			if (val) this.state.createSchool = false;
+		};
+		this._customerLinkControl.$input.on("awesomplete-selectcomplete change blur", syncCust);
 	}
 
 	respView() {

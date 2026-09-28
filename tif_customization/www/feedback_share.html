@@ -55,7 +55,7 @@ textarea:focus, button:focus-visible { outline: 2px solid var(--accent, #2f5bd3)
 </style>
 </head>
 <body>
-<div class="wrap" id="app"></div>
+<div class="wrap" id="app"><div class="empty">Loading…</div></div>
 <script>
 const TOKEN = {{ token | tojson }};
 const CSRF = {{ csrf_token | tojson }};
@@ -146,7 +146,7 @@ function render() {
 			return '<button type="button" class="role" style="--role:' + esc(r.color) + '" data-role="' + esc(r.id) + '"><span class="role-dot"></span><span><div class="role-title">' + esc(r.label) + '</div><div class="role-hint">' + esc(r.hint || "") + "</div></span></button>";
 		}).join("");
 		app.style.setProperty("--accent", "#7a4cc2");
-		app.innerHTML = '<div class="stack"><div class="card accent"><div class="kicker">Shared feedback</div><h1>Who are you?</h1><p class="intro">Select your role to open the matching feedback form.</p><div class="meta">' + (session.school_name ? ("School: <strong>" + esc(session.school_name) + "</strong>") : "") + (session.sme_name ? (" · SME: " + esc(session.sme_name)) : "") + "</div></div><div class="roles">' + roles + "</div></div>";
+		app.innerHTML = '<div class="stack"><div class="card accent"><div class="kicker">Shared feedback</div><h1>Who are you?</h1><p class="intro">Select your role to open the matching feedback form.</p><div class="meta">' + (session.school_name ? ('School: <strong>' + esc(session.school_name) + '</strong>') : '') + (session.sme_name ? (' · SME: ' + esc(session.sme_name)) : '') + '</div></div><div class="roles">' + roles + '</div></div>';
 		app.querySelectorAll("[data-role]").forEach(function (btn) {
 			btn.onclick = function () { pickRole(btn.dataset.role); };
 		});

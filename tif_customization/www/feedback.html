@@ -7,6 +7,8 @@
 <title>{{ title or "Feedback" }}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,500;6..72,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/awesomplete@1.1.5/awesomplete.min.css">
+<script src="https://cdn.jsdelivr.net/npm/awesomplete@1.1.5/awesomplete.min.js"></script>
 <style>
 html, body { direction: ltr; text-align: left; }
 body { margin: 0; background: #f5f3ee; color: #1d2230; font-family: "Figtree", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
@@ -35,7 +37,7 @@ h1 { margin: 8px 0 0; font-family: "Newsreader", Georgia, serif; font-size: 28px
 .dot { width: 18px; height: 18px; border-radius: 50%; border: 2px solid #c9c2b3; box-shadow: inset 0 0 0 3px #fff; background: #fff; flex: none; }
 .choices button.on .dot { border-color: var(--accent, #2f5bd3); background: var(--accent, #2f5bd3); }
 textarea, input[type=text], select { width: 100%; border: 1px solid #d9d3c6; background: #fff; border-radius: 10px; padding: 12px 14px; font-size: 15px; line-height: 1.5; direction: ltr !important; text-align: left !important; unicode-bidi: plaintext; }
-#customerQuery { direction: ltr !important; text-align: left !important; unicode-bidi: plaintext; }
+#customerQuery { direction: ltr !important; text-align: left !important; unicode-bidi: isolate; }
 textarea { resize: vertical; }
 textarea:focus, button:focus-visible, input:focus, select:focus { outline: 2px solid var(--accent, #2f5bd3); outline-offset: 1px; }
 .err { font-size: 12px; font-weight: 600; color: #b3401f; }
@@ -60,13 +62,63 @@ textarea:focus, button:focus-visible, input:focus, select:focus { outline: 2px s
 .share-row { display: flex; gap: 8px; width: 100%; max-width: 520px; }
 .share-row input { flex: 1; }
 .ac-wrap { position: relative; }
-.ac-list { position: absolute; z-index: 30; left: 0; right: 0; top: calc(100% + 4px); background: #fff; border: 1px solid #e6e1d6; border-radius: 10px; max-height: 260px; overflow: auto; box-shadow: 0 10px 28px rgba(29,34,48,.12); }
-.ac-item { display: block; width: 100%; text-align: left; border: 0; background: #fff; padding: 11px 14px; cursor: pointer; border-bottom: 1px solid #f0ebe3; color: inherit; }
-.ac-item:hover, .ac-item:focus { background: #fbfaf6; outline: none; }
-.ac-label { font-size: 14px; font-weight: 600; color: #1d2230; }
-.ac-desc { font-size: 12px; color: #6b6f7a; margin-top: 2px; }
-.ac-empty { padding: 12px 14px; font-size: 13px; color: #6b6f7a; }
-.picked { margin-top: 8px; font-size: 13px; color: #1f8a5b; font-weight: 600; }
+.link-field { position: relative; direction: ltr; }
+.link-field input {
+	width: 100%;
+	border: 1px solid #d9d3c6;
+	background: #fff;
+	border-radius: 10px;
+	padding: 12px 36px 12px 14px;
+	font-size: 15px;
+	line-height: 1.5;
+	direction: ltr !important;
+	text-align: left !important;
+	unicode-bidi: isolate;
+}
+.link-field .link-clear {
+	position: absolute;
+	right: 10px;
+	top: 50%;
+	transform: translateY(-50%);
+	border: 0;
+	background: transparent;
+	color: #6b6f7a;
+	font-size: 18px;
+	line-height: 1;
+	cursor: pointer;
+	padding: 4px 6px;
+	display: none;
+}
+.link-field.has-value .link-clear { display: inline-block; }
+.awesomplete { width: 100%; display: block; }
+.awesomplete > ul {
+	z-index: 50;
+	border: 1px solid #e6e1d6;
+	border-radius: 10px;
+	box-shadow: 0 10px 28px rgba(29,34,48,.12);
+	background: #fff;
+	max-height: 280px;
+	overflow: auto;
+	margin: 4px 0 0;
+	padding: 4px 0;
+	left: 0;
+	right: 0;
+	min-width: 100%;
+}
+.awesomplete > ul > li {
+	padding: 10px 14px;
+	font-size: 14px;
+	color: #1d2230;
+	border-bottom: 1px solid #f0ebe3;
+	direction: ltr;
+	text-align: left;
+}
+.awesomplete > ul > li[aria-selected="true"],
+.awesomplete > ul > li:hover { background: #f5f0ff; }
+.awesomplete mark { background: transparent; font-weight: 700; color: #7a4cc2; }
+.link-desc { display: block; font-size: 12px; color: #6b6f7a; margin-top: 2px; }
+.picked { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; padding: 10px 12px; border-radius: 10px; background: #eef8f1; border: 1px solid #b7dfc4; font-size: 13px; color: #146c3a; font-weight: 600; direction: ltr; text-align: left; }
+.picked button { border: 0; background: transparent; color: #146c3a; font-weight: 700; cursor: pointer; font-size: 12px; }
 @media (max-width: 640px) { .meta-grid { grid-template-columns: 1fr; } .share-row { flex-direction: column; } }
 </style>
 </head>
@@ -163,138 +215,220 @@ function clientMeta() {
 	};
 }
 
+function searchLink(doctype, txt) {
+	const url = API + "search_public_link?token=" + encodeURIComponent(TOKEN) +
+		"&doctype=" + encodeURIComponent(doctype) +
+		"&txt=" + encodeURIComponent(txt || "") +
+		"&limit=40";
+	return fetch(url, { headers: { Accept: "application/json" } })
+		.then(function (res) { return res.json(); })
+		.then(function (data) { return Array.isArray(data.message) ? data.message : []; });
+}
+
+function LinkField(opts) {
+	this.doctype = opts.doctype;
+	this.placeholder = opts.placeholder || ("Search " + opts.doctype + "...");
+	this.mount = typeof opts.mount === "string" ? document.getElementById(opts.mount) : opts.mount;
+	this.value = opts.value || "";
+	this.label = opts.label || opts.value || "";
+	this.onChange = opts.onChange || function () {};
+	this.disabled = !!opts.disabled;
+	this._timer = null;
+	this._seq = 0;
+	this.render();
+}
+
+LinkField.prototype.render = function () {
+	if (!this.mount) return;
+	this.mount.innerHTML =
+		'<div class="link-field' + (this.value ? " has-value" : "") + (this.disabled ? " is-disabled" : "") + '">' +
+		'<input type="text" dir="ltr" lang="en" autocomplete="off" spellcheck="false" placeholder="' + esc(this.placeholder) + '"' +
+		(this.disabled ? " disabled" : "") + ' value="' + esc(this.label || this.value || "") + '">' +
+		'<button type="button" class="link-clear" title="Clear" aria-label="Clear">&times;</button></div>';
+	this.input = this.mount.querySelector("input");
+	this.clearBtn = this.mount.querySelector(".link-clear");
+	const me = this;
+	this.clearBtn.onclick = function (e) {
+		e.preventDefault();
+		me.setValue("", "");
+		me.input.focus();
+	};
+	if (this.disabled) return;
+	if (typeof Awesomplete === "undefined") {
+		this.input.oninput = function () {
+			me.value = "";
+			me.label = me.input.value;
+			me.mount.querySelector(".link-field").classList.toggle("has-value", !!me.input.value);
+		};
+		return;
+	}
+	this.awesomplete = new Awesomplete(this.input, {
+		minChars: 0,
+		maxItems: 40,
+		autoFirst: true,
+		tabSelect: true,
+		filter: function () { return true; },
+		sort: false,
+		item: function (text) {
+			// `text` is the HTML label from data() — only for dropdown display
+			const li = document.createElement("li");
+			li.innerHTML = typeof text === "string" ? text : String((text && text.label) || text || "");
+			return li;
+		},
+		replace: function (suggestion) {
+			// IMPORTANT: never put HTML into the input — only the plain link value
+			const plain = plainText(
+				(suggestion && suggestion.value) ||
+				(typeof suggestion === "string" ? suggestion : "") ||
+				""
+			);
+			me.input.value = plain;
+		},
+		data: function (item) {
+			const value = plainText(item.value || item.label || "");
+			const title = plainText(item.label || item.value || "");
+			const desc = plainText(item.description || "");
+			const html = '<span class="link-title">' + esc(title) + "</span>" +
+				(desc ? '<span class="link-desc">' + esc(desc) + "</span>" : "");
+			return { label: html, value: value };
+		}
+	});
+	this.input.addEventListener("awesomplete-selectcomplete", function (e) {
+		let val = "";
+		if (e.text && typeof e.text === "object") {
+			val = e.text.value || "";
+		} else if (typeof e.text === "string") {
+			val = e.text;
+		}
+		val = plainText(val || me.input.value || "");
+		me.input.value = val;
+		me.setValue(val, val);
+	});
+	this.input.addEventListener("input", function () {
+		// Guard against HTML ever landing in the box
+		if (/[<>]/.test(me.input.value)) {
+			me.input.value = plainText(me.input.value);
+		}
+		me.mount.querySelector(".link-field").classList.toggle("has-value", !!me.input.value);
+		if (me.value && me.input.value !== me.label) {
+			me.value = "";
+			me.label = me.input.value;
+			me.onChange("", me.input.value);
+		}
+		me.queueSearch(me.input.value);
+	});
+	this.input.addEventListener("focus", function () {
+		me.queueSearch(me.input.value);
+	});
+	this.input.addEventListener("blur", function () {
+		if (/[<>]/.test(me.input.value)) {
+			me.input.value = plainText(me.input.value);
+		}
+	});
+};
+
+function plainText(value) {
+	return String(value == null ? "" : value)
+		.replace(/<[^>]*>/g, " ")
+		.replace(/&nbsp;/g, " ")
+		.replace(/&amp;/g, "&")
+		.replace(/&lt;/g, "<")
+		.replace(/&gt;/g, ">")
+		.replace(/&quot;/g, '"')
+		.replace(/\s+/g, " ")
+		.trim();
+}
+
+LinkField.prototype.queueSearch = function (txt) {
+	const me = this;
+	clearTimeout(this._timer);
+	const seq = ++this._seq;
+	this._timer = setTimeout(function () {
+		searchLink(me.doctype, plainText(txt)).then(function (rows) {
+			if (seq !== me._seq || !me.awesomplete) return;
+			me.awesomplete.list = rows;
+			if (me.input === document.activeElement) me.awesomplete.evaluate();
+		}).catch(function () {
+			if (seq !== me._seq || !me.awesomplete) return;
+			me.awesomplete.list = [];
+		});
+	}, 200);
+};
+
+LinkField.prototype.setValue = function (value, label) {
+	this.value = plainText(value || "");
+	this.label = plainText(label || value || "");
+	if (this.input) this.input.value = this.label;
+	if (this.mount) {
+		const wrap = this.mount.querySelector(".link-field");
+		if (wrap) wrap.classList.toggle("has-value", !!this.value || !!this.label);
+	}
+	this.onChange(this.value, this.label);
+};
+
+LinkField.prototype.getValue = function () {
+	return this.value || "";
+};
+
 function smeMetaHtml() {
-	const sme = smeData();
-	const officers = sme.staff_options || [];
-	const smeOpts = '<option value="">Select Field Officer (SME)...</option>' + officers.map(function (o) {
-		const value = o.value || o.employee_name || "";
-		const label = value + (o.division ? " - " + o.division : "");
-		return '<option value="' + esc(value) + '"' + (state.smeName === value ? " selected" : "") + ">" + esc(label) + "</option>";
-	}).join("");
-	const provinces = (sme.provinces || []).map(function (p) {
-		return '<option value="' + esc(p) + '"' + (state.schoolOpening.province === p ? " selected" : "") + ">" + esc(p) + "</option>";
-	}).join("");
 	const soa = state.schoolOpening;
-	const hits = state.schoolHits || [];
-	const acList = state.schoolOpen
-		? '<div class="ac-list" id="schoolList">' +
-			(state.schoolSearching
-				? '<div class="ac-empty">Searching Customer...</div>'
-				: hits.length
-					? hits.map(function (c, i) {
-						const value = c.value || "";
-						const label = c.label || value;
-						const desc = c.description || c.city || "";
-						return '<button type="button" class="ac-item" data-pick="' + i + '"><div class="ac-label">' + esc(label) + '</div>' +
-							(desc ? '<div class="ac-desc">' + esc(desc) + "</div>" : "") + "</button>";
-					}).join("")
-					: '<div class="ac-empty">' + (state.customerQuery.trim().length < 2 ? "Type at least 2 letters to search Customer." : "No Customer found. Create with School Opening.") + "</div>") +
-			"</div>"
-		: "";
+	const provinces = ((smeData().provinces) || []).map(function (p) {
+		return '<option value="' + esc(p) + '"' + (soa.province === p ? " selected" : "") + ">" + esc(p) + "</option>";
+	}).join("");
 	const createPanel = state.createSchool
 		? '<div class="soa"><div class="soa-title">School Opening - create school</div><p class="note">School is not in Customer yet. This creates a School Opening request (same as Easy Form).</p><div class="meta-grid">' +
-			'<label class="field' + (state.metaErrors.school_name ? " bad" : "") + '"><span>Name of School *</span><input type="text" data-key="soa-school_name" data-soa="school_name" value="' + esc(soa.school_name || "") + '"></label>' +
-			'<label class="field"><span>City</span><input type="text" data-key="soa-city" data-soa="city" value="' + esc(soa.city || "") + '"></label>' +
-			'<label class="field"><span>Area</span><input type="text" data-key="soa-area" data-soa="area" value="' + esc(soa.area || "") + '"></label>' +
+			'<label class="field' + (state.metaErrors.school_name ? " bad" : "") + '"><span>Name of School *</span><input type="text" data-key="soa-school_name" data-soa="school_name" dir="ltr" value="' + esc(soa.school_name || "") + '"></label>' +
+			'<label class="field"><span>City</span><input type="text" data-key="soa-city" data-soa="city" dir="ltr" value="' + esc(soa.city || "") + '"></label>' +
+			'<label class="field"><span>Area</span><input type="text" data-key="soa-area" data-soa="area" dir="ltr" value="' + esc(soa.area || "") + '"></label>' +
 			'<label class="field"><span>Province</span><select data-soa="province"><option value="">Select...</option>' + provinces + "</select></label>" +
-			'<label class="field span2"><span>Address</span><input type="text" data-key="soa-address" data-soa="address" value="' + esc(soa.address || "") + '"></label>' +
-			'<label class="field"><span>School mobile</span><input type="text" data-key="soa-mobile" data-soa="school_mobile" value="' + esc(soa.school_mobile || "") + '"></label>' +
-			'<label class="field"><span>School email</span><input type="text" data-key="soa-email" data-soa="school_email" value="' + esc(soa.school_email || "") + '"></label>' +
-			'<label class="field"><span>Principal name</span><input type="text" data-key="soa-pname" data-soa="principal_name" value="' + esc(soa.principal_name || "") + '"></label>' +
-			'<label class="field"><span>Principal cell</span><input type="text" data-key="soa-pcell" data-soa="principal_cell" value="' + esc(soa.principal_cell || "") + '"></label>' +
+			'<label class="field span2"><span>Address</span><input type="text" data-key="soa-address" data-soa="address" dir="ltr" value="' + esc(soa.address || "") + '"></label>' +
+			'<label class="field"><span>School mobile</span><input type="text" data-key="soa-mobile" data-soa="school_mobile" dir="ltr" value="' + esc(soa.school_mobile || "") + '"></label>' +
+			'<label class="field"><span>School email</span><input type="text" data-key="soa-email" data-soa="school_email" dir="ltr" value="' + esc(soa.school_email || "") + '"></label>' +
+			'<label class="field"><span>Principal name</span><input type="text" data-key="soa-pname" data-soa="principal_name" dir="ltr" value="' + esc(soa.principal_name || "") + '"></label>' +
+			'<label class="field"><span>Principal cell</span><input type="text" data-key="soa-pcell" data-soa="principal_cell" dir="ltr" value="' + esc(soa.principal_cell || "") + '"></label>' +
 			"</div></div>"
 		: "";
 	return '<div class="card" id="smeMetaCard" style="border:2px solid #7a4cc2"><div class="kicker">SME + School (required)</div>' +
-		'<p class="note">SME list = <strong>Field Officer</strong>. School = <strong>Customer</strong> link. Type 2+ letters and pick a school.</p><div class="meta-grid">' +
-		'<label class="field' + (state.metaErrors.smeName ? " bad" : "") + '"><span>SME name (Field Officer) *</span><select id="smeName">' + smeOpts + "</select>" +
-		(state.metaErrors.smeName ? '<div class="err">Required</div>' : "") +
-		(officers.length ? "" : '<div class="err">No active Field Officers found</div>') +
+		'<p class="note">Both fields work like Frappe <strong>Link</strong> fields. SME links to <strong>Field Officer</strong>. School links to <strong>Customer</strong>.</p><div class="meta-grid">' +
+		'<label class="field' + (state.metaErrors.smeName ? " bad" : "") + '"><span>SME name (Field Officer) *</span><div id="smeLinkMount"></div>' +
+		(state.metaErrors.smeName ? '<div class="err">Required — pick a Field Officer</div>' : "") +
 		"</label>" +
-		'<label class="field span2' + (state.metaErrors.customer ? " bad" : "") + '"><span>Customer / school *</span>' +
-		'<div class="ac-wrap"><input type="text" id="customerQuery" data-key="customerQuery" dir="ltr" inputmode="text" autocomplete="off" spellcheck="false" placeholder="Search Customer by school name..." value="' +
-		esc(state.customerQuery || "") + '"' + (state.createSchool ? " disabled" : "") + ">" + acList + "</div>" +
-		(state.customer && !state.createSchool ? '<div class="picked">Selected: ' + esc(state.customerLabel || state.customer) + "</div>" : "") +
-		(state.metaErrors.customer ? '<div class="err">Select a Customer from the list, or create one below</div>' : "") +
+		'<label class="field span2' + (state.metaErrors.customer ? " bad" : "") + '"><span>Customer / school *</span><div id="customerLinkMount"></div>' +
+		(state.metaErrors.customer ? '<div class="err">Required — pick a Customer from suggestions</div>' : "") +
 		"</label></div>" +
 		'<div style="margin-top:12px"><button type="button" class="linkish" id="toggleCreate">' +
 		(state.createSchool ? "Cancel new school" : "School not listed? Create with School Opening") +
 		"</button></div>" + createPanel + "</div>";
 }
 
-function searchCustomers(txt) {
-	const q = (txt || "").trim();
-	state.customerQuery = txt;
-	state.schoolOpen = true;
-	if (state.customer && state.customerLabel && q === state.customerLabel) {
-		state.schoolHits = [];
-		render();
-		return;
-	}
-	// Typing again clears previous Customer pick until a new row is chosen
-	if (state.customer && q !== state.customerLabel) {
-		state.customer = "";
-		state.customerLabel = "";
-	}
-	if (q.length < 2) {
-		state.schoolHits = [];
-		state.schoolSearching = false;
-		render();
-		return;
-	}
-	state.schoolSearching = true;
-	render();
-	clearTimeout(state.schoolTimer);
-	state.schoolTimer = setTimeout(async function () {
-		try {
-			const res = await fetch(
-				API + "search_public_customers?token=" + encodeURIComponent(TOKEN) +
-				"&txt=" + encodeURIComponent(q) + "&limit=40",
-				{ headers: { "Accept": "application/json" } }
-			);
-			const data = await res.json();
-			state.schoolHits = Array.isArray(data.message) ? data.message : [];
-		} catch (e) {
-			state.schoolHits = [];
-		}
-		state.schoolSearching = false;
-		state.schoolOpen = true;
-		render();
-	}, 280);
-}
-
 function bindSmeMeta() {
-	const smeName = document.getElementById("smeName");
-	if (smeName) smeName.onchange = function () {
-		state.smeName = smeName.value;
-		delete state.metaErrors.smeName;
-	};
-	const query = document.getElementById("customerQuery");
-	if (query) {
-		query.oninput = function () {
-			searchCustomers(query.value);
-		};
-		query.onfocus = function () {
-			state.schoolOpen = true;
-			if ((state.customerQuery || "").trim().length >= 2 && !(state.schoolHits || []).length) {
-				searchCustomers(state.customerQuery);
-			} else {
-				render();
-			}
-		};
-	}
-	app.querySelectorAll("[data-pick]").forEach(function (btn) {
-		btn.onclick = function () {
-			const hit = state.schoolHits[Number(btn.dataset.pick)];
-			if (!hit) return;
-			state.customer = hit.value || "";
-			state.customerLabel = hit.label || hit.value || "";
+	state._smeLink = new LinkField({
+		doctype: "Field Officer",
+		mount: "smeLinkMount",
+		placeholder: "Search Field Officer...",
+		value: state.smeName || "",
+		label: state.smeName || "",
+		onChange: function (value) {
+			state.smeName = value || "";
+			if (value) delete state.metaErrors.smeName;
+		}
+	});
+	state._customerLink = new LinkField({
+		doctype: "Customer",
+		mount: "customerLinkMount",
+		placeholder: "Search Customer / school...",
+		value: state.customer || "",
+		label: state.customerLabel || state.customer || "",
+		disabled: state.createSchool,
+		onChange: function (value, label) {
+			state.customer = value || "";
+			state.customerLabel = label || value || "";
 			state.customerQuery = state.customerLabel;
-			state.schoolHits = [];
-			state.schoolOpen = false;
-			state.createSchool = false;
-			delete state.metaErrors.customer;
-			render();
-		};
+			if (value) {
+				state.createSchool = false;
+				delete state.metaErrors.customer;
+			}
+		}
 	});
 	const toggle = document.getElementById("toggleCreate");
 	if (toggle) toggle.onclick = function () {
@@ -302,7 +436,7 @@ function bindSmeMeta() {
 		if (state.createSchool) {
 			state.customer = "";
 			state.customerLabel = "";
-			state.schoolOpen = false;
+			state.customerQuery = (state._customerLink && state._customerLink.input && state._customerLink.input.value) || "";
 			if (!state.schoolOpening.school_name && state.customerQuery) {
 				state.schoolOpening.school_name = state.customerQuery;
 			}
@@ -317,18 +451,6 @@ function bindSmeMeta() {
 		};
 		el.addEventListener(el.tagName === "SELECT" ? "change" : "input", apply);
 	});
-	document.addEventListener("click", onDocClickClose, { once: true });
-}
-
-function onDocClickClose(e) {
-	if (!state.schoolOpen) return;
-	const wrap = app.querySelector(".ac-wrap");
-	if (wrap && wrap.contains(e.target)) {
-		document.addEventListener("click", onDocClickClose, { once: true });
-		return;
-	}
-	state.schoolOpen = false;
-	render();
 }
 
 function render() {
@@ -479,9 +601,20 @@ function missing() {
 	return errs;
 }
 
+function syncLinkValues() {
+	if (state._smeLink) {
+		state.smeName = state._smeLink.getValue() || "";
+	}
+	if (state._customerLink && !state.createSchool) {
+		state.customer = state._customerLink.getValue() || "";
+		state.customerLabel = state._customerLink.label || state.customer;
+	}
+}
+
 function missingMeta() {
 	const errs = {};
 	if (!isSme()) return errs;
+	syncLinkValues();
 	if (!(state.smeName || "").trim()) errs.smeName = true;
 	if (state.createSchool) {
 		if (!(state.schoolOpening.school_name || "").trim()) errs.school_name = true;
@@ -505,6 +638,7 @@ function serverMessage(data) {
 }
 
 async function submit() {
+	syncLinkValues();
 	const metaErrs = missingMeta();
 	const errs = missing();
 	if (Object.keys(metaErrs).length || Object.keys(errs).length) {
