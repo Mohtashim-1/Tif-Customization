@@ -7,9 +7,10 @@ import re
 import frappe
 from frappe import _
 from frappe.rate_limiter import rate_limit
-from frappe.utils import get_url, now_datetime
+from frappe.utils import cint, cstr, get_url, now_datetime
 
 AUDIENCES = ("school", "parent", "student", "sme")
+PUBLIC_ROLES = ("school", "parent", "student")
 TYPES = ("rating", "choice", "yesno", "text")
 TOKEN_RE = re.compile(r"^[A-Fa-f0-9]{16,64}$")
 QID_RE = re.compile(r"^[A-Za-z0-9_-]{1,40}$")
@@ -176,13 +177,116 @@ def _links(doc):
 	return {aud: get_url("/feedback/" + (doc.get(aud + "_token") or "")) for aud in AUDIENCES}
 
 
+def _request_ip():
+	try:
+		fwd = (frappe.get_request_header("X-Forwarded-For") or "").split(",")[0].strip()
+		if fwd:
+			return fwd[:64]
+	except Exception:
+		pass
+	try:
+		ip = getattr(frappe.local, "request_ip", None) or ""
+		if ip:
+			return str(ip)[:64]
+	except Exception:
+		pass
+	try:
+		if frappe.request and frappe.request.environ:
+			return str(frappe.request.environ.get("REMOTE_ADDR") or "")[:64]
+	except Exception:
+		pass
+	return ""
+
+
+def _request_user_agent():
+	try:
+		return str(frappe.get_request_header("User-Agent") or "")[:1000]
+	except Exception:
+		return ""
+
+
+def _clean_client_meta(raw):
+	raw = _as_obj(raw) or {}
+	if not isinstance(raw, dict):
+		return {}
+	allowed = (
+		"platform",
+		"language",
+		"languages",
+		"timezone",
+		"timezoneOffset",
+		"screenWidth",
+		"screenHeight",
+		"availWidth",
+		"availHeight",
+		"colorDepth",
+		"pixelRatio",
+		"viewportWidth",
+		"viewportHeight",
+		"touchPoints",
+		"cookieEnabled",
+		"doNotTrack",
+		"hardwareConcurrency",
+		"deviceMemory",
+		"connectionType",
+		"connectionDownlink",
+		"referrer",
+		"pageUrl",
+		"macAddress",
+		"deviceId",
+		"online",
+	)
+	out = {}
+	for key in allowed:
+		if key not in raw:
+			continue
+		val = raw.get(key)
+		if val is None or val == "":
+			continue
+		if isinstance(val, (list, tuple)):
+			out[key] = [cstr(v)[:80] for v in val[:12]]
+		elif isinstance(val, (int, float, bool)):
+			out[key] = val
+		else:
+			out[key] = cstr(val)[:500]
+	return out
+
+
+def _device_fields(client_meta=None):
+	meta = _clean_client_meta(client_meta)
+	mac = cstr(meta.pop("macAddress", "") or "").strip()[:64]
+	# Browsers cannot expose real MAC addresses; keep blank unless explicitly provided.
+	return {
+		"ip_address": _request_ip(),
+		"mac_address": mac,
+		"user_agent": _request_user_agent(),
+		"client_meta_json": json.dumps(meta, ensure_ascii=False) if meta else "",
+	}
+
+
 def _responses():
 	out = {aud: [] for aud in AUDIENCES}
 	if not frappe.db.table_exists("Feedback Studio Response"):
 		return out
+	base_fields = ["name", "audience", "answers_json", "submitted_on"]
+	extra_fields = [
+		"session",
+		"sme_name",
+		"customer",
+		"school_name",
+		"school_opening",
+		"ip_address",
+		"mac_address",
+		"user_agent",
+	]
+	try:
+		meta = frappe.get_meta("Feedback Studio Response")
+		fields = base_fields + [f for f in extra_fields if meta.has_field(f)]
+	except Exception:
+		fields = base_fields
 	rows = frappe.get_all(
 		"Feedback Studio Response",
-		fields=["audience", "answers_json", "submitted_on"],
+		fields=fields,
 		order_by="creation asc",
 		limit_page_length=2000,
 		ignore_permissions=True,
@@ -198,7 +302,11 @@ def _responses():
 				answers = {}
 		if not isinstance(answers, dict):
 			answers = {}
-		out[row.audience].append({"at": str(row.submitted_on or ""), "answers": answers})
+		item = {"name": row.name, "at": str(row.submitted_on or ""), "answers": answers}
+		for key in extra_fields:
+			if hasattr(row, key):
+				item[key] = getattr(row, key) or ""
+		out[row.audience].append(item)
 	return out
 
 
@@ -261,21 +369,25 @@ def _clean_answers(form, scale, raw):
 	return cleaned
 
 
-def _store(audience, answers, doc):
+def _store(audience, answers, doc, extra=None, client_meta=None):
 	forms = _forms(doc)
 	if not forms:
 		frappe.throw(_("This form is not ready yet."))
 	cleaned = _clean_answers(forms[audience], _scale(doc.rating_scale), answers)
-	response = frappe.get_doc(
-		{
-			"doctype": "Feedback Studio Response",
-			"audience": audience,
-			"answers_json": json.dumps(cleaned, ensure_ascii=False),
-			"submitted_on": now_datetime(),
-		}
-	)
+	payload = {
+		"doctype": "Feedback Studio Response",
+		"audience": audience,
+		"answers_json": json.dumps(cleaned, ensure_ascii=False),
+		"submitted_on": now_datetime(),
+	}
+	payload.update(_device_fields(client_meta))
+	if extra:
+		for key, val in extra.items():
+			if val is not None and val != "":
+				payload[key] = val
+	response = frappe.get_doc(payload)
 	response.insert(ignore_permissions=True)
-	return _responses()[audience]
+	return response
 
 
 def _find(token):
@@ -287,6 +399,78 @@ def _find(token):
 		if doc.get(aud + "_token") == token:
 			return aud, doc
 	return None
+
+
+def _find_session(token):
+	token = (token or "").strip()
+	if not TOKEN_RE.fullmatch(token):
+		return None
+	if not frappe.db.table_exists("Feedback Studio Session"):
+		return None
+	row = frappe.db.get_value(
+		"Feedback Studio Session",
+		{"share_token": token},
+		[
+			"name",
+			"status",
+			"sme_name",
+			"customer",
+			"school_name",
+			"school_opening",
+			"sme_response",
+		],
+		as_dict=True,
+	)
+	return row
+
+
+def _share_url(token):
+	return get_url("/feedback-share/" + token)
+
+
+def _resolve_staff_name(sme_name):
+	from tif_customization.tif_customization.page.smes_activity_form.smes_activity_form import (
+		get_active_field_officer_staff,
+	)
+
+	sme_name = (sme_name or "").strip()
+	if not sme_name:
+		frappe.throw(_("Please select the SME name."))
+	staff = get_active_field_officer_staff()
+	by_name = {s["employee_name"]: s for s in staff}
+	if sme_name not in by_name:
+		frappe.throw(_("SME name must be an active field staff member."))
+	return by_name[sme_name]
+
+
+def _resolve_customer(customer):
+	customer = (customer or "").strip()
+	if not customer:
+		return None, ""
+	if not frappe.db.exists("DocType", "Customer"):
+		frappe.throw(_("Customer master is not available."))
+	if frappe.db.exists("Customer", customer):
+		label = frappe.db.get_value("Customer", customer, "customer_name") or customer
+		return customer, label
+	found = frappe.db.get_value("Customer", {"customer_name": customer}, "name")
+	if found:
+		label = frappe.db.get_value("Customer", found, "customer_name") or found
+		return found, label
+	frappe.throw(_("School / Customer '{0}' was not found. Create it with the School Opening form.").format(customer))
+
+
+def _create_school_opening(school_opening, sme_name):
+	from tif_customization.tif_customization.api.school_opening_form import create_school_opening_application
+
+	data = _as_obj(school_opening) or {}
+	if not isinstance(data, dict):
+		data = {}
+	if not (data.get("tif_representative") or "").strip():
+		data["tif_representative"] = sme_name
+	if not (data.get("visit_type") or "").strip():
+		data["visit_type"] = "Visit with enrollment"
+	soa = create_school_opening_application(data)
+	return soa
 
 
 @frappe.whitelist()
@@ -302,6 +486,52 @@ def get_studio():
 			"ratingScale": 5,
 		}
 	return _payload(doc)
+
+
+@frappe.whitelist()
+def get_sme_context():
+	"""Staff + school lookups for the SME answer form."""
+	_desk()
+	from tif_customization.tif_customization.page.smes_activity_form.smes_activity_form import (
+		get_active_field_officer_staff,
+		_customer_link_options,
+	)
+
+	staff = get_active_field_officer_staff()
+	current_emp = frappe.db.get_value(
+		"Employee",
+		{"user_id": frappe.session.user, "status": "Active"},
+		["name", "employee_name"],
+		as_dict=True,
+	)
+	staff_names = [s["employee_name"] for s in staff]
+	default_sme = ""
+	if current_emp and current_emp.employee_name in staff_names:
+		default_sme = current_emp.employee_name
+	return {
+		"staff_options": staff,
+		"staff_names": staff_names,
+		"default_sme": default_sme,
+		"customers": _customer_link_options(limit=3000),
+		"provinces": [
+			"Sindh",
+			"Punjab",
+			"KPK",
+			"Balochistan",
+			"Gilgit-Baltistan",
+			"Azad Jammu & Kashmir",
+		],
+	}
+
+
+@frappe.whitelist()
+def search_customers(txt=None, limit=40):
+	_desk()
+	from tif_customization.tif_customization.page.smes_activity_form.smes_activity_form import (
+		_customer_link_options,
+	)
+
+	return _customer_link_options(txt=txt, limit=max(1, min(cint(limit) or 40, 100)))
 
 
 @frappe.whitelist()
@@ -344,11 +574,81 @@ def save_studio(forms, rating_scale=5):
 
 
 @frappe.whitelist()
-def submit_response(audience, answers):
+def submit_response(audience, answers, client_meta=None):
 	_desk()
 	audience = _audience(audience)
+	if audience == "sme":
+		frappe.throw(_("Use the SME submit flow with SME name and school."))
 	doc = _settings()
-	return _store(audience, answers, doc)
+	_store(audience, answers, doc, client_meta=client_meta)
+	return _responses()[audience]
+
+
+@frappe.whitelist()
+def submit_sme_response(answers, sme_name, customer=None, school_opening=None, client_meta=None):
+	"""SME desk submit: require name + Customer (or create School Opening), then share QR/URL."""
+	_desk()
+	doc = _settings()
+	staff = _resolve_staff_name(sme_name)
+	sme_name = staff["employee_name"]
+	customer_name = None
+	school_label = ""
+	soa_name = None
+
+	customer = (customer or "").strip() or None
+	soa_payload = _as_obj(school_opening)
+
+	if customer:
+		customer_name, school_label = _resolve_customer(customer)
+	elif soa_payload:
+		soa = _create_school_opening(soa_payload, sme_name)
+		soa_name = soa.name
+		school_label = soa.school_name
+	else:
+		frappe.throw(_("Select a Customer / school, or create one with the School Opening form."))
+
+	response = _store(
+		"sme",
+		answers,
+		doc,
+		extra={
+			"sme_name": sme_name,
+			"customer": customer_name,
+			"school_name": school_label,
+			"school_opening": soa_name,
+		},
+		client_meta=client_meta,
+	)
+
+	token = frappe.generate_hash(length=32)
+	session = frappe.get_doc(
+		{
+			"doctype": "Feedback Studio Session",
+			"share_token": token,
+			"status": "Open",
+			"sme_name": sme_name,
+			"sme_employee": staff.get("employee"),
+			"customer": customer_name,
+			"school_name": school_label,
+			"school_opening": soa_name,
+			"sme_response": response.name,
+			"submitted_on": now_datetime(),
+		}
+	)
+	session.insert(ignore_permissions=True)
+	if frappe.get_meta("Feedback Studio Response").has_field("session"):
+		response.db_set("session", session.name, update_modified=False)
+
+	return {
+		"responses": _responses()["sme"],
+		"session": session.name,
+		"share_token": token,
+		"share_url": _share_url(token),
+		"customer": customer_name,
+		"school_name": school_label,
+		"school_opening": soa_name,
+		"sme_name": sme_name,
+	}
 
 
 @frappe.whitelist()
@@ -391,10 +691,77 @@ def get_public_form(token):
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])
 @rate_limit(limit=30, seconds=600)
-def submit_public(token, answers):
+def submit_public(token, answers, client_meta=None):
 	found = _find(token)
 	if not found:
 		frappe.throw(_("This link is not valid."))
 	audience, doc = found
-	_store(audience, answers, doc)
+	_store(audience, answers, doc, client_meta=client_meta)
+	return {"ok": True}
+
+
+@frappe.whitelist(allow_guest=True, methods=["GET"])
+def get_share_session(token):
+	session = _find_session(token)
+	if not session or session.status == "Closed":
+		return {"ok": False}
+	return {
+		"ok": True,
+		"sme_name": session.sme_name,
+		"school_name": session.school_name or session.customer or "",
+		"customer": session.customer or "",
+		"roles": [
+			{"id": "parent", "label": LABELS["parent"], "color": COLORS["parent"], "hint": "I am a parent / guardian"},
+			{"id": "school", "label": LABELS["school"], "color": COLORS["school"], "hint": "I represent the school"},
+			{"id": "student", "label": LABELS["student"], "color": COLORS["student"], "hint": "I am a student"},
+		],
+	}
+
+
+@frappe.whitelist(allow_guest=True, methods=["GET"])
+def get_share_form(token, audience):
+	session = _find_session(token)
+	if not session or session.status == "Closed":
+		return {"ok": False}
+	if audience not in PUBLIC_ROLES:
+		frappe.throw(_("Please choose Parent, School, or Student."))
+	doc = _settings()
+	forms = _forms(doc) or _default_forms()
+	form = forms[audience]
+	return {
+		"ok": True,
+		"audience": audience,
+		"label": LABELS[audience],
+		"color": COLORS[audience],
+		"title": form["title"],
+		"intro": form["intro"],
+		"questions": form["questions"],
+		"ratingScale": _scale(doc.rating_scale),
+		"school_name": session.school_name or session.customer or "",
+		"sme_name": session.sme_name,
+	}
+
+
+@frappe.whitelist(allow_guest=True, methods=["POST"])
+@rate_limit(limit=40, seconds=600)
+def submit_share(token, audience, answers, client_meta=None):
+	session = _find_session(token)
+	if not session or session.status == "Closed":
+		frappe.throw(_("This link is not valid."))
+	if audience not in PUBLIC_ROLES:
+		frappe.throw(_("Please choose Parent, School, or Student."))
+	doc = _settings()
+	_store(
+		audience,
+		answers,
+		doc,
+		extra={
+			"session": session.name,
+			"sme_name": session.sme_name,
+			"customer": session.customer,
+			"school_name": session.school_name,
+			"school_opening": session.school_opening,
+		},
+		client_meta=client_meta,
+	)
 	return {"ok": True}

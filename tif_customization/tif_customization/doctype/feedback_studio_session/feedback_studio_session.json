@@ -1,0 +1,130 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-09-28 18:40:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "share_token",
+  "status",
+  "column_break_meta",
+  "sme_name",
+  "sme_employee",
+  "section_school",
+  "customer",
+  "school_name",
+  "column_break_school",
+  "school_opening",
+  "sme_response",
+  "submitted_on"
+ ],
+ "fields": [
+  {
+   "fieldname": "share_token",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Share Token",
+   "reqd": 1,
+   "search_index": 1,
+   "unique": 1
+  },
+  {
+   "default": "Open",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Open\nClosed"
+  },
+  {
+   "fieldname": "column_break_meta",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "sme_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "SME Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "sme_employee",
+   "fieldtype": "Link",
+   "label": "SME Employee",
+   "options": "Employee"
+  },
+  {
+   "fieldname": "section_school",
+   "fieldtype": "Section Break",
+   "label": "School"
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Customer",
+   "options": "Customer"
+  },
+  {
+   "fieldname": "school_name",
+   "fieldtype": "Data",
+   "label": "School Name"
+  },
+  {
+   "fieldname": "column_break_school",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "school_opening",
+   "fieldtype": "Link",
+   "label": "School Opening Application",
+   "options": "School Opening Application"
+  },
+  {
+   "fieldname": "sme_response",
+   "fieldtype": "Link",
+   "label": "SME Response",
+   "options": "Feedback Studio Response"
+  },
+  {
+   "fieldname": "submitted_on",
+   "fieldtype": "Datetime",
+   "label": "Submitted On"
+  }
+ ],
+ "links": [],
+ "modified": "2026-09-28 18:40:00.000000",
+ "modified_by": "Administrator",
+ "module": "Tif Customization",
+ "name": "Feedback Studio Session",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "role": "System Manager",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "read": 1,
+   "role": "Field Staff",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "read": 1,
+   "role": "Field Staff Manager",
+   "write": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 0
+}

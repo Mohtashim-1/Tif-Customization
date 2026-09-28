@@ -146,6 +146,26 @@ frappe.tif_customization.FeedbackStudio = class FeedbackStudio {
 			shareOpen: false,
 			copied: false,
 			syncError: "",
+			smeName: "",
+			customer: "",
+			customerLabel: "",
+			customerQuery: "",
+			createSchool: false,
+			schoolOpening: {
+				school_name: "",
+				city: "",
+				area: "",
+				province: "",
+				address: "",
+				school_mobile: "",
+				school_email: "",
+				principal_name: "",
+				principal_cell: "",
+				visit_type: "Visit with enrollment",
+			},
+			smeContext: null,
+			shareResult: null,
+			shareCopied: false,
 		};
 	}
 
@@ -350,6 +370,57 @@ frappe.tif_customization.FeedbackStudio = class FeedbackStudio {
 		this.$.on("input change", "[data-field]", (e) => this.onField(e));
 		this.$.html('<main class="fs-main"><div class="fs-empty">Loading feedback…</div></main>');
 		this.pull();
+		this.loadSmeContext();
+	}
+
+	loadSmeContext() {
+		this.call("get_sme_context", {}, true)
+			.then((data) => {
+				if (!data) return;
+				this.state.smeContext = data;
+				if (!this.state.smeName && data.default_sme) this.state.smeName = data.default_sme;
+				if (this.state.mode === "take" && this.state.aud === "sme") this.render();
+			})
+			.catch(() => {});
+	}
+
+	clientMeta() {
+		const nav = window.navigator || {};
+		const scr = window.screen || {};
+		const conn = nav.connection || nav.mozConnection || nav.webkitConnection || {};
+		return {
+			platform: nav.platform || "",
+			language: nav.language || "",
+			languages: Array.isArray(nav.languages) ? nav.languages.slice(0, 8) : [],
+			timezone: (Intl.DateTimeFormat().resolvedOptions().timeZone) || "",
+			timezoneOffset: new Date().getTimezoneOffset(),
+			screenWidth: scr.width || 0,
+			screenHeight: scr.height || 0,
+			availWidth: scr.availWidth || 0,
+			availHeight: scr.availHeight || 0,
+			colorDepth: scr.colorDepth || 0,
+			pixelRatio: window.devicePixelRatio || 1,
+			viewportWidth: window.innerWidth || 0,
+			viewportHeight: window.innerHeight || 0,
+			touchPoints: nav.maxTouchPoints || 0,
+			cookieEnabled: !!nav.cookieEnabled,
+			doNotTrack: nav.doNotTrack || "",
+			hardwareConcurrency: nav.hardwareConcurrency || 0,
+			deviceMemory: nav.deviceMemory || 0,
+			connectionType: conn.effectiveType || "",
+			connectionDownlink: conn.downlink || 0,
+			referrer: document.referrer || "",
+			pageUrl: location.href || "",
+			online: !!nav.onLine,
+			macAddress: "",
+		};
+	}
+
+	qrImg(url) {
+		return (
+			"https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=" +
+			encodeURIComponent(url || "")
+		);
 	}
 
 	onField(e) {
@@ -406,6 +477,30 @@ frappe.tif_customization.FeedbackStudio = class FeedbackStudio {
 		}
 		if (field === "answer") {
 			this.setAnswer(el.dataset.id, el.value);
+			return;
+		}
+		if (field === "smeName") {
+			this.state.smeName = el.value;
+			return;
+		}
+		if (field === "customerQuery") {
+			this.state.customerQuery = el.value;
+			this.render();
+			return;
+		}
+		if (field === "customer") {
+			this.state.customer = el.value;
+			const opt = (el.options && el.selectedIndex >= 0 && el.options[el.selectedIndex]) || null;
+			this.state.customerLabel = opt ? opt.textContent : el.value;
+			this.state.createSchool = false;
+			this.render();
+			return;
+		}
+		if (field === "soa") {
+			const key = el.dataset.key;
+			if (!key) return;
+			this.state.schoolOpening[key] = el.value;
+			return;
 		}
 	}
 
@@ -453,7 +548,55 @@ frappe.tif_customization.FeedbackStudio = class FeedbackStudio {
 			this.state.answers = {};
 			this.state.errors = {};
 			this.state.submitted = false;
+			this.state.shareResult = null;
 			this.render();
+			return;
+		}
+		if (act === "toggle-create-school") {
+			this.state.createSchool = !this.state.createSchool;
+			if (this.state.createSchool) {
+				this.state.customer = "";
+				this.state.customerLabel = "";
+				if (!this.state.schoolOpening.school_name && this.state.customerQuery) {
+					this.state.schoolOpening.school_name = this.state.customerQuery;
+				}
+			}
+			this.render();
+			return;
+		}
+		if (act === "copy-share") {
+			const url = (this.state.shareResult && this.state.shareResult.share_url) || "";
+			if (!url) return;
+			const done = () => {
+				this.state.shareCopied = true;
+				this.render();
+				frappe.show_alert({ message: __("Link copied"), indicator: "green" });
+				setTimeout(() => {
+					this.state.shareCopied = false;
+					if (this.state.shareResult) this.render();
+				}, 1600);
+			};
+			if (navigator.clipboard && navigator.clipboard.writeText) {
+				navigator.clipboard.writeText(url).then(done).catch(() => {
+					const input = this.$.find(".fs-share-result-url").get(0);
+					if (!input) return;
+					input.focus();
+					input.select();
+					try {
+						document.execCommand("copy");
+						done();
+					} catch (err) {}
+				});
+			} else {
+				const input = this.$.find(".fs-share-result-url").get(0);
+				if (!input) return;
+				input.focus();
+				input.select();
+				try {
+					document.execCommand("copy");
+					done();
+				} catch (err) {}
+			}
 			return;
 		}
 		if (act === "up") {
@@ -528,6 +671,7 @@ frappe.tif_customization.FeedbackStudio = class FeedbackStudio {
 			this.state.answers = {};
 			this.state.errors = {};
 			this.state.submitted = false;
+			this.state.shareResult = null;
 			this.render();
 			return;
 		}
@@ -607,7 +751,58 @@ frappe.tif_customization.FeedbackStudio = class FeedbackStudio {
 			return;
 		}
 		const aud = this.state.aud;
-		this.call("submit_response", { audience: aud, answers: JSON.stringify(answers) }).then((rows) => {
+		const meta = this.clientMeta();
+		if (aud === "sme") {
+			if (!(this.state.smeName || "").trim()) {
+				frappe.msgprint(__("Please select your SME name."));
+				return;
+			}
+			if (!this.state.createSchool && !(this.state.customer || "").trim()) {
+				frappe.msgprint(__("Select a Customer / school, or create one with the School Opening form."));
+				return;
+			}
+			if (this.state.createSchool) {
+				const soa = this.state.schoolOpening || {};
+				if (!(soa.school_name || "").trim()) {
+					frappe.msgprint(__("Name of School is required to create a School Opening."));
+					return;
+				}
+			}
+			const args = {
+				answers: JSON.stringify(answers),
+				sme_name: this.state.smeName,
+				client_meta: JSON.stringify(meta),
+			};
+			if (this.state.createSchool) {
+				const soa = Object.assign({}, this.state.schoolOpening);
+				soa.tif_representative = this.state.smeName;
+				soa.key_contacts = {
+					Principal: {
+						name: soa.principal_name || "",
+						cell: soa.principal_cell || "",
+					},
+				};
+				args.school_opening = JSON.stringify(soa);
+			} else {
+				args.customer = this.state.customer;
+			}
+			this.call("submit_sme_response", args).then((data) => {
+				if (!data) return;
+				this.state.responses.sme = data.responses || this.state.responses.sme;
+				this.state.submitted = true;
+				this.state.shareResult = data;
+				this.state.answers = {};
+				this.state.errors = {};
+				this.persist();
+				this.render();
+			});
+			return;
+		}
+		this.call("submit_response", {
+			audience: aud,
+			answers: JSON.stringify(answers),
+			client_meta: JSON.stringify(meta),
+		}).then((rows) => {
 			if (!rows) return;
 			this.state.responses[aud] = rows;
 			this.state.submitted = true;
@@ -869,6 +1064,37 @@ frappe.tif_customization.FeedbackStudio = class FeedbackStudio {
 
 	takeView() {
 		if (this.state.submitted) {
+			if (this.state.aud === "sme" && this.state.shareResult && this.state.shareResult.share_url) {
+				const share = this.state.shareResult;
+				const url = share.share_url;
+				const school = share.school_name || share.customer || "";
+				return (
+					'<div class="fs-stack"><div class="fs-card accent fs-thanks"><h2>Thank you</h2>' +
+					"<p>Your SME feedback is saved. Share this QR or link with parents, the school, or students so they can submit their feedback.</p>" +
+					(school
+						? '<div class="fs-share-school">School: <strong>' + this.h(school) + "</strong></div>"
+						: "") +
+					(share.school_opening
+						? '<div class="fs-note">School Opening created: ' +
+							this.h(share.school_opening) +
+							" (pending approval into Customer).</div>"
+						: "") +
+					'<div class="fs-qr-wrap"><img class="fs-qr" src="' +
+					this.h(this.qrImg(url)) +
+					'" alt="Feedback QR code" width="220" height="220">' +
+					'<div class="fs-share-row"><input class="fs-share-url fs-share-result-url" readonly value="' +
+					this.h(url) +
+					'"><button type="button" class="fs-primary" data-act="copy-share">' +
+					(this.state.shareCopied ? "Copied" : "Copy link") +
+					"</button></div>" +
+					'<div class="fs-share-actions"><a href="' +
+					this.h(url) +
+					'" target="_blank" rel="noopener">Open link</a></div>' +
+					'<p class="fs-share-note">Anyone who opens the link chooses Parent, School, or Student, then fills that form. Each response records IP and device details.</p></div>' +
+					'<div class="fs-row"><button type="button" class="fs-ghost" data-act="again">Submit another</button>' +
+					'<button type="button" class="fs-primary" data-act="goto" data-val="resp">View responses</button></div></div></div>'
+				);
+			}
 			return (
 				'<div class="fs-stack"><div class="fs-card accent fs-thanks"><h2>Thank you</h2>' +
 				"<p>Your feedback has been recorded. It helps us improve.</p>" +
@@ -881,6 +1107,7 @@ frappe.tif_customization.FeedbackStudio = class FeedbackStudio {
 		const scale = this.scale();
 		const answers = this.state.answers;
 		const errors = this.state.errors;
+		const smeMeta = this.state.aud === "sme" ? this.smeMetaPanel() : "";
 		const cards = form.questions
 			.map((q, i) => {
 				const val = answers[q.id];
@@ -980,12 +1207,134 @@ frappe.tif_customization.FeedbackStudio = class FeedbackStudio {
 			'</div><div class="fs-display-intro">' +
 			this.h(form.intro) +
 			"</div></div>" +
+			smeMeta +
 			cards +
 			'<div class="fs-submitrow"><span class="fs-progress">' +
 			answered +
 			" of " +
 			form.questions.length +
 			' answered</span><button type="button" class="fs-primary accent" data-act="submit">Submit feedback</button></div></div>'
+		);
+	}
+
+	smeMetaPanel() {
+		const ctx = this.state.smeContext || {};
+		const staff = ctx.staff_names || [];
+		const customers = ctx.customers || [];
+		const q = (this.state.customerQuery || "").trim().toLowerCase();
+		const filtered = customers
+			.filter((c) => {
+				if (!q) return true;
+				const label = String(c.label || c.value || "").toLowerCase();
+				const value = String(c.value || "").toLowerCase();
+				return label.indexOf(q) !== -1 || value.indexOf(q) !== -1;
+			})
+			.slice(0, 80);
+		const smeOpts =
+			'<option value="">Select SME…</option>' +
+			staff
+				.map((name) => {
+					return (
+						'<option value="' +
+						this.h(name) +
+						'"' +
+						(this.state.smeName === name ? " selected" : "") +
+						">" +
+						this.h(name) +
+						"</option>"
+					);
+				})
+				.join("");
+		const custOpts =
+			'<option value="">Select school / customer…</option>' +
+			filtered
+				.map((c) => {
+					const value = c.value || "";
+					const label = c.label || value;
+					const desc = c.description ? " — " + c.description : "";
+					return (
+						'<option value="' +
+						this.h(value) +
+						'"' +
+						(this.state.customer === value ? " selected" : "") +
+						">" +
+						this.h(label + desc) +
+						"</option>"
+					);
+				})
+				.join("");
+		const provinces = (ctx.provinces || []).map((p) => {
+			return (
+				'<option value="' +
+				this.h(p) +
+				'"' +
+				(this.state.schoolOpening.province === p ? " selected" : "") +
+				">" +
+				this.h(p) +
+				"</option>"
+			);
+		}).join("");
+		const soa = this.state.schoolOpening;
+		const createPanel = this.state.createSchool
+			? '<div class="fs-soa">' +
+				'<div class="fs-soa-title">School Opening — create school</div>' +
+				'<p class="fs-share-note">School is not in Customer yet. Save a School Opening request (same as Easy Form). After approval it becomes a Customer.</p>' +
+				'<div class="fs-soa-grid">' +
+				'<label class="fs-field"><span>Name of School *</span><input data-field="soa" data-key="school_name" data-field-key="soa-school_name" value="' +
+				this.h(soa.school_name || "") +
+				'"></label>' +
+				'<label class="fs-field"><span>City</span><input data-field="soa" data-key="city" data-field-key="soa-city" value="' +
+				this.h(soa.city || "") +
+				'"></label>' +
+				'<label class="fs-field"><span>Area</span><input data-field="soa" data-key="area" data-field-key="soa-area" value="' +
+				this.h(soa.area || "") +
+				'"></label>' +
+				'<label class="fs-field"><span>Province</span><select data-field="soa" data-key="province" data-field-key="soa-province"><option value="">Select…</option>' +
+				provinces +
+				"</select></label>" +
+				'<label class="fs-field fs-span2"><span>Address</span><input data-field="soa" data-key="address" data-field-key="soa-address" value="' +
+				this.h(soa.address || "") +
+				'"></label>' +
+				'<label class="fs-field"><span>School mobile</span><input data-field="soa" data-key="school_mobile" data-field-key="soa-mobile" value="' +
+				this.h(soa.school_mobile || "") +
+				'"></label>' +
+				'<label class="fs-field"><span>School email</span><input data-field="soa" data-key="school_email" data-field-key="soa-email" value="' +
+				this.h(soa.school_email || "") +
+				'"></label>' +
+				'<label class="fs-field"><span>Principal name</span><input data-field="soa" data-key="principal_name" data-field-key="soa-pname" value="' +
+				this.h(soa.principal_name || "") +
+				'"></label>' +
+				'<label class="fs-field"><span>Principal cell</span><input data-field="soa" data-key="principal_cell" data-field-key="soa-pcell" value="' +
+				this.h(soa.principal_cell || "") +
+				'"></label>' +
+				"</div></div>"
+			: "";
+		return (
+			'<div class="fs-card fs-sme-meta"><div class="fs-kicker">SME visit details</div>' +
+			'<div class="fs-soa-grid">' +
+			'<label class="fs-field"><span>SME name *</span><select class="fs-select" data-field="smeName" data-field-key="smeName">' +
+			smeOpts +
+			"</select></label>" +
+			'<label class="fs-field"><span>Search school</span><input data-field="customerQuery" data-field-key="customerQuery" placeholder="Type to filter…" value="' +
+			this.h(this.state.customerQuery || "") +
+			'"></label>' +
+			'<label class="fs-field fs-span2"><span>Customer / school *</span><select class="fs-select" data-field="customer" data-field-key="customer"' +
+			(this.state.createSchool ? " disabled" : "") +
+			">" +
+			custOpts +
+			"</select></label></div>" +
+			'<div class="fs-share-actions" style="margin-top:12px">' +
+			'<button type="button" class="fs-mini' +
+			(this.state.createSchool ? " is-on" : "") +
+			'" data-act="toggle-create-school">' +
+			(this.state.createSchool ? "Cancel new school" : "School not listed? Create with School Opening") +
+			"</button>" +
+			(this.state.createSchool
+				? ""
+				: ' · <a href="/school-opening" target="_blank" rel="noopener">Open full School Opening form</a>') +
+			"</div>" +
+			createPanel +
+			"</div>"
 		);
 	}
 

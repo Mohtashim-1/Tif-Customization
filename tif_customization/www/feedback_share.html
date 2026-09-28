@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>{{ title or "Feedback" }}</title>
+<title>{{ title or "Share feedback" }}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,500;6..72,600&display=swap" rel="stylesheet">
 <style>
@@ -14,10 +14,17 @@ button, input, textarea { font-family: inherit; }
 .wrap { max-width: 880px; margin: 0 auto; padding: 28px 24px 64px; }
 .card { background: #fffdf9; border: 1px solid #e6e1d6; border-radius: 14px; padding: 22px 24px; }
 .stack { display: flex; flex-direction: column; gap: 16px; }
-.accent { border-top: 4px solid var(--accent, #2f5bd3); }
-.kicker { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent, #2f5bd3); }
+.accent { border-top: 4px solid var(--accent, #7a4cc2); }
+.kicker { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent, #7a4cc2); }
 h1 { margin: 8px 0 0; font-family: "Newsreader", Georgia, serif; font-size: 28px; font-weight: 600; line-height: 1.2; }
 .intro { margin: 8px 0 0; font-size: 15px; color: #4a4f5c; line-height: 1.5; }
+.meta { margin-top: 10px; font-size: 13px; color: #6b6f7a; }
+.roles { display: flex; flex-direction: column; gap: 10px; }
+.role { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; border: 1px solid #e6e1d6; background: #fff; border-radius: 12px; padding: 16px 18px; cursor: pointer; color: #1d2230; }
+.role:hover { border-color: var(--role, #7a4cc2); }
+.role-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--role, #7a4cc2); flex: none; }
+.role-title { font-size: 16px; font-weight: 700; }
+.role-hint { font-size: 13px; color: #6b6f7a; margin-top: 2px; }
 .q { background: #fffdf9; border: 1px solid #e6e1d6; border-radius: 14px; padding: 20px 22px; display: flex; flex-direction: column; gap: 14px; }
 .q.bad { border-color: #e3a08c; }
 .prompt { display: flex; gap: 10px; align-items: baseline; font-size: 16px; font-weight: 600; line-height: 1.4; }
@@ -44,6 +51,7 @@ textarea:focus, button:focus-visible { outline: 2px solid var(--accent, #2f5bd3)
 .thanks h2 { margin: 0; font-family: "Newsreader", Georgia, serif; font-size: 30px; font-weight: 600; }
 .thanks p { margin: 12px auto 0; max-width: 420px; color: #4a4f5c; line-height: 1.5; }
 .empty { border: 1px dashed #d0c9ba; border-radius: 14px; padding: 32px; text-align: center; color: #6b6f7a; }
+.back { margin-bottom: 4px; }
 </style>
 </head>
 <body>
@@ -51,8 +59,17 @@ textarea:focus, button:focus-visible { outline: 2px solid var(--accent, #2f5bd3)
 <script>
 const TOKEN = {{ token | tojson }};
 const CSRF = {{ csrf_token | tojson }};
+const API = "/api/method/tif_customization.tif_customization.api.feedback_studio.";
 const app = document.getElementById("app");
-const state = { form: null, answers: {}, errors: {}, submitted: false, status: TOKEN ? "loading" : "missing" };
+const state = {
+	status: TOKEN ? "loading" : "missing",
+	session: null,
+	role: null,
+	form: null,
+	answers: {},
+	errors: {},
+	submitted: false
+};
 
 function esc(value) {
 	return String(value == null ? "" : value)
@@ -60,6 +77,38 @@ function esc(value) {
 		.replace(/</g, "&lt;")
 		.replace(/>/g, "&gt;")
 		.replace(/"/g, "&quot;");
+}
+
+function clientMeta() {
+	const nav = window.navigator || {};
+	const scr = window.screen || {};
+	const conn = nav.connection || nav.mozConnection || nav.webkitConnection || {};
+	return {
+		platform: nav.platform || "",
+		language: nav.language || "",
+		languages: Array.isArray(nav.languages) ? nav.languages.slice(0, 8) : [],
+		timezone: (Intl.DateTimeFormat().resolvedOptions().timeZone) || "",
+		timezoneOffset: new Date().getTimezoneOffset(),
+		screenWidth: scr.width || 0,
+		screenHeight: scr.height || 0,
+		availWidth: scr.availWidth || 0,
+		availHeight: scr.availHeight || 0,
+		colorDepth: scr.colorDepth || 0,
+		pixelRatio: window.devicePixelRatio || 1,
+		viewportWidth: window.innerWidth || 0,
+		viewportHeight: window.innerHeight || 0,
+		touchPoints: nav.maxTouchPoints || 0,
+		cookieEnabled: !!nav.cookieEnabled,
+		doNotTrack: nav.doNotTrack || "",
+		hardwareConcurrency: nav.hardwareConcurrency || 0,
+		deviceMemory: nav.deviceMemory || 0,
+		connectionType: conn.effectiveType || "",
+		connectionDownlink: conn.downlink || 0,
+		referrer: document.referrer || "",
+		pageUrl: location.href || "",
+		online: !!nav.onLine,
+		macAddress: ""
+	};
 }
 
 function render() {
@@ -71,25 +120,40 @@ function render() {
 		end = active.selectionEnd;
 	}
 	if (state.status === "loading") {
-		app.innerHTML = '<div class="empty">Loading the form…</div>';
+		app.innerHTML = '<div class="empty">Loading…</div>';
 		return;
 	}
 	if (state.status === "missing" || state.status === "invalid") {
-		app.innerHTML = '<div class="card"><h1>This link is not valid</h1><p class="intro">Ask the school for a new feedback link.</p></div>';
+		app.innerHTML = '<div class="card"><h1>This link is not valid</h1><p class="intro">Ask the SME for a new feedback link.</p></div>';
 		return;
 	}
-	const form = state.form;
-	app.style.setProperty("--accent", form.color || "#2f5bd3");
 	if (state.submitted) {
-		app.innerHTML = '<div class="card accent thanks"><h2>Thank you</h2><p>Your feedback has been recorded. It helps us improve.</p><div class="row" style="justify-content:center;margin-top:16px"><button type="button" class="ghost" id="again">Submit another</button></div></div>';
+		app.style.setProperty("--accent", (state.form && state.form.color) || "#7a4cc2");
+		app.innerHTML = '<div class="card accent thanks"><h2>Thank you</h2><p>Your feedback has been recorded. It helps us improve.</p><div class="row" style="justify-content:center;margin-top:16px"><button type="button" class="ghost" id="again">Choose another role</button></div></div>';
 		document.getElementById("again").onclick = function () {
 			state.submitted = false;
+			state.role = null;
+			state.form = null;
 			state.answers = {};
 			state.errors = {};
 			render();
 		};
 		return;
 	}
+	if (!state.role) {
+		const session = state.session || {};
+		const roles = (session.roles || []).map(function (r) {
+			return '<button type="button" class="role" style="--role:' + esc(r.color) + '" data-role="' + esc(r.id) + '"><span class="role-dot"></span><span><div class="role-title">' + esc(r.label) + '</div><div class="role-hint">' + esc(r.hint || "") + "</div></span></button>";
+		}).join("");
+		app.style.setProperty("--accent", "#7a4cc2");
+		app.innerHTML = '<div class="stack"><div class="card accent"><div class="kicker">Shared feedback</div><h1>Who are you?</h1><p class="intro">Select your role to open the matching feedback form.</p><div class="meta">' + (session.school_name ? ("School: <strong>" + esc(session.school_name) + "</strong>") : "") + (session.sme_name ? (" · SME: " + esc(session.sme_name)) : "") + "</div></div><div class="roles">' + roles + "</div></div>";
+		app.querySelectorAll("[data-role]").forEach(function (btn) {
+			btn.onclick = function () { pickRole(btn.dataset.role); };
+		});
+		return;
+	}
+	const form = state.form;
+	app.style.setProperty("--accent", form.color || "#2f5bd3");
 	const scale = Number(form.ratingScale) === 10 ? 10 : 5;
 	const cards = (form.questions || []).map(function (q, i) {
 		const val = state.answers[q.id];
@@ -117,8 +181,14 @@ function render() {
 	const answered = (form.questions || []).filter(function (q) {
 		return state.answers[q.id] !== undefined && state.answers[q.id] !== "";
 	}).length;
-	const empty = (form.questions || []).length ? "" : '<div class="empty">This form has no questions yet.</div>';
-	app.innerHTML = '<div class="stack"><div class="card accent"><div class="kicker">' + esc(form.label) + ' feedback</div><h1>' + esc(form.title || "Feedback") + '</h1><p class="intro">' + esc(form.intro || "") + "</p></div>" + cards + empty + '<div class="row"><span class="progress">' + answered + " of " + (form.questions || []).length + ' answered</span><button type="button" class="submit" id="send">Submit feedback</button></div></div>';
+	app.innerHTML = '<div class="stack"><div class="back"><button type="button" class="ghost" id="back">← Change role</button></div><div class="card accent"><div class="kicker">' + esc(form.label) + ' feedback</div><h1>' + esc(form.title || "Feedback") + '</h1><p class="intro">' + esc(form.intro || "") + "</p>" + (form.school_name ? ('<div class="meta">School: <strong>' + esc(form.school_name) + "</strong></div>") : "") + "</div>" + cards + '<div class="row"><span class="progress">' + answered + " of " + (form.questions || []).length + ' answered</span><button type="button" class="submit" id="send">Submit feedback</button></div></div>';
+	document.getElementById("back").onclick = function () {
+		state.role = null;
+		state.form = null;
+		state.answers = {};
+		state.errors = {};
+		render();
+	};
 	app.querySelectorAll("[data-act]").forEach(function (btn) {
 		btn.addEventListener("click", onAct);
 	});
@@ -168,36 +238,30 @@ function missing() {
 	return errs;
 }
 
-function clientMeta() {
-	const nav = window.navigator || {};
-	const scr = window.screen || {};
-	const conn = nav.connection || nav.mozConnection || nav.webkitConnection || {};
-	return {
-		platform: nav.platform || "",
-		language: nav.language || "",
-		languages: Array.isArray(nav.languages) ? nav.languages.slice(0, 8) : [],
-		timezone: (Intl.DateTimeFormat().resolvedOptions().timeZone) || "",
-		timezoneOffset: new Date().getTimezoneOffset(),
-		screenWidth: scr.width || 0,
-		screenHeight: scr.height || 0,
-		availWidth: scr.availWidth || 0,
-		availHeight: scr.availHeight || 0,
-		colorDepth: scr.colorDepth || 0,
-		pixelRatio: window.devicePixelRatio || 1,
-		viewportWidth: window.innerWidth || 0,
-		viewportHeight: window.innerHeight || 0,
-		touchPoints: nav.maxTouchPoints || 0,
-		cookieEnabled: !!nav.cookieEnabled,
-		doNotTrack: nav.doNotTrack || "",
-		hardwareConcurrency: nav.hardwareConcurrency || 0,
-		deviceMemory: nav.deviceMemory || 0,
-		connectionType: conn.effectiveType || "",
-		connectionDownlink: conn.downlink || 0,
-		referrer: document.referrer || "",
-		pageUrl: location.href || "",
-		online: !!nav.onLine,
-		macAddress: ""
-	};
+async function pickRole(role) {
+	state.status = "loading";
+	render();
+	try {
+		const res = await fetch(API + "get_share_form?token=" + encodeURIComponent(TOKEN) + "&audience=" + encodeURIComponent(role), {
+			headers: { "Accept": "application/json" }
+		});
+		const data = await res.json();
+		if (!data.message || !data.message.ok) {
+			state.status = "invalid";
+			render();
+			return;
+		}
+		state.role = role;
+		state.form = data.message;
+		state.answers = {};
+		state.errors = {};
+		state.status = "ready";
+		document.title = data.message.title || "Feedback";
+		render();
+	} catch (e) {
+		state.status = "invalid";
+		render();
+	}
 }
 
 async function submit() {
@@ -212,14 +276,19 @@ async function submit() {
 	const button = document.getElementById("send");
 	if (button) button.disabled = true;
 	try {
-		const res = await fetch("/api/method/tif_customization.tif_customization.api.feedback_studio.submit_public", {
+		const res = await fetch(API + "submit_share", {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
 				"Accept": "application/json",
 				"X-Frappe-CSRF-Token": CSRF || ""
 			},
-			body: JSON.stringify({ token: TOKEN, answers: state.answers, client_meta: clientMeta() })
+			body: JSON.stringify({
+				token: TOKEN,
+				audience: state.role,
+				answers: state.answers,
+				client_meta: clientMeta()
+			})
 		});
 		const data = await res.json();
 		if (!res.ok || (data.exc && !data.message)) {
@@ -252,7 +321,7 @@ async function load() {
 	}
 	render();
 	try {
-		const res = await fetch("/api/method/tif_customization.tif_customization.api.feedback_studio.get_public_form?token=" + encodeURIComponent(TOKEN), {
+		const res = await fetch(API + "get_share_session?token=" + encodeURIComponent(TOKEN), {
 			headers: { "Accept": "application/json" }
 		});
 		const data = await res.json();
@@ -261,9 +330,8 @@ async function load() {
 			render();
 			return;
 		}
-		state.form = data.message;
+		state.session = data.message;
 		state.status = "ready";
-		document.title = data.message.title || "Feedback";
 		render();
 	} catch (e) {
 		state.status = "invalid";
