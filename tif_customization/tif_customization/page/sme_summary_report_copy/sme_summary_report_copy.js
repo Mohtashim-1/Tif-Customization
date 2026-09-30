@@ -461,7 +461,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			(data && data.kpi_columns) || [
 				{
 					key: "workshop",
-					label: __("Workshop Conducted"),
+					label: __("Conducted Onsite"),
 					metric: "training",
 					value: (r) =>
 						cint(r.workshop) ||
