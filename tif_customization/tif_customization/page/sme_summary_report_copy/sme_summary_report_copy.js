@@ -461,7 +461,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			(data && data.kpi_columns) || [
 				{
 					key: "workshop",
-					label: __("Workshop (Onsite)"),
+					label: __("Workshop Conducted"),
 					metric: "training",
 					value: (r) =>
 						cint(r.workshop) ||
@@ -538,8 +538,8 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				metric: "marketing",
 				hint: __("Field Visit type = Marketing only"),
 			},
-			{ label: __("Monitoring Visit (M&E)"), value: this.fmt(k.me), style: "me", metric: "monitoring" },
 			{ label: __("Follow up Visit"), value: this.fmt(k.followup), style: "followup", metric: "followup" },
+			{ label: __("Monitoring Visit (M&E)"), value: this.fmt(k.me), style: "me", metric: "monitoring" },
 			...this.activity_extra_columns(data).map((col) => ({
 				label: col.label,
 				value: this.fmt(k[col.key]),
@@ -558,7 +558,6 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				const fyKey = (col.metric || col.key || "").replace(/^outcome_/, "");
 				const fy = (data.outcome_fy || {})[fyKey] || {};
 				const actual = fy.actual != null ? fy.actual : t[col.key];
-				const fyLabel = data.fiscal_year_label || "";
 				return {
 					label: col.label,
 					value: this.fmt(actual),
@@ -570,7 +569,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 								: "outcome",
 					metric: col.metric,
 					useYtd: true,
-					hint: __("FY {0} YTD total — click for fiscal year detail", [fyLabel || "—"]),
+					hint: "",
 				};
 			}),
 		];
@@ -675,12 +674,12 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		if (card.pointsKind) attrs.push(`data-points-kind="${frappe.utils.escape_html(card.pointsKind)}"`);
 		if (card.cardKind) attrs.push(`data-card-kind="${frappe.utils.escape_html(card.cardKind)}"`);
 		const clickable = card.metric || card.pointsKind || card.cardKind;
-		const hint = card.hint || (clickable ? __("Click to see details") : __("Period total"));
+		const hint = card.hint != null ? card.hint : clickable ? __("Click to see details") : __("Period total");
 		return `
 			<div class="sme-sum-kpi sme-sum-kpi--${card.style}" ${attrs.join(" ")} title="${clickable ? __("Click to see details") : ""}">
 				<div class="sme-sum-kpi__label">${card.label}</div>
 				<div class="sme-sum-kpi__value">${card.value}</div>
-				<div class="sme-sum-kpi__hint">${hint}</div>
+				${hint ? `<div class="sme-sum-kpi__hint">${hint}</div>` : ""}
 			</div>`;
 	}
 
@@ -1291,10 +1290,11 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						<td>${frappe.utils.escape_html(v.area || "—")}</td>
 						<td>${frappe.utils.escape_html(v.category || "")}</td>
 						<td>${frappe.utils.escape_html(v.status || "")}</td>
+						<td style="max-width:280px;white-space:normal;">${frappe.utils.escape_html(v.remarks || "—")}</td>
 					</tr>`,
 							)
 							.join("")
-					: `<tr><td colspan="8" class="text-muted text-center">${__("No documents")}</td></tr>`;
+					: `<tr><td colspan="9" class="text-muted text-center">${__("No documents")}</td></tr>`;
 
 				const d = new frappe.ui.Dialog({
 					title: __("School visits — {0}", [row.label || row.employee_name || ""]),
@@ -1365,6 +1365,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 									<th>${__("Area")}</th>
 									<th>${__("Category")}</th>
 									<th>${__("Status")}</th>
+									<th>${__("Remarks")}</th>
 								</tr>
 							</thead>
 							<tbody>${visitBody}</tbody>

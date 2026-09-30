@@ -26,7 +26,7 @@ METRIC_LABELS = {
 	"monitoring": _("Monitoring (M&E) Visits"),
 	"me": _("M&E Visits"),
 	"meeting": _("Meetings"),
-	"training": _("Workshop (Onsite)"),
+	"training": _("Workshop Conducted"),
 	"academic": _("Academic / Other"),
 	"other": _("Other Visits"),
 	"followup": _("Follow up Visits"),
@@ -241,21 +241,21 @@ def get_visit_type_breakdown(from_date, to_date, staff="", submitted_only=False)
 
 
 def _visit_remarks(row) -> str:
-	"""Prefer Remarks; fall back to academic / other-task detail for Academic Task rows."""
+	"""Remarks the user typed on the Field Visit, from every activity type."""
 	parts = []
 	for key in (
+		"mt_remarks",
 		"ot_remarks",
-		"ot_academic_task_types",
+		"school_remarks_follow_up",
+		"school_additional_remarks",
+		"travel_remarks",
 		"ot_academic_task_other",
 		"ot_other_official_task_detail",
 	):
 		val = (row.get(key) or "").strip()
 		if val and val not in parts:
 			parts.append(val)
-	task = (row.get("ot_type_of_task") or "").strip()
-	if task and task not in parts:
-		parts.insert(0, task)
-	return " — ".join(parts)
+	return " | ".join(parts)
 
 
 def _school_sql(alias="fv"):
@@ -356,11 +356,13 @@ def get_visit_drilldown(filters=None, metric=None, staff=None):
 			fv.training_entry_filled_by,
 			fv.marketing_visit_category,
 			fv.me_activity_status,
+			fv.mt_remarks,
 			fv.ot_remarks,
-			fv.ot_academic_task_types,
+			fv.school_remarks_follow_up,
+			fv.school_additional_remarks,
+			fv.travel_remarks,
 			fv.ot_academic_task_other,
 			fv.ot_other_official_task_detail,
-			fv.ot_type_of_task,
 			{visit_day} AS visit_date,
 			{_school_sql("fv")} AS school,
 			{_school_unapproved_sql("fv")} AS school_unapproved,

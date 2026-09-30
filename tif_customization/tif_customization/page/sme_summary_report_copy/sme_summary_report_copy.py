@@ -68,7 +68,7 @@ SUMMARY_TYPES = (
 
 # Activity (period) columns — aligned with SME KPI Details / Target Base KPI sheet
 KPI_COLUMNS = (
-	{"key": "workshop", "label": "Workshop (Onsite)", "metric": "training"},
+	{"key": "workshop", "label": "Workshop Conducted", "metric": "training"},
 	{"key": "meeting_ulama", "label": "Meeting / Ulama and Educationist", "metric": "meeting_ulama"},
 	{"key": "teachers_training_meeting", "label": "Teachers Training Meeting (Onsite School)", "metric": "teachers_training_meeting"},
 	{

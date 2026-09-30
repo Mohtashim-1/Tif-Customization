@@ -43,7 +43,7 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 					"M&E category breakdown (Active vs In-Active):"
 				)}</p>`
 			: "";
-	const showRemarks = data.metric === "academic_task" || data.metric === "academic" || data.metric === "other_official";
+	const showRemarks = true;
 	const schoolCell = (row) => {
 		const school = frappe.utils.escape_html(row.school || "—");
 		let badge = "";
