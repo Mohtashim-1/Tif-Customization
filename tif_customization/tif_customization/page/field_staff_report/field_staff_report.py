@@ -223,13 +223,17 @@ def _officer_sql(alias="fv"):
 
 
 def _province_sql(alias="fv"):
+	"""Show a province whenever one was entered, on any activity type.
+
+	The form stores it on province, me_province, or training_province
+	depending on the activity. Use the first one that has a value.
+	"""
 	a = alias
-	return f"""CASE
-		WHEN {a}.type = 'Marketing' THEN COALESCE({a}.province, '')
-		WHEN {a}.type = 'M&E' THEN COALESCE({a}.me_province, '')
-		WHEN {a}.type = 'Training' THEN COALESCE({a}.training_province, '')
-		ELSE ''
-	END"""
+	return f"""COALESCE(
+		NULLIF(TRIM({a}.province), ''),
+		NULLIF(TRIM({a}.me_province), ''),
+		NULLIF(TRIM({a}.training_province), '')
+	)"""
 
 
 def _category_sql(alias="fv"):
