@@ -17,14 +17,16 @@
    "fieldname": "person_name",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Contact Person Name"
+   "label": "Contact Person Name",
+   "allow_on_submit": 1
   },
   {
    "columns": 2,
    "fieldname": "contact_number",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Contact Number"
+   "label": "Contact Number",
+   "allow_on_submit": 1
   },
   {
    "columns": 2,
@@ -32,7 +34,8 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Designation",
-   "options": "\nOwner\nDirector\nPrincipal\nVice Principal\nAdmin\nAdministrator\nIncharge\nCoordinator\nTeacher\nReceptionist\nFront Desk Officer (FDO)\nOther"
+   "options": "\nOwner\nDirector\nPrincipal\nVice Principal\nAdmin\nAdministrator\nIncharge\nCoordinator\nTeacher\nReceptionist\nFront Desk Officer (FDO)\nOther",
+   "allow_on_submit": 1
   },
   {
    "columns": 3,
@@ -40,14 +43,15 @@
    "fieldname": "designation_other",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Other Designation"
+   "label": "Other Designation",
+   "allow_on_submit": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-09-02 01:20:00.000000",
+ "modified": "2026-09-30 07:56:42.000000",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Field Visit School Contact",
