@@ -5,7 +5,7 @@ import os
 
 import frappe
 from frappe import _
-from frappe.utils import cint, get_url, getdate, today
+from frappe.utils import cint, cstr, get_url, getdate, today
 
 from tif_customization.tif_customization.field_visit_enrolment_access import (
 	FARHAN_ONLY_FIELD_VISIT_TYPES,
@@ -16,6 +16,7 @@ from tif_customization.tif_customization.field_visit_supervisor_only import (
 	SUPERVISOR_ONLY_ACTIVITY_TYPES,
 	can_manage_supervisor_only_field_visits,
 )
+from tif_customization.tif_customization.field_visit_permissions import get_assigned_field_officers
 from tif_customization.tif_customization.field_visit_travel_cost import sync_travel_cost
 from tif_customization.tif_customization.model_school import sync_model_school_field
 from tif_customization.tif_customization.api.school_opening_form import (
@@ -58,6 +59,7 @@ SHEET_ACTIVITY_TYPES = [
 	"M&E",
 	"Workshop",
 	"Meeting with Ulama and Educationist",
+	"Internal Meeting",
 	"Teachers Training Meeting",
 	"Headoffice/ Regional Office/ Out of Station Visit",
 	"Academic Task",
@@ -68,6 +70,7 @@ SHEET_ACTIVITY_TYPES = [
 	"Co-curricular Activity",
 	"Registration of New Schools",
 	"Registration of Participant in Workshops",
+	"Workshop Conducted",
 	"Workshop Arranged",
 	"Books Demand (Quantity)",
 	"Enrolment of Volunteers",
@@ -90,7 +93,7 @@ OFFICIAL_TASK_DOC_TYPES = (
 	"Headoffice/ Regional Office/ Out of Station Visit",
 )
 
-MEETING_DOC_TYPES = ("Meeting", "Meeting with Ulama and Educationist")
+MEETING_DOC_TYPES = ("Meeting", "Meeting with Ulama and Educationist", "Internal Meeting")
 
 DESIGNATION_SELECT_OPTIONS = frozenset(
 	{
@@ -191,6 +194,7 @@ ACTIVITY_TYPE_MAP = {
 	"M&E": "M&E",
 	"Workshop": "Workshop",
 	"Meeting with Ulama and Educationist": "Meeting with Ulama and Educationist",
+	"Internal Meeting": "Internal Meeting",
 	"Teachers Training Meeting": "Teachers Training Meeting",
 	"Headoffice/ Regional Office/ Out of Station Visit": "Headoffice/ Regional Office/ Out of Station Visit",
 	"Academic Task": "Academic Task",
@@ -202,6 +206,7 @@ ACTIVITY_TYPE_MAP = {
 	"Co-curricular Activity": "Co-curricular Activity",
 	"Registration of New Schools": "Registration of New Schools",
 	"Registration of Participant in Workshops": "Registration of Participant in Workshops",
+	"Workshop Conducted": "Workshop Conducted",
 	"Workshop Arranged": "Workshop Arranged",
 	"Books Demand (Quantity)": "Books Demand (Quantity)",
 	"Enrolment of Volunteers": "Enrolment of Volunteers",
@@ -351,6 +356,7 @@ def get_form_meta():
 		"staff_options": staff_list,
 		"staff_names": staff_names,
 		"can_manage_supervisor_only": can_manage_supervisor_only_field_visits(),
+		"assigned_field_officers": get_assigned_field_officers(),
 		"can_manage_enrolment_participants": can_manage_farhan_only_field_visit(),
 		"can_manage_farhan_only": can_manage_farhan_only_field_visit(),
 		"bulk_import_template_url": get_bulk_import_template_url(),
@@ -1252,6 +1258,22 @@ def _apply_official_task_fields(doc, data):
 			doc.designation_other = first.get("designation_other")
 
 
+def _officer_for_academic_card(doc_type, data):
+	"""On Academic Task / HO / RO Visit, a supervisor files the visit for an assigned officer."""
+	if doc_type not in OFFICIAL_TASK_DOC_TYPES:
+		return None
+	assigned = {o["employee"]: o for o in get_assigned_field_officers()}
+	if not assigned:
+		return None
+	chosen = cstr(data.get("field_officer") or "").strip()
+	officer = assigned.get(chosen)
+	if not officer:
+		frappe.throw(_("Select the field employee in Name of Staff."))
+	data["visit_by"] = officer["employee_name"]
+	data["staff_employee"] = officer["employee"]
+	return officer
+
+
 @frappe.whitelist()
 def submit_smes_activity(data):
 	"""Create a Field Visit from the easy SMEs Activity portal."""
@@ -1260,10 +1282,15 @@ def submit_smes_activity(data):
 
 	if not data.get("activity_type"):
 		frappe.throw(_("Type of Activity is required."))
-	if not data.get("visit_by"):
-		frappe.throw(_("Name of Staff is required."))
 	if not data.get("visit_date"):
 		frappe.throw(_("Date is required."))
+
+	activity_label = data.get("activity_type")
+	doc_type = ACTIVITY_TYPE_MAP.get(activity_label, activity_label)
+	for_officer = _officer_for_academic_card(doc_type, data)
+
+	if not data.get("visit_by"):
+		frappe.throw(_("Name of Staff is required."))
 
 	allowed_staff = {s["employee_name"]: s for s in get_active_field_officer_staff()}
 	if data.get("visit_by") not in allowed_staff:
@@ -1273,8 +1300,6 @@ def submit_smes_activity(data):
 	staff_meta = allowed_staff[data.get("visit_by")]
 	data["staff_employee"] = data.get("staff_employee") or staff_meta.get("employee")
 
-	activity_label = data.get("activity_type")
-	doc_type = ACTIVITY_TYPE_MAP.get(activity_label, activity_label)
 	province = PROVINCE_MAP.get(data.get("province") or "", data.get("province"))
 
 	doc = frappe.new_doc("Field Visit")
@@ -1459,6 +1484,18 @@ def submit_smes_activity(data):
 		# Marketing-style fields also collected on joint visits in Google Form
 		doc.frequency_of_visits = data.get("frequency_of_visits") or doc.frequency_of_visits
 		doc.status = data.get("status") or doc.status
+	elif doc_type == "Internal Meeting":
+		doc.mt_visit_by = doc.visit_by
+		doc.mt_month = doc.month
+		doc.mt_meeting_date = doc.visit_date
+		doc.mt_meeting_starting_time = doc.visiting_starting_time
+		doc.mt_meeting_ending_time = doc.visit_ending_time
+		doc.mt_meeting_type = "Internal Meeting (Meeting with TIF Staff)"
+		doc.mt_trainer = data.get("mt_trainer")
+		doc.training_trainer_name = data.get("mt_trainer")
+		doc.mt_agenda = data.get("mt_agenda")
+		doc.mt_remarks = data.get("mt_remarks")
+		doc.mt_resolution = data.get("mt_resolution")
 	elif doc_type == "Meeting" or doc_type == "Meeting with Ulama and Educationist":
 		doc.mt_visit_by = doc.visit_by
 		doc.mt_month = doc.month
@@ -1498,7 +1535,7 @@ def submit_smes_activity(data):
 		doc.ot_start_time = doc.visiting_starting_time
 		doc.ot_end_time = doc.visit_ending_time
 		doc.ot_remarks = data.get("school_additional_remarks") or data.get("ot_remarks")
-	elif doc_type in ("Training", "Workshop", "Teachers Training Meeting", "Workshop Arranged"):
+	elif doc_type in ("Training", "Workshop", "Teachers Training Meeting", "Workshop Conducted", "Workshop Arranged"):
 		doc.training_month = doc.month
 		doc.training_date = doc.visit_date
 		doc.training_trainer_name = data.get("training_trainer_name") or doc.visit_by
@@ -1510,7 +1547,7 @@ def submit_smes_activity(data):
 			doc.training_session_category = "Half Day Workshop"
 		if not doc.training_session_category and doc_type == "Teachers Training Meeting":
 			doc.training_session_category = "Teachers Training Meeting (One to One)"
-		if not doc.training_session_category and doc_type == "Workshop Arranged":
+		if not doc.training_session_category and doc_type in ("Workshop Arranged", "Workshop Conducted"):
 			doc.training_session_category = "Half Day Workshop"
 		doc.training_workshop_topic = data.get("training_workshop_topic")
 		doc.training_mode = data.get("training_mode")
@@ -1550,6 +1587,9 @@ def submit_smes_activity(data):
 	sync_travel_cost(doc)
 
 	doc.insert(ignore_permissions=False)
+	if for_officer and for_officer.get("user") and for_officer["user"] != frappe.session.user:
+		frappe.db.set_value("Field Visit", doc.name, "owner", for_officer["user"], update_modified=False)
+		doc.owner = for_officer["user"]
 	submitted = False
 	if data.get("submit_doc") in (True, 1, "1", "true", "True"):
 		doc.submit()

@@ -8,6 +8,7 @@ const SCHOOL_TYPES = [
 	"Training",
 	"Workshop",
 	"Teachers Training Meeting",
+	"Workshop Conducted",
 	"Workshop Arranged",
 	"Visits",
 	"Registration of New Schools",
@@ -25,8 +26,8 @@ const SCHOOL_VISIT_FORM_TYPES = [
 	"Model School B",
 	"Books Demand (Quantity)",
 ];
-const TRAINING_TYPES = ["Training", "Workshop", "Teachers Training Meeting", "Workshop Arranged"];
-const MEETING_TYPES = ["Meeting", "Meeting with Ulama and Educationist"];
+const TRAINING_TYPES = ["Training", "Workshop", "Teachers Training Meeting", "Workshop Conducted", "Workshop Arranged"];
+const MEETING_TYPES = ["Meeting", "Meeting with Ulama and Educationist", "Internal Meeting"];
 const COCURRICULAR_TYPES = ["Co-curricular Activity", "Quiz Arranged"];
 const ENROLMENT_TYPES = [
 	"Enrolment of Participants",
@@ -429,6 +430,7 @@ function apply_field_visit_logic(frm) {
 		"mt_internal_meeting_with",
 		"mt_external_meeting_with",
 		"mt_agenda",
+		"mt_trainer",
 		"mt_meeting_with_person_name",
 		"mt_contact_no",
 		"mt_designation",
@@ -444,6 +446,7 @@ function apply_field_visit_logic(frm) {
 		"mt_visiting_card",
 		"mt_meeting_picture",
 		"mt_remarks",
+		"mt_resolution",
 	];
 
 	const academic_fields = [

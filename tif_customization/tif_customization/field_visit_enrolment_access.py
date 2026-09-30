@@ -1,6 +1,6 @@
 # Copyright (c) 2026, TIF Customization and contributors
 # License: MIT
-"""Field Visit types restricted to Farhan Hussain (and admins)."""
+"""Field Visit types restricted to Farhan Hussain and Anwar Khan (and admins)."""
 
 from __future__ import annotations
 
@@ -22,6 +22,7 @@ FARHAN_ONLY_FIELD_VISIT_TYPES = frozenset(
 FARHAN_ONLY_ALLOWED_USERS = frozenset(
 	{
 		"farhan.hussain@tif.edu.pk",
+		"anwar.khan@tif.edu.pk",
 	}
 )
 
@@ -71,7 +72,7 @@ def validate_farhan_only_field_visit(doc, user: str | None = None) -> None:
 	visit_type = _visit_type(doc)
 	frappe.throw(
 		_(
-			"Only <b>Farhan Hussain</b> is allowed to create or update Field Visits with type "
+			"Only <b>Farhan Hussain</b> and <b>Anwar Khan</b> are allowed to create or update Field Visits with type "
 			"<b>{0}</b>."
 		).format(visit_type),
 		title=_("Restricted activity"),

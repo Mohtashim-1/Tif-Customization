@@ -16,8 +16,8 @@ def visit_day_sql(alias: str = "fv") -> str:
 		CASE
 			WHEN {a}.type IN ('Marketing', 'Visits', 'Registration of New Schools') THEN COALESCE({a}.visit_date, DATE({a}.timestamp), DATE({a}.creation))
 			WHEN {a}.type = 'M&E' THEN COALESCE({a}.me_visit_date, {a}.me_starting_date, DATE({a}.me_timestamp), DATE({a}.creation))
-			WHEN {a}.type IN ('Training', 'Workshop', 'Workshop Arranged', 'Teachers Training Meeting') THEN COALESCE({a}.training_date, DATE({a}.training_timestamp), {a}.visit_date, DATE({a}.creation))
-			WHEN {a}.type IN ('Meeting', 'Meeting with Ulama and Educationist') THEN COALESCE({a}.mt_meeting_date, DATE({a}.mt_timestamp), DATE({a}.creation))
+			WHEN {a}.type IN ('Training', 'Workshop', 'Workshop Conducted', 'Workshop Arranged', 'Teachers Training Meeting') THEN COALESCE({a}.training_date, DATE({a}.training_timestamp), {a}.visit_date, DATE({a}.creation))
+			WHEN {a}.type IN ('Meeting', 'Meeting with Ulama and Educationist', 'Internal Meeting') THEN COALESCE({a}.mt_meeting_date, DATE({a}.mt_timestamp), DATE({a}.creation))
 			WHEN {a}.type IN (
 				'Academic / Other Official Tasks',
 				'Academic',
@@ -87,16 +87,78 @@ def _append_employee_rows(rows: list[dict], seen: set[str], employee_ids: list[s
 			rows.append(row)
 
 
-def _field_supervisor_subordinate_employees(user: str) -> list[str]:
-	"""Active employees under this user's Field Officer record (Field Supervisor link)."""
+def _supervisor_field_officer_name(user: str) -> str | None:
 	if not frappe.db.exists("DocType", "Field Officer"):
-		return []
-
-	supervisor_fo = frappe.db.get_value(
+		return None
+	return frappe.db.get_value(
 		"Field Officer",
 		{"user": user, "status": "Active"},
 		"name",
 	)
+
+
+def _field_officer_rows(filters: dict, skip_user: str | None = None) -> list[dict]:
+	rows = frappe.get_all(
+		"Field Officer",
+		filters=filters,
+		fields=["name", "name1", "employee", "user"],
+		order_by="name1 asc",
+	)
+	officers = []
+	seen = set()
+	for row in rows:
+		if not row.employee or row.employee in seen:
+			continue
+		emp = frappe.db.get_value(
+			"Employee",
+			row.employee,
+			["name", "employee_name", "user_id", "status"],
+			as_dict=True,
+		)
+		if not emp or emp.status != "Active":
+			continue
+		user_id = row.user or emp.user_id or ""
+		if skip_user and user_id == skip_user:
+			continue
+		if user_id and not frappe.db.get_value("User", user_id, "enabled"):
+			continue
+		seen.add(emp.name)
+		officers.append(
+			{
+				"field_officer": row.name,
+				"employee": emp.name,
+				"employee_name": emp.employee_name or row.name1 or emp.name,
+				"user": user_id,
+			}
+		)
+	officers.sort(key=lambda r: (r.get("employee_name") or "").lower())
+	return officers
+
+
+def get_assigned_field_officers(user: str | None = None) -> list[dict]:
+	"""Field employees a user may file an Academic Task for.
+
+	A field supervisor gets the officers assigned under them.
+	A manager who can see all visits gets every active field employee.
+	"""
+	user = user or frappe.session.user
+	supervisor_fo = _supervisor_field_officer_name(user)
+	if supervisor_fo and frappe.db.count(
+		"Field Officer",
+		{"parent_field_officer": supervisor_fo, "status": "Active"},
+	):
+		return _field_officer_rows(
+			{"parent_field_officer": supervisor_fo, "status": "Active"},
+			skip_user=user,
+		)
+	if can_view_all_field_visits(user):
+		return _field_officer_rows({"status": "Active"})
+	return []
+
+
+def _field_supervisor_subordinate_employees(user: str) -> list[str]:
+	"""Active employees under this user's Field Officer record (Field Supervisor link)."""
+	supervisor_fo = _supervisor_field_officer_name(user)
 	if not supervisor_fo:
 		return []
 

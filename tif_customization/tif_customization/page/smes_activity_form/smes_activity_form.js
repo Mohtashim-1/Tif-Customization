@@ -402,12 +402,14 @@ class SmesActivityForm {
 		if (t.includes("Joint Visit")) return "joint";
 		if (
 			t === "Workshop" ||
+			t === "Workshop Conducted" ||
 			t === "Workshop Arranged" ||
 			t.includes("Teachers Training Meeting") ||
 			t.includes("Training")
 		) {
 			return "training";
 		}
+		if (t === "Internal Meeting") return "internal_meeting";
 		if (t.includes("Ulama") || t.includes("Educationist")) return "meeting";
 		if (t.includes("Meetings") || t === "Meeting") return "meeting";
 		if (t.includes("Academic") || t === "Other Official Tasks" || t.includes("Headoffice")) {
@@ -450,6 +452,7 @@ class SmesActivityForm {
 			joint: type_label || __("Joint Visit"),
 			training: type_label || __("Workshop"),
 			meeting: type_label || __("Meeting"),
+			internal_meeting: type_label || __("Internal Meeting"),
 			academic: type_label || __("Academic Task"),
 			cocurricular: type_label || __("Co-curricular"),
 			enrolment: type_label || __("Enrolment of Participants"),
@@ -810,6 +813,7 @@ class SmesActivityForm {
 			joint: () => this.html_joint(),
 			training: () => this.html_training(),
 			meeting: () => this.html_meeting(),
+			internal_meeting: () => this.html_internal_meeting(),
 			academic: () => this.html_academic(),
 			cocurricular: () => this.html_cocurricular(),
 			enrolment: () => this.html_enrolment(),
@@ -1181,6 +1185,20 @@ class SmesActivityForm {
 					? ""
 					: this.field("training_no_of_schools_attended", __("No. of Schools Attended"), "text", { reqd: 1 })
 			}
+		`;
+	}
+
+	html_internal_meeting() {
+		return `
+			<h3>${__("Internal Meeting")}</h3>
+			${this.field("mt_trainer", __("Trainer"), "text", { reqd: 1 })}
+			<div class="smes-row-2">
+				${this.field("starting_time", __("Start Time"), "time")}
+				${this.field("ending_time", __("End Time"), "time")}
+			</div>
+			${this.field("mt_agenda", __("Agenda"), "textarea")}
+			${this.field("mt_resolution", __("Resolution"), "textarea")}
+			${this.field("mt_remarks", __("Remarks"), "textarea")}
 		`;
 	}
 

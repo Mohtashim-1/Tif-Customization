@@ -70,6 +70,7 @@ TYPE_TO_METRIC = {
 	"Meeting": "meeting",
 	"Training": "training",
 	"Workshop": "training",
+	"Workshop Conducted": "training",
 	"Workshop Arranged": "training",
 	"Academic / Other Official Tasks": "academic",
 	"Academic Task": "academic_task",
@@ -95,7 +96,7 @@ def _metric_condition(metric: str, alias: str = "fv") -> str:
 	if m in ("visits", "all", "total"):
 		return "1=1"
 	if m == "visited_days":
-		return f"{a}.type IN ('Marketing', 'Visits', 'Meeting', 'M&E', 'Training', 'Workshop', 'Workshop Arranged', 'Academic Task', 'Other Official Tasks')"
+		return f"{a}.type IN ('Marketing', 'Visits', 'Meeting', 'M&E', 'Training', 'Workshop', 'Workshop Conducted', 'Workshop Arranged', 'Academic Task', 'Other Official Tasks')"
 	if m in ("school_visits", "school_visit"):
 		return f"{a}.type IN ('Marketing', 'Visits', 'M&E')"
 	if m == "marketing":
@@ -105,11 +106,11 @@ def _metric_condition(metric: str, alias: str = "fv") -> str:
 	if m == "meeting":
 		return f"{a}.type IN ('Meeting', 'Meeting with Ulama and Educationist')"
 	if m == "training":
-		return f"{a}.type IN ('Training', 'Workshop', 'Workshop Arranged')"
+		return f"{a}.type IN ('Training', 'Workshop', 'Workshop Conducted', 'Workshop Arranged')"
 	if m == "half_day_workshop":
-		return f"""{a}.type IN ('Training', 'Workshop', 'Workshop Arranged') AND LOWER(IFNULL({a}.training_session_category,'')) LIKE '%%half%%'"""
+		return f"""{a}.type IN ('Training', 'Workshop', 'Workshop Conducted', 'Workshop Arranged') AND LOWER(IFNULL({a}.training_session_category,'')) LIKE '%%half%%'"""
 	if m == "full_day_session":
-		return f"""{a}.type IN ('Training', 'Workshop', 'Workshop Arranged') AND LOWER(IFNULL({a}.training_session_category,'')) NOT LIKE '%%half%%'"""
+		return f"""{a}.type IN ('Training', 'Workshop', 'Workshop Conducted', 'Workshop Arranged') AND LOWER(IFNULL({a}.training_session_category,'')) NOT LIKE '%%half%%'"""
 	if m == "academic_task":
 		return f"{a}.type IN ('Academic Task', 'Academic', 'Academic / Other Official Tasks')"
 	if m == "other_official":
@@ -155,7 +156,7 @@ def _metric_condition(metric: str, alias: str = "fv") -> str:
 	if m == "grand_total":
 		return f"{a}.type IN ('Marketing', 'Visits', 'Meeting', 'M&E')"
 	if m in ("workshop_registration", "schools", "participants"):
-		return f"{a}.type IN ('Training', 'Workshop', 'Workshop Arranged', 'Teachers Training Meeting')"
+		return f"{a}.type IN ('Training', 'Workshop', 'Workshop Conducted', 'Workshop Arranged', 'Teachers Training Meeting')"
 	if m == "enrolment":
 		return f"""EXISTS (
 			SELECT 1 FROM `tabField Visit Enrolment Participant` ep

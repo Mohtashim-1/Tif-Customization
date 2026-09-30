@@ -89,6 +89,8 @@ const meeting = reactive({
 	endTime: "11:00",
 	agenda: "",
 	remarks: "",
+	trainer: "",
+	resolution: "",
 	mutalaeSample: false,
 	frequency: "New",
 	status: "Need follow up visit",
@@ -259,6 +261,7 @@ const training = reactive({
 	officialTaskKind: "",
 	taskAssignedBy: "",
 	taskAssignedByOther: "",
+	fieldOfficer: "",
 });
 
 const participants = ref([]);
@@ -329,6 +332,16 @@ const areaOptions = computed(() => {
 });
 const staffOptions = computed(() =>
 	(meta.value.staff_options || []).map((s) => s.employee_name || s.employee).filter(Boolean)
+);
+const assignedFieldOfficers = computed(() => meta.value.assigned_field_officers || []);
+const assignedFieldOfficerOptions = computed(() =>
+	assignedFieldOfficers.value.map((o) => ({
+		value: o.employee,
+		label: o.employee_name || o.employee,
+	}))
+);
+const showFieldOfficerPick = computed(
+	() => selected.value?.group === "academic" && assignedFieldOfficers.value.length > 0
 );
 const staffName = computed(() => visit.visitBy || meta.value.staff_name || boot.full_name || "");
 function nonempty(list, fallback) {
@@ -841,6 +854,16 @@ function buildPayload(submitDoc) {
 		Object.assign(payload, visit.services);
 	}
 
+	if (card?.group === "internal_meeting") {
+		payload.visit_date = meeting.meetingDate || visitDate;
+		payload.starting_time = meeting.startTime;
+		payload.ending_time = meeting.endTime;
+		payload.mt_trainer = meeting.trainer;
+		payload.mt_agenda = meeting.agenda;
+		payload.mt_remarks = meeting.remarks;
+		payload.mt_resolution = meeting.resolution;
+	}
+
 	if (card?.group === "meeting") {
 		payload.mt_person_name = meeting.meetingWith;
 		payload.mt_contact_number = meeting.contactNo;
@@ -874,6 +897,12 @@ function buildPayload(submitDoc) {
 	}
 
 	if (card?.group === "academic") {
+		const officer = assignedFieldOfficers.value.find((o) => o.employee === training.fieldOfficer);
+		if (officer) {
+			payload.field_officer = officer.employee;
+			payload.visit_by = officer.employee_name;
+			payload.staff_employee = officer.employee;
+		}
 		payload.ot_type_of_task = training.otType || "Academic Tasks";
 		payload.ot_hours_spent = training.academicHours;
 		payload.ot_academic_work_detail = training.academicWorkDetail;
@@ -1025,7 +1054,15 @@ async function saveVisit(submitDoc) {
 		error.value = "Please select an activity type first.";
 		return;
 	}
-	if (!staffName.value) {
+	if (selected.value.group === "internal_meeting" && !meeting.meetingDate) {
+		error.value = "Date is required.";
+		return;
+	}
+	if (showFieldOfficerPick.value && !training.fieldOfficer) {
+		error.value = "Select the field employee in Name of Staff.";
+		return;
+	}
+	if (!staffName.value && !training.fieldOfficer) {
 		error.value = "Your employee profile is not linked as Field Staff. Ask admin to set user on Employee.";
 		return;
 	}
@@ -1101,6 +1138,8 @@ function resetForm() {
 	meeting.instituteLabel = "";
 	meeting.agenda = "";
 	meeting.remarks = "";
+	meeting.trainer = "";
+	meeting.resolution = "";
 	training.academicWorkTypes = [];
 	training.academicWorkOther = "";
 	training.academicPages = "";
@@ -1111,6 +1150,7 @@ function resetForm() {
 	training.officialTaskKind = "";
 	training.taskAssignedBy = "";
 	training.taskAssignedByOther = "";
+	training.fieldOfficer = "";
 	travel.distance = "";
 	travel.cost = "";
 	savedName.value = "";
@@ -1623,6 +1663,27 @@ const steps = [
 						</div>
 					</div>
 
+					<div class="panel-body" v-else-if="selected.group === 'internal_meeting'">
+						<SectionTitle
+							:mode="lang"
+							title-en="Internal Meeting"
+							title-ur="اندرونی میٹنگ"
+							sub-en="Meeting with TIF staff"
+							sub-ur="ٹی آئی ایف سٹاف کے ساتھ میٹنگ"
+						/>
+						<div class="grid-2">
+							<FieldInput :mode="lang" label-en="Trainer" label-ur="ٹرینر" required v-model="meeting.trainer" />
+							<FieldDate :mode="lang" label-en="Date" label-ur="تاریخ" required v-model="meeting.meetingDate" />
+							<FieldTime :mode="lang" label-en="Start Time" label-ur="آغاز کا وقت" v-model="meeting.startTime" />
+							<FieldTime :mode="lang" label-en="End Time" label-ur="اختتام کا وقت" v-model="meeting.endTime" />
+						</div>
+						<div style="margin-top: 16px">
+							<FieldTextarea :mode="lang" label-en="Agenda" label-ur="ایجنڈا" v-model="meeting.agenda" />
+							<FieldTextarea :mode="lang" label-en="Resolution" label-ur="قرارداد" v-model="meeting.resolution" />
+							<FieldTextarea :mode="lang" label-en="Remarks" label-ur="ریمارکس" v-model="meeting.remarks" />
+						</div>
+					</div>
+
 					<div class="panel-body" v-else-if="selected.group === 'meeting'">
 						<SectionTitle
 							:mode="lang"
@@ -1707,8 +1768,8 @@ const steps = [
 					<div class="panel-body" v-else-if="selected.group === 'training' || selected.group === 'academic'">
 						<SectionTitle
 							:mode="lang"
-							:title-en="selected.id === 'workshop' ? 'Workshop Details' : selected.group === 'academic' ? 'Official Task Details' : 'Training / Visit Details'"
-							:title-ur="selected.id === 'workshop' ? 'ورکشاپ کی تفصیلات' : selected.group === 'academic' ? 'آفیشل ٹاسک کی تفصیلات' : 'تربیت / دورہ کی تفصیلات'"
+							:title-en="selected.id === 'workshop' || selected.id === 'workshop_conducted' ? 'Workshop Details' : selected.group === 'academic' ? 'Official Task Details' : 'Training / Visit Details'"
+							:title-ur="selected.id === 'workshop' || selected.id === 'workshop_conducted' ? 'ورکشاپ کی تفصیلات' : selected.group === 'academic' ? 'آفیشل ٹاسک کی تفصیلات' : 'تربیت / دورہ کی تفصیلات'"
 							:sub-en="`${clock} • Asia/Karachi auto`"
 							:sub-ur="`${clock} • خودکار وقت`"
 						/>
@@ -1731,7 +1792,18 @@ const steps = [
 							<FieldSelect :mode="lang" label-en="Province" label-ur="صوبہ" :options="provinceOptions" required v-model="training.province" />
 							<FieldInput v-if="selected.group !== 'academic' && selected.id !== 'training'" :mode="lang" label-en="No. of Schools" label-ur="اسکولوں کی تعداد" v-model="training.noOfSchools" />
 							<FieldDate :mode="lang" label-en="Date" label-ur="تاریخ" required v-model="training.date" />
-							<FieldInput :mode="lang" :label-en="selected.group === 'academic' ? 'Name of Staff' : 'Name of Trainer / Staff'" :label-ur="selected.group === 'academic' ? 'سٹاف کا نام' : 'ٹرینر / سٹاف کا نام'" required v-model="training.trainerName" />
+							<FieldSelect
+								v-if="showFieldOfficerPick"
+								:mode="lang"
+								label-en="Name of Staff"
+								label-ur="سٹاف کا نام"
+								:options="assignedFieldOfficerOptions"
+								placeholder-en="Select field employee"
+								placeholder-ur="فیلڈ ملازم منتخب کریں"
+								required
+								v-model="training.fieldOfficer"
+							/>
+							<FieldInput v-else :mode="lang" :label-en="selected.group === 'academic' ? 'Name of Staff' : 'Name of Trainer / Staff'" :label-ur="selected.group === 'academic' ? 'سٹاف کا نام' : 'ٹرینر / سٹاف کا نام'" required v-model="training.trainerName" />
 							<FieldInput v-if="selected.group !== 'academic'" :mode="lang" label-en="Venue Name" label-ur="مقام کا نام" v-model="training.venueName" />
 							<FieldInput :mode="lang" label-en="Entry Filled By" label-ur="اندراج کنندہ" v-model="training.entryFilledBy" />
 							<FieldInput v-if="selected.group !== 'academic'" :mode="lang" label-en="No. of Participants" label-ur="شرکاء کی تعداد" v-model="training.noOfParticipants" />

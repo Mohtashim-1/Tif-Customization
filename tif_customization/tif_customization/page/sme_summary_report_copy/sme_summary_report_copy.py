@@ -55,6 +55,7 @@ SUMMARY_TYPES = (
 	"M&E",
 	"Training",
 	"Workshop",
+	"Workshop Conducted",
 	"Workshop Arranged",
 	"Meeting with Ulama and Educationist",
 	"Teachers Training Meeting",
@@ -932,7 +933,7 @@ def _load_visit_stats(from_date, to_date, staff_rows):
 				bucket["active"] += 1
 			elif status == "inactive":
 				bucket["inactive"] += 1
-		elif vtype in ("Training", "Workshop", "Workshop Arranged", "Teachers Training Meeting"):
+		elif vtype in ("Training", "Workshop", "Workshop Conducted", "Workshop Arranged", "Teachers Training Meeting"):
 			bucket["schools"] += cint(row.get("schools") or 0)
 			bucket["participants"] += cint(row.get("participants") or 0)
 			bucket["trainings"] += 1
@@ -978,7 +979,7 @@ def _resolve_staff_key(row, index):
 		candidates.extend([row.get("me_visit_by"), row.get("visit_by"), row.get("owner")])
 	elif vtype == "Meeting":
 		candidates.extend([row.get("mt_visit_by"), row.get("owner")])
-	elif vtype in ("Training", "Workshop", "Workshop Arranged", "Teachers Training Meeting"):
+	elif vtype in ("Training", "Workshop", "Workshop Conducted", "Workshop Arranged", "Teachers Training Meeting"):
 		# Trainer first — SMEs often appear as trainer while another officer fills the form.
 		candidates.extend(
 			[
