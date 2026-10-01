@@ -90,6 +90,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					.sme-sum-title{text-align:center;font-size:18px;font-weight:700;margin:8px 0 14px}
 					.sme-sum-meta{text-align:center;font-size:12px;color:#6b7280;margin-bottom:12px}
 					.sme-sum-kpi-groups{display:flex;flex-direction:column;gap:12px;margin:0 0 14px}
+					.sme-sum-kpi-sep{border:0;border-top:1px solid #cbd5e1;margin:6px 0 2px;width:100%}
 					.sme-sum-kpi-group__title{font-size:12px;font-weight:700;color:#475569;margin:0 0 8px;text-transform:uppercase;letter-spacing:.04em}
 					.sme-sum-kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,150px));gap:10px;justify-content:start}
 					.sme-sum-kpis + .sme-sum-kpis{margin-top:10px}
@@ -109,7 +110,10 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					.sme-sum-kpi--ulama{border-top-color:#0891b2}
 					.sme-sum-kpi--teachers{border-top-color:#0284c7}
 					.sme-sum-kpi--headoffice{border-top-color:#6366f1}
+					.sme-sum-kpi--headoffice-visit{background:#fce7f3;border-top-color:#db2777}
 					.sme-sum-kpi--academic{border-top-color:#64748b}
+					.sme-sum-kpi--academic-task{background:#fef9c3;border-top-color:#ca8a04}
+					.sme-sum-kpi--other-official{background:#dcfce7;border-top-color:#16a34a}
 					.sme-sum-kpi--quiz{border-top-color:#c026d3}
 					.sme-sum-kpi--co_curricular{border-top-color:#9333ea}
 					.sme-sum-kpi--grand{border-top-color:#334155}
@@ -575,8 +579,10 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 								? "co_curricular"
 								: "outcome",
 					metric: col.metric,
-					useYtd: true,
-					hint: "",
+					outcomeFy: true,
+					hint: data.outcome_fy_label
+						? __("FY {0}", [data.outcome_fy_label])
+						: __("Current fiscal year"),
 				};
 			}),
 		];
@@ -654,6 +660,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			},
 			{
 				title: __("Outcomes (current fiscal year)"),
+				separator: true,
 				cards: outcomeCards,
 			},
 			{
@@ -682,6 +689,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		const attrs = [];
 		if (card.metric) attrs.push(`data-visit-metric="${frappe.utils.escape_html(card.metric)}"`);
 		if (card.useYtd) attrs.push(`data-use-ytd="1"`);
+		if (card.outcomeFy) attrs.push(`data-outcome-fy="1"`);
 		if (card.pointsKind) attrs.push(`data-points-kind="${frappe.utils.escape_html(card.pointsKind)}"`);
 		if (card.cardKind) attrs.push(`data-card-kind="${frappe.utils.escape_html(card.cardKind)}"`);
 		const clickable = card.metric || card.pointsKind || card.cardKind;
@@ -699,6 +707,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		return `<div class="sme-sum-kpi-groups">${groups
 			.map(
 				(group) => `
+			${group.separator ? `<hr class="sme-sum-kpi-sep">` : ""}
 			<div class="sme-sum-kpi-group">
 				<div class="sme-sum-kpi-group__title">${group.title}</div>
 				${(group.rows || [group.cards])
@@ -895,11 +904,18 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				return;
 			}
 			const useYtd = $(this).attr("data-use-ytd");
-			const from_date =
-				useYtd && me.data && me.data.ytd_from ? me.data.ytd_from : ctx.from_date;
+			const outcomeFy = $(this).attr("data-outcome-fy");
+			const from_date = outcomeFy
+				? (me.data && me.data.outcome_fy_from) || ctx.from_date
+				: useYtd && me.data && me.data.ytd_from
+					? me.data.ytd_from
+					: ctx.from_date;
+			const to_date = outcomeFy
+				? (me.data && me.data.outcome_fy_to) || ctx.to_date
+				: ctx.to_date;
 			frappe.tif_customization.open_visit_drilldown({
 				from_date,
-				to_date: ctx.to_date,
+				to_date,
 				staff: staff || ctx.staff || ctx.employee || "",
 				metric,
 				submitted_only: ctx.submitted_only || 1,

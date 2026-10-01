@@ -20,7 +20,7 @@ DISPLAY_COLUMNS = [
 	"province",
 	"remarks",
 	"docstatus",
-	"owner",
+	"images",
 ]
 DISPLAY_LABELS = {
 	"name": "Document No",
@@ -32,8 +32,14 @@ DISPLAY_LABELS = {
 	"province": "Province",
 	"remarks": "Remarks",
 	"docstatus": "Status",
-	"owner": "Owner",
+	"images": "School Images",
 }
+IMAGE_FIELDS = (
+	("school_picture", "School Picture"),
+	("meeting_picture", "Meeting Picture"),
+	("training_awareness_pictures", "Training & Awareness"),
+	("mt_meeting_picture", "Meeting Picture"),
+)
 PAGE_SIZE = 100
 
 
@@ -73,7 +79,10 @@ def get_report_data(filters=None):
 			fv.name,
 			fv.type,
 			fv.docstatus,
-			fv.owner,
+			fv.school_picture,
+			fv.meeting_picture,
+			fv.training_awareness_pictures,
+			fv.mt_meeting_picture,
 			{visit_date_expr} AS visit_date,
 			{_school_sql("fv")} AS school,
 			{_officer_sql("fv")} AS officer,
@@ -91,6 +100,7 @@ def get_report_data(filters=None):
 		as_dict=True,
 	)
 	_format_status(rows)
+	_attach_school_images(rows)
 
 	return {
 		"columns": DISPLAY_COLUMNS,
@@ -110,7 +120,7 @@ def download_report_excel(filters=None):
 	filters = _parse_filters(filters)
 	filters["for_export"] = 1
 	report = get_report_data(filters=filters)
-	columns = report.get("columns", [])
+	columns = [c for c in report.get("columns", []) if c != "images"]
 	labels = report.get("labels", {})
 	rows = report.get("rows", [])
 
@@ -129,7 +139,7 @@ def download_report_csv(filters=None):
 	filters = _parse_filters(filters)
 	filters["for_export"] = 1
 	report = get_report_data(filters=filters)
-	columns = report.get("columns", [])
+	columns = [c for c in report.get("columns", []) if c != "images"]
 	labels = report.get("labels", {})
 	rows = report.get("rows", [])
 
@@ -326,6 +336,19 @@ def _format_status(rows):
 	labels = {0: "Draft", 1: "Submitted", 2: "Cancelled"}
 	for row in rows:
 		row["docstatus"] = labels.get(row.get("docstatus"), row.get("docstatus"))
+
+
+def _attach_school_images(rows):
+	for row in rows:
+		images = []
+		seen = set()
+		for field, label in IMAGE_FIELDS:
+			url = (row.pop(field, None) or "").strip()
+			if not url or url in seen:
+				continue
+			seen.add(url)
+			images.append({"label": label, "url": url})
+		row["images"] = images
 
 
 def _build_summary(rows):

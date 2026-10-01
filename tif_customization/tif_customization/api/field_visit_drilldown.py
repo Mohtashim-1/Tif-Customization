@@ -192,10 +192,7 @@ def _metric_condition(metric: str, alias: str = "fv") -> str:
 	if m == "quiz":
 		return f"{a}.type = 'Quiz Arranged'"
 	if m == "co_curricular":
-		return f"""(
-			{a}.type = 'Co-curricular Activity'
-			OR ({a}.type IN ('Marketing', 'Visits') AND {a}.marketing_visit_category = 'TPS Visits')
-		)"""
+		return f"{a}.type = 'Co-curricular Activity'"
 	return "1=0"
 
 

@@ -52,7 +52,7 @@ class FieldStaffReportPage {
 					<div class="row fsr-filter-grid"></div>
 				</div>
 
-				<div class="fsr-kpis mb-2"></div>
+				<!-- <div class="fsr-kpis mb-2"></div> -->
 				<p class="fsr-breakdown fsr-breakdown-note"></p>
 
 				<div class="border rounded p-3">
@@ -228,7 +228,7 @@ class FieldStaffReportPage {
 			freeze: false,
 			callback: (r) => {
 				const data = r.message || { rows: [], columns: [], labels: {}, total_count: 0, summary: {} };
-				this.render_kpis(data.summary || {});
+				// this.render_kpis(data.summary || {});
 				this.render_breakdown(data.summary || {});
 				this.render_table(data.rows || [], data.columns || [], data.labels || {});
 				this.render_pager(data);
@@ -314,13 +314,13 @@ class FieldStaffReportPage {
 
 	render_kpis(summary) {
 		const cards = [
-			[__("Total Visits"), summary.total_visits || 0, "primary", "visits"],
-			[__("Marketing Visits"), summary.marketing_visits || 0, "marketing", "marketing"],
-			[__("M&E Visits"), summary.me_visits || 0, "me", "me"],
-			[__("Training Visits"), summary.training_visits || 0, "training", "training"],
-			[__("Meeting Visits"), summary.meeting_visits || 0, "meeting", "meeting"],
-			[__("Other Visits"), summary.other_visits || 0, "other", "other"],
-			[__("Active Field Staff"), summary.active_staff || 0, "staff", ""],
+			// [__("Total Visits"), summary.total_visits || 0, "primary", "visits"],
+			// [__("Marketing Visits"), summary.marketing_visits || 0, "marketing", "marketing"],
+			// [__("M&E Visits"), summary.me_visits || 0, "me", "me"],
+			// [__("Training Visits"), summary.training_visits || 0, "training", "training"],
+			// [__("Meeting Visits"), summary.meeting_visits || 0, "meeting", "meeting"],
+			// [__("Other Visits"), summary.other_visits || 0, "other", "other"],
+			// [__("Active Field Staff"), summary.active_staff || 0, "staff", ""],
 		];
 
 		this.body.find(".fsr-kpis").html(
@@ -376,6 +376,7 @@ class FieldStaffReportPage {
 			return;
 		}
 
+		this._last_rows = rows;
 		const safeColumns = columns.length ? columns : Object.keys(rows[0] || {});
 		const head = safeColumns
 			.map(
@@ -394,6 +395,20 @@ class FieldStaffReportPage {
 						if (col === "name") {
 							const id = frappe.utils.escape_html(value || "");
 							return `<td${cls}><a href="/app/field-visit/${id}">${id}</a></td>`;
+						}
+						if (col === "images") {
+							const imgs = row.images || [];
+							if (!imgs.length) {
+								return `<td class="text-muted">—</td>`;
+							}
+							const src = frappe.utils.escape_html(imgs[0].url || "");
+							const visit = frappe.utils.escape_html(row.name || "");
+							return `<td><button type="button" class="fsr-photo-card" data-visit="${visit}" title="${__(
+								"Click to view school images"
+							)}">
+								<img src="${src}" alt="">
+								<span>${imgs.length}</span>
+							</button></td>`;
 						}
 						if (col === "school") {
 							const school = frappe.utils.escape_html(
@@ -425,6 +440,52 @@ class FieldStaffReportPage {
 				</table>
 			</div>
 		`);
+		const me = this;
+		this.body.find(".fsr-photo-card").on("click", function (e) {
+			e.preventDefault();
+			const name = $(this).attr("data-visit");
+			const row = (me._last_rows || []).find((r) => r.name === name);
+			if (row) me.show_image_cards(row);
+		});
+	}
+
+	show_image_cards(row) {
+		const images = row.images || [];
+		const school = frappe.utils.escape_html(row.school || row.name || "");
+		const cards = images
+			.map((img, idx) => {
+				const src = frappe.utils.escape_html(img.url || "");
+				const label = frappe.utils.escape_html(img.label || __("Image"));
+				return `<button type="button" class="fsr-photo-view" data-idx="${idx}">
+					<img src="${src}" alt="${label}">
+					<div>${label}</div>
+				</button>`;
+			})
+			.join("");
+		const d = new frappe.ui.Dialog({
+			title: __("School images — {0}", [row.school || row.name || ""]),
+			size: "extra-large",
+			fields: [{ fieldtype: "HTML", fieldname: "html" }],
+			primary_action_label: __("Close"),
+			primary_action: () => d.hide(),
+		});
+		const paint = (active) => {
+			const current = images[active] || images[0] || {};
+			const src = frappe.utils.escape_html(current.url || "");
+			const label = frappe.utils.escape_html(current.label || "");
+			d.fields_dict.html.$wrapper.html(`
+				<div style="font-size:12px;color:#64748b;margin-bottom:8px;">${school}</div>
+				${src ? `<img class="fsr-photo-large" src="${src}" alt="${label}">` : ""}
+				<div style="font-size:13px;font-weight:600;margin-bottom:10px;">${label}</div>
+				<div class="fsr-photo-grid">${cards}</div>
+			`);
+		};
+		d.$wrapper.on("click", ".fsr-photo-view", (e) => {
+			e.preventDefault();
+			paint(cint($(e.currentTarget).attr("data-idx")));
+		});
+		paint(0);
+		d.show();
 	}
 
 	render_pager(data) {

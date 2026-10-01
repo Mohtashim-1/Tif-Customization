@@ -101,10 +101,7 @@ QUIZ_SQL = """
 """
 
 CO_CURRICULAR_SQL = """
-	(
-		fv.type = 'Co-curricular Activity'
-		OR (fv.type IN ('Marketing', 'Visits') AND fv.marketing_visit_category = 'TPS Visits')
-	)
+	fv.type = 'Co-curricular Activity'
 """
 
 

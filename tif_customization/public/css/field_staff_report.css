@@ -111,6 +111,63 @@
 	background: linear-gradient(90deg, #2563eb, #06b6d4);
 }
 
+.fsr-photo-card {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	border: 1px solid #e5e7eb;
+	border-radius: 10px;
+	background: #fff;
+	padding: 4px 8px 4px 4px;
+	cursor: pointer;
+	min-width: 88px;
+}
+.fsr-photo-card img {
+	width: 52px;
+	height: 40px;
+	object-fit: cover;
+	border-radius: 8px;
+	background: #f1f5f9;
+}
+.fsr-photo-card span {
+	font-size: 11px;
+	font-weight: 700;
+	color: #0f766e;
+}
+.fsr-photo-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+	gap: 12px;
+}
+.fsr-photo-view {
+	border: 1px solid #e5e7eb;
+	border-radius: 12px;
+	background: #fff;
+	padding: 8px;
+	cursor: pointer;
+	text-align: left;
+}
+.fsr-photo-view img {
+	width: 100%;
+	height: 140px;
+	object-fit: cover;
+	border-radius: 8px;
+	background: #f8fafc;
+}
+.fsr-photo-view div {
+	margin-top: 6px;
+	font-size: 12px;
+	font-weight: 600;
+}
+.fsr-photo-large {
+	width: 100%;
+	max-height: 420px;
+	object-fit: contain;
+	background: #0f172a;
+	border-radius: 10px;
+	margin-bottom: 12px;
+}
+
 @media (max-width: 900px) {
 	.fsr-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

@@ -39,6 +39,7 @@ from tif_customization.tif_customization.page.sme_kpi_details.sme_kpi_details im
 )
 from tif_customization.tif_customization.page.smes_target_base___k.smes_target_base___k import (
 	_count_actuals,
+	_fiscal_year_bounds,
 	_fiscal_year_start,
 	_points_for_scoring,
 )
@@ -476,12 +477,19 @@ def get_report_data(filters=None):
 	expense_total = flt(sum(flt(r.get("expenses") or 0) for r in rows), 2)
 	totals_out["expenses"] = expense_total
 
-	outcome_fy = _report_outcome_fy_totals(staff_rows, ytd_from, to_date)
-	# Prefer report-scope FY totals on Outcomes cards (avoids double-count on distinct schools).
+	period_outcome = _report_outcome_fy_totals(staff_rows, ytd_from, to_date)
+	# Table footer stays on fiscal year-to-date through the selected Visit To date.
 	for cfg in OUTCOME_TARGETS:
 		okey = f"outcome_{cfg['key']}"
-		if cfg["key"] in outcome_fy:
-			totals_out[okey] = outcome_fy[cfg["key"]]["actual"]
+		if cfg["key"] in period_outcome:
+			totals_out[okey] = period_outcome[cfg["key"]]["actual"]
+
+	# Outcome cards ignore the visit date filter and show the full current fiscal year.
+	report_day = getdate(today())
+	current_fy_start = cint(_fiscal_year_start(report_day.year, report_day.month))
+	outcome_fy_from, outcome_fy_to = _fiscal_year_bounds(current_fy_start)
+	outcome_fy = _report_outcome_fy_totals(staff_rows, outcome_fy_from, outcome_fy_to)
+	outcome_fy_label = f"{current_fy_start}-{str(current_fy_start + 1)[-2:]}"
 
 	model_counts = _report_model_school_counts(staff_rows, from_date, to_date)
 
@@ -489,6 +497,9 @@ def get_report_data(filters=None):
 		"from_date": str(from_date),
 		"to_date": str(to_date),
 		"ytd_from": str(ytd_from),
+		"outcome_fy_from": str(outcome_fy_from),
+		"outcome_fy_to": str(outcome_fy_to),
+		"outcome_fy_label": outcome_fy_label,
 		"fiscal_year_label": f"{fy_start_year}-{str(fy_start_year + 1)[-2:]}",
 		"working_days": working_days,
 		"supervisor": supervisor,

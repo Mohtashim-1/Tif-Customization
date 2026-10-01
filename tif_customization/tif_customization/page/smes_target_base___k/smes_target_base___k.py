@@ -532,10 +532,7 @@ def _count_actuals(from_date, to_date, staff, staff_tokens=None, submitted_only=
 	counts["co_curricular"] = _scalar_count(
 		f"""
 		SELECT COUNT(*) FROM `tabField Visit`
-		WHERE {ds} AND (
-			type = 'Co-curricular Activity'
-			OR (type IN ('Marketing', 'Visits') AND marketing_visit_category = 'TPS Visits')
-		)
+		WHERE {ds} AND type = 'Co-curricular Activity'
 		AND {_visit_date_expr('Marketing')} BETWEEN %(from_date)s AND %(to_date)s
 		{staff_sql}
 		""",
