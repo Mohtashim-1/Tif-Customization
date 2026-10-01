@@ -58,7 +58,7 @@ METRIC_LABELS = {
 	"visited_days": _("Distinct visit days (Marketing / Meeting / M&E / Training)"),
 	"model_school_a": _("Model School A"),
 	"model_school_b": _("Model School B"),
-	"model_a": _("Model A (1 department)"),
+	"model_a": _("Model A (1 department or none)"),
 	"model_b": _("Model B (2 departments)"),
 	"model_c": _("Model C (3 departments)"),
 }
@@ -88,6 +88,16 @@ def _parse(filters):
 		except Exception:
 			return {}
 	return filters or {}
+
+
+def _school_visit_sql(alias: str) -> str:
+	"""Marketing + follow-up Visits + M&E. Same set as Total School Visit."""
+	a = alias
+	return (
+		f"{a}.type = 'Marketing'"
+		f" OR ({a}.type = 'Visits' AND IFNULL({a}.marketing_visit_category, '') != 'New')"
+		f" OR {a}.type = 'M&E'"
+	)
 
 
 def _metric_condition(metric: str, alias: str = "fv") -> str:
@@ -144,11 +154,11 @@ def _metric_condition(metric: str, alias: str = "fv") -> str:
 	if m == "model_school_b":
 		return f"{department_count_sql(a)} = 2"
 	if m == "model_a":
-		return f"{department_count_sql(a)} = 1"
+		return f"({_school_visit_sql(a)}) AND {department_count_sql(a)} <= 1"
 	if m == "model_b":
-		return f"{department_count_sql(a)} = 2"
+		return f"({_school_visit_sql(a)}) AND {department_count_sql(a)} = 2"
 	if m == "model_c":
-		return f"{department_count_sql(a)} >= 3"
+		return f"({_school_visit_sql(a)}) AND {department_count_sql(a)} >= 3"
 	if m == "me_active":
 		return f"""{a}.type = 'M&E' AND LOWER(REPLACE(REPLACE(IFNULL({a}.me_activity_status,''),'-',' '),'  ',' ')) = 'active'"""
 	if m == "me_inactive":

@@ -18,10 +18,9 @@ from tif_customization.tif_customization.field_visit_permissions import (
 	expand_staff_tokens,
 	get_team_employee_rows,
 	get_team_match_values,
-	staff_match_sql,
 	visit_day_sql as _visit_day_sql,
 )
-from tif_customization.tif_customization.model_school import department_count_sql
+from tif_customization.tif_customization.model_school import count_tif_departments
 from tif_customization.tif_customization.field_visit_travel_cost import (
 	DEFAULT_PER_KM_FUEL,
 	aggregate_visit_expenses_by_staff,
@@ -491,7 +490,12 @@ def get_report_data(filters=None):
 	outcome_fy = _report_outcome_fy_totals(staff_rows, outcome_fy_from, outcome_fy_to)
 	outcome_fy_label = f"{current_fy_start}-{str(current_fy_start + 1)[-2:]}"
 
-	model_counts = _report_model_school_counts(staff_rows, from_date, to_date)
+	# Same visits as Total School Visit (marketing + follow-up + monitoring), split so A + B + C equals that total.
+	model_counts = {"model_a": 0, "model_b": 0, "model_c": 0}
+	for staff in staff_rows:
+		stats = visit_stats.get(staff["key"]) or {}
+		for key in model_counts:
+			model_counts[key] += cint(stats.get(key) or 0)
 
 	return {
 		"from_date": str(from_date),
@@ -581,58 +585,6 @@ def _staff_token_list(staff_rows):
 		if staff.get("employee"):
 			tokens.update(expand_staff_tokens(staff["employee"]))
 	return list(tokens)
-
-
-def _report_model_school_counts(staff_rows, from_date, to_date):
-	"""Distinct schools by TIF department affiliation count (QPS/TPS/CEE).
-
-	Model A = 1 department, Model B = 2, Model C = 3.
-	"""
-	tokens = _staff_token_list(staff_rows)
-	if not tokens:
-		return {"model_a": 0, "model_b": 0, "model_c": 0}
-
-	visit_day = _visit_day_sql("fv")
-	dept = department_count_sql("fv")
-	school = f"""LOWER(TRIM(COALESCE(
-		NULLIF(TRIM(fv.school_name), ''),
-		NULLIF(TRIM(fv.pending_school_name), ''),
-		NULLIF(TRIM(fv.me_school_name), ''),
-		NULLIF(TRIM(fv.training_venue_name), '')
-	)))"""
-	params = {
-		"from_date": from_date,
-		"to_date": to_date,
-		"staff_tokens": tuple(t.lower() for t in tokens) or ("__none__",),
-	}
-	staff_sql = staff_match_sql("fv", "staff_tokens")
-
-	def _count(dept_cond: str) -> int:
-		return cint(
-			frappe.db.sql(
-				f"""
-				SELECT COUNT(*) FROM (
-					SELECT {school} AS school
-					FROM `tabField Visit` fv
-					WHERE fv.docstatus = 1
-					  AND {visit_day} BETWEEN %(from_date)s AND %(to_date)s
-					  AND {staff_sql}
-					  AND ({dept_cond})
-					  AND {school} IS NOT NULL
-					  AND {school} != ''
-					GROUP BY 1
-				) t
-				""",
-				params,
-			)[0][0]
-			or 0
-		)
-
-	return {
-		"model_a": _count(f"{dept} = 1"),
-		"model_b": _count(f"{dept} = 2"),
-		"model_c": _count(f"{dept} >= 3"),
-	}
 
 
 def _report_outcome_fy_totals(staff_rows, ytd_from, to_date):
@@ -1040,6 +992,9 @@ def _load_visit_stats(from_date, to_date, staff_rows):
 			fv.training_trainer_name,
 			fv.marketing_visit_category,
 			fv.me_activity_status,
+			fv.qps_affiliated,
+			fv.tps_affiliated,
+			fv.cee_affiliated,
 			COALESCE(fv.training_no_of_schools_attended, 0) AS schools,
 			COALESCE(fv.training_no_of_participants, 0) AS participants,
 			COALESCE(NULLIF(TRIM(fv.province), ''), NULLIF(TRIM(fv.me_province), '')) AS province,
@@ -1064,6 +1019,9 @@ def _load_visit_stats(from_date, to_date, staff_rows):
 			"active": 0,
 			"inactive": 0,
 			"me": 0,
+			"model_a": 0,
+			"model_b": 0,
+			"model_c": 0,
 			"schools": 0,
 			"participants": 0,
 			"trainings": 0,
@@ -1084,31 +1042,41 @@ def _load_visit_stats(from_date, to_date, staff_rows):
 		vtype = row.get("type") or ""
 
 		# Marketing type → Marketing Visit only (do not mix into New School Sum).
+		school_visit = False
 		if vtype == "Marketing":
 			bucket["marketing"] += 1
+			school_visit = True
 		elif vtype == "Visits":
 			cat = (row.get("marketing_visit_category") or "").strip()
 			if cat == "New":
 				bucket["new"] += 1
-			elif cat in ("Followup & Other Visits", "TPS Visits"):
-				bucket["followup"] += 1
-			elif not cat:
-				# Blank category is treated as Followup & Other (common on older entries)
-				bucket["followup"] += 1
 			else:
+				# Follow-up, blank, and any other Visits category.
 				bucket["followup"] += 1
+				school_visit = True
 		elif vtype == "Registration of New Schools":
 			bucket["new"] += 1
 		elif vtype in ("Meeting", "Meeting with Ulama and Educationist"):
 			bucket["meetings"] += 1
 		elif vtype == "M&E":
 			bucket["me"] += 1
+			school_visit = True
 			status = _norm_me_status(row.get("me_activity_status"))
 			if status == "active":
 				bucket["active"] += 1
 			elif status == "inactive":
 				bucket["inactive"] += 1
-		elif vtype in ("Training", "Workshop", "Workshop Conducted", "Workshop Arranged", "Teachers Training Meeting"):
+		if school_visit:
+			# Every Total School Visit lands in one model so A + B + C equals that total.
+			# 0 departments sit with Model A (one or none); 2 is B; 3 is C.
+			dept_n = count_tif_departments(row)
+			if dept_n >= 3:
+				bucket["model_c"] += 1
+			elif dept_n == 2:
+				bucket["model_b"] += 1
+			else:
+				bucket["model_a"] += 1
+		if vtype in ("Training", "Workshop", "Workshop Conducted", "Workshop Arranged", "Teachers Training Meeting"):
 			bucket["schools"] += cint(row.get("schools") or 0)
 			bucket["participants"] += cint(row.get("participants") or 0)
 			bucket["trainings"] += 1

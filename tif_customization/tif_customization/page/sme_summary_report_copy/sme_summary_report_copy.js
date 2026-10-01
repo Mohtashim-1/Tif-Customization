@@ -589,8 +589,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		return [
 			{
 				title: __("Overview"),
-				rows: [
-					[
+				cards: [
 					{
 						label: __("Total SMEs"),
 						value: this.fmt(k.sme_count),
@@ -626,46 +625,8 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						),
 						style: "sme",
 						cardKind: "field_emp_summary",
-						hint: __("Marketing Visit + Follow up Visit + Monitoring Visit (M&E) — click for field officer breakdown"),
+						hint: __("Marketing + Follow up + Monitoring (M&E). Equals Model A + Model B + Model C."),
 					},
-					],
-					[
-					{
-						label: __("Model A"),
-						value: this.fmt(k.model_a),
-						style: "model-a",
-						metric: "model_a",
-						hint: __("School enrolled in 1 TIF department (QPS / TPS / CEE)"),
-					},
-					{
-						label: __("Model B"),
-						value: this.fmt(k.model_b),
-						style: "model-b",
-						metric: "model_b",
-						hint: __("School enrolled in 2 TIF departments"),
-					},
-					{
-						label: __("Model C"),
-						value: this.fmt(k.model_c),
-						style: "model-c",
-						metric: "model_c",
-						hint: __("School enrolled in 3 TIF departments"),
-					},
-					],
-				],
-			},
-			{
-				title: __("Activity (period)"),
-				cards: activityCards,
-			},
-			{
-				title: __("Outcomes (current fiscal year)"),
-				separator: true,
-				cards: outcomeCards,
-			},
-			{
-				title: __("Summary"),
-				cards: [
 					{
 						label: __("Working Days"),
 						value: this.fmt(visitedDaysMax),
@@ -680,6 +641,40 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						cardKind: "supervisor_list",
 						hint: __("Field Officers who manage other Field Officers"),
 					},
+				],
+			},
+			{
+				title: __("Activity (period)"),
+				cards: activityCards,
+			},
+			{
+				title: __("Outcomes (current fiscal year)"),
+				separator: true,
+				rows: [
+					outcomeCards,
+					[
+						{
+							label: __("Model A"),
+							value: this.fmt(k.model_a),
+							style: "model-a",
+							metric: "model_a",
+							hint: __("Total School Visit with 1 TIF department, or none. Selected visit dates."),
+						},
+						{
+							label: __("Model B"),
+							value: this.fmt(k.model_b),
+							style: "model-b",
+							metric: "model_b",
+							hint: __("Total School Visit enrolled in 2 TIF departments. Selected visit dates."),
+						},
+						{
+							label: __("Model C"),
+							value: this.fmt(k.model_c),
+							style: "model-c",
+							metric: "model_c",
+							hint: __("Total School Visit enrolled in 3 TIF departments. Selected visit dates."),
+						},
+					],
 				],
 			},
 		];
