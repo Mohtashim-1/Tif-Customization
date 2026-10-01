@@ -58,9 +58,9 @@ METRIC_LABELS = {
 	"visited_days": _("Distinct visit days (Marketing / Meeting / M&E / Training)"),
 	"model_school_a": _("Model School A"),
 	"model_school_b": _("Model School B"),
-	"model_a": _("Model A (1 department or none)"),
+	"model_a": _("Model A (3 departments)"),
 	"model_b": _("Model B (2 departments)"),
-	"model_c": _("Model C (3 departments)"),
+	"model_c": _("Model C (1 department)"),
 }
 
 TYPE_TO_METRIC = {
@@ -154,11 +154,11 @@ def _metric_condition(metric: str, alias: str = "fv") -> str:
 	if m == "model_school_b":
 		return f"{department_count_sql(a)} = 2"
 	if m == "model_a":
-		return f"({_school_visit_sql(a)}) AND {department_count_sql(a)} <= 1"
+		return f"({_school_visit_sql(a)}) AND {department_count_sql(a)} >= 3"
 	if m == "model_b":
 		return f"({_school_visit_sql(a)}) AND {department_count_sql(a)} = 2"
 	if m == "model_c":
-		return f"({_school_visit_sql(a)}) AND {department_count_sql(a)} >= 3"
+		return f"({_school_visit_sql(a)}) AND {department_count_sql(a)} = 1"
 	if m == "me_active":
 		return f"""{a}.type = 'M&E' AND LOWER(REPLACE(REPLACE(IFNULL({a}.me_activity_status,''),'-',' '),'  ',' ')) = 'active'"""
 	if m == "me_inactive":

@@ -490,7 +490,7 @@ def get_report_data(filters=None):
 	outcome_fy = _report_outcome_fy_totals(staff_rows, outcome_fy_from, outcome_fy_to)
 	outcome_fy_label = f"{current_fy_start}-{str(current_fy_start + 1)[-2:]}"
 
-	# Same visits as Total School Visit (marketing + follow-up + monitoring), split so A + B + C equals that total.
+	# Model A = 3 departments, Model B = 2, Model C = 1, on Marketing + follow-up + monitoring visits.
 	model_counts = {"model_a": 0, "model_b": 0, "model_c": 0}
 	for staff in staff_rows:
 		stats = visit_stats.get(staff["key"]) or {}
@@ -1067,15 +1067,14 @@ def _load_visit_stats(from_date, to_date, staff_rows):
 			elif status == "inactive":
 				bucket["inactive"] += 1
 		if school_visit:
-			# Every Total School Visit lands in one model so A + B + C equals that total.
-			# 0 departments sit with Model A (one or none); 2 is B; 3 is C.
+			# Model A = 3 departments, Model B = 2, Model C = 1. Unaffiliated visits stay out of all three.
 			dept_n = count_tif_departments(row)
 			if dept_n >= 3:
-				bucket["model_c"] += 1
+				bucket["model_a"] += 1
 			elif dept_n == 2:
 				bucket["model_b"] += 1
-			else:
-				bucket["model_a"] += 1
+			elif dept_n == 1:
+				bucket["model_c"] += 1
 		if vtype in ("Training", "Workshop", "Workshop Conducted", "Workshop Arranged", "Teachers Training Meeting"):
 			bucket["schools"] += cint(row.get("schools") or 0)
 			bucket["participants"] += cint(row.get("participants") or 0)
