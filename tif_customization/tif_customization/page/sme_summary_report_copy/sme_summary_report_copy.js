@@ -92,6 +92,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					.sme-sum-kpi-groups{display:flex;flex-direction:column;gap:12px;margin:0 0 14px}
 					.sme-sum-kpi-group__title{font-size:12px;font-weight:700;color:#475569;margin:0 0 8px;text-transform:uppercase;letter-spacing:.04em}
 					.sme-sum-kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,150px));gap:10px;justify-content:start}
+					.sme-sum-kpis + .sme-sum-kpis{margin-top:10px}
 					.sme-sum-kpi{border:1px solid var(--border-color,#e5e7eb);border-top:4px solid #64748b;border-radius:10px;background:#fff;padding:12px 14px;box-shadow:0 2px 8px rgba(15,23,42,.05);max-width:150px;min-width:132px}
 					.sme-sum-kpi[data-visit-metric],.sme-sum-kpi[data-points-kind],.sme-sum-kpi[data-card-kind]{cursor:pointer}
 					.sme-sum-kpi[data-visit-metric]:hover,.sme-sum-kpi[data-points-kind]:hover,.sme-sum-kpi[data-card-kind]:hover{box-shadow:0 4px 14px rgba(15,23,42,.12)}
@@ -582,7 +583,8 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		return [
 			{
 				title: __("Overview"),
-				cards: [
+				rows: [
+					[
 					{
 						label: __("Total SMEs"),
 						value: this.fmt(k.sme_count),
@@ -614,12 +616,36 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					{
 						label: __("Total School Visit"),
 						value: this.fmt(
-							cint(k.marketing != null ? k.marketing : 0) + cint(k.followup),
+							cint(k.marketing != null ? k.marketing : 0) + cint(k.followup) + cint(k.me),
 						),
 						style: "sme",
 						cardKind: "field_emp_summary",
-						hint: __("Marketing Visit + Follow up Visit — click for field officer breakdown"),
+						hint: __("Marketing Visit + Follow up Visit + Monitoring Visit (M&E) — click for field officer breakdown"),
 					},
+					],
+					[
+					{
+						label: __("Model A"),
+						value: this.fmt(k.model_a),
+						style: "model-a",
+						metric: "model_a",
+						hint: __("School enrolled in 1 TIF department (QPS / TPS / CEE)"),
+					},
+					{
+						label: __("Model B"),
+						value: this.fmt(k.model_b),
+						style: "model-b",
+						metric: "model_b",
+						hint: __("School enrolled in 2 TIF departments"),
+					},
+					{
+						label: __("Model C"),
+						value: this.fmt(k.model_c),
+						style: "model-c",
+						metric: "model_c",
+						hint: __("School enrolled in 3 TIF departments"),
+					},
+					],
 				],
 			},
 			{
@@ -646,27 +672,6 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						style: "supervisor",
 						cardKind: "supervisor_list",
 						hint: __("Field Officers who manage other Field Officers"),
-					},
-					{
-						label: __("Model A"),
-						value: this.fmt(k.model_a),
-						style: "model-a",
-						metric: "model_a",
-						hint: __("School enrolled in 1 TIF department (QPS / TPS / CEE)"),
-					},
-					{
-						label: __("Model B"),
-						value: this.fmt(k.model_b),
-						style: "model-b",
-						metric: "model_b",
-						hint: __("School enrolled in 2 TIF departments"),
-					},
-					{
-						label: __("Model C"),
-						value: this.fmt(k.model_c),
-						style: "model-c",
-						metric: "model_c",
-						hint: __("School enrolled in 3 TIF departments"),
 					},
 				],
 			},
@@ -696,7 +701,12 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				(group) => `
 			<div class="sme-sum-kpi-group">
 				<div class="sme-sum-kpi-group__title">${group.title}</div>
-				<div class="sme-sum-kpis">${group.cards.map((c) => this.render_kpi_card(c)).join("")}</div>
+				${(group.rows || [group.cards])
+					.map(
+						(cards) =>
+							`<div class="sme-sum-kpis">${cards.map((c) => this.render_kpi_card(c)).join("")}</div>`
+					)
+					.join("")}
 			</div>`
 			)
 			.join("")}</div>`;

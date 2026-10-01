@@ -34,6 +34,11 @@ frappe.tif_customization.open_visit_drilldown = function (opts) {
 
 frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 	const rows = data.rows || [];
+	const isMonitoring = data.metric === "monitoring" || data.metric === "me";
+	if (isMonitoring && !data.staff) {
+		frappe.tif_customization.show_monitoring_officer_dialog(data, rows);
+		return;
+	}
 	const breakdown = (data.breakdown || [])
 		.map((b) => `${frappe.utils.escape_html(b.type)} <strong>${b.count}</strong>`)
 		.join(" &nbsp;·&nbsp; ");
@@ -117,6 +122,171 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 			</table>
 		</div>
 	`);
+	d.show();
+};
+
+frappe.tif_customization.show_monitoring_officer_dialog = function (data, rows) {
+	const meBucket = (row) => {
+		const c = String(row.category || "")
+			.toLowerCase()
+			.replace(/-/g, " ")
+			.replace(/\s+/g, " ")
+			.trim();
+		return c === "active" ? "active" : "inactive";
+	};
+	const byOfficer = {};
+	(rows || []).forEach((row) => {
+		const officer = (row.officer || "").trim() || __("Unknown officer");
+		if (!byOfficer[officer]) {
+			byOfficer[officer] = { officer, total: 0, active: 0, inactive: 0, rows: [] };
+		}
+		byOfficer[officer].rows.push(row);
+		byOfficer[officer].total += 1;
+		if (meBucket(row) === "active") byOfficer[officer].active += 1;
+		else byOfficer[officer].inactive += 1;
+	});
+	const officers = Object.values(byOfficer).sort(
+		(a, b) => b.total - a.total || a.officer.localeCompare(b.officer)
+	);
+	const sum = officers.reduce(
+		(a, o) => {
+			a.total += o.total;
+			a.active += o.active;
+			a.inactive += o.inactive;
+			return a;
+		},
+		{ total: 0, active: 0, inactive: 0 }
+	);
+	const countLink = (officer, kind, count) => {
+		if (!count) return "0";
+		return `<a href="#" class="me-officer-count" data-officer="${frappe.utils.escape_html(
+			officer
+		)}" data-kind="${kind}">${cint(count).toLocaleString()}</a>`;
+	};
+	const body = officers.length
+		? officers
+				.map(
+					(o) => `<tr>
+				<td>${frappe.utils.escape_html(o.officer)}</td>
+				<td class="text-right">${countLink(o.officer, "total", o.total)}</td>
+				<td class="text-right">${countLink(o.officer, "active", o.active)}</td>
+				<td class="text-right">${countLink(o.officer, "inactive", o.inactive)}</td>
+			</tr>`
+				)
+				.join("")
+		: `<tr><td colspan="4" class="text-muted text-center">${__("No Monitoring visits in this period.")}</td></tr>`;
+
+	const d = new frappe.ui.Dialog({
+		title: data.title || __("Monitoring (M&E) Visits"),
+		size: "extra-large",
+		fields: [{ fieldtype: "HTML", fieldname: "html" }],
+		primary_action_label: __("Close"),
+		primary_action: () => d.hide(),
+	});
+
+	const showOfficers = () => {
+		d.set_title(data.title || __("Monitoring (M&E) Visits"));
+		d.fields_dict.html.$wrapper.html(`
+			<p class="text-muted" style="font-size:12px;margin-bottom:10px;">
+				${__("Field officer wise Monitoring visits. Click Total, Active, or In-Active for the visit documents.")}
+			</p>
+			<div class="table-responsive" style="max-height:420px;overflow:auto;">
+				<table class="table table-bordered table-hover" style="font-size:12px;margin:0;">
+					<thead>
+						<tr>
+							<th>${__("Field Officer")}</th>
+							<th class="text-right">${__("Total Visit")}</th>
+							<th class="text-right">${__("Active")}</th>
+							<th class="text-right">${__("In-Active")}</th>
+						</tr>
+					</thead>
+					<tbody>${body}</tbody>
+					<tfoot>
+						<tr>
+							<th>${__("Total")}</th>
+							<th class="text-right">${cint(sum.total).toLocaleString()}</th>
+							<th class="text-right">${cint(sum.active).toLocaleString()}</th>
+							<th class="text-right">${cint(sum.inactive).toLocaleString()}</th>
+						</tr>
+					</tfoot>
+				</table>
+			</div>
+		`);
+	};
+
+	const approvalLabel = (row) => {
+		if (cint(row.school_unapproved) || cint(row.school_missing)) return __("Un Approved");
+		return __("Approved");
+	};
+
+	const showDetail = (officer, kind) => {
+		const bucket = byOfficer[officer];
+		const filtered = (bucket ? bucket.rows : []).filter((row) => {
+			if (kind === "active") return meBucket(row) === "active";
+			if (kind === "inactive") return meBucket(row) === "inactive";
+			return true;
+		});
+		const kindLabel =
+			kind === "active" ? __("Active") : kind === "inactive" ? __("In-Active") : __("Total Visit");
+		d.set_title(__("{0} — {1}", [officer, kindLabel]));
+		const detailBody = filtered.length
+			? filtered
+					.map(
+						(row) => `<tr>
+					<td><a href="${frappe.utils.escape_html(row.url)}" target="_blank">${frappe.utils.escape_html(
+							row.name || ""
+						)}</a></td>
+					<td>${frappe.utils.escape_html(row.visit_date || "")}</td>
+					<td>${frappe.utils.escape_html(row.type || "")}</td>
+					<td>${frappe.utils.escape_html(row.school || "—")}</td>
+					<td>${frappe.utils.escape_html(approvalLabel(row))}</td>
+					<td>${frappe.utils.escape_html(row.officer || "")}</td>
+					<td>${frappe.utils.escape_html(row.status || "")}</td>
+					<td>${frappe.utils.escape_html(row.category || "")}</td>
+					<td style="max-width:280px;white-space:normal;">${frappe.utils.escape_html(row.remarks || "—")}</td>
+				</tr>`
+					)
+					.join("")
+			: `<tr><td colspan="9" class="text-muted text-center">${__("No Field Visits for this number.")}</td></tr>`;
+		d.fields_dict.html.$wrapper.html(`
+			<p style="margin-bottom:10px;">
+				<a href="#" class="me-officer-back">${__("← Field officers")}</a>
+				&nbsp;·&nbsp; ${frappe.utils.escape_html(officer)}
+				&nbsp;·&nbsp; ${frappe.utils.escape_html(kindLabel)}: <strong>${filtered.length}</strong>
+			</p>
+			<p class="text-muted" style="font-size:12px;">${__("Click a Document No to open that Field Visit.")}</p>
+			<div class="table-responsive" style="max-height:420px;overflow:auto;">
+				<table class="table table-bordered table-hover" style="font-size:12px;margin:0;">
+					<thead>
+						<tr>
+							<th>${__("Document No")}</th>
+							<th>${__("Visit Date")}</th>
+							<th>${__("Type")}</th>
+							<th>${__("School")}</th>
+							<th>${__("School Status")}</th>
+							<th>${__("Officer")}</th>
+							<th>${__("Status")}</th>
+							<th>${__("Category")}</th>
+							<th>${__("Remarks")}</th>
+						</tr>
+					</thead>
+					<tbody>${detailBody}</tbody>
+				</table>
+			</div>
+		`);
+	};
+
+	d.$wrapper.on("click", ".me-officer-count", (e) => {
+		e.preventDefault();
+		const officer = $(e.currentTarget).attr("data-officer");
+		const kind = $(e.currentTarget).attr("data-kind") || "total";
+		if (officer) showDetail(officer, kind);
+	});
+	d.$wrapper.on("click", ".me-officer-back", (e) => {
+		e.preventDefault();
+		showOfficers();
+	});
+	showOfficers();
 	d.show();
 };
 
