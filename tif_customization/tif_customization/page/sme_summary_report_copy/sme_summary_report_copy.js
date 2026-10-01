@@ -459,14 +459,6 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		)}" title="${__("Click to see how this is calculated")}">${html}</td>`;
 	}
 
-	max_visited_days(data) {
-		let max = 0;
-		for (const r of (data && data.rows) || []) {
-			max = Math.max(max, cint(r.visited_days) || 0);
-		}
-		return max;
-	}
-
 	kpi_columns(data) {
 		return (
 			(data && data.kpi_columns) || [
@@ -539,7 +531,6 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 
 	kpi_card_groups(data) {
 		const k = data.kpis || {};
-		const visitedDaysMax = this.max_visited_days(data);
 		const t = data.totals || {};
 		const activityCards = [
 			{
@@ -629,10 +620,9 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					},
 					{
 						label: __("Working Days"),
-						value: this.fmt(visitedDaysMax),
+						value: this.fmt(data.working_days),
 						style: "visited",
-						metric: "visited_days",
-						hint: __("Highest value in the table Visited Days column"),
+						hint: __("Weekdays (Mon–Fri) from Visit From to Visit To. Uses the Working Days filter when that is filled in."),
 					},
 					{
 						label: __("Field Supervisors"),
