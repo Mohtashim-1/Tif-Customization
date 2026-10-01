@@ -1074,6 +1074,10 @@ async function saveVisit(submitDoc) {
 		error.value = "Select Visit with enrollment or Visit without enrollment.";
 		return;
 	}
+	if (selected.value.group === "visits" && !attachments.school_picture) {
+		error.value = "School Picture is required.";
+		return;	
+	}
 	saving.value = true;
 	try {
 		const result = await apiPost(`${METHOD}.submit_smes_activity`, {
@@ -1106,6 +1110,15 @@ async function saveVisit(submitDoc) {
 	} finally {
 		saving.value = false;
 	}
+}
+
+function continueToTravel() {
+	if (selected.value?.group === "visits" && !attachments.school_picture) {
+		error.value = "School Picture is required.";
+		return;
+	}
+	error.value = "";
+	step.value = 3;
 }
 
 function resetForm() {
@@ -1464,7 +1477,7 @@ const steps = [
 						<div class="block-title">Attachments / منسلکات</div>
 						<div class="attach-grid">
 							<AttachDrop :mode="lang" label-en="Meeting Picture" label-ur="ملاقات کی تصویر" :file="attachments.meeting_picture" @pick="attachments.meeting_picture = $event" />
-							<AttachDrop :mode="lang" label-en="School Picture" label-ur="اسکول کی تصویر" :file="attachments.school_picture" @pick="attachments.school_picture = $event" />
+							<AttachDrop :mode="lang" label-en="School Picture" label-ur="اسکول کی تصویر" required :file="attachments.school_picture" @pick="attachments.school_picture = $event" />
 							<AttachDrop :mode="lang" label-en="Visiting Card" label-ur="وزٹنگ کارڈ" :file="attachments.visiting_card_attach" @pick="attachments.visiting_card_attach = $event" />
 							<AttachDrop :mode="lang" label-en="Attendance Sheet" label-ur="حاضری شیٹ" :file="attachments.attendance_sheet_attach" @pick="attachments.attendance_sheet_attach = $event" />
 							<AttachDrop :mode="lang" label-en="Pictures of Training & Awareness Session" label-ur="تربیت و آگاہی کی تصاویر" :file="attachments.training_awareness_pictures" @pick="attachments.training_awareness_pictures = $event" />
@@ -2101,7 +2114,7 @@ const steps = [
 						<div style="font-size: 12px; color: #71717a">
 							<Bi :mode="lang" en="Details ok? Travel is next" ur="تفصیلات درست؟ اگلا مرحلہ سفر ہے" />
 						</div>
-						<button class="btn btn-dark" type="button" @click="step = 3">
+						<button class="btn btn-dark" type="button" @click="continueToTravel">
 							<Bi :mode="lang" en="Continue to Travel →" ur="سفر کی تفصیل →" />
 						</button>
 					</div>

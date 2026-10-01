@@ -354,6 +354,12 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		return frappe.format(n || 0, { fieldtype: "Int" });
 	}
 
+	fmt_days(n) {
+		const v = flt(n || 0);
+		if (Math.abs(v - Math.round(v)) < 0.001) return Math.round(v).toLocaleString();
+		return v.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+	}
+
 	fmt_cur(n) {
 		return frappe.format(n || 0, { fieldtype: "Currency" });
 	}
@@ -461,7 +467,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			(data && data.kpi_columns) || [
 				{
 					key: "workshop",
-					label: __("Conducted Onsite"),
+					label: __("Workshop Conducted Onsite"),
 					metric: "training",
 					value: (r) =>
 						cint(r.workshop) ||
@@ -602,8 +608,8 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						label: __("Number of School Visit"),
 						value: this.fmt(k.followup),
 						style: "followup",
-						metric: "followup",
-						hint: __("Follow-up / existing school visits — SME wise"),
+						cardKind: "school_visit_officers",
+						hint: __("Field officer wise school count — click a count for school details"),
 					},
 					{
 						label: __("Total School Visit"),
@@ -707,11 +713,12 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		const kpiCols = this.kpi_columns(data);
 		const activityCols = [...visitCols, ...kpiCols];
 		const outcomeCols = this.outcome_subcolumns(data);
-		const colCount = 2 + activityCols.length + outcomeCols.length + 2 + 3;
+		const colCount = 2 + activityCols.length + outcomeCols.length + 3 + 3;
 
 		const tail_tds = (src, visitStaff, expenseStaff) => `
 					${this.expense_td(src, expenseStaff)}
-					${this.click_td(src.visited_days, "visited_days", visitStaff)}`;
+					${this.click_td(src.visited_days, "visited_days", visitStaff)}
+					<td class="num" title="${__("Attendance present days in this date range")}">${this.fmt_days(src.present_days)}</td>`;
 
 		const body = rows.length
 			? rows
@@ -774,7 +781,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 							<th rowspan="3">${__("Type / Division")}</th>
 							<th colspan="${activityCols.length}" class="group activity-group">${__("Activity (period)")}</th>
 							<th colspan="${outcomeCols.length}" class="group outcome-group">${__("Outcomes (current fiscal year)")}</th>
-							<th colspan="2" class="group">${__("Totals")}</th>
+							<th colspan="3" class="group">${__("Totals")}</th>
 							<th colspan="3" class="group">${__("KPI Points")}</th>
 						</tr>
 						<tr>
@@ -799,6 +806,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 								__("Click an amount to see KM, rate, and how travel expense is computed")
 							)}">${__("Expenses")}</th>
 							<th rowspan="2">${__("Visited Days")}</th>
+							<th rowspan="2" title="${__("Days marked present on Employee Attendance in this date range")}">${__("Present Days")}</th>
 							<th rowspan="2">${__("Total Points")}</th>
 							<th rowspan="2">${__("Total Earned Points")}</th>
 							<th rowspan="2">${__("Percentage")}</th>
@@ -902,6 +910,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			else if (kind === "sme_count") me.show_sme_list();
 			else if (kind === "supervisor_list") me.show_supervisor_list();
 			else if (kind === "field_emp_summary") me.show_field_emp_summary();
+			else if (kind === "school_visit_officers") me.show_school_visits_by_officer();
 		});
 
 		$root.on("click.smeSumExpense", "[data-expense-detail]", function (e) {
@@ -1104,6 +1113,156 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		if (frappe.tif_customization && frappe.tif_customization.bind_clickable_numbers) {
 			frappe.tif_customization.bind_clickable_numbers(d.$wrapper, () => this.get_filters());
 		}
+		d.show();
+	}
+
+	show_school_visits_by_officer() {
+		const ctx = this.get_filters();
+		if (!ctx.from_date || !ctx.to_date) {
+			frappe.msgprint(__("Please select Visit From Date and Visit To Date."));
+			return;
+		}
+		frappe.call({
+			method:
+				"tif_customization.tif_customization.page.sme_summary_report_copy.sme_summary_report_copy.get_followup_schools_by_officer",
+			args: { filters: ctx },
+			freeze: true,
+			freeze_message: __("Loading school visits…"),
+			callback: (r) => {
+				const detail = r.message || {};
+				const officers = detail.officers || [];
+				this._followup_schools = officers;
+				const body = officers.length
+					? officers
+							.map((o) => {
+								const key = frappe.utils.escape_html(o.key || "");
+								return `<tr>
+							<td>${frappe.utils.escape_html(o.label || o.employee_name || "")}</td>
+							<td class="text-right">
+								<a href="#" class="sme-officer-school-count" data-officer-key="${key}" title="${__(
+									"Click for school details",
+								)}">${this.fmt(o.school_count)}</a>
+							</td>
+							<td class="text-right">${this.fmt(o.visit_count)}</td>
+						</tr>`;
+							})
+							.join("")
+					: `<tr><td colspan="3" class="text-muted text-center">${__("No school visits in this period")}</td></tr>`;
+				const sumSchools = officers.reduce((a, o) => a + cint(o.school_count), 0);
+				const sumVisits = officers.reduce((a, o) => a + cint(o.visit_count), 0);
+				const d = new frappe.ui.Dialog({
+					title: __("Number of School Visit"),
+					size: "large",
+					fields: [{ fieldtype: "HTML", fieldname: "html" }],
+					primary_action_label: __("Close"),
+					primary_action: () => d.hide(),
+				});
+				d.fields_dict.html.$wrapper.html(`
+					<p class="text-muted" style="font-size:12px;margin-bottom:10px;">
+						${__("Visit Date")}: ${frappe.utils.escape_html(frappe.datetime.str_to_user(detail.from_date || ""))}
+						– ${frappe.utils.escape_html(frappe.datetime.str_to_user(detail.to_date || ""))}
+						<br>${__("Each count is how many schools that field officer visited. Click the count for school details. A school name visited more than once is highlighted.")}
+					</p>
+					<div class="table-responsive" style="max-height:420px;overflow:auto;">
+						<table class="table table-bordered table-hover" style="font-size:12px;margin:0;">
+							<thead>
+								<tr>
+									<th>${__("Field Officer")}</th>
+									<th class="text-right">${__("Schools")}</th>
+									<th class="text-right">${__("Visits")}</th>
+								</tr>
+							</thead>
+							<tbody>${body}</tbody>
+							<tfoot>
+								<tr>
+									<th>${__("Total")}</th>
+									<th class="text-right">${this.fmt(sumSchools)}</th>
+									<th class="text-right">${this.fmt(sumVisits)}</th>
+								</tr>
+							</tfoot>
+						</table>
+					</div>
+				`);
+				d.$wrapper.on("click", ".sme-officer-school-count", (e) => {
+					e.preventDefault();
+					const key = $(e.currentTarget).attr("data-officer-key");
+					if (key) this.show_officer_followup_schools(key);
+				});
+				d.show();
+			},
+		});
+	}
+
+	show_officer_followup_schools(officerKey) {
+		const key = String(officerKey || "").trim();
+		const officer = (this._followup_schools || []).find((o) => String(o.key || "") === key);
+		if (!officer) {
+			frappe.msgprint(__("No school visits found for this field officer."));
+			return;
+		}
+		const schools = officer.schools || [];
+		const dupBadge = `<span style="display:inline-block;margin-left:6px;padding:1px 6px;border:1px solid #b45309;border-radius:999px;background:#fffbeb;color:#92400e;font-size:11px;font-weight:700;white-space:nowrap;">${__(
+			"Duplicate",
+		)}</span>`;
+		const body = schools.length
+			? schools
+					.map((s) => {
+						const highlight = cint(s.duplicate)
+							? "background:#fef3c7;font-weight:700;"
+							: "";
+						const visits = (s.visits || [])
+							.map((v) => {
+								const date = v.visit_date
+									? frappe.datetime.str_to_user(v.visit_date)
+									: "—";
+								const remarks = (v.remarks || "").trim();
+								return `<div style="margin-bottom:4px;">
+									<a href="${frappe.utils.escape_html(v.url || "#")}" target="_blank">${frappe.utils.escape_html(
+										v.name || "",
+									)}</a>
+									<span class="text-muted"> · ${frappe.utils.escape_html(date)}</span>
+									${remarks ? `<div class="text-muted">${frappe.utils.escape_html(remarks)}</div>` : ""}
+								</div>`;
+							})
+							.join("");
+						return `<tr style="${highlight}">
+							<td>${frappe.utils.escape_html(s.school || "—")}${cint(s.duplicate) ? dupBadge : ""}</td>
+							<td>${frappe.utils.escape_html(s.province || "—")}</td>
+							<td>${frappe.utils.escape_html(s.area || "—")}</td>
+							<td class="text-right">${this.fmt(s.visit_count)}</td>
+							<td>${visits || "—"}</td>
+						</tr>`;
+					})
+					.join("")
+			: `<tr><td colspan="5" class="text-muted text-center">${__("No schools")}</td></tr>`;
+		const d = new frappe.ui.Dialog({
+			title: __("{0} — Schools", [officer.employee_name || officer.label || ""]),
+			size: "extra-large",
+			fields: [{ fieldtype: "HTML", fieldname: "html" }],
+			primary_action_label: __("Close"),
+			primary_action: () => d.hide(),
+		});
+		d.fields_dict.html.$wrapper.html(`
+			<p class="text-muted" style="font-size:12px;margin-bottom:10px;">
+				${__("Schools")}: <strong>${this.fmt(officer.school_count)}</strong>
+				&nbsp;·&nbsp; ${__("Visits")}: <strong>${this.fmt(officer.visit_count)}</strong>
+				<br>${__("A school name that appears more than once is highlighted.")}
+			</p>
+			<div class="table-responsive" style="max-height:460px;overflow:auto;">
+				<table class="table table-bordered" style="font-size:12px;margin:0;">
+					<thead>
+						<tr>
+							<th>${__("School")}</th>
+							<th>${__("Province")}</th>
+							<th>${__("Area")}</th>
+							<th class="text-right">${__("Visits")}</th>
+							<th>${__("Visit Detail")}</th>
+						</tr>
+					</thead>
+					<tbody>${body}</tbody>
+				</table>
+			</div>
+		`);
 		d.show();
 	}
 
@@ -1396,6 +1555,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			{ group: __("Overview"), label: __("New School Visit"), value: row.new, metric: "new" },
 			{ group: __("Overview"), label: __("Number of School Visit"), value: row.followup, metric: "followup" },
 			{ group: __("Overview"), label: __("Visited Days"), value: row.visited_days, metric: "visited_days" },
+			{ group: __("Overview"), label: __("Present Days"), value: row.present_days, display: this.fmt_days(row.present_days) },
 			...this.visit_columns().map((col) => ({
 				group: __("Activity (period)"),
 				label: col.label,
@@ -1442,16 +1602,19 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		}
 		const items = this.officer_kpi_rows(row, data);
 		const body = items
-			.map(
-				(item) => `<tr>
+			.map((item) => {
+				const shown = item.display != null ? item.display : this.fmt(item.value);
+				const clickable = !!item.metric;
+				return `<tr>
 				<td>${frappe.utils.escape_html(item.group)}</td>
 				<td>${frappe.utils.escape_html(item.label)}</td>
-				<td class="num sme-click" data-visit-metric="${frappe.utils.escape_html(item.metric || "")}"
-					data-visit-staff="${frappe.utils.escape_html(item.staff || "")}"
-					${item.useYtd ? 'data-use-ytd="1"' : ""}
-					title="${__("Click to see Field Visits")}">${this.fmt(item.value)}</td>
-			</tr>`,
-			)
+				<td class="num${clickable ? " sme-click" : ""}" ${
+					clickable
+						? `data-visit-metric="${frappe.utils.escape_html(item.metric)}" data-visit-staff="${frappe.utils.escape_html(item.staff || "")}" ${item.useYtd ? 'data-use-ytd="1"' : ""} title="${__("Click to see Field Visits")}"`
+						: ""
+				}>${shown}</td>
+			</tr>`;
+			})
 			.join("");
 
 		const d = new frappe.ui.Dialog({
@@ -1769,6 +1932,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			...this.outcome_subcolumns(this.data).map((c) => c.header || c.shortHeader),
 			"Expenses",
 			"Visited Days",
+			"Present Days",
 			"Total Points",
 			"Total Earned Points",
 			"Percentage",
@@ -1788,6 +1952,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					...this.outcome_subcolumns(this.data).map((c) => r[c.key] || 0),
 					r.expenses || 0,
 					r.visited_days || 0,
+					r.present_days || 0,
 					r.total_points || 0,
 					r.earned_points || 0,
 					r.percentage || 0,

@@ -12,6 +12,7 @@ from tif_customization.tif_customization.doctype.school.school_customer import (
 
 def create_customer_from_application(app):
 	if app.customer and frappe.db.exists("Customer", app.customer):
+		_ensure_address_and_contacts(app, app.customer)
 		_link_field_visits_to_customer(app, app.customer)
 		return app.customer
 
@@ -19,6 +20,7 @@ def create_customer_from_application(app):
 	if existing:
 		app.db_set("customer", existing, update_modified=False)
 		app.db_set("erp_school_code", existing, update_modified=False)
+		_ensure_address_and_contacts(app, existing)
 		_link_field_visits_to_customer(app, existing)
 		return existing
 
@@ -70,9 +72,6 @@ def create_customer_from_application(app):
 	customer.flags.ignore_mandatory = True
 	customer.insert()
 
-	_add_address(customer, app)
-	_add_director_contact(customer, app)
-
 	app.db_set(
 		{
 			"customer": customer.name,
@@ -90,6 +89,7 @@ def create_customer_from_application(app):
 		indicator="green",
 		title=_("School Opening Approved"),
 	)
+	_ensure_address_and_contacts(app, customer.name)
 	_link_field_visits_to_customer(app, customer.name)
 	return customer.name
 
@@ -188,50 +188,176 @@ def _build_remarks(app):
 	return "<br>".join(lines)
 
 
-def _add_address(customer, app):
-	if not app.address and not app.city:
+def _ensure_connection_fields():
+	"""Link field so Address and Contact show in School Opening Application connections."""
+	from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
+
+	create_custom_fields(
+		{
+			"Address": [
+				{
+					"fieldname": "school_opening_application",
+					"label": "School Opening Application",
+					"fieldtype": "Link",
+					"options": "School Opening Application",
+					"insert_after": "address_title",
+					"read_only": 1,
+					"no_copy": 1,
+				}
+			],
+			"Contact": [
+				{
+					"fieldname": "school_opening_application",
+					"label": "School Opening Application",
+					"fieldtype": "Link",
+					"options": "School Opening Application",
+					"insert_after": "company_name",
+					"read_only": 1,
+					"no_copy": 1,
+				}
+			],
+		},
+		ignore_validate=True,
+		update=False,
+	)
+
+
+def _ensure_address_and_contacts(app, customer_name):
+	if not customer_name or not frappe.db.exists("Customer", customer_name):
 		return
+	_ensure_connection_fields()
+	_ensure_address(app, customer_name)
+	_ensure_contacts(app, customer_name)
+
+
+def _linked_docs(doctype, customer_name):
+	return frappe.db.sql(
+		f"""
+		SELECT parent
+		FROM `tabDynamic Link`
+		WHERE parenttype = %(doctype)s
+		  AND link_doctype = 'Customer'
+		  AND link_name = %(customer)s
+		""",
+		{"doctype": doctype, "customer": customer_name},
+		pluck=True,
+	)
+
+
+def _append_link(doc, link_doctype, link_name):
+	if not link_name:
+		return
+	for row in doc.get("links") or []:
+		if row.link_doctype == link_doctype and row.link_name == link_name:
+			return
+	doc.append("links", {"link_doctype": link_doctype, "link_name": link_name})
+
+
+def _ensure_address(app, customer_name):
+	if not (app.address or app.city or app.area):
+		return
+	existing = _linked_docs("Address", customer_name)
 	try:
-		address = frappe.new_doc("Address")
-		address.address_title = app.school_name
-		address.address_type = "Billing"
-		address.address_line1 = app.address or app.school_name
-		if app.area:
-			address.address_line2 = app.area
-		if app.city:
-			address.city = app.city
-		if app.province:
-			address.state = app.province
-		if app.country:
-			address.country = app.country
-		if app.school_email:
-			address.email_id = app.school_email
-		if app.school_ptcl:
-			address.phone = app.school_ptcl
-		address.append("links", {"link_doctype": "Customer", "link_name": customer.name})
+		if existing:
+			address = frappe.get_doc("Address", existing[0])
+		else:
+			address = frappe.new_doc("Address")
+			address.address_title = app.school_name
+			address.address_type = "Billing"
+			address.address_line1 = app.address or app.school_name
+			if app.area:
+				address.address_line2 = app.area
+			if app.city:
+				address.city = app.city
+			if app.province:
+				address.state = app.province
+			if app.country:
+				address.country = app.country
+			if app.school_email:
+				address.email_id = app.school_email
+			if app.school_ptcl:
+				address.phone = app.school_ptcl
+		address.school_opening_application = app.name
+		if not frappe.db.get_value("Customer", customer_name, "customer_primary_address"):
+			address.is_primary_address = 1
+		_append_link(address, "Customer", customer_name)
+		_append_link(address, "School Opening Application", app.name)
 		address.flags.ignore_permissions = True
-		address.insert()
+		address.flags.ignore_mandatory = True
+		if address.is_new():
+			address.insert()
+		else:
+			address.save()
+		if not frappe.db.get_value("Customer", customer_name, "customer_primary_address"):
+			from frappe.contacts.doctype.address.address import render_address
+
+			frappe.db.set_value(
+				"Customer",
+				customer_name,
+				{
+					"customer_primary_address": address.name,
+					"primary_address": render_address(address.name, check_permissions=False),
+				},
+				update_modified=False,
+			)
 	except Exception:
 		frappe.log_error(title="School Opening Application — address failed")
 
 
-def _add_director_contact(customer, app):
-	director = None
+def _contact_rows(app):
+	rows = []
 	for row in app.get("key_contacts") or []:
-		if (row.role or "").lower() == "director" and row.contact_name:
-			director = row
-			break
-	if not director:
+		name = (row.contact_name or "").strip()
+		if name:
+			rows.append(row)
+	rows.sort(key=lambda row: 0 if (row.role or "").strip().lower() == "director" else 1)
+	return rows
+
+
+def _ensure_contacts(app, customer_name):
+	rows = _contact_rows(app)
+	if not rows:
 		return
-	try:
-		contact = frappe.new_doc("Contact")
-		contact.first_name = director.contact_name
-		if director.cell_no:
-			contact.append("phone_nos", {"phone": director.cell_no, "is_primary_mobile_no": 1})
-		if app.school_email:
-			contact.append("email_ids", {"email_id": app.school_email, "is_primary": 1})
-		contact.append("links", {"link_doctype": "Customer", "link_name": customer.name})
-		contact.flags.ignore_permissions = True
-		contact.insert()
-	except Exception:
-		frappe.log_error(title="School Opening Application — contact failed")
+	existing_names = {
+		(frappe.db.get_value("Contact", name, "first_name") or "").strip().lower(): name
+		for name in _linked_docs("Contact", customer_name)
+	}
+	created = []
+	for idx, row in enumerate(rows):
+		person = (row.contact_name or "").strip()
+		phone = (row.cell_no or "").strip()
+		if phone in ("0", "-", "—"):
+			phone = ""
+		try:
+			existing = existing_names.get(person.lower())
+			if existing:
+				contact = frappe.get_doc("Contact", existing)
+			else:
+				contact = frappe.new_doc("Contact")
+				contact.first_name = person
+				if phone:
+					contact.append("phone_nos", {"phone": phone, "is_primary_mobile_no": 1})
+				if idx == 0 and app.school_email:
+					contact.append("email_ids", {"email_id": app.school_email, "is_primary": 1})
+			if row.role:
+				contact.designation = row.role
+			contact.company_name = app.school_name
+			contact.school_opening_application = app.name
+			if idx == 0 and not frappe.db.get_value("Customer", customer_name, "customer_primary_contact"):
+				contact.is_primary_contact = 1
+			_append_link(contact, "Customer", customer_name)
+			_append_link(contact, "School Opening Application", app.name)
+			contact.flags.ignore_permissions = True
+			contact.flags.ignore_mandatory = True
+			if contact.is_new():
+				contact.insert()
+				existing_names[person.lower()] = contact.name
+			else:
+				contact.save()
+			created.append(contact.name)
+		except Exception:
+			frappe.log_error(title=f"School Opening Application — contact failed ({person})")
+	if created and not frappe.db.get_value("Customer", customer_name, "customer_primary_contact"):
+		frappe.db.set_value(
+			"Customer", customer_name, "customer_primary_contact", created[0], update_modified=False
+		)

@@ -69,7 +69,7 @@ SUMMARY_TYPES = (
 
 # Activity (period) columns — aligned with SME KPI Details / Target Base KPI sheet
 KPI_COLUMNS = (
-	{"key": "workshop", "label": "Conducted Onsite", "metric": "training"},
+	{"key": "workshop", "label": "Workshop Conducted Onsite", "metric": "training"},
 	{"key": "meeting_ulama", "label": "Meeting / Ulama and Educationist", "metric": "meeting_ulama"},
 	{"key": "teachers_training_meeting", "label": "Teachers Training Meeting (Onsite School)", "metric": "teachers_training_meeting"},
 	{
@@ -333,6 +333,9 @@ def get_report_data(filters=None):
 	staff_rows = _get_sme_staff(filters)
 	visit_stats = _load_visit_stats(from_date, to_date, staff_rows)
 	expenses = _load_expenses(from_date, to_date, staff_rows)
+	present_days_map = _present_days_by_employee(
+		from_date, to_date, [s.get("employee") for s in staff_rows]
+	)
 
 	fy_start_year = cint(_fiscal_year_start(to_date.year, to_date.month))
 	ytd_from = getdate(f"{fy_start_year}-07-01")
@@ -359,6 +362,7 @@ def get_report_data(filters=None):
 		schools = cint(stats.get("schools") or 0)
 		participants = cint(stats.get("participants") or 0)
 		visited_days = cint(stats.get("visited_days") or 0)
+		present_days = flt(present_days_map.get(staff.get("employee")) or 0, 1)
 		province = (stats.get("province") or "").strip()
 		area = (stats.get("area") or "").strip()
 		# Grand Total = Visits New/Followup + Marketing type + Meetings + M&E
@@ -396,6 +400,7 @@ def get_report_data(filters=None):
 			"grand_total": grand_total,
 			"expenses": expense_amt,
 			"visited_days": visited_days,
+			"present_days": present_days,
 			"difference": difference,
 			"total_points": flt(staff_expected, 2),
 			"earned_points": flt(earned_points, 2),
@@ -429,6 +434,7 @@ def get_report_data(filters=None):
 			"grand_total",
 			"expenses",
 			"visited_days",
+			"present_days",
 			"difference",
 			"total_points",
 			"earned_points",
@@ -445,7 +451,7 @@ def get_report_data(filters=None):
 
 	outcome_pcts = [flt(r.get("outcome_pct") or 0) for r in rows if r.get("outcome_pct") is not None]
 
-	money_or_points = ("expenses", "score_points", "total_points", "earned_points")
+	money_or_points = ("expenses", "score_points", "total_points", "earned_points", "present_days")
 	totals_out = {
 		k: (flt(v, 2) if k in money_or_points else cint(v))
 		for k, v in totals.items()
@@ -666,6 +672,129 @@ def _outcome_row_fields(staff, ytd_from, to_date):
 	return fields
 
 
+@frappe.whitelist()
+def get_followup_schools_by_officer(filters=None):
+	"""Follow-up school visits grouped by field officer, for Number of School Visit."""
+	if not frappe.has_permission("Field Visit", "read"):
+		frappe.throw(_("You are not permitted to view Field Visit data."))
+
+	filters = _parse_filters(filters)
+	from_date, to_date = _resolve_dates(filters)
+	staff_rows = _get_sme_staff(filters)
+	index = _staff_key_index(staff_rows)
+	key_to_staff = {s["key"]: s for s in staff_rows}
+
+	from tif_customization.tif_customization.api.field_visit_drilldown import _school_sql, _visit_remarks
+	from tif_customization.tif_customization.field_visit_permissions import apply_team_scope_to_conditions
+
+	visit_day = _visit_day_sql("fv")
+	conditions = [
+		"fv.docstatus = 1",
+		f"{visit_day} BETWEEN %(from_date)s AND %(to_date)s",
+		"fv.type = 'Visits'",
+		"IFNULL(fv.marketing_visit_category, '') != 'New'",
+	]
+	params = {"from_date": from_date, "to_date": to_date}
+	apply_team_scope_to_conditions(conditions, params, alias="fv")
+	where_sql = " AND ".join(f"({c})" for c in conditions)
+	rows = frappe.db.sql(
+		f"""
+		SELECT
+			fv.name,
+			fv.owner,
+			fv.visit_by,
+			fv.me_visit_by,
+			fv.mt_visit_by,
+			fv.training_entry_filled_by,
+			fv.training_trainer_name,
+			fv.mt_remarks,
+			fv.ot_remarks,
+			fv.school_remarks_follow_up,
+			fv.school_additional_remarks,
+			fv.travel_remarks,
+			fv.ot_academic_task_other,
+			fv.ot_other_official_task_detail,
+			{visit_day} AS visit_date,
+			{_school_sql("fv")} AS school,
+			COALESCE(NULLIF(TRIM(fv.province), ''), NULLIF(TRIM(fv.me_province), '')) AS province,
+			COALESCE(NULLIF(TRIM(fv.area), ''), NULLIF(TRIM(fv.me_area), '')) AS area
+		FROM `tabField Visit` fv
+		WHERE {where_sql}
+		ORDER BY visit_date DESC, fv.name DESC
+		""",
+		params,
+		as_dict=True,
+	)
+
+	by_officer = {}
+	name_counts = {}
+	for row in rows:
+		staff_key = _resolve_staff_key(row, index)
+		if not staff_key:
+			continue
+		school = (row.get("school") or "").strip()
+		norm = " ".join(school.lower().split())
+		if norm:
+			name_counts[norm] = name_counts.get(norm, 0) + 1
+		bucket = by_officer.setdefault(staff_key, {})
+		school_key = norm or "__blank__"
+		school_bucket = bucket.setdefault(
+			school_key,
+			{
+				"school": school,
+				"province": (row.get("province") or "").strip(),
+				"area": (row.get("area") or "").strip(),
+				"visits": [],
+			},
+		)
+		school_bucket["visits"].append(
+			{
+				"name": row.name,
+				"visit_date": str(row.visit_date) if row.visit_date else "",
+				"url": f"/app/field-visit/{row.name}",
+				"province": (row.get("province") or "").strip(),
+				"area": (row.get("area") or "").strip(),
+				"remarks": _visit_remarks(row),
+			}
+		)
+
+	officers = []
+	for key, schools in by_officer.items():
+		staff = key_to_staff.get(key) or {}
+		school_rows = []
+		for school_key, school in schools.items():
+			norm = "" if school_key == "__blank__" else school_key
+			school_rows.append(
+				{
+					"school": school["school"] or _("No school name"),
+					"province": school["province"],
+					"area": school["area"],
+					"visit_count": len(school["visits"]),
+					"duplicate": 1 if norm and name_counts.get(norm, 0) > 1 else 0,
+					"visits": school["visits"],
+				}
+			)
+		school_rows.sort(key=lambda s: (-s["duplicate"], -s["visit_count"], (s["school"] or "").lower()))
+		name = staff.get("employee_name") or key
+		officers.append(
+			{
+				"key": key,
+				"employee_name": name,
+				"label": f"SME - {name}",
+				"school_count": len(school_rows),
+				"visit_count": sum(s["visit_count"] for s in school_rows),
+				"schools": school_rows,
+			}
+		)
+	officers.sort(key=lambda o: (-o["school_count"], -o["visit_count"], (o["employee_name"] or "").lower()))
+	return {
+		"from_date": str(from_date),
+		"to_date": str(to_date),
+		"officers": officers,
+		"visit_count": sum(o["visit_count"] for o in officers),
+	}
+
+
 def _parse_filters(filters):
 	if isinstance(filters, str):
 		try:
@@ -783,6 +912,41 @@ def _get_sme_staff(filters):
 			}
 		)
 	return result
+
+
+def _present_days_by_employee(from_date, to_date, employee_ids):
+	"""Present days in the report range, using the same rule as Employee Attendance.
+
+	A day counts when the employee checked in and was not absent.
+	A Saturday marked as a half day counts as 0.5.
+	"""
+	ids = [e for e in (employee_ids or []) if e]
+	if not ids or not frappe.db.table_exists("Employee Attendance Table"):
+		return {}
+	rows = frappe.db.sql(
+		"""
+		SELECT ea.employee AS employee,
+			SUM(
+				CASE
+					WHEN DAYOFWEEK(t.date) = 7 AND IFNULL(t.sat_halfday, 0) = 1 THEN 0.5
+					WHEN IFNULL(t.absent, 0) = 0
+						AND t.check_in_1 IS NOT NULL
+						AND TIME(t.check_in_1) <> '00:00:00'
+					THEN 1
+					ELSE 0
+				END
+			) AS present_days
+		FROM `tabEmployee Attendance Table` t
+		INNER JOIN `tabEmployee Attendance` ea ON ea.name = t.parent
+		WHERE t.date BETWEEN %(from_date)s AND %(to_date)s
+			AND ea.employee IN %(employees)s
+			AND IFNULL(ea.docstatus, 0) < 2
+		GROUP BY ea.employee
+		""",
+		{"from_date": from_date, "to_date": to_date, "employees": tuple(ids)},
+		as_dict=True,
+	)
+	return {r.employee: flt(r.present_days, 1) for r in rows}
 
 
 def _field_officer_map(employees, user_ids):
