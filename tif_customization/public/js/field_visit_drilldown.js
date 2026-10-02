@@ -50,7 +50,8 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 			: "";
 	const showRemarks = true;
 	const hideSchool = data.metric === "academic_task";
-	const colCount = (hideSchool ? 6 : 7) + (showRemarks ? 1 : 0);
+	const hideType = data.metric === "workshop_conducted";
+	const colCount = (hideSchool ? 6 : 7) - (hideType ? 1 : 0) + (showRemarks ? 1 : 0);
 	const schoolCell = (row) => {
 		const school = frappe.utils.escape_html(row.school || "—");
 		let badge = "";
@@ -70,7 +71,7 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 					(row) => `<tr>
 				<td><a href="${frappe.utils.escape_html(row.url)}">${frappe.utils.escape_html(row.name)}</a></td>
 				<td>${frappe.utils.escape_html(row.visit_date || "")}</td>
-				<td>${frappe.utils.escape_html(row.type || "")}</td>
+				${hideType ? "" : `<td>${frappe.utils.escape_html(row.type || "")}</td>`}
 				${hideSchool ? "" : `<td>${schoolCell(row)}</td>`}
 				<td>${frappe.utils.escape_html(row.officer || "")}</td>
 				<td>${frappe.utils.escape_html(row.status || "")}</td>
@@ -110,7 +111,7 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 					<tr>
 						<th>${__("Document No")}</th>
 						<th>${__("Visit Date")}</th>
-						<th>${__("Type")}</th>
+						${hideType ? "" : `<th>${__("Type")}</th>`}
 						${hideSchool ? "" : `<th>${__("School / Venue")}</th>`}
 						<th>${__("Officer")}</th>
 						<th>${__("Status")}</th>

@@ -69,7 +69,7 @@ SUMMARY_TYPES = (
 
 # Activity (period) columns — aligned with SME KPI Details / Target Base KPI sheet
 KPI_COLUMNS = (
-	{"key": "workshop", "label": "Workshop Conducted Onsite", "metric": "training"},
+	{"key": "workshop", "label": "Workshop Conducted Onsite", "metric": "workshop_conducted"},
 	{"key": "meeting_ulama", "label": "Meeting / Ulama and Educationist", "metric": "meeting_ulama"},
 	{"key": "teachers_training_meeting", "label": "Teachers Training Meeting (Onsite School)", "metric": "teachers_training_meeting"},
 	{
@@ -414,9 +414,8 @@ def get_report_data(filters=None):
 		}
 		for col in KPI_COLUMNS:
 			if col["key"] == "workshop":
-				row["workshop"] = cint(actuals.get("half_day_workshop") or 0) + cint(
-					actuals.get("full_day_session") or 0
-				)
+				# Card / table: only Field Visit type = Workshop Conducted.
+				row["workshop"] = cint(stats.get("workshop_conducted") or 0)
 			else:
 				row[col["key"]] = cint(actuals.get(col["key"]) or 0)
 		row.update(_outcome_row_fields(staff, ytd_from, to_date))
@@ -637,7 +636,7 @@ def _outcome_row_fields(staff, ytd_from, to_date):
 
 @frappe.whitelist()
 def get_followup_schools_by_officer(filters=None):
-	"""Follow-up school visits grouped by field officer, for Number of School Visit."""
+	"""New + follow-up school visits grouped by field officer, for Number of School."""
 	if not frappe.has_permission("Field Visit", "read"):
 		frappe.throw(_("You are not permitted to view Field Visit data."))
 
@@ -654,8 +653,8 @@ def get_followup_schools_by_officer(filters=None):
 	conditions = [
 		"fv.docstatus = 1",
 		f"{visit_day} BETWEEN %(from_date)s AND %(to_date)s",
-		"fv.type = 'Visits'",
-		"IFNULL(fv.marketing_visit_category, '') != 'New'",
+		# Matches Number of School card: Follow up Visit + New School Visit.
+		"(fv.type = 'Visits' OR fv.type = 'Registration of New Schools')",
 	]
 	params = {"from_date": from_date, "to_date": to_date}
 	apply_team_scope_to_conditions(conditions, params, alias="fv")
@@ -1025,6 +1024,7 @@ def _load_visit_stats(from_date, to_date, staff_rows):
 			"schools": 0,
 			"participants": 0,
 			"trainings": 0,
+			"workshop_conducted": 0,
 			"province": "",
 			"area": "",
 			"_days": set(),
@@ -1079,6 +1079,8 @@ def _load_visit_stats(from_date, to_date, staff_rows):
 			bucket["schools"] += cint(row.get("schools") or 0)
 			bucket["participants"] += cint(row.get("participants") or 0)
 			bucket["trainings"] += 1
+			if vtype == "Workshop Conducted":
+				bucket["workshop_conducted"] += 1
 
 		if vtype in ("Marketing", "Visits", "M&E", "Registration of New Schools"):
 			prov = (row.get("province") or "").strip()

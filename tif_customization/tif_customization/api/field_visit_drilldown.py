@@ -27,6 +27,7 @@ METRIC_LABELS = {
 	"me": _("M&E Visits"),
 	"meeting": _("Meetings"),
 	"training": _("Workshop Conducted Onsite"),
+	"workshop_conducted": _("Workshop Conducted Onsite"),
 	"academic": _("Academic / Other"),
 	"other": _("Other Visits"),
 	"followup": _("Follow up Visits"),
@@ -43,7 +44,7 @@ METRIC_LABELS = {
 	"headoffice_visit": _("Head office / Regional / Out of station"),
 	"academic_task": _("Academic Task"),
 	"other_official": _("Other Official Tasks"),
-	"co_curricular": _("Co-curricular Activities"),
+	"co_curricular": _("Activities / Exhibition / Stall"),
 	"quiz": _("Quiz Arranged"),
 	"new_school_registration": _("Registration of New Schools"),
 	"new_schools": _("Registration of New Schools"),
@@ -115,6 +116,8 @@ def _metric_condition(metric: str, alias: str = "fv") -> str:
 		return f"{a}.type = 'M&E'"
 	if m == "meeting":
 		return f"{a}.type IN ('Meeting', 'Meeting with Ulama and Educationist')"
+	if m == "workshop_conducted":
+		return f"{a}.type = 'Workshop Conducted'"
 	if m == "training":
 		return f"{a}.type IN ('Training', 'Workshop', 'Workshop Conducted', 'Workshop Arranged')"
 	if m == "half_day_workshop":

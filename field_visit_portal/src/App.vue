@@ -1668,6 +1668,17 @@ const steps = [
 							<FieldSelect :mode="lang" label-en="Registered with TIF as a Volunteer" label-ur="کیا TIF کے ساتھ والینٹیئر رجسٹرڈ ہے؟" :options="['Yes', 'No']" required v-model="me.volunteer" />
 						</div>
 
+						<div class="block-title">Remarks / ریمارکس</div>
+						<div class="academic-work">
+							<FieldTextarea
+								:mode="lang"
+								label-en="Remarks"
+								label-ur="ریمارکس"
+								placeholder="Any additional remarks regarding this monitoring visit"
+								v-model="visit.schoolAdditionalRemarks"
+							/>
+						</div>
+
 						<div class="block-title">Attachments / منسلکات</div>
 						<div class="attach-grid">
 							<AttachDrop :mode="lang" label-en="School Picture" label-ur="اسکول کی تصویر" :file="attachments.school_picture" @pick="attachments.school_picture = $event" />

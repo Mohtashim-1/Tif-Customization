@@ -48,7 +48,7 @@ OUTCOME_WEIGHT = 0.30
 OUTCOME_TARGETS = (
 	{"key": "enrolment", "label": _("Enrollment of Participants in Online Course"), "short_label": _("Enrollment of Participants in Online Course"), "target": 50, "metric": "enrolment"},
 	{"key": "quiz", "label": _("Quiz Arranged"), "short_label": _("Quiz Arranged"), "target": 1, "metric": "quiz"},
-	{"key": "co_curricular", "label": _("Activities (Events) Function"), "short_label": _("Activities (Events) Function"), "target": 1, "metric": "co_curricular"},
+	{"key": "co_curricular", "label": _("Activities / Exhibition / Stall"), "short_label": _("Activities / Exhibition / Stall"), "target": 1, "metric": "co_curricular"},
 	{
 		"key": "new_schools",
 		"label": _("Registration of New Schools"),

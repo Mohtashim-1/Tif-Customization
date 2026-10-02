@@ -417,7 +417,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			(data && data.outcome_columns) || [
 				{ key: "outcome_enrolment", label: __("Enrollment of Participants in Mutal e quran Course"), short_label: __("Enrollment of Participants in Multi-media Course"), metric: "enrolment" },
 				{ key: "outcome_quiz", label: __("Quiz Arranged"), short_label: __("Quiz Arranged"), metric: "quiz" },
-				{ key: "outcome_co_curricular", label: __("Activities (Events) Function"), short_label: __("Co-curricular Activities"), metric: "co_curricular" },
+				{ key: "outcome_co_curricular", label: __("Activities / Exhibition / Stall"), short_label: __("Activities / Exhibition / Stall"), metric: "co_curricular" },
 				{
 					key: "outcome_new_schools",
 					label: __("Registration of New Schools"),
@@ -465,10 +465,8 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				{
 					key: "workshop",
 					label: __("Workshop Conducted Onsite"),
-					metric: "training",
-					value: (r) =>
-						cint(r.workshop) ||
-						cint(r.half_day_workshop) + cint(r.full_day_session),
+					metric: "workshop_conducted",
+					value: (r) => cint(r.workshop),
 				},
 				{
 					key: "meeting_ulama",
@@ -547,6 +545,10 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				value: this.fmt(k[col.key]),
 				style: (col.key || "activity").replace(/_/g, "-"),
 				metric: col.metric || col.key,
+				hint:
+					col.key === "workshop"
+						? __("Field Visit type = Workshop Conducted only")
+						: undefined,
 			})),
 		];
 		const outcomeCards = [
@@ -603,11 +605,11 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						hint: __("Only Visits type with category New (not Marketing type)"),
 					},
 					{
-						label: __("Number of School Visit"),
-						value: this.fmt(k.followup),
+						label: __("Number of School"),
+						value: this.fmt(cint(k.followup) + cint(k.new)),
 						style: "followup",
 						cardKind: "school_visit_officers",
-						hint: __("Field officer wise school count — click a count for school details"),
+						hint: __("Follow up Visit + New School Visit — click a count for school details"),
 					},
 					{
 						label: __("Total School Visit"),
@@ -1172,7 +1174,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					<p class="text-muted" style="font-size:12px;margin-bottom:10px;">
 						${__("Visit Date")}: ${frappe.utils.escape_html(frappe.datetime.str_to_user(detail.from_date || ""))}
 						– ${frappe.utils.escape_html(frappe.datetime.str_to_user(detail.to_date || ""))}
-						<br>${__("Each count is how many schools that field officer visited. Click the count for school details. A school name visited more than once is highlighted.")}
+						<br>${__("Follow up Visit + New School Visit. Each count is how many schools that field officer visited. Click the count for school details. A school name visited more than once is highlighted.")}
 					</p>
 					<div class="table-responsive" style="max-height:420px;overflow:auto;">
 						<table class="table table-bordered table-hover" style="font-size:12px;margin:0;">
@@ -1576,9 +1578,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			...this.activity_extra_columns(data).map((col) => ({
 				group: __("Activity (period)"),
 				label: col.label,
-				value: col.key === "workshop"
-					? cint(row.workshop) || cint(row.half_day_workshop) + cint(row.full_day_session)
-					: row[col.key],
+				value: col.key === "workshop" ? cint(row.workshop) : row[col.key],
 				metric: col.metric || col.key,
 			})),
 			...this.outcome_period_columns(data).map((col) => ({
