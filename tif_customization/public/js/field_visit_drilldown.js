@@ -1,5 +1,31 @@
 frappe.tif_customization = frappe.tif_customization || {};
 
+frappe.tif_customization.format_visit_remarks = function (remarks) {
+	const text = (remarks || "").trim();
+	if (!text) return "—";
+	const labeled = ["Books:", "Workshop:", "Program:", "Remarks:"];
+	const parts = text.split(" | ").filter(Boolean);
+	const hasHeadings = parts.some((p) => labeled.some((h) => p.startsWith(h)));
+	if (!hasHeadings) {
+		return frappe.utils.escape_html(text);
+	}
+	return parts
+		.map((part) => {
+			const heading = labeled.find((h) => part.startsWith(h));
+			if (!heading) {
+				return `<div style="margin-bottom:3px;line-height:1.35;">${frappe.utils.escape_html(
+					part
+				)}</div>`;
+			}
+			const body = part.slice(heading.length).trim() || "—";
+			const muted = body === "—" ? ' style="color:#9ca3af;"' : "";
+			return `<div style="margin-bottom:3px;line-height:1.35;"><strong>${frappe.utils.escape_html(
+				heading
+			)}</strong> <span${muted}>${frappe.utils.escape_html(body)}</span></div>`;
+		})
+		.join("");
+};
+
 frappe.tif_customization.open_visit_drilldown = function (opts) {
 	opts = opts || {};
 	const from_date = opts.from_date;
@@ -18,6 +44,8 @@ frappe.tif_customization.open_visit_drilldown = function (opts) {
 				to_date,
 				staff,
 				metric,
+				province: opts.province || "",
+				city: opts.city || "",
 				submitted_only: opts.submitted_only || opts.submitted || 0,
 			},
 			metric,
@@ -50,7 +78,7 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 			: "";
 	const showRemarks = true;
 	const hideSchool = data.metric === "academic_task";
-	const hideType = data.metric === "workshop_conducted";
+	const hideType = false;
 	const colCount = (hideSchool ? 6 : 7) - (hideType ? 1 : 0) + (showRemarks ? 1 : 0);
 	const schoolCell = (row) => {
 		const school = frappe.utils.escape_html(row.school || "—");
@@ -76,7 +104,13 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 				<td>${frappe.utils.escape_html(row.officer || "")}</td>
 				<td>${frappe.utils.escape_html(row.status || "")}</td>
 				<td>${frappe.utils.escape_html(row.category || "")}</td>
-				${showRemarks ? `<td style="max-width:280px;white-space:normal;">${frappe.utils.escape_html(row.remarks || "—")}</td>` : ""}
+				${
+					showRemarks
+						? `<td style="max-width:320px;white-space:normal;">${frappe.tif_customization.format_visit_remarks(
+								row.remarks
+							)}</td>`
+						: ""
+				}
 			</tr>`
 				)
 				.join("")
@@ -244,7 +278,9 @@ frappe.tif_customization.show_monitoring_officer_dialog = function (data, rows) 
 					<td>${frappe.utils.escape_html(row.officer || "")}</td>
 					<td>${frappe.utils.escape_html(row.status || "")}</td>
 					<td>${frappe.utils.escape_html(row.category || "")}</td>
-					<td style="max-width:280px;white-space:normal;">${frappe.utils.escape_html(row.remarks || "—")}</td>
+					<td style="max-width:320px;white-space:normal;">${frappe.tif_customization.format_visit_remarks(
+						row.remarks
+					)}</td>
 				</tr>`
 					)
 					.join("")

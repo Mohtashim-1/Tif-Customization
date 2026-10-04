@@ -19,6 +19,7 @@ DISPLAY_COLUMNS = [
 	"category",
 	"province",
 	"remarks",
+	"programs",
 	"docstatus",
 	"images",
 ]
@@ -31,6 +32,7 @@ DISPLAY_LABELS = {
 	"category": "Category",
 	"province": "Province",
 	"remarks": "Remarks",
+	"programs": "Programs / Books",
 	"docstatus": "Status",
 	"images": "School Images",
 }
@@ -39,6 +41,28 @@ IMAGE_FIELDS = (
 	("meeting_picture", "Meeting Picture"),
 	("training_awareness_pictures", "Training & Awareness"),
 	("mt_meeting_picture", "Meeting Picture"),
+)
+# Service checkboxes marked Yes on the Field Visit form (QPS / TPS / CEE).
+PROGRAM_SERVICE_FIELDS = (
+	("qps_mqh_books", "QPS: MQH Books"),
+	("qps_mqh_teachers_guides", "QPS: MQH Teachers Guides"),
+	("qps_onsite_training", "QPS: Onsite Training"),
+	("qps_online_training", "QPS: Online Training"),
+	("qps_registration_lms", "QPS: Registration in LMS"),
+	("qps_50_days_syllabus", "QPS: 50 Days MQH Syllabus"),
+	("qps_mqh_quiz", "QPS: MQH Quiz"),
+	("qps_meeting_educationalist", "QPS: Meeting Educationalist / Ulama"),
+	("tps_noorani_qaida", "TPS: Noorani Qaida"),
+	("tps_noorani_qaida_guide", "TPS: Noorani Qaida Guide"),
+	("tps_noorani_qaida_workbook_khi", "TPS: Noorani Qaida Workbook"),
+	("tps_1_day_tajweed_females", "TPS: 1 Day Tajweed (Females)"),
+	("tps_ttc_tajweed_khi", "TPS: TTC Tajweed"),
+	("tps_tajweed_customize", "TPS: Tajweed Customize"),
+	("tps_tajweed_workshop_kids_khi", "TPS: Tajweed Workshop Kids"),
+	("cee_elp", "CEE: ELP"),
+	("cee_tecc_foundation", "CEE: TECC Foundation"),
+	("cee_tecc_professional", "CEE: TECC Professional"),
+	("cee_one_day_workshop", "CEE: One Day Workshop"),
 )
 PAGE_SIZE = 100
 
@@ -73,22 +97,48 @@ def get_report_data(filters=None):
 		limit = summary["total_visits"]
 		offset = 0
 
+	service_select = ",\n\t\t\t".join(f"fv.{fn}" for fn, _label in PROGRAM_SERVICE_FIELDS)
 	rows = frappe.db.sql(
 		f"""
 		SELECT
 			fv.name,
 			fv.type,
 			fv.docstatus,
+			fv.school_name,
+			fv.pending_school_name,
+			fv.me_school_name,
 			fv.school_picture,
 			fv.meeting_picture,
 			fv.training_awareness_pictures,
 			fv.mt_meeting_picture,
+			fv.mt_remarks,
+			fv.ot_remarks,
+			fv.school_remarks_follow_up,
+			fv.school_additional_remarks,
+			fv.travel_remarks,
+			fv.ot_academic_task_other,
+			fv.ot_other_official_task_detail,
+			fv.me_activity_status,
+			fv.me_mqh_book_status,
+			fv.me_mqh_book_version,
+			fv.me_mqh_book_part,
+			fv.me_teachers_training_session,
+			fv.me_reason_of_above,
+			fv.training_session_category,
+			fv.training_workshop_topic,
+			fv.training_no_of_participants,
+			fv.training_no_of_schools_attended,
+			fv.mt_mqh_sample_provided,
+			fv.marketing_material_provided,
+			fv.qps_affiliated,
+			fv.tps_affiliated,
+			fv.cee_affiliated,
+			{service_select},
 			{visit_date_expr} AS visit_date,
 			{_school_sql("fv")} AS school,
 			{_officer_sql("fv")} AS officer,
 			{_category_sql("fv")} AS category,
 			{_province_sql("fv")} AS province,
-			{_remarks_sql("fv")} AS remarks,
 			{_school_unapproved_sql("fv")} AS school_unapproved,
 			CASE WHEN {_school_sql("fv")} IS NULL THEN 1 ELSE 0 END AS school_missing
 		FROM `tabField Visit` fv
@@ -100,6 +150,7 @@ def get_report_data(filters=None):
 		as_dict=True,
 	)
 	_format_status(rows)
+	_enrich_remarks_and_programs(rows)
 	_attach_school_images(rows)
 
 	return {
@@ -176,6 +227,7 @@ def _build_where(filters, from_date, to_date):
 	visit_type = filters.get("type")
 	user = filters.get("user")
 	province = filters.get("province")
+	city = (filters.get("city") or "").strip()
 
 	conditions = ["fv.docstatus < 2"]
 	params = {}
@@ -200,6 +252,9 @@ def _build_where(filters, from_date, to_date):
 	if province:
 		conditions.append(f"({_province_sql('fv')}) = %(province)s")
 		params["province"] = province
+	if city:
+		conditions.append(f"({_city_sql('fv')}) = %(city)s")
+		params["city"] = city
 
 	return " AND ".join(conditions), params, visit_date_expr
 
@@ -246,23 +301,23 @@ def _province_sql(alias="fv"):
 	)"""
 
 
+def _city_sql(alias="fv"):
+	"""City from any activity type: visits, M&E, training, or meeting."""
+	a = alias
+	return f"""COALESCE(
+		NULLIF(TRIM({a}.city), ''),
+		NULLIF(TRIM({a}.me_city), ''),
+		NULLIF(TRIM({a}.training_city), ''),
+		NULLIF(TRIM({a}.mt_city), '')
+	)"""
+
+
 def _category_sql(alias="fv"):
 	a = alias
 	return f"""COALESCE(
 		NULLIF(TRIM({a}.marketing_visit_category), ''),
 		NULLIF(TRIM({a}.me_activity_status), ''),
 		NULLIF(TRIM({a}.training_session_category), '')
-	)"""
-
-
-def _remarks_sql(alias="fv"):
-	a = alias
-	return f"""CONCAT_WS(' | ',
-		NULLIF(TRIM({a}.mt_remarks), ''),
-		NULLIF(TRIM({a}.ot_remarks), ''),
-		NULLIF(TRIM({a}.school_remarks_follow_up), ''),
-		NULLIF(TRIM({a}.school_additional_remarks), ''),
-		NULLIF(TRIM({a}.travel_remarks), '')
 	)"""
 
 
@@ -338,7 +393,182 @@ def _format_status(rows):
 		row["docstatus"] = labels.get(row.get("docstatus"), row.get("docstatus"))
 
 
+def _clean_text(value):
+	if value is None:
+		return ""
+	text = str(value).replace("\r", "\n").strip()
+	text = re.sub(r"\n+", "; ", text)
+	text = re.sub(r"\s+", " ", text).strip()
+	return text
+
+
+def _strip_pending_school_opening(text: str) -> str:
+	"""Drop auto-inserted Pending school (School Opening SOA-…) lines from remarks."""
+	if not text:
+		return ""
+	parts = re.split(r"\s*[;\n]\s*|\s*\|\s*", text)
+	kept = []
+	for part in parts:
+		part = part.strip()
+		if not part:
+			continue
+		if re.match(r"(?i)^pending\s+school\s*\(school\s+opening", part):
+			continue
+		if re.match(r"(?i)^pending\s+school\b", part) and "school opening" in part.lower():
+			continue
+		kept.append(part)
+	# Also strip inline prefix: "Pending school (School Opening SOA-x): Name; rest"
+	out = "; ".join(kept)
+	out = re.sub(
+		r"(?i)pending\s+school\s*\(school\s+opening[^)]*\):\s*[^;|]*[;|]?\s*",
+		"",
+		out,
+	).strip(" ;|")
+	return _clean_text(out)
+
+
+def _yes_value(value) -> bool:
+	raw = (str(value) if value is not None else "").strip().lower()
+	return raw in ("1", "yes", "true", "y")
+
+
+def _enrich_remarks_and_programs(rows):
+	"""Same Books / Workshop / Program / Remarks headings as SME card drilldowns."""
+	from tif_customization.tif_customization.api.field_visit_drilldown import (
+		_books_heading,
+		_program_heading,
+		_visit_remarks,
+		_workshop_heading,
+	)
+
+	customers = set()
+	for row in rows:
+		for key in ("school_name", "me_school_name"):
+			cust = (row.get(key) or "").strip()
+			if cust:
+				customers.add(cust)
+	so_books = _sales_order_books_by_customer(customers)
+
+	drop_keys = [
+		"mt_remarks",
+		"ot_remarks",
+		"school_remarks_follow_up",
+		"school_additional_remarks",
+		"travel_remarks",
+		"ot_academic_task_other",
+		"ot_other_official_task_detail",
+		"me_activity_status",
+		"me_mqh_book_status",
+		"me_mqh_book_version",
+		"me_mqh_book_part",
+		"me_teachers_training_session",
+		"me_reason_of_above",
+		"training_session_category",
+		"training_workshop_topic",
+		"training_no_of_participants",
+		"training_no_of_schools_attended",
+		"mt_mqh_sample_provided",
+		"marketing_material_provided",
+		"qps_affiliated",
+		"tps_affiliated",
+		"cee_affiliated",
+		"school_name",
+		"pending_school_name",
+		"me_school_name",
+		*[fn for fn, _label in PROGRAM_SERVICE_FIELDS],
+	]
+
+	for row in rows:
+		# Append Sales Order books into Program heading when present.
+		cust = (row.get("school_name") or row.get("me_school_name") or "").strip()
+		so_items = so_books.get(cust) or []
+		if so_items:
+			so_text = "Sales Order: " + "; ".join(so_items[:8])
+			if len(so_items) > 8:
+				so_text += f" (+{len(so_items) - 8} more)"
+			# Temporarily stash so _program_heading-style text can include SO in remarks.
+			row["_so_books_extra"] = so_text
+
+		remarks = _visit_remarks(row)
+		if row.get("_so_books_extra"):
+			# Inject SO books into Program: section.
+			parts = remarks.split(" | ")
+			for i, part in enumerate(parts):
+				if part.startswith("Program:"):
+					body = part[len("Program:") :].strip()
+					if body in ("", "—"):
+						parts[i] = f"Program: {row['_so_books_extra']}"
+					else:
+						parts[i] = f"Program: {body} · {row['_so_books_extra']}"
+					break
+			remarks = " | ".join(parts)
+		row["remarks"] = remarks
+
+		# Compact programs column mirrors the three headings (for export / filter).
+		program_bits = []
+		books = _books_heading(row)
+		if books:
+			program_bits.append(f"Books: {books}")
+		workshop = _workshop_heading(row)
+		if workshop:
+			program_bits.append(f"Workshop: {workshop}")
+		program = _program_heading(row)
+		if program:
+			program_bits.append(f"Program: {program}")
+		if row.get("_so_books_extra"):
+			program_bits.append(row["_so_books_extra"])
+		row["programs"] = " | ".join(program_bits) if program_bits else ""
+
+		for key in drop_keys + ["_so_books_extra"]:
+			row.pop(key, None)
+
+
+def _sales_order_books_by_customer(customers):
+	"""Recent submitted Sales Order item names per school (Customer)."""
+	if not customers:
+		return {}
+	rows = frappe.db.sql(
+		"""
+		SELECT
+			so.customer,
+			soi.item_name,
+			soi.item_code,
+			SUM(soi.qty) AS qty,
+			MAX(so.transaction_date) AS last_date
+		FROM `tabSales Order` so
+		INNER JOIN `tabSales Order Item` soi ON soi.parent = so.name
+		WHERE so.docstatus = 1
+		  AND so.customer IN %(customers)s
+		  AND so.transaction_date >= DATE_SUB(CURDATE(), INTERVAL 18 MONTH)
+		GROUP BY so.customer, soi.item_name, soi.item_code
+		ORDER BY so.customer, last_date DESC, soi.item_name
+		""",
+		{"customers": tuple(customers)},
+		as_dict=True,
+	)
+	out = {}
+	for row in rows:
+		cust = (row.customer or "").strip()
+		if not cust:
+			continue
+		name = _clean_text(row.item_name or row.item_code)
+		if not name:
+			continue
+		qty = cint(row.qty)
+		label = f"{name} × {qty}" if qty else name
+		out.setdefault(cust, []).append(label)
+	return out
+
+
 def _attach_school_images(rows):
+	urls = []
+	for row in rows:
+		for field, _label in IMAGE_FIELDS:
+			url = (row.get(field) or "").strip()
+			if url:
+				urls.append(url)
+	file_times = _file_upload_times(urls)
+
 	for row in rows:
 		images = []
 		seen = set()
@@ -347,8 +577,71 @@ def _attach_school_images(rows):
 			if not url or url in seen:
 				continue
 			seen.add(url)
-			images.append({"label": label, "url": url})
+			captured = _guess_capture_time_from_filename(url)
+			uploaded = file_times.get(url)
+			if captured:
+				taken_at = captured
+				taken_label = _("Captured")
+			elif uploaded:
+				taken_at = uploaded
+				taken_label = _("Uploaded")
+			else:
+				taken_at = ""
+				taken_label = ""
+			images.append(
+				{
+					"label": label,
+					"url": url,
+					"taken_at": taken_at,
+					"taken_label": taken_label,
+				}
+			)
 		row["images"] = images
+
+
+def _file_upload_times(urls):
+	"""Earliest File.creation per file_url (upload / attach time)."""
+	unique = sorted({(u or "").strip() for u in urls if (u or "").strip()})
+	if not unique:
+		return {}
+	rows = frappe.db.sql(
+		"""
+		SELECT file_url, MIN(creation) AS creation
+		FROM `tabFile`
+		WHERE file_url IN %(urls)s
+		GROUP BY file_url
+		""",
+		{"urls": tuple(unique)},
+		as_dict=True,
+	)
+	out = {}
+	for row in rows:
+		url = (row.file_url or "").strip()
+		if url and row.creation:
+			out[url] = str(row.creation)[:19]
+	return out
+
+
+def _guess_capture_time_from_filename(url: str) -> str:
+	"""Best-effort camera/WhatsApp time from the file name (not EXIF)."""
+	name = (url or "").rsplit("/", 1)[-1]
+	# IMG_20260915_105654 / IMG20260915105654
+	m = re.search(r"(20\d{2})(\d{2})(\d{2})[_-]?(\d{2})(\d{2})(\d{2})", name)
+	if m:
+		y, mo, d, hh, mm, ss = m.groups()
+		return f"{y}-{mo}-{d} {hh}:{mm}:{ss}"
+	# 2026-10-03 style
+	m = re.search(r"(20\d{2})[-_](\d{2})[-_](\d{2})", name)
+	if m:
+		y, mo, d = m.groups()
+		return f"{y}-{mo}-{d}"
+	# WhatsApp / phone compact date: IMG-20261003-WA0009
+	m = re.search(r"(20\d{2})(\d{2})(\d{2})", name)
+	if m:
+		y, mo, d = m.groups()
+		if 1 <= int(mo) <= 12 and 1 <= int(d) <= 31:
+			return f"{y}-{mo}-{d}"
+	return ""
 
 
 def _build_summary(rows):

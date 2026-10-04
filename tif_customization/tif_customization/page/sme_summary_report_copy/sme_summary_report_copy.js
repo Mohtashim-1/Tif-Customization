@@ -101,6 +101,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					.sme-sum-kpi__value{color:#0f172a;font-size:22px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums}
 					.sme-sum-kpi__hint{margin-top:6px;font-size:10px;color:#94a3b8}
 					.sme-sum-kpi--followup,.sme-sum-kpi--new,.sme-sum-kpi--marketing{border-top-color:#0d9488}
+					.sme-sum-kpi--workshop-arranged,.sme-sum-kpi--workshop{border-top-color:#d97706}
 					.sme-sum-kpi--meeting{border-top-color:#ca8a04}
 					.sme-sum-kpi--active,.sme-sum-kpi--inactive,.sme-sum-kpi--me{border-top-color:#7c3aed}
 					.sme-sum-kpi--schools,.sme-sum-kpi--participants,.sme-sum-kpi--training{border-top-color:#ea580c}
@@ -110,10 +111,10 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					.sme-sum-kpi--ulama{border-top-color:#0891b2}
 					.sme-sum-kpi--teachers{border-top-color:#0284c7}
 					.sme-sum-kpi--headoffice{border-top-color:#6366f1}
-					.sme-sum-kpi--headoffice-visit{background:#fce7f3;border-top-color:#db2777}
-					.sme-sum-kpi--academic{border-top-color:#64748b}
-					.sme-sum-kpi--academic-task{background:#fef9c3;border-top-color:#ca8a04}
-					.sme-sum-kpi--other-official{background:#dcfce7;border-top-color:#16a34a}
+					.sme-sum-kpi--headoffice-visit,
+					.sme-sum-kpi--academic,
+					.sme-sum-kpi--academic-task,
+					.sme-sum-kpi--other-official{background:#eef2ff;border-top-color:#6366f1}
 					.sme-sum-kpi--quiz{border-top-color:#c026d3}
 					.sme-sum-kpi--co_curricular{border-top-color:#9333ea}
 					.sme-sum-kpi--grand{border-top-color:#334155}
@@ -124,6 +125,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					.sme-sum-kpi--sme{border-top-color:#475569}
 					.sme-sum-kpi--supervisor{border-top-color:#7c2d12}
 					.sme-sum-kpi--outcome{border-top-color:#ca8a04}
+					.sme-sum-kpi--volunteers{background:#ecfdf5;border-top-color:#059669}
 					.sme-sum-kpi--model-a{border-top-color:#b45309}
 					.sme-sum-kpi--model-b{border-top-color:#c2410c}
 					.sme-sum-kpi--model-c{border-top-color:#9a3412}
@@ -222,6 +224,23 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			$sel.find('option[value="urban"]').text(__("Other Province Urban"));
 			$sel.find('option[value="rural"]').text(__("Other Province Rural"));
 		}, 0);
+
+		this.province = this.make_filter({
+			label: __("Province"),
+			fieldtype: "Select",
+			fieldname: "province",
+			options:
+				"\nPunjab\nSindh\nKhyber Pakhtunkhwa\nBalochistan\nAzad Jammu & Kashmir\nGilgit-Baltistan\nIslamabad Capital Territory",
+			description: __("Limit visit counts to this province"),
+		});
+
+		this.city = this.make_filter({
+			label: __("City"),
+			fieldtype: "Link",
+			fieldname: "city",
+			options: "City",
+			description: __("Limit visit counts to this city"),
+		});
 
 		this.supervisor = this.make_filter({
 			label: __("Supervisor"),
@@ -322,6 +341,8 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			to_date: this.to_date.get_value() || month.to_date,
 			working_days: this.working_days.get_value() || "",
 			region: this.region.get_value() || "karachi",
+			province: (this.province.get_value() || "").trim(),
+			city: (this.city.get_value() || "").trim(),
 			supervisor: (this.supervisor.get_value() || "").trim(),
 			employee,
 			staff: this.get_drilldown_staff() || employee,
@@ -417,11 +438,11 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			(data && data.outcome_columns) || [
 				{ key: "outcome_enrolment", label: __("Enrollment of Participants in Mutal e quran Course"), short_label: __("Enrollment of Participants in Multi-media Course"), metric: "enrolment" },
 				{ key: "outcome_quiz", label: __("Quiz Arranged"), short_label: __("Quiz Arranged"), metric: "quiz" },
-				{ key: "outcome_co_curricular", label: __("Activities / Exhibition / Stall"), short_label: __("Activities / Exhibition / Stall"), metric: "co_curricular" },
+				{ key: "outcome_co_curricular", label: __("Stall Activities / Activation"), short_label: __("Stall Activities / Activation"), metric: "co_curricular" },
 				{
 					key: "outcome_new_schools",
-					label: __("Registration of New Schools"),
-					short_label: __("Registration of New Schools"),
+					label: __("Registered Schools"),
+					short_label: __("Registered Schools"),
 					metric: "new_schools",
 				},
 				{ key: "outcome_workshop_registration", label: __("Workshop Participants"), short_label: __("Workshop Participants"), metric: "workshop_registration" },
@@ -463,6 +484,11 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		return (
 			(data && data.kpi_columns) || [
 				{
+					key: "workshop_arranged",
+					label: __("Workshop Arranged"),
+					metric: "workshop_arranged",
+				},
+				{
 					key: "workshop",
 					label: __("Workshop Conducted Onsite"),
 					metric: "workshop_conducted",
@@ -483,7 +509,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					label: __("Head Office / Regional Office / Out of Station Visit"),
 					metric: "headoffice_visit",
 				},
-				{ key: "academic_task", label: __("Academic Task"), metric: "academic_task" },
+				{ key: "academic_task", label: __("Academic Task (Content Development)"), metric: "academic_task" },
 				{ key: "other_official", label: __("Other Official Tasks"), metric: "other_official" },
 			]
 		);
@@ -511,6 +537,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 	/** Workshop / Ulama / Teachers Training / Head Office / Academic / Other Official under Activity. */
 	activity_extra_columns(data) {
 		const keys = new Set([
+			"workshop_arranged",
 			"workshop",
 			"meeting_ulama",
 			"teachers_training_meeting",
@@ -546,9 +573,11 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				style: (col.key || "activity").replace(/_/g, "-"),
 				metric: col.metric || col.key,
 				hint:
-					col.key === "workshop"
-						? __("Field Visit type = Workshop Conducted only")
-						: undefined,
+					col.key === "workshop_arranged"
+						? __("Field Visit type = Workshop Arranged")
+						: col.key === "workshop"
+							? __("Field Visit type = Workshop Conducted or Workshop")
+							: undefined,
 			})),
 		];
 		const outcomeCards = [
@@ -570,12 +599,24 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 							? "quiz"
 							: col.metric === "co_curricular"
 								? "co_curricular"
-								: "outcome",
+								: col.metric === "volunteers"
+									? "volunteers"
+									: "outcome",
 					metric: col.metric,
 					outcomeFy: true,
-					hint: data.outcome_fy_label
-						? __("FY {0}", [data.outcome_fy_label])
-						: __("Current fiscal year"),
+					hint:
+						col.metric === "new_schools"
+							? __(
+									"Schools with any book, workshop, or program running{0}",
+									[
+										data.outcome_fy_label
+											? ` · ${data.outcome_fy_label}`
+											: "",
+									]
+								)
+							: data.outcome_fy_label
+								? data.outcome_fy_label
+								: __("1 July → today"),
 				};
 			}),
 		];
@@ -590,13 +631,15 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						cardKind: "sme_count",
 						hint: __("SMEs in this report"),
 					},
-					// {
-					// 	label: __("Total School Sum - SME Wise "),
-					// 	value: this.fmt(k.school_visits),
-					// 	style: "school",
-					// 	metric: "school_visits",
-					// 	hint: __("Total visit sum — SME wise (New + Follow up + Monitoring)"),
-					// },
+					{
+						label: __("Total School Visit"),
+						value: this.fmt(
+							cint(k.marketing != null ? k.marketing : 0) + cint(k.followup) + cint(k.me),
+						),
+						style: "sme",
+						cardKind: "field_emp_summary",
+						hint: __("Marketing + Follow up + Monitoring (M&E) — click for field officer breakdown"),
+					},
 					{
 						label: __("New School Visit"),
 						value: this.fmt(k.new),
@@ -610,15 +653,6 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						style: "followup",
 						cardKind: "school_visit_officers",
 						hint: __("Follow up Visit + New School Visit — click a count for school details"),
-					},
-					{
-						label: __("Total School Visit"),
-						value: this.fmt(
-							cint(k.marketing != null ? k.marketing : 0) + cint(k.followup) + cint(k.me),
-						),
-						style: "sme",
-						cardKind: "field_emp_summary",
-						hint: __("Marketing + Follow up + Monitoring (M&E) — click for field officer breakdown"),
 					},
 					{
 						label: __("Working Days"),
@@ -640,7 +674,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				cards: activityCards,
 			},
 			{
-				title: __("Outcomes (current fiscal year)"),
+				title: __("Outcomes (YTD: 1 July → today)"),
 				separator: true,
 				rows: [
 					outcomeCards,
@@ -719,7 +753,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		const kpiCols = this.kpi_columns(data);
 		const activityCols = [...visitCols, ...kpiCols];
 		const outcomeCols = this.outcome_subcolumns(data);
-		const colCount = 2 + activityCols.length + outcomeCols.length + 3 + 3;
+		const colCount = 3 + activityCols.length + outcomeCols.length + 3 + 3;
 
 		const tail_tds = (src, visitStaff, expenseStaff) => `
 					${this.expense_td(src, expenseStaff)}
@@ -736,6 +770,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				<tr class="${low ? "sme-low" : ""}">
 					<td class="left">${frappe.utils.escape_html(r.label || "")}</td>
 					<td>${frappe.utils.escape_html(r.division || r.region_label || "—")}</td>
+					<td>${frappe.utils.escape_html(r.province || "—")}</td>
 					${this.activity_tds(r, staff, data)}
 					${this.outcome_tds(r, staff, data)}
 					${tail_tds(r, staff, expenseStaff)}
@@ -785,8 +820,9 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						<tr>
 							<th rowspan="3" class="left">${__("Name")}</th>
 							<th rowspan="3">${__("Type / Division")}</th>
+							<th rowspan="3">${__("Province")}</th>
 							<th colspan="${activityCols.length}" class="group activity-group">${__("Activity (period)")}</th>
-							<th colspan="${outcomeCols.length}" class="group outcome-group">${__("Outcomes (current fiscal year)")}</th>
+							<th colspan="${outcomeCols.length}" class="group outcome-group">${__("Outcomes (YTD: 1 July → today)")}</th>
 							<th colspan="3" class="group">${__("Totals")}</th>
 							<th colspan="3" class="group">${__("KPI Points")}</th>
 						</tr>
@@ -832,6 +868,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					<tfoot>
 						<tr>
 							<th class="left">${__("Total")}</th>
+							<th></th>
 							<th></th>
 							${this.activity_tds(t, "", data)}
 							${this.outcome_tds(t, "", data)}
@@ -905,6 +942,8 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				to_date,
 				staff: staff || ctx.staff || ctx.employee || "",
 				metric,
+				province: ctx.province || "",
+				city: ctx.city || "",
 				submitted_only: ctx.submitted_only || 1,
 			});
 		});
@@ -1228,13 +1267,20 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 								const date = v.visit_date
 									? frappe.datetime.str_to_user(v.visit_date)
 									: "—";
-								const remarks = (v.remarks || "").trim();
+								const remarksHtml =
+									frappe.tif_customization && frappe.tif_customization.format_visit_remarks
+										? frappe.tif_customization.format_visit_remarks(v.remarks)
+										: frappe.utils.escape_html((v.remarks || "").trim() || "—");
 								return `<div style="margin-bottom:4px;">
 									<a href="${frappe.utils.escape_html(v.url || "#")}" target="_blank">${frappe.utils.escape_html(
 										v.name || "",
 									)}</a>
 									<span class="text-muted"> · ${frappe.utils.escape_html(date)}</span>
-									${remarks ? `<div class="text-muted">${frappe.utils.escape_html(remarks)}</div>` : ""}
+									${
+										(v.remarks || "").trim()
+											? `<div class="text-muted" style="white-space:normal;">${remarksHtml}</div>`
+											: ""
+									}
 								</div>`;
 							})
 							.join("");
@@ -1462,7 +1508,11 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						<td>${frappe.utils.escape_html(v.area || "—")}</td>
 						<td>${frappe.utils.escape_html(v.category || "")}</td>
 						<td>${frappe.utils.escape_html(v.status || "")}</td>
-						<td style="max-width:280px;white-space:normal;">${frappe.utils.escape_html(v.remarks || "—")}</td>
+						<td style="max-width:320px;white-space:normal;">${
+							frappe.tif_customization && frappe.tif_customization.format_visit_remarks
+								? frappe.tif_customization.format_visit_remarks(v.remarks)
+								: frappe.utils.escape_html(v.remarks || "—")
+						}</td>
 					</tr>`,
 							)
 							.join("")
@@ -1553,6 +1603,8 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						to_date: filters.to_date,
 						staff,
 						metric,
+						province: filters.province || "",
+						city: filters.city || "",
 						submitted_only: filters.submitted_only || 1,
 					});
 				});
@@ -1939,6 +1991,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		const headers = [
 			"Name",
 			"Type / Division",
+			"Province",
 			...this.activity_table_columns(this.data).map((c) => c.label),
 			...this.outcome_subcolumns(this.data).map((c) => c.header || c.shortHeader),
 			"Expenses",
@@ -1957,6 +2010,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				[
 					`"${(r.label || "").replace(/"/g, '""')}"`,
 					`"${(r.division || r.region_label || "").replace(/"/g, '""')}"`,
+					`"${(r.province || "").replace(/"/g, '""')}"`,
 					...this.activity_table_columns(this.data).map((c) =>
 						c.value ? c.value(r) : r[c.key] || 0
 					),

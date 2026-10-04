@@ -13,6 +13,7 @@ from frappe.utils import add_days, cint, flt, get_first_day, get_last_day, getda
 from tif_customization.tif_customization.api.field_visit_drilldown import (
 	_metric_condition,
 	get_visit_type_breakdown,
+	registered_school_sql,
 )
 from tif_customization.tif_customization.doctype.reporting.reporting import (
 	_gazetted_holiday_dates,
@@ -48,11 +49,11 @@ OUTCOME_WEIGHT = 0.30
 OUTCOME_TARGETS = (
 	{"key": "enrolment", "label": _("Enrollment of Participants in Online Course"), "short_label": _("Enrollment of Participants in Online Course"), "target": 50, "metric": "enrolment"},
 	{"key": "quiz", "label": _("Quiz Arranged"), "short_label": _("Quiz Arranged"), "target": 1, "metric": "quiz"},
-	{"key": "co_curricular", "label": _("Activities / Exhibition / Stall"), "short_label": _("Activities / Exhibition / Stall"), "target": 1, "metric": "co_curricular"},
+	{"key": "co_curricular", "label": _("Stall Activities / Activation"), "short_label": _("Stall Activities / Activation"), "target": 1, "metric": "co_curricular"},
 	{
 		"key": "new_schools",
-		"label": _("Registration of New Schools"),
-		"short_label": _("Registration of New Schools"),
+		"label": _("Registered Schools"),
+		"short_label": _("Registered Schools"),
 		"target": 24,
 		"metric": "new_schools",
 	},
@@ -85,16 +86,8 @@ VISIT_DETAIL_PARTS = (
 	{"key": "visit_other", "label": _("Other"), "metric": "meeting", "count_key": "meeting"},
 )
 
-NEW_SCHOOL_SQL = """
-	fv.type IN ('Marketing', 'Visits', 'M&E', 'Joint Visit with SME', 'Registration of New Schools')
-	AND (
-		(fv.type IN ('Marketing', 'Visits') AND fv.marketing_visit_category = 'New')
-		OR fv.type = 'Registration of New Schools'
-		OR fv.qps_affiliated = 'Yes - Newly Registered'
-		OR fv.tps_affiliated = 'Yes - Newly Registered'
-		OR fv.cee_affiliated = 'Yes - Newly Registered'
-	)
-"""
+# Schools where any book, workshop, or program is running (distinct school names).
+NEW_SCHOOL_SQL = registered_school_sql("fv")
 
 QUIZ_SQL = """
 	fv.type = 'Quiz Arranged'
@@ -299,7 +292,7 @@ def _staff_detail(staff, from_date, to_date, ytd_from, filters, officer_row=None
 		"reward_note": _("Highest % Achiever {0}-{1}: Cash Reward with Shield").format(
 			fy_start_year, fy_start_year + 1
 		),
-		"reward_new_schools": _("Highest Registration of New Schools: Cash Reward"),
+		"reward_new_schools": _("Highest Registered Schools: Cash Reward"),
 		"visit_total": visit_bd.get("total") or 0,
 		"visit_breakdown": visit_bd.get("breakdown") or [],
 		"footnotes": _footnotes(),
@@ -637,7 +630,7 @@ def _footnotes():
 	return [
 		_("Only submitted Field Visits are counted. Draft documents are excluded."),
 		_("Activity % = period points ÷ (working days × daily points). Daily points: Karachi 6, Urban 5, Rural 4."),
-		_("Outcome % = average of yearly compulsory mins (YTD). New schools are distinct school names from Marketing New visits and M&E / Joint visits marked Newly Registered — not School master records."),
+		_("Outcome % = average of yearly compulsory mins (YTD). Registered Schools = distinct school names where any book, workshop, or program is running on a submitted Field Visit."),
 		_("Overall % = 70% activity + 30% outcome. Annual increment band uses Overall %."),
 		_("* Model School A: Affiliated with at least one Program of 3 departments."),
 		_("** Model School B: Affiliated with at least one Program of 2 departments."),

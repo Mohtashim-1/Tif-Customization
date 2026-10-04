@@ -38,12 +38,15 @@ from tif_customization.tif_customization.page.sme_kpi_details.sme_kpi_details im
 )
 from tif_customization.tif_customization.page.smes_target_base___k.smes_target_base___k import (
 	_count_actuals,
-	_fiscal_year_bounds,
 	_fiscal_year_start,
 	_points_for_scoring,
 )
 
 SME_DESIGNATION = "School Marketing Executive"
+
+# Hidden from SME Summary Report Copy table / cards (still Active elsewhere).
+EXCLUDED_SME_EMPLOYEES = frozenset({"HR-EMP-00006"})  # Hafiz Shahnawaz Awan
+EXCLUDED_SME_NAME_NEEDLES = ("hafiz shahnawaz",)
 
 # Activity types that roll into the summary columns / visited days
 # "Visits" is the current school-visit form; "Marketing" is the legacy type.
@@ -69,6 +72,7 @@ SUMMARY_TYPES = (
 
 # Activity (period) columns — aligned with SME KPI Details / Target Base KPI sheet
 KPI_COLUMNS = (
+	{"key": "workshop_arranged", "label": "Workshop Arranged", "metric": "workshop_arranged"},
 	{"key": "workshop", "label": "Workshop Conducted Onsite", "metric": "workshop_conducted"},
 	{"key": "meeting_ulama", "label": "Meeting / Ulama and Educationist", "metric": "meeting_ulama"},
 	{"key": "teachers_training_meeting", "label": "Teachers Training Meeting (Onsite School)", "metric": "teachers_training_meeting"},
@@ -77,7 +81,7 @@ KPI_COLUMNS = (
 		"label": "Head Office / Regional Office / Out of Station Visit",
 		"metric": "headoffice_visit",
 	},
-	{"key": "academic_task", "label": "Academic Task", "metric": "academic_task"},
+	{"key": "academic_task", "label": "Academic Task (Content Development)", "metric": "academic_task"},
 	{"key": "other_official", "label": "Other Official Tasks", "metric": "other_official"},
 )
 KPI_KEYS = tuple(c["key"] for c in KPI_COLUMNS)
@@ -331,7 +335,31 @@ def get_report_data(filters=None):
 	supervisors = _list_field_supervisors()
 	supervisor_stats = _supervisor_stats(supervisors)
 	staff_rows = _get_sme_staff(filters)
-	visit_stats = _load_visit_stats(from_date, to_date, staff_rows)
+	province = (filters.get("province") or "").strip()
+	city = (filters.get("city") or "").strip()
+	visit_stats = _load_visit_stats(
+		from_date, to_date, staff_rows, city=city, province=province
+	)
+	if province or city:
+		# Only SMEs with at least one visit in the selected province / city.
+		active_keys = {
+			key
+			for key, st in visit_stats.items()
+			if any(
+				cint(st.get(k) or 0)
+				for k in (
+					"marketing",
+					"followup",
+					"new",
+					"me",
+					"meetings",
+					"workshop_conducted",
+					"workshop_arranged",
+					"trainings",
+				)
+			)
+		}
+		staff_rows = [s for s in staff_rows if s.get("key") in active_keys]
 	expenses = _load_expenses(from_date, to_date, staff_rows)
 	present_days_map = _present_days_by_employee(
 		from_date, to_date, [s.get("employee") for s in staff_rows]
@@ -414,8 +442,10 @@ def get_report_data(filters=None):
 		}
 		for col in KPI_COLUMNS:
 			if col["key"] == "workshop":
-				# Card / table: only Field Visit type = Workshop Conducted.
+				# Card / table: Field Visit type = Workshop Conducted or Workshop.
 				row["workshop"] = cint(stats.get("workshop_conducted") or 0)
+			elif col["key"] == "workshop_arranged":
+				row["workshop_arranged"] = cint(stats.get("workshop_arranged") or 0)
 			else:
 				row[col["key"]] = cint(actuals.get(col["key"]) or 0)
 		row.update(_outcome_row_fields(staff, ytd_from, to_date))
@@ -482,12 +512,15 @@ def get_report_data(filters=None):
 		if cfg["key"] in period_outcome:
 			totals_out[okey] = period_outcome[cfg["key"]]["actual"]
 
-	# Outcome cards ignore the visit date filter and show the full current fiscal year.
+	# Outcome cards: fiscal YTD = 1 July → today (ignore visit date filter / not full FY to 30 Jun).
 	report_day = getdate(today())
 	current_fy_start = cint(_fiscal_year_start(report_day.year, report_day.month))
-	outcome_fy_from, outcome_fy_to = _fiscal_year_bounds(current_fy_start)
+	outcome_fy_from = getdate(f"{current_fy_start}-07-01")
+	outcome_fy_to = report_day
+	if outcome_fy_from > outcome_fy_to:
+		outcome_fy_from = outcome_fy_to
 	outcome_fy = _report_outcome_fy_totals(staff_rows, outcome_fy_from, outcome_fy_to)
-	outcome_fy_label = f"{current_fy_start}-{str(current_fy_start + 1)[-2:]}"
+	outcome_fy_label = f"{outcome_fy_from.strftime('%d-%b-%Y')} → {outcome_fy_to.strftime('%d-%b-%Y')}"
 
 	# Model A = 3 departments, Model B = 2, Model C = 1, on Marketing + follow-up + monitoring visits.
 	model_counts = {"model_a": 0, "model_b": 0, "model_c": 0}
@@ -538,6 +571,7 @@ def get_report_data(filters=None):
 			"visited_days": visited_days_max,
 			"grand_total": cint(totals.get("grand_total") or 0),
 			"visits": cint(totals.get("visits") or 0),
+			"workshop_arranged": cint(totals.get("workshop_arranged") or 0),
 			"workshop": cint(totals.get("workshop") or 0),
 			"meeting_ulama": cint(totals.get("meeting_ulama") or 0),
 			"teachers_training_meeting": cint(totals.get("teachers_training_meeting") or 0),
@@ -646,7 +680,11 @@ def get_followup_schools_by_officer(filters=None):
 	index = _staff_key_index(staff_rows)
 	key_to_staff = {s["key"]: s for s in staff_rows}
 
-	from tif_customization.tif_customization.api.field_visit_drilldown import _school_sql, _visit_remarks
+	from tif_customization.tif_customization.api.field_visit_drilldown import (
+		VISIT_REMARKS_EXTRA_SELECT,
+		_school_sql,
+		_visit_remarks,
+	)
 	from tif_customization.tif_customization.field_visit_permissions import apply_team_scope_to_conditions
 
 	visit_day = _visit_day_sql("fv")
@@ -657,12 +695,21 @@ def get_followup_schools_by_officer(filters=None):
 		"(fv.type = 'Visits' OR fv.type = 'Registration of New Schools')",
 	]
 	params = {"from_date": from_date, "to_date": to_date}
+	province = (filters.get("province") or "").strip()
+	city = (filters.get("city") or "").strip()
+	if province:
+		conditions.append(f"({_province_sql('fv')}) = %(province)s")
+		params["province"] = province
+	if city:
+		conditions.append(f"({_city_sql('fv')}) = %(city)s")
+		params["city"] = city
 	apply_team_scope_to_conditions(conditions, params, alias="fv")
 	where_sql = " AND ".join(f"({c})" for c in conditions)
 	rows = frappe.db.sql(
 		f"""
 		SELECT
 			fv.name,
+			fv.type,
 			fv.owner,
 			fv.visit_by,
 			fv.me_visit_by,
@@ -676,9 +723,14 @@ def get_followup_schools_by_officer(filters=None):
 			fv.travel_remarks,
 			fv.ot_academic_task_other,
 			fv.ot_other_official_task_detail,
+			{VISIT_REMARKS_EXTRA_SELECT},
 			{visit_day} AS visit_date,
 			{_school_sql("fv")} AS school,
-			COALESCE(NULLIF(TRIM(fv.province), ''), NULLIF(TRIM(fv.me_province), '')) AS province,
+			COALESCE(
+				NULLIF(TRIM(fv.province), ''),
+				NULLIF(TRIM(fv.me_province), ''),
+				NULLIF(TRIM(fv.training_province), '')
+			) AS province,
 			COALESCE(NULLIF(TRIM(fv.area), ''), NULLIF(TRIM(fv.me_area), '')) AS area
 		FROM `tabField Visit` fv
 		WHERE {where_sql}
@@ -849,6 +901,15 @@ def _get_sme_staff(filters):
 	if employee_filter:
 		rows = [r for r in rows if r.name == employee_filter]
 
+	rows = [
+		r
+		for r in rows
+		if r.name not in EXCLUDED_SME_EMPLOYEES
+		and not any(
+			needle in (r.employee_name or "").lower() for needle in EXCLUDED_SME_NAME_NEEDLES
+		)
+	]
+
 	# Prefetch User full_name for owner matching
 	user_ids = [r.user_id for r in rows if r.user_id]
 	full_names = {}
@@ -967,7 +1028,26 @@ def _staff_match_values(emp, user_full_name=None) -> set[str]:
 	return {v for v in vals if v}
 
 
-def _load_visit_stats(from_date, to_date, staff_rows):
+def _province_sql(alias="fv"):
+	a = alias
+	return f"""COALESCE(
+		NULLIF(TRIM({a}.province), ''),
+		NULLIF(TRIM({a}.me_province), ''),
+		NULLIF(TRIM({a}.training_province), '')
+	)"""
+
+
+def _city_sql(alias="fv"):
+	a = alias
+	return f"""COALESCE(
+		NULLIF(TRIM({a}.city), ''),
+		NULLIF(TRIM({a}.me_city), ''),
+		NULLIF(TRIM({a}.training_city), ''),
+		NULLIF(TRIM({a}.mt_city), '')
+	)"""
+
+
+def _load_visit_stats(from_date, to_date, staff_rows, city=None, province=None):
 	"""Aggregate Field Visit counts per SME key."""
 	if not staff_rows:
 		return {}
@@ -978,6 +1058,16 @@ def _load_visit_stats(from_date, to_date, staff_rows):
 			index[str(v).strip().lower()] = s["key"]
 
 	visit_day = _visit_day_sql("fv")
+	city = (city or "").strip()
+	province = (province or "").strip()
+	extra_sql = ""
+	params = {"from_date": from_date, "to_date": to_date, "types": SUMMARY_TYPES}
+	if province:
+		extra_sql += f" AND ({_province_sql('fv')}) = %(province)s"
+		params["province"] = province
+	if city:
+		extra_sql += f" AND ({_city_sql('fv')}) = %(city)s"
+		params["city"] = city
 	rows = frappe.db.sql(
 		f"""
 		SELECT
@@ -996,16 +1086,24 @@ def _load_visit_stats(from_date, to_date, staff_rows):
 			fv.cee_affiliated,
 			COALESCE(fv.training_no_of_schools_attended, 0) AS schools,
 			COALESCE(fv.training_no_of_participants, 0) AS participants,
-			COALESCE(NULLIF(TRIM(fv.province), ''), NULLIF(TRIM(fv.me_province), '')) AS province,
-			COALESCE(NULLIF(TRIM(fv.area), ''), NULLIF(TRIM(fv.me_area), '')) AS area,
+			COALESCE(
+				NULLIF(TRIM(fv.province), ''),
+				NULLIF(TRIM(fv.me_province), ''),
+				NULLIF(TRIM(fv.training_province), '')
+			) AS province,
+			COALESCE(
+				NULLIF(TRIM(fv.area), ''),
+				NULLIF(TRIM(fv.me_area), '')
+			) AS area,
 			{visit_day} AS visit_day
 		FROM `tabField Visit` fv
 		WHERE fv.docstatus = 1
 		AND fv.type IN %(types)s
 		AND {visit_day} IS NOT NULL
 		AND {visit_day} BETWEEN %(from_date)s AND %(to_date)s
+		{extra_sql}
 		""",
-		{"from_date": from_date, "to_date": to_date, "types": SUMMARY_TYPES},
+		params,
 		as_dict=True,
 	)
 
@@ -1025,6 +1123,7 @@ def _load_visit_stats(from_date, to_date, staff_rows):
 			"participants": 0,
 			"trainings": 0,
 			"workshop_conducted": 0,
+			"workshop_arranged": 0,
 			"province": "",
 			"area": "",
 			"_days": set(),
@@ -1079,16 +1178,18 @@ def _load_visit_stats(from_date, to_date, staff_rows):
 			bucket["schools"] += cint(row.get("schools") or 0)
 			bucket["participants"] += cint(row.get("participants") or 0)
 			bucket["trainings"] += 1
-			if vtype == "Workshop Conducted":
+			if vtype in ("Workshop Conducted", "Workshop"):
 				bucket["workshop_conducted"] += 1
+			if vtype == "Workshop Arranged":
+				bucket["workshop_arranged"] += 1
 
-		if vtype in ("Marketing", "Visits", "M&E", "Registration of New Schools"):
-			prov = (row.get("province") or "").strip()
-			area = (row.get("area") or "").strip()
-			if prov:
-				bucket["_province_counts"][prov] = bucket["_province_counts"].get(prov, 0) + 1
-			if area:
-				bucket["_area_counts"][area] = bucket["_area_counts"].get(area, 0) + 1
+		# Province / area from any visit type that has them (not only school visits).
+		prov = (row.get("province") or "").strip()
+		area = (row.get("area") or "").strip()
+		if prov:
+			bucket["_province_counts"][prov] = bucket["_province_counts"].get(prov, 0) + 1
+		if area:
+			bucket["_area_counts"][area] = bucket["_area_counts"].get(area, 0) + 1
 
 		if row.get("visit_day"):
 			bucket["_days"].add(str(row.visit_day))

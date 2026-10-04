@@ -9,8 +9,14 @@
   "volunteer_name",
   "contact_number",
   "email",
+  "profession",
+  "contribution",
+  "column_break_loc",
   "province",
   "city",
+  "area",
+  "address",
+  "school",
   "volunteer_form_submitted",
   "remarks"
  ],
@@ -43,6 +49,24 @@
   },
   {
    "columns": 1,
+   "fieldname": "profession",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Profession",
+   "allow_on_submit": 1
+  },
+  {
+   "fieldname": "contribution",
+   "fieldtype": "Small Text",
+   "label": "What is he/she doing (role / contribution)",
+   "allow_on_submit": 1
+  },
+  {
+   "fieldname": "column_break_loc",
+   "fieldtype": "Column Break"
+  },
+  {
+   "columns": 1,
    "fieldname": "province",
    "fieldtype": "Select",
    "in_list_view": 1,
@@ -60,6 +84,27 @@
    "allow_on_submit": 1
   },
   {
+   "fieldname": "area",
+   "fieldtype": "Data",
+   "label": "Area / Locality",
+   "allow_on_submit": 1
+  },
+  {
+   "fieldname": "address",
+   "fieldtype": "Small Text",
+   "label": "Address",
+   "allow_on_submit": 1
+  },
+  {
+   "columns": 2,
+   "fieldname": "school",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "School (optional)",
+   "options": "Customer",
+   "allow_on_submit": 1
+  },
+  {
    "columns": 1,
    "default": "No",
    "fieldname": "volunteer_form_submitted",
@@ -72,7 +117,7 @@
   {
    "fieldname": "remarks",
    "fieldtype": "Small Text",
-   "label": "Remarks",
+   "label": "Other / Remarks",
    "allow_on_submit": 1
   }
  ],
@@ -80,7 +125,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-09-30 07:56:42.000000",
+ "modified": "2026-10-05 03:50:00.000000",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Field Visit Volunteer",

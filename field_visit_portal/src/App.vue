@@ -33,6 +33,7 @@ const error = ref("");
 const success = ref(false);
 const savedName = ref("");
 const showParticipant = ref(false);
+const showVolunteer = ref(false);
 const selectedId = ref("");
 const meta = ref({
 	staff_name: "",
@@ -274,6 +275,34 @@ const participantForm = reactive({
 	date: todayISO(),
 	school: "",
 });
+
+const volunteers = ref([]);
+const volunteerVisit = reactive({
+	date: todayISO(),
+	city: "",
+	area: "",
+	province: "Punjab",
+	registered: "Yes",
+	remarks: "",
+});
+function emptyVolunteerForm() {
+	return {
+		name: "",
+		contact: "",
+		email: "",
+		profession: "",
+		contribution: "",
+		province: "Punjab",
+		city: "",
+		area: "",
+		address: "",
+		school: "",
+		schoolLabel: "",
+		formSubmitted: "No",
+		remarks: "",
+	};
+}
+const volunteerForm = reactive(emptyVolunteerForm());
 
 const books = ref([]);
 const travel = reactive({
@@ -690,6 +719,40 @@ function addParticipant() {
 	showParticipant.value = false;
 }
 
+function openVolunteerModal() {
+	Object.assign(volunteerForm, emptyVolunteerForm());
+	volunteerForm.province = volunteerVisit.province || "Punjab";
+	volunteerForm.city = volunteerVisit.city || "";
+	volunteerForm.area = volunteerVisit.area || "";
+	showVolunteer.value = true;
+}
+
+function addVolunteer() {
+	if (!(volunteerForm.name || "").trim()) return;
+	if (!(volunteerForm.contact || "").trim()) return;
+	volunteers.value.push({
+		id: String(Date.now()),
+		name: volunteerForm.name.trim(),
+		contact: volunteerForm.contact.trim(),
+		email: (volunteerForm.email || "").trim(),
+		profession: (volunteerForm.profession || "").trim(),
+		contribution: (volunteerForm.contribution || "").trim(),
+		province: volunteerForm.province || volunteerVisit.province,
+		city: volunteerForm.city || volunteerVisit.city,
+		area: volunteerForm.area || volunteerVisit.area,
+		address: (volunteerForm.address || "").trim(),
+		school: volunteerForm.school || "",
+		schoolLabel: volunteerForm.schoolLabel || volunteerForm.school || "",
+		formSubmitted: volunteerForm.formSubmitted || "No",
+		remarks: (volunteerForm.remarks || "").trim(),
+	});
+	Object.assign(volunteerForm, emptyVolunteerForm());
+	volunteerForm.province = volunteerVisit.province || "Punjab";
+	volunteerForm.city = volunteerVisit.city || "";
+	volunteerForm.area = volunteerVisit.area || "";
+	showVolunteer.value = false;
+}
+
 function addBook() {
 	books.value.push({
 		id: String(Date.now()),
@@ -759,8 +822,17 @@ function buildPayload(submitDoc) {
 	const card = selected.value;
 	const activityType = resolveActivityType(card, training.otType, meta.value.activity_types || []);
 	const schoolForm = card?.group === "visits" || card?.group === "books" || card?.group === "me";
-	const visitDate = schoolForm ? visit.visitDate : meeting.meetingDate || training.date || todayISO();
-	const city = schoolForm ? visit.city : meeting.city || training.city;
+	const volunteerFormGroup = card?.group === "volunteer";
+	const visitDate = schoolForm
+		? visit.visitDate
+		: volunteerFormGroup
+			? volunteerVisit.date
+			: meeting.meetingDate || training.date || todayISO();
+	const city = schoolForm
+		? visit.city
+		: volunteerFormGroup
+			? volunteerVisit.city
+			: meeting.city || training.city;
 	const payload = {
 		activity_type: activityType,
 		visit_by: staffName.value,
@@ -771,9 +843,17 @@ function buildPayload(submitDoc) {
 		starting_time: card?.group === "visits" || card?.group === "me" ? visit.startTime : meeting.startTime,
 		ending_time: card?.group === "visits" || card?.group === "me" ? visit.endTime : meeting.endTime,
 		city,
-		area: schoolForm ? visit.area : meeting.area,
-		province: schoolForm ? visit.province : training.province,
-		school_name: schoolForm ? visit.schoolName : meeting.institute || training.venueName,
+		area: schoolForm ? visit.area : volunteerFormGroup ? volunteerVisit.area : meeting.area,
+		province: schoolForm
+			? visit.province
+			: volunteerFormGroup
+				? volunteerVisit.province
+				: training.province,
+		school_name: schoolForm
+			? visit.schoolName
+			: volunteerFormGroup
+				? volunteers.value.find((v) => v.school)?.school || ""
+				: meeting.institute || training.venueName,
 		contact_person_name: schoolForm ? visit.meetingWith : meeting.meetingWith,
 		contact_number: schoolForm ? visit.contactNumber : meeting.contactNo,
 		designation: schoolForm ? visit.designation : "",
@@ -971,6 +1051,25 @@ function buildPayload(submitDoc) {
 		payload.training_session_category = training.trainingCategory;
 	}
 
+	if (card?.group === "volunteer") {
+		payload.registered_volunteer = volunteerVisit.registered || "Yes";
+		payload.school_additional_remarks = volunteerVisit.remarks || "";
+		payload.volunteer_enrolments = volunteers.value.map((v) => ({
+			volunteer_name: v.name,
+			contact_number: v.contact,
+			email: v.email,
+			profession: v.profession,
+			contribution: v.contribution,
+			province: v.province,
+			city: v.city,
+			area: v.area,
+			address: v.address,
+			school: v.school,
+			volunteer_form_submitted: v.formSubmitted || "No",
+			remarks: v.remarks,
+		}));
+	}
+
 	if (card?.id === "registration") {
 		payload.workshop_attendees = participants.value.map((p) => ({
 			attendee_name: p.name,
@@ -1078,6 +1177,20 @@ async function saveVisit(submitDoc) {
 		error.value = "School Picture is required.";
 		return;	
 	}
+	if (selected.value.group === "volunteer") {
+		if (!volunteers.value.length) {
+			error.value = "Add at least one volunteer.";
+			return;
+		}
+		if (!volunteerVisit.date) {
+			error.value = "Date is required.";
+			return;
+		}
+		if (!volunteerVisit.city) {
+			error.value = "City is required.";
+			return;
+		}
+	}
 	saving.value = true;
 	try {
 		const result = await apiPost(`${METHOD}.submit_smes_activity`, {
@@ -1125,6 +1238,16 @@ function resetForm() {
 	step.value = 1;
 	selectedId.value = "";
 	participants.value = [];
+	volunteers.value = [];
+	Object.assign(volunteerVisit, {
+		date: todayISO(),
+		city: "",
+		area: "",
+		province: "Punjab",
+		registered: "Yes",
+		remarks: "",
+	});
+	Object.assign(volunteerForm, emptyVolunteerForm());
 	books.value = [];
 	attachments.card = null;
 	attachments.meeting = null;
@@ -1992,6 +2115,105 @@ const steps = [
 						</div>
 					</div>
 
+					<div class="panel-body" v-else-if="selected.group === 'volunteer'">
+						<SectionTitle
+							:mode="lang"
+							title-en="Volunteer Enrolment"
+							title-ur="والنٹیئر اندراج"
+							sub-en="Record contact, location, profession — optionally tag a school"
+							sub-ur="رابطہ، مقام، پیشہ درج کریں — ضرورت ہو تو اسکول بھی منسلک کریں"
+						/>
+						<div class="grid-2" style="margin-top: 12px">
+							<FieldDate :mode="lang" label-en="Date" label-ur="تاریخ" required v-model="volunteerVisit.date" />
+							<FieldSelect
+								:mode="lang"
+								label-en="Registered with TIF as Volunteer"
+								label-ur="TIF کے ساتھ والنٹیئر رجسٹرڈ؟"
+								:options="['Yes', 'No']"
+								required
+								v-model="volunteerVisit.registered"
+							/>
+							<FieldLink
+								:mode="lang"
+								label-en="City"
+								label-ur="شہر"
+								placeholder="Type to search city"
+								empty-text="No cities found"
+								:options="cityLinkOptions"
+								:search="searchCities"
+								required
+								v-model="volunteerVisit.city"
+							/>
+							<FieldSelect
+								:mode="lang"
+								label-en="Province"
+								label-ur="صوبہ"
+								:options="provinceOptions"
+								required
+								v-model="volunteerVisit.province"
+							/>
+							<FieldInput :mode="lang" label-en="Area / Locality" label-ur="علاقہ" v-model="volunteerVisit.area" />
+							<div style="grid-column: 1 / -1">
+								<FieldTextarea
+									:mode="lang"
+									label-en="Visit / batch remarks"
+									label-ur="دورہ / بیچ نوٹس"
+									v-model="volunteerVisit.remarks"
+								/>
+							</div>
+						</div>
+						<div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; margin-top: 28px">
+							<SectionTitle
+								:mode="lang"
+								title-en="Volunteers"
+								title-ur="والنٹیئرز"
+								sub-en="Add one or more people"
+								sub-ur="ایک یا زیادہ افراد شامل کریں"
+								small
+							/>
+							<button class="btn btn-green" type="button" @click="openVolunteerModal">
+								<Bi :mode="lang" en="+ Add Volunteer" ur="والنٹیئر شامل کریں" />
+							</button>
+						</div>
+						<div v-if="!volunteers.length" class="empty">
+							<div style="font-size: 28px">🤝</div>
+							<div style="margin-top: 8px; font-weight: 600">
+								<Bi :mode="lang" en="No volunteers yet" ur="ابھی کوئی والنٹیئر نہیں" />
+							</div>
+							<button class="btn btn-green" style="margin-top: 16px" type="button" @click="openVolunteerModal">
+								<Bi :mode="lang" en="Add Volunteer" ur="والنٹیئر شامل کریں" />
+							</button>
+						</div>
+						<div v-else class="grid-2" style="margin-top: 20px">
+							<div v-for="v in volunteers" :key="v.id" class="person-card">
+								<div class="avatar">{{ initials(v.name) }}</div>
+								<div style="flex: 1; min-width: 0">
+									<div style="font-weight: 600; font-size: 13px">{{ v.name }}</div>
+									<div style="font-size: 11px; color: #71717a">
+										{{ v.contact }}<span v-if="v.profession"> · {{ v.profession }}</span>
+									</div>
+									<div style="font-size: 11px; color: #71717a">
+										{{ v.city }}{{ v.area ? `, ${v.area}` : "" }} · {{ v.province }}
+									</div>
+									<div v-if="v.schoolLabel || v.school" style="font-size: 11px; color: #71717a">
+										🏫 {{ v.schoolLabel || v.school }}
+									</div>
+									<div v-if="v.contribution" style="font-size: 11px; color: #52525b; margin-top: 2px">
+										{{ v.contribution }}
+									</div>
+								</div>
+								<button
+									class="btn"
+									style="padding: 4px 10px; font-size: 11px"
+									type="button"
+									@click="volunteers = volunteers.filter((x) => x.id !== v.id)"
+								>
+									<Bi :mode="lang" en="Remove" ur="حذف کریں" />
+								</button>
+							</div>
+						</div>
+					</div>
+
 					<div class="panel-body" v-else-if="selected.group === 'enrolment'">
 						<div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px">
 							<SectionTitle :mode="lang" :title-en="selected.titleEn" :title-ur="selected.titleUr" sub-en="View participants as cards" sub-ur="شرکاء کو کارڈز میں دیکھیں" />
@@ -2202,6 +2424,18 @@ const steps = [
 							<span style="opacity: 0.7">Participants</span>
 							<span>{{ participants.length }} added</span>
 						</div>
+						<div v-if="selected?.group === 'volunteer'" class="summary-row">
+							<span style="opacity: 0.7">Volunteers</span>
+							<span>{{ volunteers.length }} added</span>
+						</div>
+						<div v-if="selected?.group === 'volunteer'" class="summary-row">
+							<span style="opacity: 0.7">City</span>
+							<span>{{ volunteerVisit.city || "-" }} · {{ volunteerVisit.province }}</span>
+						</div>
+						<div v-if="selected?.group === 'volunteer'" class="summary-row">
+							<span style="opacity: 0.7">Date</span>
+							<span>{{ volunteerVisit.date }}</span>
+						</div>
 						<div v-if="selected?.group === 'books'" class="summary-row">
 							<span style="opacity: 0.7">Books</span>
 							<span>{{ bookTotal() }} books</span>
@@ -2251,27 +2485,110 @@ const steps = [
 
 		<div v-if="showParticipant" class="modal-bg" @click.self="showParticipant = false">
 			<div class="modal">
-				<div style="display: flex; justify-content: space-between">
+				<div class="modal-head">
 					<div style="font-weight: 600; font-size: 16px">
 						<Bi :mode="lang" en="Add Participant" ur="نیا شریک شامل کریں" />
 					</div>
 					<button class="icon-btn" type="button" @click="showParticipant = false">✕</button>
 				</div>
-				<div class="grid-2" style="margin-top: 20px">
-					<div style="grid-column: 1 / -1">
-						<FieldInput :mode="lang" label-en="Name" label-ur="نام" required v-model="participantForm.name" />
+				<div class="modal-body">
+					<div class="grid-2">
+						<div style="grid-column: 1 / -1">
+							<FieldInput :mode="lang" label-en="Name" label-ur="نام" required v-model="participantForm.name" />
+						</div>
+						<FieldInput :mode="lang" label-en="Contact" label-ur="رابطہ" v-model="participantForm.contact" />
+						<FieldInput :mode="lang" label-en="City" label-ur="شہر" v-model="participantForm.city" />
+						<FieldSelect :mode="lang" label-en="Province" label-ur="صوبہ" :options="provinceOptions" v-model="participantForm.province" />
+						<FieldSelect :mode="lang" label-en="Course Name" label-ur="کورس کا نام" :options="courseOptions" required v-model="participantForm.course" />
+						<FieldDate :mode="lang" label-en="Date" label-ur="تاریخ" v-model="participantForm.date" />
 					</div>
-					<FieldInput :mode="lang" label-en="Contact" label-ur="رابطہ" v-model="participantForm.contact" />
-					<FieldInput :mode="lang" label-en="City" label-ur="شہر" v-model="participantForm.city" />
-					<FieldSelect :mode="lang" label-en="Province" label-ur="صوبہ" :options="provinceOptions" v-model="participantForm.province" />
-					<FieldSelect :mode="lang" label-en="Course Name" label-ur="کورس کا نام" :options="courseOptions" required v-model="participantForm.course" />
-					<FieldDate :mode="lang" label-en="Date" label-ur="تاریخ" v-model="participantForm.date" />
 				</div>
-				<div style="margin-top: 24px; display: flex; justify-content: flex-end; gap: 8px">
+				<div class="modal-foot">
 					<button class="btn" type="button" @click="showParticipant = false">
 						<Bi :mode="lang" en="Cancel" ur="منسوخ کریں" />
 					</button>
 					<button class="btn btn-green" type="button" @click="addParticipant">
+						<Bi :mode="lang" en="Add" ur="شامل کریں" />
+					</button>
+				</div>
+			</div>
+		</div>
+
+		<div v-if="showVolunteer" class="modal-bg" @click.self="showVolunteer = false">
+			<div class="modal" style="max-width: 640px">
+				<div class="modal-head">
+					<div style="font-weight: 600; font-size: 16px">
+						<Bi :mode="lang" en="Add Volunteer" ur="نیا والنٹیئر شامل کریں" />
+					</div>
+					<button class="icon-btn" type="button" @click="showVolunteer = false">✕</button>
+				</div>
+				<div class="modal-body">
+					<div class="grid-2">
+						<div style="grid-column: 1 / -1">
+							<FieldInput :mode="lang" label-en="Volunteer Name" label-ur="والنٹیئر کا نام" required v-model="volunteerForm.name" />
+						</div>
+						<FieldInput :mode="lang" label-en="Contact Number" label-ur="موبائل نمبر" required v-model="volunteerForm.contact" />
+						<FieldInput :mode="lang" label-en="Email" label-ur="ای میل" v-model="volunteerForm.email" />
+						<FieldInput :mode="lang" label-en="Profession" label-ur="پیشہ" v-model="volunteerForm.profession" />
+						<FieldSelect
+							:mode="lang"
+							label-en="Form Submitted"
+							label-ur="فارم جمع؟"
+							:options="['Yes', 'No']"
+							v-model="volunteerForm.formSubmitted"
+						/>
+						<div style="grid-column: 1 / -1">
+							<FieldTextarea
+								:mode="lang"
+								label-en="What is he/she doing (role / contribution)"
+								label-ur="کیا کر رہے ہیں (کردار / تعاون)"
+								v-model="volunteerForm.contribution"
+							/>
+						</div>
+						<FieldLink
+							:mode="lang"
+							label-en="City"
+							label-ur="شہر"
+							placeholder="Type to search city"
+							empty-text="No cities found"
+							:options="cityLinkOptions"
+							:search="searchCities"
+							v-model="volunteerForm.city"
+						/>
+						<FieldSelect
+							:mode="lang"
+							label-en="Province"
+							label-ur="صوبہ"
+							:options="provinceOptions"
+							v-model="volunteerForm.province"
+						/>
+						<FieldInput :mode="lang" label-en="Area / Locality" label-ur="علاقہ" v-model="volunteerForm.area" />
+						<div style="grid-column: 1 / -1">
+							<FieldTextarea :mode="lang" label-en="Address" label-ur="پتہ" v-model="volunteerForm.address" />
+						</div>
+						<div style="grid-column: 1 / -1">
+							<FieldLink
+								:mode="lang"
+								label-en="Tag School (optional)"
+								label-ur="اسکول منسلک کریں (اختیاری)"
+								placeholder="Type to search school"
+								empty-text="No schools found"
+								:options="customerOptions"
+								:search="searchSchools"
+								v-model="volunteerForm.school"
+								v-model:label="volunteerForm.schoolLabel"
+							/>
+						</div>
+						<div style="grid-column: 1 / -1">
+							<FieldTextarea :mode="lang" label-en="Other / Remarks" label-ur="دیگر / نوٹس" v-model="volunteerForm.remarks" />
+						</div>
+					</div>
+				</div>
+				<div class="modal-foot">
+					<button class="btn" type="button" @click="showVolunteer = false">
+						<Bi :mode="lang" en="Cancel" ur="منسوخ کریں" />
+					</button>
+					<button class="btn btn-green" type="button" @click="addVolunteer">
 						<Bi :mode="lang" en="Add" ur="شامل کریں" />
 					</button>
 				</div>

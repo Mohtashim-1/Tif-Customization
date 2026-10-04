@@ -29,6 +29,8 @@ class FieldStaffReportPage {
 		if (route.to_date && this.filters.to_date) this.filters.to_date.set_value(route.to_date);
 		if (route.user && this.filters.user) this.filters.user.set_value(route.user);
 		if (route.type && this.filters.type) this.filters.type.set_value(route.type);
+		if (route.city && this.filters.city) this.filters.city.set_value(route.city);
+		if (route.province && this.filters.province) this.filters.province.set_value(route.province);
 		frappe.route_options = null;
 	}
 
@@ -53,7 +55,7 @@ class FieldStaffReportPage {
 				</div>
 
 				<!-- <div class="fsr-kpis mb-2"></div> -->
-				<p class="fsr-breakdown fsr-breakdown-note"></p>
+				<!-- Total visits breakdown line removed -->
 
 				<div class="border rounded p-3">
 					<div class="d-flex align-items-center justify-content-between mb-2">
@@ -111,7 +113,7 @@ class FieldStaffReportPage {
 				label: __("Type"),
 				fieldname: "type",
 				fieldtype: "Select",
-				options: "\nMarketing\nM&E\nTraining\nMeeting\nAcademic / Other Official Tasks"
+				options: "\nMarketing\nM&E\nTraining\nAcademic / Other Official Tasks"
 			}),
 			user: this.make_filter({
 				label: __("Field Staff"),
@@ -125,7 +127,13 @@ class FieldStaffReportPage {
 				fieldtype: "Select",
 				options:
 					"\nPunjab\nSindh\nKhyber Pakhtunkhwa\nBalochistan\nAzad Jammu & Kashmir\nGilgit-Baltistan\nIslamabad Capital Territory"
-			})
+			}),
+			city: this.make_filter({
+				label: __("City"),
+				fieldname: "city",
+				fieldtype: "Link",
+				options: "City",
+			}),
 		};
 		this.load_team_filter_options();
 	}
@@ -166,7 +174,8 @@ class FieldStaffReportPage {
 				to_date: frappe.datetime.get_today(),
 				type: "",
 				user: "",
-				province: ""
+				province: "",
+				city: "",
 			});
 			this.offset = 0;
 			this.load_data();
@@ -211,7 +220,8 @@ class FieldStaffReportPage {
 			to_date: this.filters.to_date.get_value(),
 			type: this.filters.type.get_value(),
 			user: this.filters.user.get_value(),
-			province: this.filters.province.get_value()
+			province: this.filters.province.get_value(),
+			city: this.filters.city.get_value(),
 		};
 	}
 
@@ -229,7 +239,7 @@ class FieldStaffReportPage {
 			callback: (r) => {
 				const data = r.message || { rows: [], columns: [], labels: {}, total_count: 0, summary: {} };
 				// this.render_kpis(data.summary || {});
-				this.render_breakdown(data.summary || {});
+				// this.render_breakdown(data.summary || {});
 				this.render_table(data.rows || [], data.columns || [], data.labels || {});
 				this.render_pager(data);
 				const total = data.total_count || 0;
@@ -391,7 +401,8 @@ class FieldStaffReportPage {
 				const tds = safeColumns
 					.map((col) => {
 						const value = row[col];
-						const cls = col === "remarks" ? ' class="fsr-col-remarks"' : "";
+						const cls =
+							col === "remarks" || col === "programs" ? ' class="fsr-col-remarks"' : "";
 						if (col === "name") {
 							const id = frappe.utils.escape_html(value || "");
 							return `<td${cls}><a href="/app/field-visit/${id}">${id}</a></td>`;
@@ -403,11 +414,14 @@ class FieldStaffReportPage {
 							}
 							const src = frappe.utils.escape_html(imgs[0].url || "");
 							const visit = frappe.utils.escape_html(row.name || "");
+							const when = imgs[0].taken_at
+								? frappe.datetime.str_to_user(imgs[0].taken_at)
+								: "";
 							return `<td><button type="button" class="fsr-photo-card" data-visit="${visit}" title="${__(
 								"Click to view school images"
 							)}">
 								<img src="${src}" alt="">
-								<span>${imgs.length}</span>
+								<span>${imgs.length}${when ? `<small>${frappe.utils.escape_html(when)}</small>` : ""}</span>
 							</button></td>`;
 						}
 						if (col === "school") {
@@ -422,6 +436,24 @@ class FieldStaffReportPage {
 							}
 							badge = badge ? `<span class="fsr-unapproved">${badge}</span>` : "";
 							return `<td>${school}${badge}</td>`;
+						}
+						if (col === "remarks") {
+							const html =
+								frappe.tif_customization && frappe.tif_customization.format_visit_remarks
+									? frappe.tif_customization.format_visit_remarks(value)
+									: frappe.utils.escape_html(
+											value == null || value === "" ? "—" : String(value)
+										);
+							return `<td${cls}>${html}</td>`;
+						}
+						if (col === "programs") {
+							const html =
+								frappe.tif_customization && frappe.tif_customization.format_visit_remarks
+									? frappe.tif_customization.format_visit_remarks(value)
+									: frappe.utils.escape_html(
+											value == null || value === "" ? "—" : String(value)
+										);
+							return `<td${cls}>${html}</td>`;
 						}
 						return `<td${cls}>${frappe.utils.escape_html(
 							value == null || value === "" ? "-" : String(value)
@@ -452,6 +484,12 @@ class FieldStaffReportPage {
 	show_image_cards(row) {
 		const images = row.images || [];
 		const school = frappe.utils.escape_html(row.school || row.name || "");
+		const timeLine = (img) => {
+			if (!img || !img.taken_at) return "";
+			const when = frappe.utils.escape_html(frappe.datetime.str_to_user(img.taken_at));
+			const kind = frappe.utils.escape_html(img.taken_label || __("Time"));
+			return `<div class="fsr-photo-time">${kind}: ${when}</div>`;
+		};
 		const cards = images
 			.map((img, idx) => {
 				const src = frappe.utils.escape_html(img.url || "");
@@ -459,6 +497,7 @@ class FieldStaffReportPage {
 				return `<button type="button" class="fsr-photo-view" data-idx="${idx}">
 					<img src="${src}" alt="${label}">
 					<div>${label}</div>
+					${timeLine(img)}
 				</button>`;
 			})
 			.join("");
@@ -476,8 +515,9 @@ class FieldStaffReportPage {
 			d.fields_dict.html.$wrapper.html(`
 				<div style="font-size:12px;color:#64748b;margin-bottom:8px;">${school}</div>
 				${src ? `<img class="fsr-photo-large" src="${src}" alt="${label}">` : ""}
-				<div style="font-size:13px;font-weight:600;margin-bottom:10px;">${label}</div>
-				<div class="fsr-photo-grid">${cards}</div>
+				<div style="font-size:13px;font-weight:600;margin-bottom:4px;">${label}</div>
+				${timeLine(current)}
+				<div class="fsr-photo-grid" style="margin-top:10px;">${cards}</div>
 			`);
 		};
 		d.$wrapper.on("click", ".fsr-photo-view", (e) => {

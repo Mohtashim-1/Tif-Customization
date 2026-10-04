@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import json
+import re
 
 import frappe
 from frappe import _
@@ -27,6 +28,7 @@ METRIC_LABELS = {
 	"me": _("M&E Visits"),
 	"meeting": _("Meetings"),
 	"training": _("Workshop Conducted Onsite"),
+	"workshop_arranged": _("Workshop Arranged"),
 	"workshop_conducted": _("Workshop Conducted Onsite"),
 	"academic": _("Academic / Other"),
 	"other": _("Other Visits"),
@@ -42,13 +44,13 @@ METRIC_LABELS = {
 	"meeting_ulama": _("Meeting / Ulama and Educationist"),
 	"teachers_training_meeting": _("Teachers Training Meeting"),
 	"headoffice_visit": _("Head office / Regional / Out of station"),
-	"academic_task": _("Academic Task"),
+	"academic_task": _("Academic Task (Content Development)"),
 	"other_official": _("Other Official Tasks"),
-	"co_curricular": _("Activities / Exhibition / Stall"),
+	"co_curricular": _("Stall Activities / Activation"),
 	"quiz": _("Quiz Arranged"),
-	"new_school_registration": _("Registration of New Schools"),
-	"new_schools": _("Registration of New Schools"),
-	"new_school": _("Registration of New Schools"),
+	"new_school_registration": _("Registered Schools"),
+	"new_schools": _("Registered Schools"),
+	"new_school": _("Registered Schools"),
 	"workshop_registration": _("Workshop / Training sessions"),
 	"enrolment": _("Enrollment of Participants in Online Course"),
 	"volunteers": _("Volunteer visits"),
@@ -101,6 +103,46 @@ def _school_visit_sql(alias: str) -> str:
 	)
 
 
+def _yes_field_sql(field: str, alias: str = "fv") -> str:
+	return f"LOWER(TRIM(IFNULL({alias}.{field},''))) IN ('1','yes','true','y')"
+
+
+def registered_school_sql(alias: str = "fv") -> str:
+	"""School where any book, workshop, or program is running on the visit."""
+	a = alias
+	yes = lambda f: _yes_field_sql(f, a)
+	return f"""(
+		IFNULL({a}.me_mqh_book_status, '') != ''
+		OR {yes("qps_mqh_books")}
+		OR {yes("qps_mqh_teachers_guides")}
+		OR {yes("mt_mqh_sample_provided")}
+		OR {yes("tps_noorani_qaida")}
+		OR {yes("tps_noorani_qaida_guide")}
+		OR {yes("tps_noorani_qaida_workbook_khi")}
+		OR {a}.type IN (
+			'Workshop Conducted', 'Workshop', 'Workshop Arranged',
+			'Training', 'Teachers Training Meeting'
+		)
+		OR {yes("me_teachers_training_session")}
+		OR {yes("qps_onsite_training")}
+		OR {yes("qps_online_training")}
+		OR {yes("tps_1_day_tajweed_females")}
+		OR {yes("tps_ttc_tajweed_khi")}
+		OR {yes("tps_tajweed_customize")}
+		OR {yes("tps_tajweed_workshop_kids_khi")}
+		OR {yes("cee_one_day_workshop")}
+		OR IFNULL({a}.qps_affiliated, '') LIKE 'Yes%%'
+		OR IFNULL({a}.tps_affiliated, '') LIKE 'Yes%%'
+		OR IFNULL({a}.cee_affiliated, '') LIKE 'Yes%%'
+		OR {yes("qps_registration_lms")}
+		OR {yes("qps_50_days_syllabus")}
+		OR {yes("qps_mqh_quiz")}
+		OR {yes("cee_elp")}
+		OR {yes("cee_tecc_foundation")}
+		OR {yes("cee_tecc_professional")}
+	)"""
+
+
 def _metric_condition(metric: str, alias: str = "fv") -> str:
 	a = alias
 	m = (metric or "visits").strip().lower()
@@ -116,8 +158,10 @@ def _metric_condition(metric: str, alias: str = "fv") -> str:
 		return f"{a}.type = 'M&E'"
 	if m == "meeting":
 		return f"{a}.type IN ('Meeting', 'Meeting with Ulama and Educationist')"
+	if m == "workshop_arranged":
+		return f"{a}.type = 'Workshop Arranged'"
 	if m == "workshop_conducted":
-		return f"{a}.type = 'Workshop Conducted'"
+		return f"{a}.type IN ('Workshop Conducted', 'Workshop')"
 	if m == "training":
 		return f"{a}.type IN ('Training', 'Workshop', 'Workshop Conducted', 'Workshop Arranged')"
 	if m == "half_day_workshop":
@@ -145,13 +189,8 @@ def _metric_condition(metric: str, alias: str = "fv") -> str:
 			OR ({a}.type = 'Visits' AND {a}.marketing_visit_category = 'New')
 		)"""
 	if m in ("new_schools", "new_school"):
-		return f"""{a}.type IN ('Marketing', 'Visits', 'M&E', 'Joint Visit with SME', 'Registration of New Schools') AND (
-			({a}.type IN ('Marketing', 'Visits') AND {a}.marketing_visit_category = 'New')
-			OR {a}.type = 'Registration of New Schools'
-			OR {a}.qps_affiliated = 'Yes - Newly Registered'
-			OR {a}.tps_affiliated = 'Yes - Newly Registered'
-			OR {a}.cee_affiliated = 'Yes - Newly Registered'
-		)"""
+		# Distinct schools counted in KPI via registered_school_sql; drilldown shows matching visits.
+		return registered_school_sql(a)
 	if m == "model_school_a":
 		return f"{department_count_sql(a)} >= 3"
 	if m == "model_school_b":
@@ -251,9 +290,183 @@ def get_visit_type_breakdown(from_date, to_date, staff="", submitted_only=False)
 	return {"total": total, "breakdown": breakdown}
 
 
+def _strip_pending_school_opening(text: str) -> str:
+	"""Remove auto note: Pending school (School Opening SOA-…): name."""
+	if not text:
+		return ""
+	text = str(text).replace("\r", "\n")
+	# Whole lines that are only the pending-school note
+	lines = []
+	for line in text.split("\n"):
+		stripped = line.strip()
+		if re.match(r"(?i)^pending\s+school\s*\(school\s+opening", stripped):
+			continue
+		if re.match(r"(?i)^pending\s+school\b", stripped) and "school opening" in stripped.lower():
+			continue
+		lines.append(line)
+	text = "\n".join(lines)
+	# Inline prefix before the real officer notes
+	text = re.sub(
+		r"(?i)pending\s+school\s*\(school\s+opening[^)]*\):\s*[^\n|;]*[\n|;]?\s*",
+		"",
+		text,
+	)
+	return " ".join(text.split()).strip(" |;")
+
+
+PROGRAM_SERVICE_LABELS = (
+	("qps_mqh_books", "MQH Books"),
+	("qps_mqh_teachers_guides", "MQH Teachers Guides"),
+	("qps_onsite_training", "Onsite Training"),
+	("qps_online_training", "Online Training"),
+	("qps_registration_lms", "LMS Registration"),
+	("qps_50_days_syllabus", "50 Days MQH Syllabus"),
+	("qps_mqh_quiz", "MQH Quiz"),
+	("tps_noorani_qaida", "Noorani Qaida"),
+	("tps_noorani_qaida_guide", "Noorani Qaida Guide"),
+	("tps_noorani_qaida_workbook_khi", "Noorani Qaida Workbook"),
+	("tps_1_day_tajweed_females", "1 Day Tajweed (Females)"),
+	("tps_ttc_tajweed_khi", "TTC Tajweed"),
+	("tps_tajweed_customize", "Tajweed Customize"),
+	("tps_tajweed_workshop_kids_khi", "Tajweed Workshop Kids"),
+	("cee_elp", "ELP"),
+	("cee_tecc_foundation", "TECC Foundation"),
+	("cee_tecc_professional", "TECC Professional"),
+	("cee_one_day_workshop", "One Day Workshop"),
+)
+
+VISIT_REMARKS_EXTRA_SELECT = """
+	fv.me_mqh_book_status,
+	fv.me_mqh_book_version,
+	fv.me_mqh_book_part,
+	fv.me_teachers_training_session,
+	fv.mt_mqh_sample_provided,
+	fv.training_session_category,
+	fv.training_workshop_topic,
+	fv.training_no_of_participants,
+	fv.qps_affiliated,
+	fv.tps_affiliated,
+	fv.cee_affiliated,
+	fv.qps_mqh_books,
+	fv.qps_mqh_teachers_guides,
+	fv.qps_onsite_training,
+	fv.qps_online_training,
+	fv.qps_registration_lms,
+	fv.qps_50_days_syllabus,
+	fv.qps_mqh_quiz,
+	fv.tps_noorani_qaida,
+	fv.tps_noorani_qaida_guide,
+	fv.tps_noorani_qaida_workbook_khi,
+	fv.tps_1_day_tajweed_females,
+	fv.tps_ttc_tajweed_khi,
+	fv.tps_tajweed_customize,
+	fv.tps_tajweed_workshop_kids_khi,
+	fv.cee_elp,
+	fv.cee_tecc_foundation,
+	fv.cee_tecc_professional,
+	fv.cee_one_day_workshop
+"""
+
+
+def _yes(value) -> bool:
+	return str(value or "").strip().lower() in ("1", "yes", "true", "y")
+
+
+def _clean(value) -> str:
+	return " ".join(str(value or "").replace("\r", "\n").split()).strip()
+
+
+def _books_heading(row) -> str:
+	bits = []
+	status = _clean(row.get("me_mqh_book_status"))
+	version = _clean(row.get("me_mqh_book_version"))
+	parts = _clean(row.get("me_mqh_book_part")).replace(" ; ", "; ")
+	if status:
+		bits.append(status)
+	if version:
+		bits.append(version)
+	if parts:
+		bits.append(parts)
+	if _yes(row.get("qps_mqh_books")):
+		bits.append("MQH Books marked Yes")
+	if _yes(row.get("qps_mqh_teachers_guides")):
+		bits.append("MQH Teachers Guides Yes")
+	if _yes(row.get("mt_mqh_sample_provided")):
+		bits.append("Mutalae Quran sample provided")
+	if _yes(row.get("tps_noorani_qaida")):
+		bits.append("Noorani Qaida")
+	if _yes(row.get("tps_noorani_qaida_workbook_khi")):
+		bits.append("Noorani Qaida Workbook")
+	return " · ".join(bits)
+
+
+def _workshop_heading(row) -> str:
+	bits = []
+	vtype = _clean(row.get("type"))
+	workshop_types = {
+		"Workshop Conducted",
+		"Workshop",
+		"Workshop Arranged",
+		"Training",
+		"Teachers Training Meeting",
+	}
+	if vtype == "Workshop Conducted":
+		bits.append("Conducted")
+	elif vtype in workshop_types:
+		bits.append(vtype)
+	cat = _clean(row.get("training_session_category"))
+	if cat:
+		bits.append(cat)
+	topic = _clean(row.get("training_workshop_topic"))
+	if topic:
+		bits.append(topic)
+	teachers = _clean(row.get("me_teachers_training_session"))
+	if teachers in ("1", "Yes", "yes"):
+		bits.append("Teachers training Yes")
+	elif teachers in ("No", "no"):
+		bits.append("Teachers training No")
+	if _yes(row.get("qps_onsite_training")):
+		bits.append("Onsite Training Yes")
+	if _yes(row.get("qps_online_training")):
+		bits.append("Online Training Yes")
+	participants = row.get("training_no_of_participants")
+	if participants not in (None, "", 0, "0") and (vtype in workshop_types or bits):
+		bits.append(f"Participants {participants}")
+	return " · ".join(bits)
+
+
+def _program_heading(row) -> str:
+	bits = []
+	for key, label in (
+		("qps_affiliated", "QPS"),
+		("tps_affiliated", "TPS"),
+		("cee_affiliated", "CEE"),
+	):
+		aff = _clean(row.get(key))
+		if aff and aff.lower().startswith("yes"):
+			bits.append(f"{label}: {aff}")
+	marked = []
+	for field, label in PROGRAM_SERVICE_LABELS:
+		if field in (
+			"qps_mqh_books",
+			"qps_mqh_teachers_guides",
+			"qps_onsite_training",
+			"qps_online_training",
+			"tps_noorani_qaida",
+			"tps_noorani_qaida_workbook_khi",
+		):
+			# Already covered under Books / Workshop headings.
+			continue
+		if _yes(row.get(field)):
+			marked.append(label)
+	if marked:
+		bits.append("; ".join(marked))
+	return " · ".join(bits)
+
+
 def _visit_remarks(row) -> str:
-	"""Remarks the user typed on the Field Visit, from every activity type."""
-	parts = []
+	"""Always Books / Workshop / Program / Remarks headings (every card drilldown)."""
+	notes = []
 	for key in (
 		"mt_remarks",
 		"ot_remarks",
@@ -263,10 +476,19 @@ def _visit_remarks(row) -> str:
 		"ot_academic_task_other",
 		"ot_other_official_task_detail",
 	):
-		val = (row.get(key) or "").strip()
-		if val and val not in parts:
-			parts.append(val)
-	return " | ".join(parts)
+		val = _strip_pending_school_opening((row.get(key) or "").strip())
+		if val and val not in notes:
+			notes.append(val)
+	# Keep free-text as one Remarks section (join with ; so UI can split on " | ").
+	notes_text = "; ".join(notes) if notes else "—"
+	return " | ".join(
+		[
+			f"Books: {_books_heading(row) or '—'}",
+			f"Workshop: {_workshop_heading(row) or '—'}",
+			f"Program: {_program_heading(row) or '—'}",
+			f"Remarks: {notes_text}",
+		]
+	)
 
 
 def _school_sql(alias="fv"):
@@ -340,6 +562,8 @@ def get_visit_drilldown(filters=None, metric=None, staff=None):
 
 	visit_day = visit_day_sql("fv")
 	submitted_only = cint(filters.get("submitted_only") or filters.get("submitted") or 0)
+	province = (filters.get("province") or "").strip()
+	city = (filters.get("city") or "").strip()
 	docstatus_sql = "fv.docstatus = 1" if submitted_only else "fv.docstatus < 2"
 	conditions = [
 		docstatus_sql,
@@ -352,6 +576,25 @@ def get_visit_drilldown(filters=None, metric=None, staff=None):
 		tokens = expand_staff_tokens(staff)
 		params["staff_tokens"] = tuple(t.lower() for t in tokens) or ("__none__",)
 		conditions.append(staff_match_sql("fv", "staff_tokens"))
+	if province:
+		conditions.append(
+			"""COALESCE(
+				NULLIF(TRIM(fv.province), ''),
+				NULLIF(TRIM(fv.me_province), ''),
+				NULLIF(TRIM(fv.training_province), '')
+			) = %(province)s"""
+		)
+		params["province"] = province
+	if city:
+		conditions.append(
+			"""COALESCE(
+				NULLIF(TRIM(fv.city), ''),
+				NULLIF(TRIM(fv.me_city), ''),
+				NULLIF(TRIM(fv.training_city), ''),
+				NULLIF(TRIM(fv.mt_city), '')
+			) = %(city)s"""
+		)
+		params["city"] = city
 
 	where_sql = " AND ".join(f"({c})" for c in conditions)
 	rows = frappe.db.sql(
@@ -374,6 +617,7 @@ def get_visit_drilldown(filters=None, metric=None, staff=None):
 			fv.travel_remarks,
 			fv.ot_academic_task_other,
 			fv.ot_other_official_task_detail,
+			{VISIT_REMARKS_EXTRA_SELECT},
 			{visit_day} AS visit_date,
 			{_school_sql("fv")} AS school,
 			{_school_unapproved_sql("fv")} AS school_unapproved,

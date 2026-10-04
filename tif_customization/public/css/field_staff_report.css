@@ -130,9 +130,23 @@
 	background: #f1f5f9;
 }
 .fsr-photo-card span {
+	display: flex;
+	flex-direction: column;
 	font-size: 11px;
 	font-weight: 700;
 	color: #0f766e;
+	line-height: 1.2;
+}
+.fsr-photo-card span small {
+	font-size: 10px;
+	font-weight: 500;
+	color: #64748b;
+}
+.fsr-photo-time {
+	margin-top: 4px;
+	font-size: 11px;
+	font-weight: 500;
+	color: #64748b;
 }
 .fsr-photo-grid {
 	display: grid;

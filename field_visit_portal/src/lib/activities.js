@@ -60,6 +60,16 @@ export const ACTIVITY_CARDS = [
 		subUr: "ورکشاپ / تربیت کا انعقاد",
 	},
 	{
+		id: "volunteer",
+		type: "Enrolment of Volunteers",
+		group: "volunteer",
+		emoji: "🤝",
+		titleEn: "Volunteer Enrolment",
+		titleUr: "والنٹیئر اندراج",
+		subEn: "Contact, location, school, profession",
+		subUr: "رابطہ، مقام، اسکول، پیشہ",
+	},
+	{
 		id: "enrolment",
 		type: "Enrolment of Participants",
 		group: "enrolment",
