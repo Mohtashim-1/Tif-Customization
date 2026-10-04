@@ -22,6 +22,13 @@ PORTAL_LINKS = {
 			"is_query_report": 0,
 			"highlight": False,
 		},
+		{
+			"label": "Teacher Training Dashboard",
+			"link_type": "URL",
+			"link_to": "/app/teacher-training-dashboard",
+			"is_query_report": 0,
+			"highlight": False,
+		},
 	],
 }
 
