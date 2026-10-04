@@ -13,6 +13,7 @@ const SCHOOL_TYPES = [
 	"Visits",
 	"Registration of New Schools",
 	"Enrolment of Volunteers",
+	"Enrolment of Ambassadors",
 	"Model School A",
 	"Model School B",
 	"Books Demand (Quantity)",
@@ -22,6 +23,7 @@ const SCHOOL_VISIT_FORM_TYPES = [
 	"Visits",
 	"Registration of New Schools",
 	"Enrolment of Volunteers",
+	"Enrolment of Ambassadors",
 	"Model School A",
 	"Model School B",
 	"Books Demand (Quantity)",
@@ -586,10 +588,26 @@ function apply_field_visit_logic(frm) {
 		if (type === "M&E") {
 			set_hidden(frm, ["registered_volunteer"], false);
 			set_hidden(frm, ["section_break_volunteers", "volunteer_enrolments"], true);
-		} else if (type !== "Enrolment of Volunteers") {
+			set_hidden(frm, ["section_break_ambassadors", "ambassador_enrolments"], true);
+		} else if (type === "Enrolment of Volunteers") {
+			set_hidden(frm, ["section_break_ambassadors", "ambassador_enrolments"], true);
+		} else if (type === "Enrolment of Ambassadors") {
 			set_hidden(
 				frm,
 				["registered_volunteer", "section_break_volunteers", "volunteer_enrolments"],
+				true,
+			);
+			set_hidden(frm, ["section_break_ambassadors", "ambassador_enrolments"], false);
+		} else {
+			set_hidden(
+				frm,
+				[
+					"registered_volunteer",
+					"section_break_volunteers",
+					"volunteer_enrolments",
+					"section_break_ambassadors",
+					"ambassador_enrolments",
+				],
 				true,
 			);
 		}

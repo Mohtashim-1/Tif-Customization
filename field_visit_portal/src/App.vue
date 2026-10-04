@@ -34,6 +34,7 @@ const success = ref(false);
 const savedName = ref("");
 const showParticipant = ref(false);
 const showVolunteer = ref(false);
+const showAmbassador = ref(false);
 const selectedId = ref("");
 const meta = ref({
 	staff_name: "",
@@ -303,6 +304,34 @@ function emptyVolunteerForm() {
 	};
 }
 const volunteerForm = reactive(emptyVolunteerForm());
+
+const ambassadors = ref([]);
+const ambassadorVisit = reactive({
+	date: todayISO(),
+	city: "",
+	area: "",
+	province: "Punjab",
+	registered: "Yes",
+	remarks: "",
+});
+function emptyAmbassadorForm() {
+	return {
+		name: "",
+		contact: "",
+		email: "",
+		profession: "",
+		contribution: "",
+		province: "Punjab",
+		city: "",
+		area: "",
+		address: "",
+		school: "",
+		schoolLabel: "",
+		formSubmitted: "No",
+		remarks: "",
+	};
+}
+const ambassadorForm = reactive(emptyAmbassadorForm());
 
 const books = ref([]);
 const travel = reactive({
@@ -753,6 +782,40 @@ function addVolunteer() {
 	showVolunteer.value = false;
 }
 
+function openAmbassadorModal() {
+	Object.assign(ambassadorForm, emptyAmbassadorForm());
+	ambassadorForm.province = ambassadorVisit.province || "Punjab";
+	ambassadorForm.city = ambassadorVisit.city || "";
+	ambassadorForm.area = ambassadorVisit.area || "";
+	showAmbassador.value = true;
+}
+
+function addAmbassador() {
+	if (!(ambassadorForm.name || "").trim()) return;
+	if (!(ambassadorForm.contact || "").trim()) return;
+	ambassadors.value.push({
+		id: String(Date.now()),
+		name: ambassadorForm.name.trim(),
+		contact: ambassadorForm.contact.trim(),
+		email: (ambassadorForm.email || "").trim(),
+		profession: (ambassadorForm.profession || "").trim(),
+		contribution: (ambassadorForm.contribution || "").trim(),
+		province: ambassadorForm.province || ambassadorVisit.province,
+		city: ambassadorForm.city || ambassadorVisit.city,
+		area: ambassadorForm.area || ambassadorVisit.area,
+		address: (ambassadorForm.address || "").trim(),
+		school: ambassadorForm.school || "",
+		schoolLabel: ambassadorForm.schoolLabel || ambassadorForm.school || "",
+		formSubmitted: ambassadorForm.formSubmitted || "No",
+		remarks: (ambassadorForm.remarks || "").trim(),
+	});
+	Object.assign(ambassadorForm, emptyAmbassadorForm());
+	ambassadorForm.province = ambassadorVisit.province || "Punjab";
+	ambassadorForm.city = ambassadorVisit.city || "";
+	ambassadorForm.area = ambassadorVisit.area || "";
+	showAmbassador.value = false;
+}
+
 function addBook() {
 	books.value.push({
 		id: String(Date.now()),
@@ -823,16 +886,21 @@ function buildPayload(submitDoc) {
 	const activityType = resolveActivityType(card, training.otType, meta.value.activity_types || []);
 	const schoolForm = card?.group === "visits" || card?.group === "books" || card?.group === "me";
 	const volunteerFormGroup = card?.group === "volunteer";
+	const ambassadorFormGroup = card?.group === "ambassador";
 	const visitDate = schoolForm
 		? visit.visitDate
 		: volunteerFormGroup
 			? volunteerVisit.date
-			: meeting.meetingDate || training.date || todayISO();
+			: ambassadorFormGroup
+				? ambassadorVisit.date
+				: meeting.meetingDate || training.date || todayISO();
 	const city = schoolForm
 		? visit.city
 		: volunteerFormGroup
 			? volunteerVisit.city
-			: meeting.city || training.city;
+			: ambassadorFormGroup
+				? ambassadorVisit.city
+				: meeting.city || training.city;
 	const payload = {
 		activity_type: activityType,
 		visit_by: staffName.value,
@@ -843,17 +911,27 @@ function buildPayload(submitDoc) {
 		starting_time: card?.group === "visits" || card?.group === "me" ? visit.startTime : meeting.startTime,
 		ending_time: card?.group === "visits" || card?.group === "me" ? visit.endTime : meeting.endTime,
 		city,
-		area: schoolForm ? visit.area : volunteerFormGroup ? volunteerVisit.area : meeting.area,
+		area: schoolForm
+			? visit.area
+			: volunteerFormGroup
+				? volunteerVisit.area
+				: ambassadorFormGroup
+					? ambassadorVisit.area
+					: meeting.area,
 		province: schoolForm
 			? visit.province
 			: volunteerFormGroup
 				? volunteerVisit.province
-				: training.province,
+				: ambassadorFormGroup
+					? ambassadorVisit.province
+					: training.province,
 		school_name: schoolForm
 			? visit.schoolName
 			: volunteerFormGroup
 				? volunteers.value.find((v) => v.school)?.school || ""
-				: meeting.institute || training.venueName,
+				: ambassadorFormGroup
+					? ambassadors.value.find((v) => v.school)?.school || ""
+					: meeting.institute || training.venueName,
 		contact_person_name: schoolForm ? visit.meetingWith : meeting.meetingWith,
 		contact_number: schoolForm ? visit.contactNumber : meeting.contactNo,
 		designation: schoolForm ? visit.designation : "",
@@ -1070,6 +1148,24 @@ function buildPayload(submitDoc) {
 		}));
 	}
 
+	if (card?.group === "ambassador") {
+		payload.school_additional_remarks = ambassadorVisit.remarks || "";
+		payload.ambassador_enrolments = ambassadors.value.map((v) => ({
+			ambassador_name: v.name,
+			contact_number: v.contact,
+			email: v.email,
+			profession: v.profession,
+			contribution: v.contribution,
+			province: v.province,
+			city: v.city,
+			area: v.area,
+			address: v.address,
+			school: v.school,
+			ambassador_form_submitted: v.formSubmitted || "No",
+			remarks: v.remarks,
+		}));
+	}
+
 	if (card?.id === "registration") {
 		payload.workshop_attendees = participants.value.map((p) => ({
 			attendee_name: p.name,
@@ -1191,6 +1287,20 @@ async function saveVisit(submitDoc) {
 			return;
 		}
 	}
+	if (selected.value.group === "ambassador") {
+		if (!ambassadors.value.length) {
+			error.value = "Add at least one ambassador.";
+			return;
+		}
+		if (!ambassadorVisit.date) {
+			error.value = "Date is required.";
+			return;
+		}
+		if (!ambassadorVisit.city) {
+			error.value = "City is required.";
+			return;
+		}
+	}
 	saving.value = true;
 	try {
 		const result = await apiPost(`${METHOD}.submit_smes_activity`, {
@@ -1248,6 +1358,16 @@ function resetForm() {
 		remarks: "",
 	});
 	Object.assign(volunteerForm, emptyVolunteerForm());
+	ambassadors.value = [];
+	Object.assign(ambassadorVisit, {
+		date: todayISO(),
+		city: "",
+		area: "",
+		province: "Punjab",
+		registered: "Yes",
+		remarks: "",
+	});
+	Object.assign(ambassadorForm, emptyAmbassadorForm());
 	books.value = [];
 	attachments.card = null;
 	attachments.meeting = null;
@@ -2214,6 +2334,105 @@ const steps = [
 						</div>
 					</div>
 
+					<div class="panel-body" v-else-if="selected.group === 'ambassador'">
+						<SectionTitle
+							:mode="lang"
+							title-en="Ambassador Enrolment"
+							title-ur="ایمبیسڈر اندراج"
+							sub-en="Record contact, location, profession — optionally tag a school"
+							sub-ur="رابطہ، مقام، پیشہ درج کریں — ضرورت ہو تو اسکول بھی منسلک کریں"
+						/>
+						<div class="grid-2" style="margin-top: 12px">
+							<FieldDate :mode="lang" label-en="Date" label-ur="تاریخ" required v-model="ambassadorVisit.date" />
+							<FieldSelect
+								:mode="lang"
+								label-en="Registered with TIF as Ambassador"
+								label-ur="TIF کے ساتھ ایمبیسڈر رجسٹرڈ؟"
+								:options="['Yes', 'No']"
+								required
+								v-model="ambassadorVisit.registered"
+							/>
+							<FieldLink
+								:mode="lang"
+								label-en="City"
+								label-ur="شہر"
+								placeholder="Type to search city"
+								empty-text="No cities found"
+								:options="cityLinkOptions"
+								:search="searchCities"
+								required
+								v-model="ambassadorVisit.city"
+							/>
+							<FieldSelect
+								:mode="lang"
+								label-en="Province"
+								label-ur="صوبہ"
+								:options="provinceOptions"
+								required
+								v-model="ambassadorVisit.province"
+							/>
+							<FieldInput :mode="lang" label-en="Area / Locality" label-ur="علاقہ" v-model="ambassadorVisit.area" />
+							<div style="grid-column: 1 / -1">
+								<FieldTextarea
+									:mode="lang"
+									label-en="Visit / batch remarks"
+									label-ur="دورہ / بیچ نوٹس"
+									v-model="ambassadorVisit.remarks"
+								/>
+							</div>
+						</div>
+						<div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; margin-top: 28px">
+							<SectionTitle
+								:mode="lang"
+								title-en="Ambassadors"
+								title-ur="ایمبیسڈرز"
+								sub-en="Add one or more people"
+								sub-ur="ایک یا زیادہ افراد شامل کریں"
+								small
+							/>
+							<button class="btn btn-green" type="button" @click="openAmbassadorModal">
+								<Bi :mode="lang" en="+ Add Ambassador" ur="ایمبیسڈر شامل کریں" />
+							</button>
+						</div>
+						<div v-if="!ambassadors.length" class="empty">
+							<div style="font-size: 28px">🏅</div>
+							<div style="margin-top: 8px; font-weight: 600">
+								<Bi :mode="lang" en="No ambassadors yet" ur="ابھی کوئی ایمبیسڈر نہیں" />
+							</div>
+							<button class="btn btn-green" style="margin-top: 16px" type="button" @click="openAmbassadorModal">
+								<Bi :mode="lang" en="Add Ambassador" ur="ایمبیسڈر شامل کریں" />
+							</button>
+						</div>
+						<div v-else class="grid-2" style="margin-top: 20px">
+							<div v-for="v in ambassadors" :key="v.id" class="person-card">
+								<div class="avatar">{{ initials(v.name) }}</div>
+								<div style="flex: 1; min-width: 0">
+									<div style="font-weight: 600; font-size: 13px">{{ v.name }}</div>
+									<div style="font-size: 11px; color: #71717a">
+										{{ v.contact }}<span v-if="v.profession"> · {{ v.profession }}</span>
+									</div>
+									<div style="font-size: 11px; color: #71717a">
+										{{ v.city }}{{ v.area ? `, ${v.area}` : "" }} · {{ v.province }}
+									</div>
+									<div v-if="v.schoolLabel || v.school" style="font-size: 11px; color: #71717a">
+										🏫 {{ v.schoolLabel || v.school }}
+									</div>
+									<div v-if="v.contribution" style="font-size: 11px; color: #52525b; margin-top: 2px">
+										{{ v.contribution }}
+									</div>
+								</div>
+								<button
+									class="btn"
+									style="padding: 4px 10px; font-size: 11px"
+									type="button"
+									@click="ambassadors = ambassadors.filter((x) => x.id !== v.id)"
+								>
+									<Bi :mode="lang" en="Remove" ur="حذف کریں" />
+								</button>
+							</div>
+						</div>
+					</div>
+
 					<div class="panel-body" v-else-if="selected.group === 'enrolment'">
 						<div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px">
 							<SectionTitle :mode="lang" :title-en="selected.titleEn" :title-ur="selected.titleUr" sub-en="View participants as cards" sub-ur="شرکاء کو کارڈز میں دیکھیں" />
@@ -2436,6 +2655,18 @@ const steps = [
 							<span style="opacity: 0.7">Date</span>
 							<span>{{ volunteerVisit.date }}</span>
 						</div>
+						<div v-if="selected?.group === 'ambassador'" class="summary-row">
+							<span style="opacity: 0.7">Ambassadors</span>
+							<span>{{ ambassadors.length }} added</span>
+						</div>
+						<div v-if="selected?.group === 'ambassador'" class="summary-row">
+							<span style="opacity: 0.7">City</span>
+							<span>{{ ambassadorVisit.city || "-" }} · {{ ambassadorVisit.province }}</span>
+						</div>
+						<div v-if="selected?.group === 'ambassador'" class="summary-row">
+							<span style="opacity: 0.7">Date</span>
+							<span>{{ ambassadorVisit.date }}</span>
+						</div>
 						<div v-if="selected?.group === 'books'" class="summary-row">
 							<span style="opacity: 0.7">Books</span>
 							<span>{{ bookTotal() }} books</span>
@@ -2589,6 +2820,87 @@ const steps = [
 						<Bi :mode="lang" en="Cancel" ur="منسوخ کریں" />
 					</button>
 					<button class="btn btn-green" type="button" @click="addVolunteer">
+						<Bi :mode="lang" en="Add" ur="شامل کریں" />
+					</button>
+				</div>
+			</div>
+		</div>
+
+		<div v-if="showAmbassador" class="modal-bg" @click.self="showAmbassador = false">
+			<div class="modal" style="max-width: 640px">
+				<div class="modal-head">
+					<div style="font-weight: 600; font-size: 16px">
+						<Bi :mode="lang" en="Add Ambassador" ur="نیا ایمبیسڈر شامل کریں" />
+					</div>
+					<button class="icon-btn" type="button" @click="showAmbassador = false">✕</button>
+				</div>
+				<div class="modal-body">
+					<div class="grid-2">
+						<div style="grid-column: 1 / -1">
+							<FieldInput :mode="lang" label-en="Ambassador Name" label-ur="ایمبیسڈر کا نام" required v-model="ambassadorForm.name" />
+						</div>
+						<FieldInput :mode="lang" label-en="Contact Number" label-ur="موبائل نمبر" required v-model="ambassadorForm.contact" />
+						<FieldInput :mode="lang" label-en="Email" label-ur="ای میل" v-model="ambassadorForm.email" />
+						<FieldInput :mode="lang" label-en="Profession" label-ur="پیشہ" v-model="ambassadorForm.profession" />
+						<FieldSelect
+							:mode="lang"
+							label-en="Form Submitted"
+							label-ur="فارم جمع؟"
+							:options="['Yes', 'No']"
+							v-model="ambassadorForm.formSubmitted"
+						/>
+						<div style="grid-column: 1 / -1">
+							<FieldTextarea
+								:mode="lang"
+								label-en="What is he/she doing (role / contribution)"
+								label-ur="کیا کر رہے ہیں (کردار / تعاون)"
+								v-model="ambassadorForm.contribution"
+							/>
+						</div>
+						<FieldLink
+							:mode="lang"
+							label-en="City"
+							label-ur="شہر"
+							placeholder="Type to search city"
+							empty-text="No cities found"
+							:options="cityLinkOptions"
+							:search="searchCities"
+							v-model="ambassadorForm.city"
+						/>
+						<FieldSelect
+							:mode="lang"
+							label-en="Province"
+							label-ur="صوبہ"
+							:options="provinceOptions"
+							v-model="ambassadorForm.province"
+						/>
+						<FieldInput :mode="lang" label-en="Area / Locality" label-ur="علاقہ" v-model="ambassadorForm.area" />
+						<div style="grid-column: 1 / -1">
+							<FieldTextarea :mode="lang" label-en="Address" label-ur="پتہ" v-model="ambassadorForm.address" />
+						</div>
+						<div style="grid-column: 1 / -1">
+							<FieldLink
+								:mode="lang"
+								label-en="Tag School (optional)"
+								label-ur="اسکول منسلک کریں (اختیاری)"
+								placeholder="Type to search school"
+								empty-text="No schools found"
+								:options="customerOptions"
+								:search="searchSchools"
+								v-model="ambassadorForm.school"
+								v-model:label="ambassadorForm.schoolLabel"
+							/>
+						</div>
+						<div style="grid-column: 1 / -1">
+							<FieldTextarea :mode="lang" label-en="Other / Remarks" label-ur="دیگر / نوٹس" v-model="ambassadorForm.remarks" />
+						</div>
+					</div>
+				</div>
+				<div class="modal-foot">
+					<button class="btn" type="button" @click="showAmbassador = false">
+						<Bi :mode="lang" en="Cancel" ur="منسوخ کریں" />
+					</button>
+					<button class="btn btn-green" type="button" @click="addAmbassador">
 						<Bi :mode="lang" en="Add" ur="شامل کریں" />
 					</button>
 				</div>

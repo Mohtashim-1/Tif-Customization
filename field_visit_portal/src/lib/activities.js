@@ -70,6 +70,16 @@ export const ACTIVITY_CARDS = [
 		subUr: "رابطہ، مقام، اسکول، پیشہ",
 	},
 	{
+		id: "ambassador",
+		type: "Enrolment of Ambassadors",
+		group: "ambassador",
+		emoji: "🏅",
+		titleEn: "Ambassador Enrolment",
+		titleUr: "ایمبیسڈر اندراج",
+		subEn: "Contact, location, school, profession",
+		subUr: "رابطہ، مقام، اسکول، پیشہ",
+	},
+	{
 		id: "enrolment",
 		type: "Enrolment of Participants",
 		group: "enrolment",

@@ -510,7 +510,7 @@
    "hidden": 0,
    "is_query_report": 0,
    "label": "SME",
-   "link_count": 12,
+   "link_count": 13,
    "onboard": 0,
    "type": "Card Break"
   },
@@ -530,6 +530,26 @@
    "label": "SME Daily Reporting ",
    "link_count": 0,
    "link_to": "field-staff-report",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Volunteer Dashboard",
+   "link_count": 0,
+   "link_to": "volunteer-dashboard",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Ambassador Dashboard",
+   "link_count": 0,
+   "link_to": "ambassador-dashboard",
    "link_type": "Page",
    "onboard": 0,
    "type": "Link"
@@ -595,7 +615,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-09-28 19:37:26.627243",
+ "modified": "2026-10-05 04:13:31.843725",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Reports",

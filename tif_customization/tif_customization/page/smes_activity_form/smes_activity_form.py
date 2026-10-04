@@ -74,6 +74,7 @@ SHEET_ACTIVITY_TYPES = [
 	"Workshop Arranged",
 	"Books Demand (Quantity)",
 	"Enrolment of Volunteers",
+	"Enrolment of Ambassadors",
 	"Model School A",
 	"Model School B",
 ]
@@ -210,6 +211,7 @@ ACTIVITY_TYPE_MAP = {
 	"Workshop Arranged": "Workshop Arranged",
 	"Books Demand (Quantity)": "Books Demand (Quantity)",
 	"Enrolment of Volunteers": "Enrolment of Volunteers",
+	"Enrolment of Ambassadors": "Enrolment of Ambassadors",
 	"Model School A": "Model School A",
 	"Model School B": "Model School B",
 	"Marketing Visit": "Marketing",
@@ -226,6 +228,7 @@ SCHOOL_NAME_LINK_TYPES = {
 	"Visits",
 	"Registration of New Schools",
 	"Enrolment of Volunteers",
+	"Enrolment of Ambassadors",
 	"Model School A",
 	"Model School B",
 	"Books Demand (Quantity)",
@@ -1573,6 +1576,8 @@ def submit_smes_activity(data):
 		_append_enrolment_rows(doc, data)
 	elif doc_type == "Enrolment of Volunteers":
 		_append_volunteer_rows(doc, data)
+	elif doc_type == "Enrolment of Ambassadors":
+		_append_ambassador_rows(doc, data)
 	elif doc_type in (
 		"Attendance / Registration in One Day / Half day Workshop",
 		"Registration of Participant in Workshops",
@@ -1824,6 +1829,66 @@ def _append_volunteer_rows(doc, data):
 			entry["school"] = school
 		doc.append("volunteer_enrolments", entry)
 	# Optional parent school tag from first volunteer school / payload.
+	if not cstr(doc.school_name or "").strip():
+		parent_school = cstr(data.get("school_name") or "").strip()
+		if not parent_school:
+			for row in rows:
+				if isinstance(row, dict):
+					parent_school = cstr(row.get("school") or row.get("school_name") or "").strip()
+					if parent_school:
+						break
+		if parent_school:
+			doc.school_name = _resolve_customer_link(parent_school) or parent_school
+
+
+def _append_ambassador_rows(doc, data):
+	"""Child table Field Visit Ambassador — same shape as volunteers."""
+	rows = data.get("ambassador_enrolments") or data.get("ambassadors") or []
+	if isinstance(rows, str):
+		try:
+			rows = frappe.parse_json(rows) or []
+		except Exception:
+			rows = []
+	meta = frappe.get_meta("Field Visit Ambassador")
+	has = {df.fieldname for df in meta.fields}
+	for row in rows:
+		if not isinstance(row, dict):
+			continue
+		name = cstr(row.get("ambassador_name") or row.get("name")).strip()
+		if not name:
+			continue
+		province = PROVINCE_MAP.get(
+			cstr(row.get("province") or "").strip(),
+			cstr(row.get("province") or data.get("province") or "").strip(),
+		) or cstr(data.get("province") or "").strip()
+		school = cstr(row.get("school") or row.get("school_name") or "").strip()
+		if school:
+			school = _resolve_customer_link(school) or school
+		entry = {
+			"ambassador_name": name,
+			"contact_number": cstr(row.get("contact_number") or row.get("contact") or "").strip(),
+			"email": cstr(row.get("email") or "").strip(),
+			"province": province,
+			"city": cstr(row.get("city") or data.get("city") or "").strip(),
+			"ambassador_form_submitted": cstr(
+				row.get("ambassador_form_submitted") or row.get("form_submitted") or "No"
+			).strip()
+			or "No",
+			"remarks": cstr(row.get("remarks") or "").strip(),
+		}
+		if "profession" in has:
+			entry["profession"] = cstr(row.get("profession") or "").strip()
+		if "contribution" in has:
+			entry["contribution"] = cstr(
+				row.get("contribution") or row.get("what_doing") or ""
+			).strip()
+		if "area" in has:
+			entry["area"] = cstr(row.get("area") or data.get("area") or "").strip()
+		if "address" in has:
+			entry["address"] = cstr(row.get("address") or "").strip()
+		if "school" in has and school:
+			entry["school"] = school
+		doc.append("ambassador_enrolments", entry)
 	if not cstr(doc.school_name or "").strip():
 		parent_school = cstr(data.get("school_name") or "").strip()
 		if not parent_school:

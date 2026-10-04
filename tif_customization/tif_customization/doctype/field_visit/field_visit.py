@@ -94,6 +94,7 @@ class FieldVisit(Document):
 			self._validate_training_attendees()
 			self._sync_training_attendee_defaults()
 		self._validate_volunteer_enrolments()
+		self._validate_ambassador_enrolments()
 		self._validate_enrolment_participants()
 		self._validate_workshop_attendees()
 		self._sync_school_contacts()
@@ -165,6 +166,17 @@ class FieldVisit(Document):
 			key = name.lower()
 			if key in names:
 				frappe.throw(_("Duplicate volunteer name: {0}").format(row.volunteer_name))
+			names.add(key)
+
+	def _validate_ambassador_enrolments(self):
+		names = set()
+		for row in self.ambassador_enrolments or []:
+			name = (row.ambassador_name or "").strip()
+			if not name:
+				frappe.throw(_("Ambassador Name is required for all ambassador rows."))
+			key = name.lower()
+			if key in names:
+				frappe.throw(_("Duplicate ambassador name: {0}").format(row.ambassador_name))
 			names.add(key)
 
 	def _validate_enrolment_participants(self):

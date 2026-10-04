@@ -537,7 +537,6 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 	/** Workshop / Ulama / Teachers Training / Head Office / Academic / Other Official under Activity. */
 	activity_extra_columns(data) {
 		const keys = new Set([
-			"workshop_arranged",
 			"workshop",
 			"meeting_ulama",
 			"teachers_training_meeting",
@@ -573,11 +572,9 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				style: (col.key || "activity").replace(/_/g, "-"),
 				metric: col.metric || col.key,
 				hint:
-					col.key === "workshop_arranged"
-						? __("Field Visit type = Workshop Arranged")
-						: col.key === "workshop"
-							? __("Field Visit type = Workshop Conducted or Workshop")
-							: undefined,
+					col.key === "workshop"
+						? __("Field Visit type = Workshop Conducted or Workshop")
+						: undefined,
 			})),
 		];
 		const outcomeCards = [
