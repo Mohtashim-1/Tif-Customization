@@ -1266,10 +1266,20 @@ def _officer_for_academic_card(doc_type, data):
 	if doc_type not in OFFICIAL_TASK_DOC_TYPES:
 		return None
 	assigned = {o["employee"]: o for o in get_assigned_field_officers()}
+	# Managers may pick any active field-officer staff (role-based), not only FO tree
+	if can_manage_supervisor_only_field_visits():
+		for row in get_active_field_officer_staff():
+			assigned.setdefault(row["employee"], row)
 	if not assigned:
 		return None
 	chosen = cstr(data.get("field_officer") or "").strip()
 	officer = assigned.get(chosen)
+	if not officer:
+		# Allow name match (legacy) → resolve to employee
+		for row in assigned.values():
+			if cstr(row.get("employee_name") or "").strip() == chosen:
+				officer = row
+				break
 	if not officer:
 		frappe.throw(_("Select the field employee in Name of Staff."))
 	data["visit_by"] = officer["employee_name"]

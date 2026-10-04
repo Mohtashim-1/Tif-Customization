@@ -138,22 +138,57 @@ def _field_officer_rows(filters: dict, skip_user: str | None = None) -> list[dic
 def get_assigned_field_officers(user: str | None = None) -> list[dict]:
 	"""Field employees a user may file an Academic Task for.
 
-	A field supervisor gets the officers assigned under them.
+	A field supervisor gets themselves plus officers assigned under them.
 	A manager who can see all visits gets every active field employee.
+	The logged-in employee's own name is always included when they are Active,
+	so supervisors can file Academic / HO / RO visits for themselves.
 	"""
 	user = user or frappe.session.user
+	officers: list[dict] = []
+	seen: set[str] = set()
+
+	def _extend(rows: list[dict]):
+		for row in rows:
+			emp = row.get("employee")
+			if not emp or emp in seen:
+				continue
+			seen.add(emp)
+			officers.append(row)
+
 	supervisor_fo = _supervisor_field_officer_name(user)
-	if supervisor_fo and frappe.db.count(
-		"Field Officer",
-		{"parent_field_officer": supervisor_fo, "status": "Active"},
-	):
-		return _field_officer_rows(
-			{"parent_field_officer": supervisor_fo, "status": "Active"},
-			skip_user=user,
+	if supervisor_fo:
+		# Supervisor themselves (Name of Staff) + team under them
+		_extend(_field_officer_rows({"name": supervisor_fo, "status": "Active"}))
+		_extend(
+			_field_officer_rows(
+				{"parent_field_officer": supervisor_fo, "status": "Active"},
+				skip_user=user,
+			)
 		)
-	if can_view_all_field_visits(user):
-		return _field_officer_rows({"status": "Active"})
-	return []
+	elif can_view_all_field_visits(user):
+		_extend(_field_officer_rows({"status": "Active"}))
+
+	# Always include logged-in Active employee (e.g. SME Manager without Field Officer row)
+	me = get_employee_for_user(user)
+	if me and me.name not in seen:
+		officers.insert(
+			0,
+			{
+				"field_officer": "",
+				"employee": me.name,
+				"employee_name": me.employee_name or me.name,
+				"user": user,
+			},
+		)
+		seen.add(me.name)
+
+	officers.sort(
+		key=lambda r: (
+			0 if me and r.get("employee") == me.name else 1,
+			(r.get("employee_name") or "").lower(),
+		)
+	)
+	return officers
 
 
 def _field_supervisor_subordinate_employees(user: str) -> list[str]:

@@ -392,14 +392,31 @@ const staffOptions = computed(() =>
 	(meta.value.staff_options || []).map((s) => s.employee_name || s.employee).filter(Boolean)
 );
 const assignedFieldOfficers = computed(() => meta.value.assigned_field_officers || []);
-const assignedFieldOfficerOptions = computed(() =>
-	assignedFieldOfficers.value.map((o) => ({
-		value: o.employee,
-		label: o.employee_name || o.employee,
-	}))
-);
+const assignedFieldOfficerOptions = computed(() => {
+	const byEmp = new Map();
+	for (const o of assignedFieldOfficers.value) {
+		if (!o?.employee) continue;
+		byEmp.set(o.employee, {
+			value: o.employee,
+			label: (o.employee_name || o.employee || "").trim(),
+		});
+	}
+	// Supervisors / managers: also offer full staff_options so names outside the FO tree appear
+	if (meta.value.can_manage_supervisor_only) {
+		for (const s of meta.value.staff_options || []) {
+			if (!s?.employee || byEmp.has(s.employee)) continue;
+			byEmp.set(s.employee, {
+				value: s.employee,
+				label: (s.employee_name || s.employee || "").trim(),
+			});
+		}
+	}
+	return [...byEmp.values()]
+		.filter((o) => o.label)
+		.sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
+});
 const showFieldOfficerPick = computed(
-	() => selected.value?.group === "academic" && assignedFieldOfficers.value.length > 0
+	() => selected.value?.group === "academic" && assignedFieldOfficerOptions.value.length > 0
 );
 const staffName = computed(() => visit.visitBy || meta.value.staff_name || boot.full_name || "");
 function nonempty(list, fallback) {
