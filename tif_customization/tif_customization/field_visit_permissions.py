@@ -135,11 +135,22 @@ def _field_officer_rows(filters: dict, skip_user: str | None = None) -> list[dic
 	return officers
 
 
+def _supervisor_group_officers() -> list[dict]:
+	"""Active Field Officers marked as supervisors (is_group)."""
+	if not frappe.db.exists("DocType", "Field Officer"):
+		return []
+	meta = frappe.get_meta("Field Officer")
+	if not meta.has_field("is_group"):
+		return []
+	return _field_officer_rows({"status": "Active", "is_group": 1})
+
+
 def get_assigned_field_officers(user: str | None = None) -> list[dict]:
 	"""Field employees a user may file an Academic Task for.
 
 	A field supervisor gets themselves plus officers assigned under them.
 	A manager who can see all visits gets every active field employee.
+	Supervisor-capable users also always get peer supervisors (is_group).
 	The logged-in employee's own name is always included when they are Active,
 	so supervisors can file Academic / HO / RO visits for themselves.
 	"""
@@ -168,6 +179,16 @@ def get_assigned_field_officers(user: str | None = None) -> list[dict]:
 	elif can_view_all_field_visits(user):
 		_extend(_field_officer_rows({"status": "Active"}))
 
+	# Peer supervisors (e.g. M. Adnan Munir) for anyone who can file supervisor-only tasks
+	from tif_customization.tif_customization.field_visit_supervisor_only import (
+		can_manage_supervisor_only_field_visits,
+	)
+
+	if can_manage_supervisor_only_field_visits(user) or can_view_all_field_visits(user):
+		_extend(_supervisor_group_officers())
+		if can_view_all_field_visits(user):
+			_extend(_field_officer_rows({"status": "Active"}))
+
 	# Always include logged-in Active employee (e.g. SME Manager without Field Officer row)
 	me = get_employee_for_user(user)
 	if me and me.name not in seen:
@@ -178,13 +199,20 @@ def get_assigned_field_officers(user: str | None = None) -> list[dict]:
 				"employee": me.name,
 				"employee_name": me.employee_name or me.name,
 				"user": user,
+				"is_supervisor": 0,
 			},
 		)
 		seen.add(me.name)
 
+	# Flag supervisors for UI labels
+	supervisor_emps = {r["employee"] for r in _supervisor_group_officers()}
+	for row in officers:
+		row["is_supervisor"] = 1 if row.get("employee") in supervisor_emps else 0
+
 	officers.sort(
 		key=lambda r: (
 			0 if me and r.get("employee") == me.name else 1,
+			0 if r.get("is_supervisor") else 1,
 			(r.get("employee_name") or "").lower(),
 		)
 	)

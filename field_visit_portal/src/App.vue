@@ -392,28 +392,51 @@ const staffOptions = computed(() =>
 	(meta.value.staff_options || []).map((s) => s.employee_name || s.employee).filter(Boolean)
 );
 const assignedFieldOfficers = computed(() => meta.value.assigned_field_officers || []);
+function staffOptionLabel(name, isSupervisor) {
+	const base = (name || "").trim();
+	if (!base) return "";
+	return isSupervisor ? `${base} (Supervisor)` : base;
+}
+function staffSearchAlias(name) {
+	// So "Adnan Munir" matches stored "M. Adnan Munir"
+	return String(name || "")
+		.replace(/\bM\.\s*/gi, " ")
+		.replace(/\s+/g, " ")
+		.trim();
+}
 const assignedFieldOfficerOptions = computed(() => {
 	const byEmp = new Map();
 	for (const o of assignedFieldOfficers.value) {
 		if (!o?.employee) continue;
+		const name = (o.employee_name || o.employee || "").trim();
 		byEmp.set(o.employee, {
 			value: o.employee,
-			label: (o.employee_name || o.employee || "").trim(),
+			label: staffOptionLabel(name, o.is_supervisor),
+			alias: staffSearchAlias(name),
+			searchText: `${name} ${staffSearchAlias(name)} supervisor`,
 		});
 	}
 	// Supervisors / managers: also offer full staff_options so names outside the FO tree appear
 	if (meta.value.can_manage_supervisor_only) {
 		for (const s of meta.value.staff_options || []) {
 			if (!s?.employee || byEmp.has(s.employee)) continue;
+			const name = (s.employee_name || s.employee || "").trim();
 			byEmp.set(s.employee, {
 				value: s.employee,
-				label: (s.employee_name || s.employee || "").trim(),
+				label: staffOptionLabel(name, s.is_supervisor),
+				alias: staffSearchAlias(name),
+				searchText: `${name} ${staffSearchAlias(name)}`,
 			});
 		}
 	}
 	return [...byEmp.values()]
 		.filter((o) => o.label)
-		.sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
+		.sort((a, b) => {
+			const aSup = /\(Supervisor\)/.test(a.label) ? 0 : 1;
+			const bSup = /\(Supervisor\)/.test(b.label) ? 0 : 1;
+			if (aSup !== bSup) return aSup - bSup;
+			return a.label.localeCompare(b.label, undefined, { sensitivity: "base" });
+		});
 });
 const showFieldOfficerPick = computed(
 	() => selected.value?.group === "academic" && assignedFieldOfficerOptions.value.length > 0
@@ -2084,6 +2107,7 @@ const steps = [
 								:options="assignedFieldOfficerOptions"
 								placeholder-en="Select field employee"
 								placeholder-ur="فیلڈ ملازم منتخب کریں"
+								searchable
 								required
 								v-model="training.fieldOfficer"
 							/>
