@@ -3,7 +3,15 @@ frappe.tif_customization = frappe.tif_customization || {};
 frappe.tif_customization.format_visit_remarks = function (remarks) {
 	const text = (remarks || "").trim();
 	if (!text) return "—";
-	const labeled = ["Books:", "Workshop:", "Program:", "Remarks:"];
+	const labeled = [
+		"School Status:",
+		"Books:",
+		"Workshop:",
+		"Program:",
+		"Visit Summary:",
+		"Remarks:",
+		"Inactive reason:",
+	];
 	const parts = text.split(" | ").filter(Boolean);
 	const hasHeadings = parts.some((p) => labeled.some((h) => p.startsWith(h)));
 	if (!hasHeadings) {
@@ -65,6 +73,14 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 	const isMonitoring = data.metric === "monitoring" || data.metric === "me";
 	if (isMonitoring && !data.staff) {
 		frappe.tif_customization.show_monitoring_officer_dialog(data, rows);
+		return;
+	}
+	if (data.metric === "enrolment") {
+		frappe.tif_customization.show_enrolment_officer_dialog(data);
+		return;
+	}
+	if (data.metric === "workshop_registration") {
+		frappe.tif_customization.show_workshop_participant_dialog(data);
 		return;
 	}
 	const breakdown = (data.breakdown || [])
@@ -150,13 +166,283 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 						<th>${__("Officer")}</th>
 						<th>${__("Status")}</th>
 						<th>${__("Category")}</th>
-						${showRemarks ? `<th>${__("Remarks")}</th>` : ""}
+						${showRemarks ? `<th>${__("Visit Summary")}</th>` : ""}
 					</tr>
 				</thead>
 				<tbody>${body}</tbody>
 			</table>
 		</div>
 	`);
+	d.show();
+};
+
+frappe.tif_customization.show_workshop_participant_dialog = function (data) {
+	const visits = data.rows || [];
+	const people = data.participants || [];
+	const byVisit = {};
+	people.forEach((row) => {
+		const key = row.visit || "";
+		if (!byVisit[key]) byVisit[key] = [];
+		byVisit[key].push(row);
+	});
+	const visitByName = {};
+	visits.forEach((row) => {
+		visitByName[row.name] = row;
+	});
+	const headcount = visits.reduce((sum, row) => sum + cint(row.participants), 0);
+	const d = new frappe.ui.Dialog({
+		title: data.title || __("Workshop Participants"),
+		size: "extra-large",
+		fields: [{ fieldtype: "HTML", fieldname: "html" }],
+		primary_action_label: __("Open Field Staff Report"),
+		primary_action: () => {
+			d.hide();
+			frappe.route_options = {
+				from_date: data.from_date,
+				to_date: data.to_date,
+				user: data.staff || "",
+			};
+			frappe.set_route("field-staff-report");
+		},
+	});
+	const schoolCell = (row) => {
+		const school = frappe.utils.escape_html(row.school || "—");
+		let badge = "";
+		if (cint(row.school_unapproved)) badge = __("Un Approved");
+		else if (cint(row.school_missing)) badge = __("School Detail Missing");
+		badge = badge
+			? `<span style="display:inline-block;margin-left:6px;padding:1px 6px;border:1px solid #dc2626;border-radius:999px;background:#fef2f2;color:#b91c1c;font-size:11px;font-weight:700;white-space:nowrap;">${badge}</span>`
+			: "";
+		return `${school}${badge}`;
+	};
+	const showVisits = () => {
+		d.set_title(data.title || __("Workshop Participants: {0}", [headcount]));
+		const body = visits.length
+			? visits
+					.map((row) => {
+						const n = cint(row.participants);
+						const link = n
+							? `<a href="#" class="ws-participant-count" data-visit="${frappe.utils.escape_html(
+									row.name
+								)}">${n.toLocaleString()}</a>`
+							: "0";
+						return `<tr>
+					<td><a href="${frappe.utils.escape_html(row.url)}">${frappe.utils.escape_html(row.name)}</a></td>
+					<td>${frappe.utils.escape_html(row.visit_date || "")}</td>
+					<td>${frappe.utils.escape_html(row.type || "")}</td>
+					<td>${schoolCell(row)}</td>
+					<td>${frappe.utils.escape_html(row.officer || "")}</td>
+					<td class="text-right">${link}</td>
+					<td style="max-width:320px;white-space:normal;">${frappe.tif_customization.format_visit_remarks(
+						row.remarks
+					)}</td>
+				</tr>`;
+					})
+					.join("")
+			: `<tr><td colspan="7" class="text-muted text-center">${__("No workshops in this period.")}</td></tr>`;
+		d.fields_dict.html.$wrapper.html(`
+			<p class="text-muted" style="font-size:12px;margin-bottom:10px;">
+				${__("Workshop Participants")}: <strong>${cint(headcount).toLocaleString()}</strong>
+				&nbsp;·&nbsp; ${__("Workshops")}: <strong>${visits.length}</strong>
+				&nbsp;·&nbsp; ${__("Click a participant number to see name, contact, school, and designation.")}
+			</p>
+			<div class="table-responsive" style="max-height:420px;overflow:auto;">
+				<table class="table table-bordered table-hover" style="font-size:12px;margin:0;">
+					<thead>
+						<tr>
+							<th>${__("Document No")}</th>
+							<th>${__("Visit Date")}</th>
+							<th>${__("Type")}</th>
+							<th>${__("School / Venue")}</th>
+							<th>${__("Officer")}</th>
+							<th class="text-right">${__("Participants")}</th>
+							<th>${__("Visit Summary")}</th>
+						</tr>
+					</thead>
+					<tbody>${body}</tbody>
+				</table>
+			</div>
+		`);
+	};
+	const showPeople = (visitName) => {
+		const visit = visitByName[visitName] || {};
+		const rows = byVisit[visitName] || [];
+		const recorded = cint(visit.participants);
+		d.set_title(__("{0} — Participants", [visit.school || visitName || __("Participants")]));
+		const table = rows.length
+			? rows
+					.map(
+						(row) => `<tr>
+					<td>${frappe.utils.escape_html(row.name || "—")}</td>
+					<td>${frappe.utils.escape_html(row.contact || "—")}</td>
+					<td>${frappe.utils.escape_html(row.school || "—")}</td>
+					<td>${frappe.utils.escape_html(row.designation || "—")}</td>
+					<td>${frappe.utils.escape_html(row.date || visit.visit_date || "—")}</td>
+					<td><a href="${frappe.utils.escape_html(row.url || visit.url || "#")}" target="_blank">${frappe.utils.escape_html(
+							row.visit || visitName || ""
+						)}</a></td>
+				</tr>`
+					)
+					.join("")
+			: `<tr><td colspan="6" class="text-muted text-center">${__(
+					"This workshop records {0} participants, but the attendance names were not entered on the Field Visit.",
+					[recorded.toLocaleString()]
+				)}</td></tr>`;
+		const namedNote =
+			rows.length && recorded && rows.length !== recorded
+				? `<span class="text-muted">&nbsp;·&nbsp; ${__("Recorded on the visit")}: ${recorded.toLocaleString()}</span>`
+				: "";
+		d.fields_dict.html.$wrapper.html(`
+			<p style="margin-bottom:10px;">
+				<a href="#" class="ws-participant-back">${__("← Workshops")}</a>
+				&nbsp;·&nbsp; ${frappe.utils.escape_html(visit.school || "")}
+				&nbsp;·&nbsp; ${__("Participants")}: <strong>${rows.length ? rows.length : recorded}</strong>
+				${namedNote}
+			</p>
+			<div class="table-responsive" style="max-height:420px;overflow:auto;">
+				<table class="table table-bordered table-hover" style="font-size:12px;margin:0;">
+					<thead>
+						<tr>
+							<th>${__("Participant")}</th>
+							<th>${__("Contact")}</th>
+							<th>${__("School")}</th>
+							<th>${__("Designation")}</th>
+							<th>${__("Date")}</th>
+							<th>${__("Visit")}</th>
+						</tr>
+					</thead>
+					<tbody>${table}</tbody>
+				</table>
+			</div>
+		`);
+	};
+	showVisits();
+	d.$wrapper.on("click", ".ws-participant-count", (e) => {
+		e.preventDefault();
+		const visit = $(e.currentTarget).attr("data-visit");
+		if (visit) showPeople(visit);
+	});
+	d.$wrapper.on("click", ".ws-participant-back", (e) => {
+		e.preventDefault();
+		showVisits();
+	});
+	d.show();
+};
+
+frappe.tif_customization.show_enrolment_officer_dialog = function (data) {
+	const people = data.participants || [];
+	const byOfficer = {};
+	people.forEach((row) => {
+		const officer = (row.officer || "").trim() || __("Unknown officer");
+		if (!byOfficer[officer]) byOfficer[officer] = { officer, rows: [] };
+		byOfficer[officer].rows.push(row);
+	});
+	const officers = Object.values(byOfficer).sort(
+		(a, b) => b.rows.length - a.rows.length || a.officer.localeCompare(b.officer)
+	);
+	const total = people.length;
+	const d = new frappe.ui.Dialog({
+		title: data.title || __("Enrollment of Participants"),
+		size: "extra-large",
+		fields: [{ fieldtype: "HTML", fieldname: "html" }],
+		primary_action_label: __("Close"),
+		primary_action: () => d.hide(),
+	});
+	const participantTable = (rows) => {
+		if (!rows.length) {
+			return `<tr><td colspan="7" class="text-muted text-center">${__("No participants")}</td></tr>`;
+		}
+		return rows
+			.map(
+				(row) => `<tr>
+				<td>${frappe.utils.escape_html(row.name || "—")}</td>
+				<td>${frappe.utils.escape_html(row.contact || "—")}</td>
+				<td>${frappe.utils.escape_html(row.course || "—")}</td>
+				<td>${frappe.utils.escape_html(row.date || "—")}</td>
+				<td>${frappe.utils.escape_html(row.school || "—")}</td>
+				<td>${frappe.utils.escape_html(row.city || "—")}${row.province ? " · " + frappe.utils.escape_html(row.province) : ""}</td>
+				<td><a href="${frappe.utils.escape_html(row.url || "#")}" target="_blank">${frappe.utils.escape_html(row.visit || "")}</a></td>
+			</tr>`
+			)
+			.join("");
+	};
+	const showOfficers = () => {
+		d.set_title(data.title || __("Enrollment of Participants"));
+		const body = officers.length
+			? officers
+					.map(
+						(o) => `<tr>
+					<td>${frappe.utils.escape_html(o.officer)}</td>
+					<td class="text-right"><a href="#" class="enrol-officer-count" data-officer="${frappe.utils.escape_html(
+						o.officer
+					)}">${cint(o.rows.length).toLocaleString()}</a></td>
+				</tr>`
+					)
+					.join("")
+			: `<tr><td colspan="2" class="text-muted text-center">${__("No enrollments in this period.")}</td></tr>`;
+		d.fields_dict.html.$wrapper.html(`
+			<p class="text-muted" style="font-size:12px;margin-bottom:10px;">
+				${__("Field officer and how many participants they enrolled. Click the number for participant details.")}
+				&nbsp;·&nbsp; ${__("Total")}: <strong>${cint(total).toLocaleString()}</strong>
+			</p>
+			<div class="table-responsive" style="max-height:420px;overflow:auto;">
+				<table class="table table-bordered table-hover" style="font-size:12px;margin:0;">
+					<thead>
+						<tr>
+							<th>${__("Field Officer")}</th>
+							<th class="text-right">${__("Enrollment")}</th>
+						</tr>
+					</thead>
+					<tbody>${body}</tbody>
+					<tfoot>
+						<tr>
+							<th>${__("Total")}</th>
+							<th class="text-right">${cint(total).toLocaleString()}</th>
+						</tr>
+					</tfoot>
+				</table>
+			</div>
+		`);
+	};
+	const showPeople = (officer) => {
+		const bucket = byOfficer[officer];
+		const rows = bucket ? bucket.rows : people;
+		d.set_title(__("{0} — Participants", [officer || __("Participants")]));
+		d.fields_dict.html.$wrapper.html(`
+			<p style="margin-bottom:10px;">
+				${data.staff ? "" : `<a href="#" class="enrol-officer-back">${__("← Field officers")}</a> &nbsp;·&nbsp;`}
+				${frappe.utils.escape_html(officer || "")}
+				&nbsp;·&nbsp; ${__("Participants")}: <strong>${rows.length}</strong>
+			</p>
+			<div class="table-responsive" style="max-height:420px;overflow:auto;">
+				<table class="table table-bordered table-hover" style="font-size:12px;margin:0;">
+					<thead>
+						<tr>
+							<th>${__("Participant")}</th>
+							<th>${__("Contact")}</th>
+							<th>${__("Course")}</th>
+							<th>${__("Date")}</th>
+							<th>${__("School")}</th>
+							<th>${__("City")}</th>
+							<th>${__("Visit")}</th>
+						</tr>
+					</thead>
+					<tbody>${participantTable(rows)}</tbody>
+				</table>
+			</div>
+		`);
+	};
+	if (data.staff) showPeople((people[0] && people[0].officer) || data.staff);
+	else showOfficers();
+	d.$wrapper.on("click", ".enrol-officer-count", (e) => {
+		e.preventDefault();
+		const officer = $(e.currentTarget).attr("data-officer");
+		if (officer) showPeople(officer);
+	});
+	d.$wrapper.on("click", ".enrol-officer-back", (e) => {
+		e.preventDefault();
+		showOfficers();
+	});
 	d.show();
 };
 
@@ -167,7 +453,9 @@ frappe.tif_customization.show_monitoring_officer_dialog = function (data, rows) 
 			.replace(/-/g, " ")
 			.replace(/\s+/g, " ")
 			.trim();
-		return c === "active" ? "active" : "inactive";
+		if (c === "active" || c.startsWith("active ")) return "active";
+		if (c.startsWith("in active") || c.startsWith("inactive")) return "inactive";
+		return "other";
 	};
 	const byOfficer = {};
 	(rows || []).forEach((row) => {
@@ -177,8 +465,9 @@ frappe.tif_customization.show_monitoring_officer_dialog = function (data, rows) 
 		}
 		byOfficer[officer].rows.push(row);
 		byOfficer[officer].total += 1;
-		if (meBucket(row) === "active") byOfficer[officer].active += 1;
-		else byOfficer[officer].inactive += 1;
+		const bucket = meBucket(row);
+		if (bucket === "active") byOfficer[officer].active += 1;
+		else if (bucket === "inactive") byOfficer[officer].inactive += 1;
 	});
 	const officers = Object.values(byOfficer).sort(
 		(a, b) => b.total - a.total || a.officer.localeCompare(b.officer)
@@ -304,7 +593,7 @@ frappe.tif_customization.show_monitoring_officer_dialog = function (data, rows) 
 							<th>${__("Officer")}</th>
 							<th>${__("Status")}</th>
 							<th>${__("Category")}</th>
-							<th>${__("Remarks")}</th>
+							<th>${__("Visit Summary")}</th>
 						</tr>
 					</thead>
 					<tbody>${detailBody}</tbody>

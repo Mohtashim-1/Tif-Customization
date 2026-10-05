@@ -12,7 +12,6 @@ from tif_customization.tif_customization.field_visit_enrolment_access import (
 	can_manage_farhan_only_field_visit,
 )
 from tif_customization.tif_customization.field_visit_supervisor_only import (
-	FIELD_OFFICER_ALLOWED_OT_TASKS,
 	SUPERVISOR_ONLY_ACTIVITY_TYPES,
 	can_manage_supervisor_only_field_visits,
 )
@@ -38,9 +37,7 @@ _ALL_ACADEMIC_TASK_TYPES = [
 
 
 def _academic_task_type_options_for_user():
-	if can_manage_supervisor_only_field_visits():
-		return list(_ALL_ACADEMIC_TASK_TYPES)
-	return sorted(FIELD_OFFICER_ALLOWED_OT_TASKS)
+	return list(_ALL_ACADEMIC_TASK_TYPES)
 
 
 HIDDEN_ACTIVITY_TYPE_LABELS = {

@@ -18,32 +18,26 @@ from tif_customization.tif_customization.field_visit_enrolment_access import (
 )
 from tif_customization.tif_customization.field_visit_permissions import can_view_all_field_visits
 
-# Top-level Field Visit types — supervisors only (Field Officers use Follow up under combined type).
+# Same Type of Task list for field officers and admins.
 HEADOFFICE_VISIT_TYPE = "Headoffice/ Regional Office/ Out of Station Visit"
 ACADEMIC_ACTIVITY_TYPE = "Academic"
 OTHER_OFFICIAL_ACTIVITY_TYPE = "Other Official Tasks"
 
-SUPERVISOR_ONLY_ACTIVITY_TYPES = frozenset(
-	{
-		HEADOFFICE_VISIT_TYPE,
-		ACADEMIC_ACTIVITY_TYPE,
-		OTHER_OFFICIAL_ACTIVITY_TYPE,
-	}
+SUPERVISOR_ONLY_ACTIVITY_TYPES = frozenset()
+
+SUPERVISOR_ONLY_OT_TASKS = frozenset()
+
+FIELD_OFFICER_OT_TASKS = (
+	"Academic Tasks",
+	"Head Office Visit",
+	"Regional Office Visit",
+	"Out of Station Visit",
+	"Meeting of Regional Staff (Supervisors) and SMEs",
+	"Follow up Calls / Calls to Schools",
+	"Other Official Tasks",
 )
 
-# KPI: Academic Task, Other Official Tasks, Head / Regional / Out of station (legacy combined type)
-SUPERVISOR_ONLY_OT_TASKS = frozenset(
-	{
-		"Academic Tasks",
-		"Head Office Visit",
-		"Regional Office Visit",
-		"Out of Station Visit",
-		"Meeting of Regional Staff (Supervisors) and SMEs",
-		"Other Official Tasks",
-	}
-)
-
-FIELD_OFFICER_ALLOWED_OT_TASKS = frozenset({"Follow up Calls / Calls to Schools"})
+FIELD_OFFICER_ALLOWED_OT_TASKS = frozenset(FIELD_OFFICER_OT_TASKS)
 
 _HEADOFFICE_TEXT_MARKERS = (
 	"head office",
@@ -125,10 +119,9 @@ def validate_supervisor_only_field_visit(doc, user: str | None = None) -> None:
 	frappe.throw(
 		_(
 			"Only a <b>Field Supervisor</b> (or HR / manager) may record "
-			"<b>Head office / Regional / Out of station</b> visits, "
-			"<b>Academic Tasks</b>, or <b>Other Official Tasks</b>. "
-			"Field Officers may use <b>Follow up Calls / Calls to Schools</b> under "
-			"Academic / Other Official Tasks."
+			"<b>Head office / Regional / Out of station</b> visits. "
+			"Field Officers may record <b>Academic Tasks</b>, "
+			"<b>Other Official Tasks</b>, and <b>Follow up Calls / Calls to Schools</b>."
 		),
 		title=_("Supervisor activity"),
 		exc=frappe.PermissionError,
@@ -152,7 +145,7 @@ def get_supervisor_field_visit_access(name: str | None = None):
 	return {
 		"can_manage_supervisor_only": can_manage_supervisor_only_field_visits(),
 		"doc_is_supervisor_only": doc_is_supervisor_only,
-		"field_officer_ot_tasks": sorted(FIELD_OFFICER_ALLOWED_OT_TASKS),
+		"field_officer_ot_tasks": list(FIELD_OFFICER_OT_TASKS),
 		"supervisor_only_types": sorted(SUPERVISOR_ONLY_ACTIVITY_TYPES),
 		"can_manage_enrolment_participants": can_manage_enrolment_participants_field_visit(),
 		"can_manage_farhan_only": can_manage_farhan_only_field_visit(),

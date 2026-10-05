@@ -49,7 +49,7 @@ OUTCOME_WEIGHT = 0.30
 OUTCOME_TARGETS = (
 	{"key": "enrolment", "label": _("Enrollment of Participants in Online Course"), "short_label": _("Enrollment of Participants in Online Course"), "target": 50, "metric": "enrolment"},
 	{"key": "quiz", "label": _("Quiz Arranged"), "short_label": _("Quiz Arranged"), "target": 1, "metric": "quiz"},
-	{"key": "co_curricular", "label": _("Stall Activities / Activation"), "short_label": _("Stall Activities / Activation"), "target": 1, "metric": "co_curricular"},
+	{"key": "co_curricular", "label": _("Stall Activity / Exhibition"), "short_label": _("Stall Activity / Exhibition"), "target": 1, "metric": "co_curricular"},
 	{
 		"key": "new_schools",
 		"label": _("Registered Schools"),
@@ -464,7 +464,7 @@ def _training_participants(from_date, to_date, tokens):
 			SELECT COALESCE(SUM(COALESCE(fv.training_no_of_participants, 0)), 0)
 			FROM `tabField Visit` fv
 			WHERE fv.docstatus = 1
-			  AND fv.type = 'Training'
+			  AND fv.type IN ('Workshop Conducted', 'Workshop')
 			  AND {visit_day} BETWEEN %(from_date)s AND %(to_date)s
 			  AND {_staff_where(tokens)}
 			""",

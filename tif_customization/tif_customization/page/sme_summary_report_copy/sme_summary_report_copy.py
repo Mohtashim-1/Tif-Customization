@@ -366,7 +366,7 @@ def get_report_data(filters=None):
 	)
 
 	fy_start_year = cint(_fiscal_year_start(to_date.year, to_date.month))
-	ytd_from = getdate(f"{fy_start_year}-07-01")
+	ytd_from = getdate(f"{to_date.year}-01-01")
 	if ytd_from > to_date:
 		ytd_from = from_date
 
@@ -506,23 +506,22 @@ def get_report_data(filters=None):
 	totals_out["expenses"] = expense_total
 
 	period_outcome = _report_outcome_fy_totals(staff_rows, ytd_from, to_date)
-	# Table footer stays on fiscal year-to-date through the selected Visit To date.
+	# Table footer is 1 January through the selected Visit To date.
 	for cfg in OUTCOME_TARGETS:
 		okey = f"outcome_{cfg['key']}"
 		if cfg["key"] in period_outcome:
 			totals_out[okey] = period_outcome[cfg["key"]]["actual"]
 
-	# Outcome cards: fiscal YTD = 1 July → today (ignore visit date filter / not full FY to 30 Jun).
+	# Outcome cards: 1 January → today (not the July fiscal year).
 	report_day = getdate(today())
-	current_fy_start = cint(_fiscal_year_start(report_day.year, report_day.month))
-	outcome_fy_from = getdate(f"{current_fy_start}-07-01")
+	outcome_fy_from = getdate(f"{report_day.year}-01-01")
 	outcome_fy_to = report_day
 	if outcome_fy_from > outcome_fy_to:
 		outcome_fy_from = outcome_fy_to
 	outcome_fy = _report_outcome_fy_totals(staff_rows, outcome_fy_from, outcome_fy_to)
 	outcome_fy_label = f"{outcome_fy_from.strftime('%d-%b-%Y')} → {outcome_fy_to.strftime('%d-%b-%Y')}"
 
-	# Model A = 3 departments, Model B = 2, Model C = 1, on Marketing + follow-up + monitoring visits.
+	# Model A + B + C = Number of School (follow-up visits + new school visits).
 	model_counts = {"model_a": 0, "model_b": 0, "model_c": 0}
 	for staff in staff_rows:
 		stats = visit_stats.get(staff["key"]) or {}
@@ -692,7 +691,11 @@ def get_followup_schools_by_officer(filters=None):
 		"fv.docstatus = 1",
 		f"{visit_day} BETWEEN %(from_date)s AND %(to_date)s",
 		# Matches Number of School card: Follow up Visit + New School Visit.
-		"(fv.type = 'Visits' OR fv.type = 'Registration of New Schools')",
+		"""(
+			fv.type = 'Visits'
+			OR fv.type = 'Registration of New Schools'
+			OR (fv.type = 'Marketing' AND IFNULL(fv.marketing_visit_category, '') = 'New')
+		)""",
 	]
 	params = {"from_date": from_date, "to_date": to_date}
 	province = (filters.get("province") or "").strip()
@@ -1081,6 +1084,7 @@ def _load_visit_stats(from_date, to_date, staff_rows, city=None, province=None):
 			fv.training_trainer_name,
 			fv.marketing_visit_category,
 			fv.me_activity_status,
+			fv.me_mqh_book_status,
 			fv.qps_affiliated,
 			fv.tps_affiliated,
 			fv.cee_affiliated,
@@ -1140,39 +1144,37 @@ def _load_visit_stats(from_date, to_date, staff_rows, city=None, province=None):
 		bucket = stats[staff_key]
 		vtype = row.get("type") or ""
 
-		# Marketing type → Marketing Visit only (do not mix into New School Sum).
-		school_visit = False
-		if vtype == "Marketing":
-			bucket["marketing"] += 1
-			school_visit = True
-		elif vtype == "Visits":
+		# New School = category New on Marketing or Visits, plus Registration of New Schools.
+		# Other Marketing stays on Marketing Visit. Other Visits stay on Follow up.
+		# Number of School = new + follow up. Model A/B/C is that same set, so the three models add up to it.
+		number_of_school = False
+		if vtype in ("Marketing", "Visits", "Registration of New Schools"):
 			cat = (row.get("marketing_visit_category") or "").strip()
-			if cat == "New":
+			if vtype == "Registration of New Schools" or cat == "New":
 				bucket["new"] += 1
+				number_of_school = True
+			elif vtype == "Marketing":
+				bucket["marketing"] += 1
 			else:
-				# Follow-up, blank, and any other Visits category.
 				bucket["followup"] += 1
-				school_visit = True
-		elif vtype == "Registration of New Schools":
-			bucket["new"] += 1
+				number_of_school = True
 		elif vtype in ("Meeting", "Meeting with Ulama and Educationist"):
 			bucket["meetings"] += 1
 		elif vtype == "M&E":
 			bucket["me"] += 1
-			school_visit = True
-			status = _norm_me_status(row.get("me_activity_status"))
+			status = _effective_me_status(row.get("me_activity_status"), row.get("me_mqh_book_status"))
 			if status == "active":
 				bucket["active"] += 1
 			elif status == "inactive":
 				bucket["inactive"] += 1
-		if school_visit:
-			# Model A = 3 departments, Model B = 2, Model C = 1. Unaffiliated visits stay out of all three.
+		if number_of_school:
+			# Model A = 3 departments, Model B = 2, Model C = 1 or none.
 			dept_n = count_tif_departments(row)
 			if dept_n >= 3:
 				bucket["model_a"] += 1
 			elif dept_n == 2:
 				bucket["model_b"] += 1
-			elif dept_n == 1:
+			else:
 				bucket["model_c"] += 1
 		if vtype in ("Training", "Workshop", "Workshop Conducted", "Workshop Arranged", "Teachers Training Meeting"):
 			bucket["schools"] += cint(row.get("schools") or 0)
@@ -1212,6 +1214,17 @@ def _norm_me_status(value) -> str:
 		return "active"
 	if raw in ("inactive", "in active"):
 		return "inactive"
+	return ""
+
+
+def _effective_me_status(activity, book_status) -> str:
+	"""School is Active when book status is Active, even if the activity field was left blank."""
+	activity_n = _norm_me_status(activity)
+	book_n = _norm_me_status(book_status)
+	if book_n == "inactive" or (activity_n == "inactive" and book_n != "active"):
+		return "inactive"
+	if book_n == "active" or activity_n == "active":
+		return "active"
 	return ""
 
 

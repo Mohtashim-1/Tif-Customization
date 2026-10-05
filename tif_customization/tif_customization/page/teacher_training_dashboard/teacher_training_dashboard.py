@@ -255,6 +255,43 @@ def _load_sessions(filters):
 	return sessions, from_date, to_date
 
 
+def _trainer_tokens(name):
+	stop = {
+		"mr", "ms", "mrs", "sahab", "sahib", "sb", "molana", "maulana",
+		"muhammad", "mohammad", "mohd", "the", "dr",
+	}
+	text = "".join(ch.lower() if ch.isalnum() else " " for ch in (name or ""))
+	return [t for t in text.split() if t not in stop and len(t) > 2]
+
+
+def _trainers_match(a, b):
+	if not (a or "").strip() or not (b or "").strip():
+		return False
+	if " ".join((a or "").lower().split()) == " ".join((b or "").lower().split()):
+		return True
+	left, right = set(_trainer_tokens(a)), set(_trainer_tokens(b))
+	shared = left & right
+	if not shared:
+		return False
+	return any(len(token) >= 5 for token in shared) or len(shared) >= 2
+
+
+def _program_for_event(date, trainer, sessions):
+	"""Assign a field-visit or feedback row to a program when date + trainer match one program."""
+	day = str(date or "")[:10]
+	if not day:
+		return ""
+	programs = {
+		s["program"]
+		for s in sessions
+		if s.get("date") == day and _trainers_match(trainer, s.get("trainer"))
+	}
+	programs.discard("")
+	if len(programs) == 1:
+		return next(iter(programs))
+	return ""
+
+
 def _group_cards(sessions, key):
 	bucket = {}
 	for s in sessions:
@@ -368,6 +405,119 @@ def _session_participants(session_names):
 	)
 
 
+def _feedback_payload(rows):
+	return [
+		{
+			"name": r.name,
+			"attendee": (r.attendee_name or "").strip(),
+			"email": (r.email or "").strip(),
+			"date": str(r.training_date) if r.training_date else "",
+			"trainer": (r.trainer_name or "").strip(),
+			"venue": (r.venue_name or "").strip(),
+			"category": (r.session_category or "").strip(),
+			"overall": cint(r.overall_rating),
+			"content": cint(r.content_quality),
+			"trainer_rating": cint(r.trainer_rating),
+			"venue_rating": cint(r.venue_rating),
+			"recommend": (r.would_recommend or "").strip(),
+			"went_well": (r.what_went_well or "").strip(),
+			"improvements": (r.improvements or "").strip(),
+			"comments": (r.additional_comments or "").strip(),
+			"visit": r.field_visit,
+			"url": f"/app/training-attendee-feedback/{r.name}",
+		}
+		for r in rows
+	]
+
+
+def _schedule_participants(rows):
+	return [
+		{
+			"source": "Schedule",
+			"name": (r.participant_name or "").strip(),
+			"contact": " · ".join(x for x in [(r.email or "").strip(), (r.phone or "").strip()] if x),
+			"date": str(r.training_date) if r.training_date else "",
+			"session": r.session,
+			"school": (r.school_name or r.tag_school or "").strip(),
+			"trainer": (r.trainer_name or "").strip(),
+			"status": r.attendance_status or "",
+			"program": (r.program or "").strip() or "(No Program)",
+			"url": f"/app/upcoming-training/{r.session}",
+		}
+		for r in rows
+	]
+
+
+def _fv_participant_payload(rows):
+	return [
+		{
+			"source": "Field Visit",
+			"name": (r.attendee_name or "").strip(),
+			"contact": " · ".join(x for x in [(r.contact_number or "").strip(), (r.email or "").strip()] if x),
+			"date": str(r.training_date) if r.training_date else "",
+			"session": r.visit,
+			"school": (r.school_organization or "").strip(),
+			"trainer": (r.trainer_name or "").strip(),
+			"status": "Feedback" if cint(r.feedback_submitted) else "No feedback",
+			"venue": (r.training_venue or "").strip(),
+			"url": f"/app/field-visit/{r.visit}",
+		}
+		for r in rows
+	]
+
+
+def _programs_detail(sessions, schedule_rows, fv_rows, feedback_rows):
+	"""One block per program: its sessions, participants, and feedback."""
+	blocks = {}
+
+	def slot(label):
+		return blocks.setdefault(
+			label,
+			{"label": label, "sessions": [], "participants": [], "feedback": []},
+		)
+
+	for s in sessions:
+		slot(s["program"])["sessions"].append(s)
+
+	for row in _schedule_participants(schedule_rows):
+		slot(row["program"])["participants"].append(row)
+
+	for raw, row in zip(fv_rows, _fv_participant_payload(fv_rows)):
+		program = _program_for_event(raw.training_date, raw.trainer_name, sessions)
+		if not program:
+			continue
+		row["program"] = program
+		slot(program)["participants"].append(row)
+
+	for raw, row in zip(feedback_rows, _feedback_payload(feedback_rows)):
+		program = _program_for_event(raw.training_date, raw.trainer_name, sessions)
+		if not program:
+			program = "(No Program)"
+		row["program"] = program
+		slot(program)["feedback"].append(row)
+
+	out = []
+	for block in blocks.values():
+		ratings = [cint(f["overall"]) for f in block["feedback"] if cint(f["overall"])]
+		block["stats"] = {
+			"sessions": len(block["sessions"]),
+			"completed": sum(1 for s in block["sessions"] if s["status"] == "completed"),
+			"upcoming": sum(1 for s in block["sessions"] if s["status"] == "upcoming"),
+			"in_progress": sum(1 for s in block["sessions"] if s["status"] == "in_progress"),
+			"participants": len(block["participants"]),
+			"schedule_participants": sum(1 for p in block["participants"] if p["source"] == "Schedule"),
+			"fv_participants": sum(1 for p in block["participants"] if p["source"] == "Field Visit"),
+			"feedback": len(block["feedback"]),
+			"avg_rating": round(sum(ratings) / len(ratings), 2) if ratings else None,
+		}
+		block["sessions"] = block["sessions"][:200]
+		block["participants"] = block["participants"][:400]
+		block["feedback"] = block["feedback"][:200]
+		out.append(block)
+	out.sort(key=lambda b: (-b["stats"]["sessions"], b["label"].lower()))
+	return out
+
+
 @frappe.whitelist()
 def get_dashboard_data(filters=None):
 	_check()
@@ -395,6 +545,8 @@ def get_dashboard_data(filters=None):
 	options_schools = sorted({s["school"] for s in sessions}, key=str.lower)
 	options_trainers = sorted({s["trainer"] for s in sessions if s["trainer"]}, key=str.lower)
 	options_modes = sorted({s["mode"] for s in sessions if s["mode"]}, key=str.lower)
+	schedule_rows = _session_participants([s["name"] for s in sessions])
+	programs = _programs_detail(sessions, schedule_rows, fv_participants, feedback)
 
 	return {
 		"from_date": str(from_date),
@@ -420,6 +572,7 @@ def get_dashboard_data(filters=None):
 			"feedback_pending": max(0, len(fv_participants) - fb_yes),
 			"avg_rating": avg_rating,
 		},
+		"programs": programs,
 		"by_program": _group_cards(sessions, "program"),
 		"by_school": _group_cards(sessions, "school"),
 		"by_trainer": _group_cards(sessions, "trainer")[:25],

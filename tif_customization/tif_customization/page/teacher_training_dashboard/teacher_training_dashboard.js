@@ -28,7 +28,6 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 		this.page.add_action_item(__("Upcoming Training List"), () => {
 			frappe.set_route("List", "Upcoming Training");
 		});
-		this.bind();
 		this.load();
 	}
 
@@ -48,9 +47,7 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 					.ttd-filters .frappe-control{margin-bottom:0}
 					.ttd-actions{display:flex;gap:8px;align-items:end;flex-wrap:wrap}
 					.ttd-kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:10px;margin:0 0 16px}
-					.ttd-kpi{background:#fff;border:1px solid #e5e7eb;border-top:4px solid #0f766e;border-radius:10px;padding:12px 14px;cursor:pointer;transition:box-shadow .15s,transform .15s}
-					.ttd-kpi:hover{box-shadow:0 6px 18px rgba(15,23,42,.08);transform:translateY(-1px)}
-					.ttd-kpi.active{outline:2px solid #0f766e;outline-offset:1px}
+					.ttd-kpi{background:#fff;border:1px solid #e5e7eb;border-top:4px solid #0f766e;border-radius:10px;padding:12px 14px}
 					.ttd-kpi--prog{border-top-color:#2563eb;background:#eff6ff}
 					.ttd-kpi--school{border-top-color:#d97706;background:#fffbeb}
 					.ttd-kpi--part{border-top-color:#059669;background:#ecfdf5}
@@ -91,41 +88,27 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 					.ttd-pill.no{background:#f1f5f9;color:#64748b}
 					.ttd-empty{padding:22px;color:#94a3b8;font-size:13px;text-align:center}
 					.ttd-muted{color:#94a3b8;font-size:11px}
+					.ttd-prog{background:#fff;border:1px solid #e5e7eb;border-radius:12px;margin:0 0 18px;overflow:hidden}
+					.ttd-prog-h{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;padding:14px 16px;border-bottom:1px solid #e5e7eb;background:#f8fafc}
+					.ttd-prog-h h2{margin:0;font-size:16px;font-weight:750}
+					.ttd-prog-stats{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:#475569}
+					.ttd-prog-stats b{font-size:16px;color:#0f172a;font-variant-numeric:tabular-nums;margin-right:4px}
+					.ttd-block{border-top:1px solid #e5e7eb}
+					.ttd-block h3{margin:0;padding:10px 14px 0;font-size:13px;font-weight:750}
+					.ttd-block .body{max-height:360px;overflow:auto}
 				</style>
 				<p class="ttd-note">${__(
-					"Teacher Training from Upcoming Training schedules (Training Schedule portal). Default department is T. Training. Click KPIs or program/school cards for drill-down details — sessions, participants, and feedback."
+					"Each program shows its sessions, participants, and feedback together. Participants include schedule attendance and field-visit attendees matched to that program by date and trainer. Default department is T. Training."
 				)}</p>
 				<div class="ttd-filters no-print"></div>
 				<div class="ttd-kpis"></div>
 				<div class="ttd-sec">
 					<div class="ttd-sec-h"><h2>${__("Programs")}</h2><small class="ttd-prog-count"></small></div>
-					<div class="ttd-cards ttd-by-program"></div>
-				</div>
-				<div class="ttd-sec">
-					<div class="ttd-sec-h"><h2>${__("Schools")}</h2><small class="ttd-school-count"></small></div>
-					<div class="ttd-cards ttd-by-school"></div>
-				</div>
-				<div class="ttd-panel ttd-drill">
-					<div class="ttd-panel-h">
-						<div>
-							<h3 class="ttd-drill-title">${__("Details")}</h3>
-							<div class="sub ttd-drill-sub">${__("Select a KPI or card to drill down")}</div>
-						</div>
-						<div class="ttd-tabs">
-							<button type="button" data-tab="sessions" class="active">${__("Sessions")}</button>
-							<button type="button" data-tab="participants">${__("Participants")}</button>
-							<button type="button" data-tab="fv">${__("Field Visit Attendees")}</button>
-							<button type="button" data-tab="feedback">${__("Feedback")}</button>
-						</div>
-					</div>
-					<div class="body ttd-drill-body"><div class="ttd-empty">${__("Loading…")}</div></div>
+					<div class="ttd-programs"></div>
 				</div>
 			</div>
 		`);
 		this.$root = $(this.page.body).find(".ttd-root");
-		this.activeTab = "sessions";
-		this.activeKind = "sessions";
-		this.activeValue = "";
 	}
 
 	make_control(df) {
@@ -205,29 +188,6 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 			});
 	}
 
-	bind() {
-		this.$root.on("click", ".ttd-kpi", (e) => {
-			const $k = $(e.currentTarget);
-			const kind = $k.attr("data-kind");
-			const value = $k.attr("data-value") || "";
-			this.$root.find(".ttd-kpi").removeClass("active");
-			$k.addClass("active");
-			this.open_drill(kind, value);
-		});
-		this.$root.on("click", ".ttd-card", (e) => {
-			const $c = $(e.currentTarget);
-			this.$root.find(".ttd-card").removeClass("active");
-			$c.addClass("active");
-			this.open_drill($c.attr("data-kind"), $c.attr("data-value"));
-		});
-		this.$root.on("click", "[data-tab]", (e) => {
-			this.activeTab = $(e.currentTarget).attr("data-tab");
-			this.$root.find("[data-tab]").removeClass("active");
-			$(e.currentTarget).addClass("active");
-			this.render_drill_body();
-		});
-	}
-
 	filter_values() {
 		return {
 			from_date: this.filters.from_date.get_value(),
@@ -251,7 +211,6 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 				this.data = r.message || {};
 				this.fill_option_selects();
 				this.render();
-				this.open_drill(this.activeKind || "sessions", this.activeValue || "", true);
 			},
 		});
 	}
@@ -352,116 +311,60 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 				.join("")
 		);
 
-		this.render_cards(".ttd-by-program", d.by_program || [], "program");
-		this.render_cards(".ttd-by-school", d.by_school || [], "school");
-		const namedProg = (d.by_program || []).filter((r) => r.label !== "(No Program)").length;
-		const taggedSchools = cint(k.schools);
-		this.$root
-			.find(".ttd-prog-count")
-			.text(__("{0} named · {1} cards", [namedProg, (d.by_program || []).length]));
-		this.$root
-			.find(".ttd-school-count")
-			.text(
-				__("{0} tagged schools · {1} sessions without school", [
-					taggedSchools,
-					cint(k.schools_unspecified),
-				])
-			);
+		const programs = d.programs || [];
+		const named = programs.filter((p) => p.label !== "(No Program)").length;
+		this.$root.find(".ttd-prog-count").text(__("{0} named programs", [named]));
+		this.render_programs(programs);
 	}
 
-	render_cards(sel, rows, kind) {
-		if (!rows.length) {
-			this.$root.find(sel).html(`<div class="ttd-empty">${__("No data")}</div>`);
+	render_programs(programs) {
+		if (!programs.length) {
+			this.$root.find(".ttd-programs").html(`<div class="ttd-empty">${__("No programs in this period")}</div>`);
 			return;
 		}
-		const untagged = new Set(["Not tagged", "Online"]);
-		this.$root.find(sel).html(
-			rows
-				.map((r) => {
-					const isLoc = kind === "school" && untagged.has(r.label);
-					const titleHint = isLoc
-						? `<div class="ttd-muted" style="margin:-4px 0 8px">${__("No school tagged — showing location")}</div>`
-						: kind === "school" && r.label.includes(" · ")
-							? `<div class="ttd-muted" style="margin:-4px 0 8px">${__("City / area (school not tagged)")}</div>`
-							: "";
-					// city·area style cards also mean untagged
-					const locStyle =
-						kind === "school" && (isLoc || (r.label.includes(" · ") && !r.label.includes("School")))
-							? ' style="opacity:.92;border-left-color:#94a3b8"'
-							: "";
-					return `<div class="ttd-card ttd-card--${kind}" data-kind="${kind}" data-value="${frappe.utils.escape_html(r.label)}"${locStyle}>
-						<div class="title">${this.esc(r.label)}</div>
-						${titleHint}
-						<div class="meta">
-							<div><b>${cint(r.sessions)}</b>${__("Sessions")}</div>
-							<div><b>${cint(r.present || r.participants)}</b>${__("Participants")}</div>
-							<div><b>${cint(r.completed)}</b>${__("Done")}</div>
-							<div><b>${cint(r.upcoming)}</b>${__("Upcoming")}</div>
+		this.$root.find(".ttd-programs").html(
+			programs
+				.map((p, i) => {
+					const s = p.stats || {};
+					const rating =
+						s.avg_rating != null ? __(" · avg {0}", [s.avg_rating]) : "";
+					return `<section class="ttd-prog" data-index="${i}">
+						<div class="ttd-prog-h">
+							<h2>${this.esc(p.label)}</h2>
+							<div class="ttd-prog-stats">
+								<span><b>${cint(s.sessions)}</b>${__("Sessions")}</span>
+								<span><b>${cint(s.participants)}</b>${__("Participants")}</span>
+								<span><b>${cint(s.feedback)}</b>${__("Feedback")}${rating ? this.esc(rating) : ""}</span>
+							</div>
 						</div>
-					</div>`;
+						<div class="ttd-block">
+							<h3>${__("Sessions")} (${cint(s.sessions)})</h3>
+							<div class="body ttd-sessions"></div>
+						</div>
+						<div class="ttd-block">
+							<h3>${__("Participants")} (${cint(s.participants)})</h3>
+							<div class="body ttd-participants"></div>
+						</div>
+						<div class="ttd-block">
+							<h3>${__("Feedback")} (${cint(s.feedback)})</h3>
+							<div class="body ttd-feedback"></div>
+						</div>
+					</section>`;
 				})
 				.join("")
 		);
-	}
-
-	open_drill(kind, value, silent) {
-		this.activeKind = kind || "sessions";
-		this.activeValue = value || "";
-		if (kind === "feedback") this.activeTab = "feedback";
-		else if (kind === "participants") this.activeTab = "participants";
-		else this.activeTab = "sessions";
-		this.$root.find("[data-tab]").removeClass("active");
-		this.$root.find(`[data-tab="${this.activeTab}"]`).addClass("active");
-
-		const titleMap = {
-			sessions: __("All Sessions"),
-			program: __("Program: {0}", [value || __("All")]),
-			school: __("School: {0}", [value || __("All")]),
-			participants: __("Participants"),
-			feedback: __("Feedback"),
-			status: __("Status: {0}", [value || __("All")]),
-			trainer: __("Trainer: {0}", [value || __("All")]),
-		};
-		this.$root.find(".ttd-drill-title").text(titleMap[kind] || __("Details"));
-
-		frappe.call({
-			method:
-				"tif_customization.tif_customization.page.teacher_training_dashboard.teacher_training_dashboard.get_drilldown",
-			args: {
-				filters: this.filter_values(),
-				kind: this.activeKind,
-				value: this.activeValue,
-			},
-			freeze: !silent,
-			freeze_message: __("Loading details…"),
-			callback: (r) => {
-				this.drill = r.message || {};
-				const s = this.drill.summary || {};
-				this.$root
-					.find(".ttd-drill-sub")
-					.text(
-						__(
-							"{0} sessions · {1} schedule participants · {2} FV attendees · {3} feedback",
-							[cint(s.sessions), cint(s.participants), cint(s.fv_participants), cint(s.feedback)]
-						)
-					);
-				this.render_drill_body();
-			},
+		this.$root.find(".ttd-prog").each((i, el) => {
+			const $prog = $(el);
+			const p = programs[i] || {};
+			this.render_sessions(p.sessions || [], $prog.find(".ttd-sessions"));
+			this.render_participants(p.participants || [], $prog.find(".ttd-participants"));
+			this.render_feedback(p.feedback || [], $prog.find(".ttd-feedback"));
 		});
 	}
 
-	render_drill_body() {
-		const d = this.drill || {};
-		const tab = this.activeTab;
-		if (tab === "sessions") this.render_sessions(d.sessions || []);
-		else if (tab === "participants") this.render_participants(d.participants || []);
-		else if (tab === "fv") this.render_fv(d.fv_participants || []);
-		else if (tab === "feedback") this.render_feedback(d.feedback || []);
-	}
-
-	render_sessions(rows) {
+	render_sessions(rows, $body) {
 		if (!rows.length) {
-			this.$root.find(".ttd-drill-body").html(`<div class="ttd-empty">${__("No sessions")}</div>`);
+			$body.html(`<div class="ttd-empty">${__("No sessions")}</div>`);
 			return;
 		}
 		const body = rows
@@ -487,7 +390,7 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 				</tr>`
 			)
 			.join("");
-		this.$root.find(".ttd-drill-body").html(`
+		$body.html(`
 			<table class="ttd-table">
 				<thead><tr>
 					<th>${__("Session")}</th><th>${__("Date")}</th><th>${__("Program")}</th>
@@ -499,11 +402,11 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 		`);
 	}
 
-	render_participants(rows) {
+	render_participants(rows, $body) {
 		if (!rows.length) {
-			this.$root
-				.find(".ttd-drill-body")
-				.html(`<div class="ttd-empty">${__("No schedule participants (upload Zoom attendance on the session)")}</div>`);
+			$body.html(
+				`<div class="ttd-empty">${__("No participants for this program yet")}</div>`
+			);
 			return;
 		}
 		const body = rows
@@ -511,73 +414,32 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 				(r) => `<tr>
 					<td>
 						<div style="font-weight:650">${this.esc(r.name)}</div>
-						<div class="ttd-muted">${this.esc(r.email)}${r.phone ? " · " + this.esc(r.phone) : ""}</div>
+						<div class="ttd-muted">${this.esc(r.contact)}</div>
 					</td>
+					<td>${this.esc(r.source)}</td>
 					<td>${this.esc(r.date)}</td>
 					<td><a href="${frappe.utils.escape_html(r.url)}" target="_blank">${this.esc(r.session)}</a></td>
-					<td>${this.esc(r.program)}</td>
 					<td>${this.esc(r.school)}</td>
 					<td>${this.esc(r.trainer)}</td>
 					<td>${this.esc(r.status)}</td>
-					<td class="num">${cint(r.duration)}</td>
 				</tr>`
 			)
 			.join("");
-		this.$root.find(".ttd-drill-body").html(`
+		$body.html(`
 			<table class="ttd-table">
 				<thead><tr>
-					<th>${__("Participant")}</th><th>${__("Date")}</th><th>${__("Session")}</th>
-					<th>${__("Program")}</th><th>${__("School")}</th><th>${__("Trainer")}</th>
-					<th>${__("Status")}</th><th class="num">${__("Mins")}</th>
+					<th>${__("Participant")}</th><th>${__("Source")}</th><th>${__("Date")}</th>
+					<th>${__("Session")}</th><th>${__("School")}</th><th>${__("Trainer")}</th>
+					<th>${__("Status")}</th>
 				</tr></thead>
 				<tbody>${body}</tbody>
 			</table>
 		`);
 	}
 
-	render_fv(rows) {
+	render_feedback(rows, $body) {
 		if (!rows.length) {
-			this.$root
-				.find(".ttd-drill-body")
-				.html(`<div class="ttd-empty">${__("No Field Visit training attendees in this period")}</div>`);
-			return;
-		}
-		const body = rows
-			.map(
-				(r) => `<tr>
-					<td>
-						<div style="font-weight:650">${this.esc(r.name)}</div>
-						<div class="ttd-muted">${this.esc(r.contact)}${r.email ? " · " + this.esc(r.email) : ""}</div>
-					</td>
-					<td>${this.esc(r.school)}</td>
-					<td>${this.esc(r.designation)}</td>
-					<td>${this.esc(r.date)}</td>
-					<td>${this.esc(r.trainer)}</td>
-					<td>${this.esc(r.venue)}</td>
-					<td><span class="ttd-pill ${r.feedback_submitted ? "yes" : "no"}">${
-						r.feedback_submitted ? __("Yes") : __("No")
-					}</span></td>
-					<td><a href="${frappe.utils.escape_html(r.url)}" target="_blank">${this.esc(r.visit)}</a></td>
-				</tr>`
-			)
-			.join("");
-		this.$root.find(".ttd-drill-body").html(`
-			<table class="ttd-table">
-				<thead><tr>
-					<th>${__("Attendee")}</th><th>${__("School")}</th><th>${__("Designation")}</th>
-					<th>${__("Date")}</th><th>${__("Trainer")}</th><th>${__("Venue")}</th>
-					<th>${__("Feedback")}</th><th>${__("Visit")}</th>
-				</tr></thead>
-				<tbody>${body}</tbody>
-			</table>
-		`);
-	}
-
-	render_feedback(rows) {
-		if (!rows.length) {
-			this.$root
-				.find(".ttd-drill-body")
-				.html(`<div class="ttd-empty">${__("No feedback submitted yet")}</div>`);
+			$body.html(`<div class="ttd-empty">${__("No feedback submitted for this program yet")}</div>`);
 			return;
 		}
 		const body = rows
@@ -598,7 +460,7 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 				</tr>`
 			)
 			.join("");
-		this.$root.find(".ttd-drill-body").html(`
+		$body.html(`
 			<table class="ttd-table">
 				<thead><tr>
 					<th>${__("Attendee")}</th><th>${__("Date")}</th><th>${__("Trainer")}</th>

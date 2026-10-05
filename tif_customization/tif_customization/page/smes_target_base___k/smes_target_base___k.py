@@ -511,7 +511,7 @@ def _count_actuals(from_date, to_date, staff, staff_tokens=None, submitted_only=
 		f"""
 		SELECT COALESCE(SUM(COALESCE(training_no_of_participants, 0)), 0)
 		FROM `tabField Visit`
-		WHERE {ds} AND type IN ('Training', 'Workshop', 'Workshop Arranged')
+		WHERE {ds} AND type IN ('Workshop Conducted', 'Workshop')
 		AND {_visit_date_expr('Training')} BETWEEN %(from_date)s AND %(to_date)s
 		{staff_sql}
 		""",

@@ -146,11 +146,7 @@ function farhan_only_types(access) {
 	}
 	return [ENROLMENT_PARTICIPANTS_TYPE, WORKSHOP_ATTENDANCE_TYPE];
 }
-const SUPERVISOR_ONLY_ACTIVITY_TYPES_DEFAULT = [
-	"Headoffice/ Regional Office/ Out of Station Visit",
-	"Academic",
-	"Other Official Tasks",
-];
+const SUPERVISOR_ONLY_ACTIVITY_TYPES_DEFAULT = [];
 const ACADEMIC_LIKE_ACTIVITY_TYPES = [
 	"Academic / Other Official Tasks",
 	"Academic",
@@ -183,7 +179,17 @@ function apply_visible_type_options(frm) {
 function apply_supervisor_field_visit_restrictions(frm) {
 	const access = _supervisor_field_visit_access || {};
 	const can = access.can_manage_supervisor_only;
-	const allowed = (access.field_officer_ot_tasks || ["Follow up Calls / Calls to Schools"]).join("\n");
+	const allowed = (
+		access.field_officer_ot_tasks || [
+			"Academic Tasks",
+			"Head Office Visit",
+			"Regional Office Visit",
+			"Out of Station Visit",
+			"Meeting of Regional Staff (Supervisors) and SMEs",
+			"Follow up Calls / Calls to Schools",
+			"Other Official Tasks",
+		]
+	).join("\n");
 	const blockedTypes = new Set(supervisor_only_types(access));
 
 	const canFarhan = access.can_manage_farhan_only ?? access.can_manage_enrolment_participants;
@@ -236,7 +242,7 @@ function apply_supervisor_field_visit_restrictions(frm) {
 		frappe.show_alert(
 			{
 				message: __(
-					"This visit is a supervisor-only activity (Head office / Academic / Other Official). You cannot edit it.",
+					"This visit is a supervisor-only activity (Head office / Regional / Out of station). You cannot edit it.",
 				),
 				indicator: "orange",
 			},
@@ -1235,7 +1241,7 @@ frappe.ui.form.on("Field Visit", {
 			frappe.msgprint({
 				title: __("Supervisor activity"),
 				message: __(
-					"Head office / Regional / Out of station, Academic, and Other Official Tasks can only be recorded by a Field Supervisor.",
+					"Head office / Regional / Out of station visits can only be recorded by a Field Supervisor.",
 				),
 				indicator: "red",
 			});

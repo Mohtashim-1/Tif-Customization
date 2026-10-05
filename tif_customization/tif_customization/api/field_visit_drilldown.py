@@ -46,12 +46,12 @@ METRIC_LABELS = {
 	"headoffice_visit": _("Head office / Regional / Out of station"),
 	"academic_task": _("Academic Task (Content Development)"),
 	"other_official": _("Other Official Tasks"),
-	"co_curricular": _("Stall Activities / Activation"),
+	"co_curricular": _("Stall Activity / Exhibition"),
 	"quiz": _("Quiz Arranged"),
 	"new_school_registration": _("Registered Schools"),
 	"new_schools": _("Registered Schools"),
 	"new_school": _("Registered Schools"),
-	"workshop_registration": _("Workshop / Training sessions"),
+	"workshop_registration": _("Workshop Participants"),
 	"enrolment": _("Enrollment of Participants in Online Course"),
 	"volunteers": _("Volunteer visits"),
 	"schools": _("Training visits (schools attended)"),
@@ -63,7 +63,7 @@ METRIC_LABELS = {
 	"model_school_b": _("Model School B"),
 	"model_a": _("Model A (3 departments)"),
 	"model_b": _("Model B (2 departments)"),
-	"model_c": _("Model C (1 department)"),
+	"model_c": _("Model C (1 department or not affiliated)"),
 }
 
 TYPE_TO_METRIC = {
@@ -100,6 +100,16 @@ def _school_visit_sql(alias: str) -> str:
 		f"{a}.type = 'Marketing'"
 		f" OR ({a}.type = 'Visits' AND IFNULL({a}.marketing_visit_category, '') != 'New')"
 		f" OR {a}.type = 'M&E'"
+	)
+
+
+def _number_of_school_sql(alias: str) -> str:
+	"""Follow-up Visits + New School visits. Same set as the Number of School card."""
+	a = alias
+	return (
+		f"{a}.type = 'Visits'"
+		f" OR {a}.type = 'Registration of New Schools'"
+		f" OR ({a}.type = 'Marketing' AND IFNULL({a}.marketing_visit_category, '') = 'New')"
 	)
 
 
@@ -153,7 +163,7 @@ def _metric_condition(metric: str, alias: str = "fv") -> str:
 	if m in ("school_visits", "school_visit"):
 		return f"{a}.type IN ('Marketing', 'Visits', 'M&E')"
 	if m == "marketing":
-		return f"{a}.type = 'Marketing'"
+		return f"{a}.type = 'Marketing' AND IFNULL({a}.marketing_visit_category, '') != 'New'"
 	if m in ("me", "monitoring"):
 		return f"{a}.type = 'M&E'"
 	if m == "meeting":
@@ -186,7 +196,7 @@ def _metric_condition(metric: str, alias: str = "fv") -> str:
 	if m == "new" or m == "new_school_registration":
 		return f"""(
 			{a}.type = 'Registration of New Schools'
-			OR ({a}.type = 'Visits' AND {a}.marketing_visit_category = 'New')
+			OR ({a}.type IN ('Marketing', 'Visits') AND {a}.marketing_visit_category = 'New')
 		)"""
 	if m in ("new_schools", "new_school"):
 		# Distinct schools counted in KPI via registered_school_sql; drilldown shows matching visits.
@@ -196,18 +206,20 @@ def _metric_condition(metric: str, alias: str = "fv") -> str:
 	if m == "model_school_b":
 		return f"{department_count_sql(a)} = 2"
 	if m == "model_a":
-		return f"({_school_visit_sql(a)}) AND {department_count_sql(a)} >= 3"
+		return f"({_number_of_school_sql(a)}) AND {department_count_sql(a)} >= 3"
 	if m == "model_b":
-		return f"({_school_visit_sql(a)}) AND {department_count_sql(a)} = 2"
+		return f"({_number_of_school_sql(a)}) AND {department_count_sql(a)} = 2"
 	if m == "model_c":
-		return f"({_school_visit_sql(a)}) AND {department_count_sql(a)} = 1"
+		return f"({_number_of_school_sql(a)}) AND {department_count_sql(a)} <= 1"
 	if m == "me_active":
 		return f"""{a}.type = 'M&E' AND LOWER(REPLACE(REPLACE(IFNULL({a}.me_activity_status,''),'-',' '),'  ',' ')) = 'active'"""
 	if m == "me_inactive":
 		return f"""{a}.type = 'M&E' AND LOWER(REPLACE(REPLACE(IFNULL({a}.me_activity_status,''),'-',' '),'  ',' ')) IN ('inactive', 'in active')"""
 	if m == "grand_total":
 		return f"{a}.type IN ('Marketing', 'Visits', 'Meeting', 'M&E')"
-	if m in ("workshop_registration", "schools", "participants"):
+	if m == "workshop_registration":
+		return f"{a}.type IN ('Workshop Conducted', 'Workshop')"
+	if m in ("schools", "participants"):
 		return f"{a}.type IN ('Training', 'Workshop', 'Workshop Conducted', 'Workshop Arranged', 'Teachers Training Meeting')"
 	if m == "enrolment":
 		return f"""EXISTS (
@@ -464,8 +476,42 @@ def _program_heading(row) -> str:
 	return " · ".join(bits)
 
 
+def _me_norm(value) -> str:
+	raw = (value or "").strip().lower().replace("-", " ").replace("_", " ")
+	raw = " ".join(raw.split())
+	if raw == "active":
+		return "active"
+	if raw in ("inactive", "in active"):
+		return "inactive"
+	return ""
+
+
+def _me_status_note(row) -> tuple[str, str]:
+	"""Active / In-Active plus why.
+
+	Book status (Mutalae Quran) is filled more often than Active / Inactive.
+	A blank activity field used to be shown as In-Active even when the school status was Active.
+	"""
+	activity = _me_norm(row.get("me_activity_status"))
+	book = _me_norm(row.get("me_mqh_book_status"))
+	reason = _clean(row.get("me_inactive_reasons") or row.get("me_reason_of_above"))
+	if book == "active" or (activity == "active" and book != "inactive"):
+		if activity == "inactive" and book == "active":
+			note = "Activity status says In-Active, but school status is Active"
+			if reason:
+				note = f"{note}. Reason entered: {reason}"
+			return "Active", note
+		return "Active", ""
+	if book == "inactive" or activity == "inactive":
+		why = reason or "Reason not entered on the Field Visit"
+		if activity == "active" and book == "inactive":
+			why = f"School status is In-Active while activity status is Active. {why}"
+		return "In-Active", why
+	return "Status not filled", "Active / Inactive was left blank, so this visit is not counted as In-Active"
+
+
 def _visit_remarks(row) -> str:
-	"""Always Books / Workshop / Program / Remarks headings (every card drilldown)."""
+	"""School Status / Workshop / Program / Visit Summary (every card drilldown)."""
 	notes = []
 	for key in (
 		"mt_remarks",
@@ -479,16 +525,18 @@ def _visit_remarks(row) -> str:
 		val = _strip_pending_school_opening((row.get(key) or "").strip())
 		if val and val not in notes:
 			notes.append(val)
-	# Keep free-text as one Remarks section (join with ; so UI can split on " | ").
 	notes_text = "; ".join(notes) if notes else "—"
-	return " | ".join(
-		[
-			f"Books: {_books_heading(row) or '—'}",
-			f"Workshop: {_workshop_heading(row) or '—'}",
-			f"Program: {_program_heading(row) or '—'}",
-			f"Remarks: {notes_text}",
-		]
-	)
+	parts = [
+		f"School Status: {_books_heading(row) or '—'}",
+		f"Workshop: {_workshop_heading(row) or '—'}",
+		f"Program: {_program_heading(row) or '—'}",
+		f"Visit Summary: {notes_text}",
+	]
+	if (row.get("type") or "") == "M&E":
+		label, why = _me_status_note(row)
+		if why:
+			parts.append(f"Inactive reason: {label}. {why}")
+	return " | ".join(parts)
 
 
 def _school_sql(alias="fv"):
@@ -523,25 +571,254 @@ def _school_unapproved_sql(alias="fv"):
 	END"""
 
 
-def _me_activity_bucket(status: str | None) -> str:
-	"""M&E activity status → Active / In-Active (same rules as KPI me_active / me_inactive)."""
-	norm = (status or "").strip().lower().replace("-", " ")
-	norm = " ".join(norm.split())
-	if norm == "active":
-		return _("Active")
-	return _("In-Active")
+def _me_activity_bucket(status: str | None, book_status: str | None = None) -> str:
+	"""M&E status. Active book status is not treated as In-Active when activity is blank."""
+	label, _why = _me_status_note(
+		{"me_activity_status": status, "me_mqh_book_status": book_status}
+	)
+	return label
 
 
 def _monitoring_category_breakdown(rows: list) -> list[dict]:
 	buckets: dict[str, int] = {}
 	for r in rows:
-		label = _me_activity_bucket(r.get("me_activity_status"))
+		label = _me_activity_bucket(r.get("me_activity_status"), r.get("me_mqh_book_status"))
 		buckets[label] = buckets.get(label, 0) + 1
 	order = {_("Active"): 0, _("In-Active"): 1}
 	return sorted(
 		[{"type": k, "count": v} for k, v in buckets.items()],
 		key=lambda x: (order.get(x["type"], 9), x["type"]),
 	)
+
+
+def _enrolment_participant_rows(visits: list) -> list[dict]:
+	"""One row per enrolled participant, tagged with the field officer on the visit."""
+	if not visits or not frappe.db.table_exists("Field Visit Enrolment Participant"):
+		return []
+	by_visit = {v["name"]: v for v in visits if v.get("name")}
+	if not by_visit:
+		return []
+	rows = frappe.db.sql(
+		"""
+		SELECT
+			parent AS visit,
+			participant_name,
+			contact_number,
+			city,
+			province,
+			enroll_in_course,
+			date_of_enrolment,
+			other_special_session_name
+		FROM `tabField Visit Enrolment Participant`
+		WHERE parent IN %(names)s
+		ORDER BY IFNULL(date_of_enrolment, '1000-01-01') DESC, idx ASC
+		""",
+		{"names": tuple(by_visit)},
+		as_dict=True,
+	)
+	out = []
+	for row in rows:
+		visit = by_visit.get(row.visit) or {}
+		course = (row.enroll_in_course or "").strip()
+		if course == "Other Special Session Offered by TIF" and (row.other_special_session_name or "").strip():
+			course = (row.other_special_session_name or "").strip()
+		out.append(
+			{
+				"name": (row.participant_name or "").strip(),
+				"contact": (row.contact_number or "").strip(),
+				"city": (row.city or "").strip(),
+				"province": (row.province or "").strip(),
+				"course": course,
+				"date": str(row.date_of_enrolment) if row.date_of_enrolment else (visit.get("visit_date") or ""),
+				"officer": visit.get("officer") or "",
+				"school": visit.get("school") or "",
+				"visit": row.visit,
+				"url": visit.get("url") or f"/app/field-visit/{row.visit}",
+			}
+		)
+	return out
+
+
+def _attendance_file_path(file_url: str) -> str | None:
+	url = (file_url or "").split("?")[0].strip()
+	if url.startswith("/private/files/"):
+		name = url.split("/private/files/", 1)[1]
+		return frappe.get_site_path("private", "files", name)
+	if url.startswith("/files/"):
+		name = url.split("/files/", 1)[1]
+		return frappe.get_site_path("public", "files", name)
+	return None
+
+
+def _cell_text(value) -> str:
+	if value is None:
+		return ""
+	if isinstance(value, float) and value.is_integer():
+		return str(int(value))
+	text = str(value).strip()
+	if text.endswith(".0") and text[:-2].isdigit():
+		return text[:-2]
+	return text
+
+
+def _xlsx_rows(path: str) -> list[dict]:
+	"""Read the first sheet. Keys are column letters."""
+	import os
+	import zipfile
+	import xml.etree.ElementTree as ET
+
+	if not path or not os.path.isfile(path):
+		return []
+	ns = {"m": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+	try:
+		with zipfile.ZipFile(path) as book:
+			shared = []
+			if "xl/sharedStrings.xml" in book.namelist():
+				root = ET.fromstring(book.read("xl/sharedStrings.xml"))
+				for si in root.findall("m:si", ns):
+					shared.append("".join(t.text or "" for t in si.findall(".//m:t", ns)))
+			sheet_name = "xl/worksheets/sheet1.xml"
+			if sheet_name not in book.namelist():
+				sheets = [n for n in book.namelist() if n.startswith("xl/worksheets/sheet")]
+				if not sheets:
+					return []
+				sheet_name = sorted(sheets)[0]
+			root = ET.fromstring(book.read(sheet_name))
+	except Exception:
+		return []
+
+	rows: dict[int, dict] = {}
+	for cell in root.findall(".//m:c", ns):
+		ref = cell.get("r") or ""
+		col = "".join(ch for ch in ref if ch.isalpha())
+		row_no = "".join(ch for ch in ref if ch.isdigit())
+		if not col or not row_no:
+			continue
+		node = cell.find("m:v", ns)
+		raw = node.text if node is not None else ""
+		if cell.get("t") == "s" and str(raw).isdigit():
+			idx = int(raw)
+			raw = shared[idx] if idx < len(shared) else ""
+		rows.setdefault(int(row_no), {})[col] = _cell_text(raw)
+	return [rows[i] for i in sorted(rows)]
+
+
+def _attendance_sheet_people(file_url: str, visit: dict) -> list[dict]:
+	"""Names from the Field Visit attendance Excel (Name, School, Designation, Contact)."""
+	path = _attendance_file_path(file_url)
+	grid = _xlsx_rows(path) if path else []
+	if not grid:
+		return []
+	header_idx = None
+	columns = {}
+	for i, row in enumerate(grid[:25]):
+		labels = {col: (text or "").strip().lower() for col, text in row.items()}
+		found = {}
+		for col, label in labels.items():
+			if "participant" in label or label in ("name", "attendee name", "teacher name"):
+				found.setdefault("name", col)
+			elif "school" in label or "organization" in label:
+				found.setdefault("school", col)
+			elif "designation" in label:
+				found.setdefault("designation", col)
+			elif "contact" in label or "mobile" in label or "phone" in label:
+				found.setdefault("contact", col)
+		if "name" in found and len(found) >= 2:
+			header_idx = i
+			columns = found
+			break
+	if header_idx is None:
+		return []
+	people = []
+	for row in grid[header_idx + 1 :]:
+		name = (row.get(columns.get("name", "")) or "").strip()
+		if not name or name.lower() in ("name", "name of participants", "s. #", "s#"):
+			continue
+		if name.replace(".", "").isdigit():
+			continue
+		people.append(
+			{
+				"name": name,
+				"contact": (row.get(columns.get("contact", "")) or "").strip(),
+				"school": (row.get(columns.get("school", "")) or "").strip() or (visit.get("school") or ""),
+				"designation": (row.get(columns.get("designation", "")) or "").strip(),
+				"date": visit.get("visit_date") or "",
+				"officer": visit.get("officer") or "",
+				"visit": visit.get("name") or "",
+				"url": visit.get("url") or "",
+			}
+		)
+	return people
+
+
+def _workshop_participant_rows(visits: list, sheet_by_visit: dict) -> list[dict]:
+	"""Named workshop participants from the attendee tables, then the attendance Excel."""
+	if not visits:
+		return []
+	by_visit = {v["name"]: v for v in visits if v.get("name")}
+	if not by_visit:
+		return []
+	names = tuple(by_visit)
+	out = []
+	covered = set()
+
+	def _add(rows, name_key, contact_key, school_key, date_key, designation_key=""):
+		for row in rows:
+			visit = by_visit.get(row.parent) or {}
+			person = (row.get(name_key) or "").strip()
+			if not person:
+				continue
+			covered.add(row.parent)
+			out.append(
+				{
+					"name": person,
+					"contact": (row.get(contact_key) or "").strip(),
+					"school": (row.get(school_key) or "").strip() or (visit.get("school") or ""),
+					"designation": (row.get(designation_key) or "").strip() if designation_key else "",
+					"date": str(row.get(date_key)) if row.get(date_key) else (visit.get("visit_date") or ""),
+					"officer": visit.get("officer") or "",
+					"visit": row.parent,
+					"url": visit.get("url") or f"/app/field-visit/{row.parent}",
+				}
+			)
+
+	if frappe.db.table_exists("Training Attendee"):
+		rows = frappe.db.sql(
+			"""
+			SELECT parent, attendee_name, contact_number, school_organization,
+				training_date, designation
+			FROM `tabTraining Attendee`
+			WHERE parent IN %(names)s
+			ORDER BY idx ASC
+			""",
+			{"names": names},
+			as_dict=True,
+		)
+		_add(rows, "attendee_name", "contact_number", "school_organization", "training_date", "designation")
+	if frappe.db.table_exists("Field Visit Workshop Attendee"):
+		rows = frappe.db.sql(
+			"""
+			SELECT parent, attendee_name, contact_number, school_organization, training_date
+			FROM `tabField Visit Workshop Attendee`
+			WHERE parent IN %(names)s
+			ORDER BY idx ASC
+			""",
+			{"names": names},
+			as_dict=True,
+		)
+		_add(rows, "attendee_name", "contact_number", "school_organization", "training_date")
+
+	for visit_name, visit in by_visit.items():
+		if visit_name in covered:
+			continue
+		sheet = sheet_by_visit.get(visit_name) or ""
+		if not sheet:
+			continue
+		parsed = _attendance_sheet_people(sheet, visit)
+		if parsed:
+			covered.add(visit_name)
+			out.extend(parsed)
+	return out
 
 
 @frappe.whitelist()
@@ -610,6 +887,8 @@ def get_visit_drilldown(filters=None, metric=None, staff=None):
 			fv.training_entry_filled_by,
 			fv.marketing_visit_category,
 			fv.me_activity_status,
+			fv.me_inactive_reasons,
+			fv.me_reason_of_above,
 			fv.mt_remarks,
 			fv.ot_remarks,
 			fv.school_remarks_follow_up,
@@ -617,6 +896,7 @@ def get_visit_drilldown(filters=None, metric=None, staff=None):
 			fv.travel_remarks,
 			fv.ot_academic_task_other,
 			fv.ot_other_official_task_detail,
+			fv.attendance_sheet_excel,
 			{VISIT_REMARKS_EXTRA_SELECT},
 			{visit_day} AS visit_date,
 			{_school_sql("fv")} AS school,
@@ -648,7 +928,9 @@ def get_visit_drilldown(filters=None, metric=None, staff=None):
 			or ""
 		)
 		if vtype == "M&E":
-			category = _me_activity_bucket(r.me_activity_status)
+			category, why = _me_status_note(r)
+			if why and category == "In-Active":
+				category = f"In-Active — {why}"
 		else:
 			category = r.marketing_visit_category or r.me_activity_status or ""
 		remarks = _visit_remarks(r)
@@ -667,27 +949,45 @@ def get_visit_drilldown(filters=None, metric=None, staff=None):
 				"status": status_map.get(r.docstatus, r.docstatus),
 				"category": category,
 				"remarks": remarks,
+				"participants": cint(r.training_no_of_participants),
 				"url": f"/app/field-visit/{r.name}",
 			}
 		)
 
+	sheet_by_visit = {r.name: r.attendance_sheet_excel or "" for r in rows}
+	if metric == "enrolment":
+		participants = _enrolment_participant_rows(out)
+	elif metric == "workshop_registration":
+		participants = _workshop_participant_rows(out, sheet_by_visit)
+	else:
+		participants = []
+
 	if metric in ("monitoring", "me"):
 		breakdown = _monitoring_category_breakdown(rows)
+	elif metric == "enrolment":
+		breakdown = []
 	else:
 		breakdown = [{"type": k, "count": v} for k, v in sorted(by_type.items(), key=lambda x: (-x[1], x[0]))]
 	label = METRIC_LABELS.get(metric, metric.replace("_", " ").title())
 	parts = [f"{b['type']} {b['count']}" for b in breakdown]
 	subtitle = " · ".join(parts) if parts else _("No documents")
+	if metric == "enrolment":
+		count = len(participants)
+	elif metric == "workshop_registration":
+		count = sum(cint(v.get("participants")) for v in out)
+	else:
+		count = len(out)
 
 	return {
 		"metric": metric,
 		"label": label,
-		"count": len(out),
+		"count": count,
 		"breakdown": breakdown,
 		"subtitle": subtitle,
-		"title": _("{0}: {1}").format(label, len(out)),
+		"title": _("{0}: {1}").format(label, count),
 		"from_date": str(from_date),
 		"to_date": str(to_date),
 		"staff": staff,
 		"rows": out,
+		"participants": participants,
 	}
