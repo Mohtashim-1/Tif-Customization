@@ -99,6 +99,46 @@ OUTCOME_COLUMNS = tuple(
 OUTCOME_KEYS = tuple(c["key"] for c in OUTCOME_COLUMNS) + ("outcome_pct",)
 
 
+def _summary_outcome_columns():
+	"""Registered Schools, then Model A / B / C as that total split. Not visit sums."""
+	models = (
+		{
+			"key": "outcome_model_school_a",
+			"label": _("Model A"),
+			"short_label": _("Model A"),
+			"metric": "model_school_a",
+			"yearly_min": 0,
+		},
+		{
+			"key": "outcome_model_school_b",
+			"label": _("Model B"),
+			"short_label": _("Model B"),
+			"metric": "model_school_b",
+			"yearly_min": 0,
+		},
+		{
+			"key": "outcome_model_school_c",
+			"label": _("Model C"),
+			"short_label": _("Model C"),
+			"metric": "model_school_c",
+			"yearly_min": 0,
+		},
+	)
+	out = []
+	seen = set()
+	for col in OUTCOME_COLUMNS:
+		if col.get("metric") in ("model_school_a", "model_school_b"):
+			continue
+		out.append(dict(col))
+		seen.add(col["key"])
+		if col.get("metric") == "new_schools":
+			for model in models:
+				if model["key"] not in seen:
+					out.append(dict(model))
+					seen.add(model["key"])
+	return out
+
+
 def _supervisor_subordinate_ids(supervisor: str) -> set[str]:
 	"""Team under a field supervisor, including the supervisor's own Employee row."""
 	supervisor = (supervisor or "").strip()
@@ -366,7 +406,7 @@ def get_report_data(filters=None):
 	)
 
 	fy_start_year = cint(_fiscal_year_start(to_date.year, to_date.month))
-	ytd_from = getdate(f"{to_date.year}-01-01")
+	ytd_from = getdate(f"{fy_start_year}-07-01")
 	if ytd_from > to_date:
 		ytd_from = from_date
 
@@ -383,6 +423,10 @@ def get_report_data(filters=None):
 		followup = cint(stats.get("followup") or 0)
 		new = cint(stats.get("new") or 0)
 		marketing = cint(stats.get("marketing") or 0)
+		marketing_new = cint(stats.get("marketing_new") or 0)
+		model_a = cint(stats.get("model_a") or 0)
+		model_b = cint(stats.get("model_b") or 0)
+		model_c = cint(stats.get("model_c") or 0)
 		meetings = cint(stats.get("meetings") or 0)
 		active = cint(stats.get("active") or 0)
 		inactive = cint(stats.get("inactive") or 0)
@@ -393,8 +437,8 @@ def get_report_data(filters=None):
 		present_days = flt(present_days_map.get(staff.get("employee")) or 0, 1)
 		province = (stats.get("province") or "").strip()
 		area = (stats.get("area") or "").strip()
-		# Grand Total = Visits New/Followup + Marketing type + Meetings + M&E
-		grand_total = followup + new + marketing + meetings + me
+		# Category New on a Marketing visit is in both cards. Count that visit once here.
+		grand_total = followup + new + marketing + meetings + me - marketing_new
 		expense_amt = flt(expenses.get(key) or 0)
 		difference = visited_days - working_days
 
@@ -419,6 +463,10 @@ def get_report_data(filters=None):
 			"followup": followup,
 			"new": new,
 			"marketing": marketing,
+			"marketing_new": marketing_new,
+			"model_a": model_a,
+			"model_b": model_b,
+			"model_c": model_c,
 			"meetings": meetings,
 			"active": active,
 			"inactive": inactive,
@@ -454,6 +502,10 @@ def get_report_data(filters=None):
 			"followup",
 			"new",
 			"marketing",
+			"marketing_new",
+			"model_a",
+			"model_b",
+			"model_c",
 			"meetings",
 			"active",
 			"inactive",
@@ -506,15 +558,21 @@ def get_report_data(filters=None):
 	totals_out["expenses"] = expense_total
 
 	period_outcome = _report_outcome_fy_totals(staff_rows, ytd_from, to_date)
-	# Table footer is 1 January through the selected Visit To date.
+	# Table footer is 1 July (current fiscal year) through the selected Visit To date.
 	for cfg in OUTCOME_TARGETS:
 		okey = f"outcome_{cfg['key']}"
 		if cfg["key"] in period_outcome:
 			totals_out[okey] = period_outcome[cfg["key"]]["actual"]
+	# Model C is the rest of Registered Schools. The footer is that distinct total,
+	# not the sum of each officer's column.
+	totals_out["outcome_model_school_c"] = cint(
+		(period_outcome.get("model_school_c") or {}).get("actual") or 0
+	)
 
-	# Outcome cards: 1 January → today (not the July fiscal year).
+	# Outcome cards: 1 July of the current fiscal year through today.
 	report_day = getdate(today())
-	outcome_fy_from = getdate(f"{report_day.year}-01-01")
+	fy_card_year = cint(_fiscal_year_start(report_day.year, report_day.month))
+	outcome_fy_from = getdate(f"{fy_card_year}-07-01")
 	outcome_fy_to = report_day
 	if outcome_fy_from > outcome_fy_to:
 		outcome_fy_from = outcome_fy_to
@@ -556,7 +614,7 @@ def get_report_data(filters=None):
 		"totals": totals_out,
 		"outcome_fy": outcome_fy,
 		"kpi_columns": list(KPI_COLUMNS),
-		"outcome_columns": list(OUTCOME_COLUMNS),
+		"outcome_columns": _summary_outcome_columns(),
 		"kpis": {
 			"followup": cint(totals.get("followup") or 0),
 			"new": cint(totals.get("new") or 0),
@@ -580,12 +638,14 @@ def get_report_data(filters=None):
 			"quiz": cint(totals.get("quiz") or 0) or cint(totals.get("outcome_quiz") or 0),
 			"co_curricular": cint(totals.get("co_curricular") or 0),
 			"marketing": cint(totals.get("marketing") or 0),
+			"marketing_new": cint(totals.get("marketing_new") or 0),
 			"me": cint(totals.get("me") or 0),
 			"training": cint(totals.get("workshop") or 0),
 			"school_visits": cint(totals.get("followup") or 0)
 			+ cint(totals.get("new") or 0)
 			+ cint(totals.get("marketing") or 0)
-			+ cint(totals.get("me") or 0),
+			+ cint(totals.get("me") or 0)
+			- cint(totals.get("marketing_new") or 0),
 			"total_points": flt(totals.get("total_points") or 0, 2),
 			"earned_points": flt(totals.get("earned_points") or 0, 2),
 			"percentage": totals_out["percentage"],
@@ -637,6 +697,23 @@ def _report_outcome_fy_totals(staff_rows, ytd_from, to_date):
 			"metric": cfg.get("metric") or key,
 			"label": cfg.get("label") or key,
 		}
+	out["model_school_c"] = {
+		"actual": cint(actuals.get("model_school_c") or 0),
+		"yearly_min": 0,
+		"metric": "model_school_c",
+		"label": _("Model C"),
+	}
+	visit_stats = _load_visit_stats(ytd_from, to_date, staff_rows) if staff_rows else {}
+	workshop_n = sum(
+		cint((visit_stats.get(staff["key"]) or {}).get("workshop_conducted") or 0)
+		for staff in staff_rows
+	)
+	out["workshop_conducted"] = {
+		"actual": workshop_n,
+		"yearly_min": 0,
+		"metric": "workshop_conducted",
+		"label": _("Workshop"),
+	}
 	return out
 
 
@@ -663,6 +740,7 @@ def _outcome_row_fields(staff, ytd_from, to_date):
 		fields[f"outcome_{key}"] = flt(actual, 2) if key == "workshop_registration" else cint(actual)
 		fields[f"outcome_{key}_pct"] = flt(pct, 2)
 		pcts.append(pct)
+	fields["outcome_model_school_c"] = cint(ytd.get("model_school_c") or 0)
 	fields["outcome_pct"] = flt(sum(pcts) / len(pcts), 2) if pcts else 0.0
 	return fields
 
@@ -1116,6 +1194,7 @@ def _load_visit_stats(from_date, to_date, staff_rows, city=None, province=None):
 			"followup": 0,
 			"new": 0,
 			"marketing": 0,
+			"marketing_new": 0,
 			"meetings": 0,
 			"active": 0,
 			"inactive": 0,
@@ -1144,18 +1223,20 @@ def _load_visit_stats(from_date, to_date, staff_rows, city=None, province=None):
 		bucket = stats[staff_key]
 		vtype = row.get("type") or ""
 
-		# New School = category New on Marketing or Visits, plus Registration of New Schools.
-		# Other Marketing stays on Marketing Visit. Other Visits stay on Follow up.
-		# Number of School = new + follow up. Model A/B/C is that same set, so the three models add up to it.
+		# New school visits are filed as type Visits, category New (type Marketing is rarely used).
+		# Marketing Visit counts that same set, so the two cards match.
+		# Follow up is Visits that are not category New.
 		number_of_school = False
 		if vtype in ("Marketing", "Visits", "Registration of New Schools"):
 			cat = (row.get("marketing_visit_category") or "").strip()
-			if vtype == "Registration of New Schools" or cat == "New":
-				bucket["new"] += 1
-				number_of_school = True
-			elif vtype == "Marketing":
+			is_new = vtype == "Registration of New Schools" or cat == "New"
+			if is_new or vtype == "Marketing":
 				bucket["marketing"] += 1
-			else:
+			if is_new:
+				bucket["new"] += 1
+				bucket["marketing_new"] += 1
+				number_of_school = True
+			elif vtype != "Marketing":
 				bucket["followup"] += 1
 				number_of_school = True
 		elif vtype in ("Meeting", "Meeting with Ulama and Educationist"):

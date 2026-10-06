@@ -79,6 +79,20 @@ function esc(value) {
 		.replace(/"/g, "&quot;");
 }
 
+function visitMeta(session) {
+	const parts = [];
+	if (session && session.field_visit) {
+		parts.push("Field visit: <strong>" + esc(session.field_visit) + "</strong>");
+	}
+	if (session && session.school_name) {
+		parts.push("School: <strong>" + esc(session.school_name) + "</strong>");
+	}
+	if (session && session.sme_name) {
+		parts.push("SME: " + esc(session.sme_name));
+	}
+	return parts.join(" · ");
+}
+
 function clientMeta() {
 	const nav = window.navigator || {};
 	const scr = window.screen || {};
@@ -146,7 +160,8 @@ function render() {
 			return '<button type="button" class="role" style="--role:' + esc(r.color) + '" data-role="' + esc(r.id) + '"><span class="role-dot"></span><span><div class="role-title">' + esc(r.label) + '</div><div class="role-hint">' + esc(r.hint || "") + "</div></span></button>";
 		}).join("");
 		app.style.setProperty("--accent", "#7a4cc2");
-		app.innerHTML = '<div class="stack"><div class="card accent"><div class="kicker">Shared feedback</div><h1>Who are you?</h1><p class="intro">Select your role to open the matching feedback form.</p><div class="meta">' + (session.school_name ? ('School: <strong>' + esc(session.school_name) + '</strong>') : '') + (session.sme_name ? (' · SME: ' + esc(session.sme_name)) : '') + '</div></div><div class="roles">' + roles + '</div></div>';
+		const meta = visitMeta(session);
+		app.innerHTML = '<div class="stack"><div class="card accent"><div class="kicker">Shared feedback</div><h1>Who are you?</h1><p class="intro">Select your role to open the matching feedback form. This response is recorded against the field visit.</p>' + (meta ? ('<div class="meta">' + meta + "</div>") : "") + '</div><div class="roles">' + roles + "</div></div>";
 		app.querySelectorAll("[data-role]").forEach(function (btn) {
 			btn.onclick = function () { pickRole(btn.dataset.role); };
 		});
@@ -164,7 +179,7 @@ function render() {
 			for (let n = 1; n <= scale; n++) {
 				buttons += '<button type="button" data-act="rate" data-id="' + esc(q.id) + '" data-val="' + n + '"' + (val === n ? ' class="on"' : "") + ">" + n + "</button>";
 			}
-			control = '<div class="rates">' + buttons + '</div><div class="caption">1 = Poor · ' + scale + " = Excellent</div>";
+			control = '<div class="rates">' + buttons + '</div><div class="caption">1 = No change · ' + scale + " = Very significant change</div>";
 		} else if (q.type === "choice") {
 			control = '<div class="choices">' + (q.options || []).map(function (o, j) {
 				return '<button type="button" data-act="choice" data-id="' + esc(q.id) + '" data-j="' + j + '"' + (val === o ? ' class="on"' : "") + '><span class="dot"></span><span>' + esc(o) + "</span></button>";
@@ -181,7 +196,7 @@ function render() {
 	const answered = (form.questions || []).filter(function (q) {
 		return state.answers[q.id] !== undefined && state.answers[q.id] !== "";
 	}).length;
-	app.innerHTML = '<div class="stack"><div class="back"><button type="button" class="ghost" id="back">← Change role</button></div><div class="card accent"><div class="kicker">' + esc(form.label) + ' feedback</div><h1>' + esc(form.title || "Feedback") + '</h1><p class="intro">' + esc(form.intro || "") + "</p>" + (form.school_name ? ('<div class="meta">School: <strong>' + esc(form.school_name) + "</strong></div>") : "") + "</div>" + cards + '<div class="row"><span class="progress">' + answered + " of " + (form.questions || []).length + ' answered</span><button type="button" class="submit" id="send">Submit feedback</button></div></div>';
+	app.innerHTML = '<div class="stack"><div class="back"><button type="button" class="ghost" id="back">← Change role</button></div><div class="card accent"><div class="kicker">' + esc(form.label) + ' feedback</div><h1>' + esc(form.title || "Feedback") + '</h1><p class="intro">' + esc(form.intro || "") + "</p>" + (visitMeta(form) ? ('<div class="meta">' + visitMeta(form) + "</div>") : "") + "</div>" + cards + '<div class="row"><span class="progress">' + answered + " of " + (form.questions || []).length + ' answered</span><button type="button" class="submit" id="send">Submit feedback</button></div></div>';
 	document.getElementById("back").onclick = function () {
 		state.role = null;
 		state.form = null;

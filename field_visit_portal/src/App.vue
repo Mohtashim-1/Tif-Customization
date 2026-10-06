@@ -11,6 +11,7 @@ import SectionTitle from "./components/SectionTitle.vue";
 import AttachDrop from "./components/AttachDrop.vue";
 import SchoolOpeningPanel from "./components/SchoolOpeningPanel.vue";
 import { apiGet, apiPost, uploadFile, METHOD, TRAVEL_METHOD } from "./lib/api";
+import { fileWithCaptureTime } from "./lib/captureTime";
 import {
 	ACTIVITY_CARDS,
 	QUARTER_OPTIONS,
@@ -1259,7 +1260,7 @@ async function uploadAttachments(docname) {
 			];
 	for (const [key, fieldname] of map) {
 		if (attachments[key]) {
-			jobs.push(uploadFile(attachments[key], { doctype: "Field Visit", docname, fieldname }));
+			jobs.push(fileWithCaptureTime(attachments[key]).then((file) => uploadFile(file, { doctype: "Field Visit", docname, fieldname })));
 		}
 	}
 	await Promise.all(jobs);
@@ -1277,7 +1278,11 @@ async function uploadSoaAttachments(docname) {
 	];
 	for (const [key, fieldname] of map) {
 		if (attachments[key]) {
-			jobs.push(uploadFile(attachments[key], { doctype: "School Opening Application", docname, fieldname, isPrivate: false }));
+			jobs.push(
+				fileWithCaptureTime(attachments[key]).then((file) =>
+					uploadFile(file, { doctype: "School Opening Application", docname, fieldname, isPrivate: false })
+				)
+			);
 		}
 	}
 	await Promise.all(jobs);
@@ -1364,6 +1369,8 @@ async function saveVisit(submitDoc) {
 			await apiPost(`${METHOD}.submit_field_visit_doc`, { name: result.name });
 		}
 		success.value = true;
+		const redirected = await goToVisitFeedback(result.name, result.feedback_url);
+		if (redirected) return;
 		setTimeout(() => {
 			success.value = false;
 			resetForm();
@@ -1373,6 +1380,25 @@ async function saveVisit(submitDoc) {
 	} finally {
 		saving.value = false;
 	}
+}
+
+async function goToVisitFeedback(visitName, feedbackUrl) {
+	let url = feedbackUrl || "";
+	if (!url && visitName) {
+		try {
+			const fb = await apiPost(
+				"tif_customization.tif_customization.api.feedback_studio.start_session_from_field_visit",
+				{ name: visitName }
+			);
+			url = fb.feedback_url || fb.share_url || "";
+		} catch (e) {
+			error.value = e.message || "Visit saved, but feedback could not be opened.";
+			return false;
+		}
+	}
+	if (!url) return false;
+	window.location.assign(url);
+	return true;
 }
 
 function continueToTravel() {
@@ -2957,6 +2983,7 @@ const steps = [
 				<div style="font-size: 13px; color: #71717a; margin-top: 8px; line-height: 1.6">
 					Your request has been saved.
 					<strong v-if="savedName"> {{ savedName }}</strong>
+					<div style="margin-top: 8px">Opening feedback for this field visit…</div>
 					<div class="urdu">آپ کی درخواست محفوظ ہو گئی ہے۔</div>
 				</div>
 			</div>

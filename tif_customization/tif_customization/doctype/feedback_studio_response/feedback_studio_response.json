@@ -13,6 +13,7 @@
   "customer",
   "school_name",
   "school_opening",
+  "field_visit",
   "section_device",
   "ip_address",
   "mac_address",
@@ -29,7 +30,7 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Audience",
-   "options": "school\nparent\nstudent\nsme",
+   "options": "school\nteacher\nparent\nstudent\nsme",
    "reqd": 1,
    "search_index": 1
   },
@@ -77,6 +78,15 @@
    "options": "School Opening Application"
   },
   {
+   "fieldname": "field_visit",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Field Visit",
+   "options": "Field Visit",
+   "search_index": 1
+  },
+  {
    "fieldname": "section_device",
    "fieldtype": "Section Break",
    "label": "Device / Network"
@@ -117,7 +127,7 @@
   }
  ],
  "links": [],
- "modified": "2026-09-28 18:40:00.000000",
+ "modified": "2026-10-06 15:20:00.000000",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Feedback Studio Response",

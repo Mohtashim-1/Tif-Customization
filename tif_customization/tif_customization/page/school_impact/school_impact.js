@@ -147,6 +147,7 @@ frappe.tif_customization.SchoolImpact = class SchoolImpact {
 					<option value="">${__("All audiences")}</option>
 					<option value="sme">${__("SME")}</option>
 					<option value="school">${__("School")}</option>
+					<option value="teacher">${__("Teacher")}</option>
 					<option value="parent">${__("Parent")}</option>
 					<option value="student">${__("Student")}</option>
 				</select>
@@ -354,11 +355,11 @@ frappe.tif_customization.SchoolImpact = class SchoolImpact {
 	}
 
 	audience_label(id) {
-		return { sme: __("SME"), school: __("School"), parent: __("Parent"), student: __("Student") }[id] || id || "";
+		return { sme: __("SME"), school: __("School"), teacher: __("Teacher"), parent: __("Parent"), student: __("Student") }[id] || id || "";
 	}
 
 	audience_color(id) {
-		return { sme: "#7a4cc2", school: "#2f5bd3", parent: "#1f8a5b", student: "#c8561f" }[id] || "#64748b";
+		return { sme: "#7a4cc2", school: "#2f5bd3", teacher: "#0f766e", parent: "#1f8a5b", student: "#c8561f" }[id] || "#64748b";
 	}
 
 	score_class(impact) {
@@ -485,7 +486,7 @@ frappe.tif_customization.SchoolImpact = class SchoolImpact {
 
 	render_question(group) {
 		const parts = this.parts_for(group);
-		const audiences = ["sme", "school", "parent", "student"].filter((id) =>
+		const audiences = ["sme", "school", "teacher", "parent", "student"].filter((id) =>
 			group.parts.some((part) => part.audience === id)
 		);
 		const chips = audiences
@@ -582,7 +583,7 @@ frappe.tif_customization.SchoolImpact = class SchoolImpact {
 		rows.sort((a, b) => {
 			let left = a[key];
 			let right = b[key];
-			const audienceKey = { aud_sme: "sme", aud_school: "school", aud_parent: "parent", aud_student: "student" }[key];
+			const audienceKey = { aud_sme: "sme", aud_school: "school", aud_teacher: "teacher", aud_parent: "parent", aud_student: "student" }[key];
 			if (audienceKey) {
 				left = (a.by_audience && a.by_audience[audienceKey]) || 0;
 				right = (b.by_audience && b.by_audience[audienceKey]) || 0;
@@ -609,6 +610,7 @@ frappe.tif_customization.SchoolImpact = class SchoolImpact {
 							<td class="num">${this.esc(row.responses)}</td>
 							<td class="num">${this.esc(by.sme || 0)}</td>
 							<td class="num">${this.esc(by.school || 0)}</td>
+							<td class="num">${this.esc(by.teacher || 0)}</td>
 							<td class="num">${this.esc(by.parent || 0)}</td>
 							<td class="num">${this.esc(by.student || 0)}</td>
 							<td class="num">${this.esc(avg)}</td>
@@ -618,13 +620,14 @@ frappe.tif_customization.SchoolImpact = class SchoolImpact {
 						</tr>`;
 					})
 					.join("")
-			: `<tr><td colspan="11" class="si-empty">${__("No feedback submitted for these filters.")}</td></tr>`;
+			: `<tr><td colspan="12" class="si-empty">${__("No feedback submitted for these filters.")}</td></tr>`;
 		const head = [
 			["school", __("School")],
 			["sme_name", __("SME")],
 			["responses", __("Responses")],
 			["aud_sme", __("SME")],
 			["aud_school", __("School")],
+			["aud_teacher", __("Teacher")],
 			["aud_parent", __("Parent")],
 			["aud_student", __("Student")],
 			["avg_rating", __("Avg rating")],
@@ -762,6 +765,7 @@ frappe.tif_customization.SchoolImpact = class SchoolImpact {
 			"Responses",
 			"SME replies",
 			"School replies",
+			"Teacher replies",
 			"Parent replies",
 			"Student replies",
 			"Average rating",
@@ -778,6 +782,7 @@ frappe.tif_customization.SchoolImpact = class SchoolImpact {
 				row.responses,
 				by.sme || 0,
 				by.school || 0,
+				by.teacher || 0,
 				by.parent || 0,
 				by.student || 0,
 				row.avg_rating == null ? "" : row.avg_rating,

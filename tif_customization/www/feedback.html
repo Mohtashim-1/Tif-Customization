@@ -481,7 +481,7 @@ function render() {
 		if (isSme() && state.shareResult && state.shareResult.share_url) {
 			const share = state.shareResult;
 			const url = share.share_url;
-			app.innerHTML = '<div class="card accent thanks"><h2>Thank you</h2><p>Your SME feedback is saved. Share this QR or link with parents, the school, or students.</p>' +
+			app.innerHTML = '<div class="card accent thanks"><h2>Thank you</h2><p>Your SME feedback is saved. Share this QR or link with parents, students, teachers, or the school.</p>' +
 				(share.school_name ? '<p class="note">School: <strong>' + esc(share.school_name) + "</strong></p>" : "") +
 				(share.school_opening ? '<p class="note">School Opening created: ' + esc(share.school_opening) + "</p>" : "") +
 				'<div class="qr-wrap"><img class="qr" src="' + esc(qrImg(url)) + '" width="220" height="220" alt="QR">' +
@@ -521,7 +521,7 @@ function render() {
 			for (let n = 1; n <= scale; n++) {
 				buttons += '<button type="button" data-act="rate" data-id="' + esc(q.id) + '" data-val="' + n + '"' + (val === n ? ' class="on"' : "") + ">" + n + "</button>";
 			}
-			control = '<div class="rates">' + buttons + '</div><div class="caption">1 = Poor · ' + scale + " = Excellent</div>";
+			control = '<div class="rates">' + buttons + '</div><div class="caption">1 = No change · ' + scale + " = Very significant change</div>";
 		} else if (q.type === "choice") {
 			control = '<div class="choices">' + (q.options || []).map(function (o, j) {
 				return '<button type="button" data-act="choice" data-id="' + esc(q.id) + '" data-j="' + j + '"' + (val === o ? ' class="on"' : "") + '><span class="dot"></span><span>' + esc(o) + "</span></button>";

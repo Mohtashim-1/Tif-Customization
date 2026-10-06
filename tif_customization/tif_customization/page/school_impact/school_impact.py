@@ -9,10 +9,11 @@ import json
 import frappe
 from frappe.utils import add_days, cint, date_diff, getdate, now_datetime
 
-AUDIENCES = ("sme", "school", "parent", "student")
+AUDIENCES = ("sme", "school", "teacher", "parent", "student")
 LABELS = {
 	"sme": "SME",
 	"school": "School",
+	"teacher": "Teacher",
 	"parent": "Parent",
 	"student": "Student",
 }
@@ -33,19 +34,41 @@ ROLES = (
 # Order matches the default field forms.
 DEFAULT_QUESTIONS = {
 	"school": [
-		{"type": "rating", "text": "How well does leadership communicate school priorities?"},
-		{"type": "choice", "text": "Which area needs the most support?"},
-		{"type": "text", "text": "What one change would make your work easier?"},
+		{"type": "choice", "text": "To what extent have Islamic values been promoted through this session / training?"},
+		{"type": "choice", "text": "Which practice has been implemented most?"},
+		{"type": "choice", "text": "Implementation level"},
+		{"type": "choice", "text": "Main challenge or support needed"},
+		{"type": "text", "text": "What support would help you implement the learning more effectively?"},
+		{"type": "choice", "text": "Where have you observed the most significant change?"},
+		{"type": "text", "text": "Which Islamic value should receive more focus in the coming months?"},
+		{"type": "text", "text": "Please share one specific example that demonstrates the change you observed."},
+	],
+	"teacher": [
+		{"type": "rating", "text": "I understand and apply Islamic values more effectively in teaching."},
+		{"type": "rating", "text": "I apply the teaching techniques learned in the workshop."},
+		{"type": "rating", "text": "I use storytelling effectively where appropriate."},
+		{"type": "rating", "text": "I model Islamic values through my own behaviour."},
+		{"type": "rating", "text": "I show greater patience, kindness and empathy toward students."},
+		{"type": "rating", "text": "I encourage positive behaviour and good character."},
+		{"type": "rating", "text": "I use new classroom activities."},
+		{"type": "rating", "text": "I reflect more consciously on my role as teacher and role model."},
+		{"type": "choice", "text": "Have you changed any teaching practice after the training?"},
+		{"type": "text", "text": "If yes, mention one specific change."},
+		{"type": "text", "text": "What impact have you observed in students as a result of applying the training?"},
 	],
 	"parent": [
-		{"type": "rating", "text": "How satisfied are you with communication from the school?"},
-		{"type": "yesno", "text": "Do you feel informed about your child’s progress?"},
-		{"type": "text", "text": "Anything else you would like us to know?"},
+		{"type": "choice", "text": "How often does your child talk about value-based stories from school?"},
+		{"type": "choice", "text": "Have you been involved in school character-building or values activities?"},
+		{"type": "choice", "text": "Observed change in your child’s character after storytelling / training"},
+		{"type": "rating", "text": "Change in respect for teachers / elders"},
+		{"type": "text", "text": "Give one specific example of a positive change you noticed at home."},
 	],
 	"student": [
-		{"type": "rating", "text": "How much do you enjoy your lessons?"},
-		{"type": "choice", "text": "How do you learn best?"},
-		{"type": "yesno", "text": "Do you feel safe at school?"},
+		{"type": "choice", "text": "How often were value-based stories used with you?"},
+		{"type": "choice", "text": "How were the stories used?"},
+		{"type": "choice", "text": "How interested / engaged were you during the stories?"},
+		{"type": "choice", "text": "Observed change after storytelling"},
+		{"type": "text", "text": "Give one specific example of a positive change after storytelling."},
 	],
 	"sme": [
 		{"type": "rating", "text": "How accurate and current is the curriculum content?"},
@@ -54,14 +77,50 @@ DEFAULT_QUESTIONS = {
 	],
 }
 KNOWN_CHOICES = {
-	"Resources",
-	"Training",
-	"Workload",
-	"Facilities",
-	"Group work",
-	"On my own",
-	"Hands-on activities",
-	"Listening to the teacher",
+	"Daily",
+	"2–3 times a week",
+	"Once a week",
+	"Occasionally",
+	"Not yet",
+	"Significant",
+	"Moderate",
+	"Slight",
+	"No noticeable change",
+	"Storytelling activity",
+	"Classroom lesson",
+	"Morning assembly",
+	"Discussion / reflection",
+	"Role-play / activity",
+	"Other",
+	"Very high",
+	"High",
+	"Low",
+	"Very low",
+	"Not at all",
+	"Small extent",
+	"Some extent",
+	"Great extent",
+	"Consistently",
+	"Storytelling",
+	"Classroom activities",
+	"Character-building activities",
+	"Appreciation / reward system",
+	"Parent involvement",
+	"School-wide",
+	"Some classes",
+	"Individual teacher / classroom",
+	"Lack of time",
+	"Lack of resources",
+	"Students’ varying backgrounds",
+	"Lack of parental support",
+	"Lack of follow-up / support",
+	"Students",
+	"Teacher / teaching practice",
+	"Classroom environment",
+	"School level",
+	"No significant change yet",
+	"Yes",
+	"Partially",
 	"Keep as is",
 	"Minor revisions",
 	"Major revisions",
@@ -184,6 +243,7 @@ def _fields():
 		"school_name",
 		"school_opening",
 		"session",
+		"field_visit",
 	]
 	if not frappe.db.table_exists("Feedback Studio Response"):
 		return []
@@ -570,7 +630,12 @@ def get_report_data(filters=None):
 	avg_rating = round(rating_sum / rating_count, 1) if rating_count else None
 	impact = round(100.0 * (rating_sum / rating_count) / scale) if rating_count and scale else None
 	positive_pct = round(100.0 * positive / rating_count) if rating_count else None
-	community = audience_counts["school"] + audience_counts["parent"] + audience_counts["student"]
+	community = (
+		audience_counts["school"]
+		+ audience_counts["teacher"]
+		+ audience_counts["parent"]
+		+ audience_counts["student"]
+	)
 	linked_schools = sum(1 for item in school_rows if item["key"] != "__none__")
 
 	return {
@@ -597,7 +662,7 @@ def get_report_data(filters=None):
 				"value": f"{positive_pct}%" if positive_pct is not None else "—",
 				"hint": "Ratings at 80% of the scale or higher",
 			},
-			{"key": "community", "label": "Community replies", "value": community, "hint": "School, parent, and student"},
+			{"key": "community", "label": "Community replies", "value": community, "hint": "School, teacher, parent, and student"},
 			{"key": "visits", "label": "Visits shared", "value": _session_count(filters), "hint": "Feedback sessions opened"},
 		],
 		"audiences": [

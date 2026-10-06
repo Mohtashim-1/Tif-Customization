@@ -359,9 +359,10 @@ def _enriched_actuals(from_date, to_date, staff, tokens):
 	actuals["co_curricular"] = _visit_count(from_date, to_date, tokens, CO_CURRICULAR_SQL)
 	actuals["new_schools"] = _distinct_schools(from_date, to_date, tokens, NEW_SCHOOL_SQL)
 	actuals["new_school_registration"] = actuals["new_schools"]
-	dept = department_count_sql("fv")
-	actuals["model_school_a"] = _distinct_schools(from_date, to_date, tokens, f"{dept} >= 3")
-	actuals["model_school_b"] = _distinct_schools(from_date, to_date, tokens, f"{dept} = 2")
+	models = _registered_model_split(from_date, to_date, tokens)
+	actuals["model_school_a"] = models["model_a"]
+	actuals["model_school_b"] = models["model_b"]
+	actuals["model_school_c"] = models["model_c"]
 	sum_participants = _training_participants(from_date, to_date, tokens)
 	actuals["workshop_registration"] = max(workshop_children, sum_participants)
 	return actuals
@@ -428,6 +429,45 @@ def _visit_count(from_date, to_date, tokens, extra_sql):
 		)[0][0]
 		or 0
 	)
+
+
+def _registered_model_split(from_date, to_date, tokens):
+	"""Registered schools once each: Model A = 3 departments, B = 2, C = the rest.
+
+	A + B + C equals Registered Schools. A school is classified by its highest
+	department count in the date range, so the total is not a sum of visits.
+	"""
+	visit_day = visit_day_sql("fv")
+	school = _school_expr("fv")
+	dept = department_count_sql("fv")
+	params = _staff_params(from_date, to_date, tokens)
+	row = frappe.db.sql(
+		f"""
+		SELECT
+			COALESCE(SUM(CASE WHEN dept >= 3 THEN 1 ELSE 0 END), 0) AS model_a,
+			COALESCE(SUM(CASE WHEN dept = 2 THEN 1 ELSE 0 END), 0) AS model_b,
+			COALESCE(SUM(CASE WHEN dept <= 1 THEN 1 ELSE 0 END), 0) AS model_c
+		FROM (
+			SELECT {school} AS school, MAX({dept}) AS dept
+			FROM `tabField Visit` fv
+			WHERE fv.docstatus = 1
+			  AND {visit_day} BETWEEN %(from_date)s AND %(to_date)s
+			  AND {_staff_where(tokens)}
+			  AND ({NEW_SCHOOL_SQL})
+			  AND {school} IS NOT NULL
+			  AND {school} != ''
+			GROUP BY 1
+		) schools
+		""",
+		params,
+		as_dict=True,
+	)
+	found = row[0] if row else {}
+	return {
+		"model_a": cint(found.get("model_a") or 0),
+		"model_b": cint(found.get("model_b") or 0),
+		"model_c": cint(found.get("model_c") or 0),
+	}
 
 
 def _distinct_schools(from_date, to_date, tokens, extra_sql):

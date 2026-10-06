@@ -830,13 +830,12 @@ def _city_link_options(txt="", limit=80):
 		else:
 			where.append(f"name LIKE %({key})s")
 		params[key] = f"%{token}%"
-	label_sql = "IFNULL(city, name)" if has_city else "name"
 	rows = frappe.db.sql(
 		f"""
-		SELECT name, {label_sql} AS city_label
+		SELECT name
 		FROM `tabCity`
 		WHERE {" AND ".join(where)}
-		ORDER BY city_label ASC
+		ORDER BY name ASC
 		LIMIT {limit}
 		""",
 		params,
@@ -846,11 +845,10 @@ def _city_link_options(txt="", limit=80):
 	seen = set()
 	for row in rows:
 		name = (row.get("name") or "").strip()
-		label = (row.get("city_label") or name).strip()
 		if not name or name in seen:
 			continue
 		seen.add(name)
-		out.append({"value": name, "label": label, "name": name})
+		out.append({"value": name, "label": name, "name": name})
 	return out
 
 
@@ -1610,7 +1608,7 @@ def submit_smes_activity(data):
 		submitted = True
 	frappe.db.commit()
 
-	return {
+	out = {
 		"name": doc.name,
 		"submitted": submitted,
 		"url": get_url(f"/app/field-visit/{doc.name}"),
@@ -1622,6 +1620,18 @@ def submit_smes_activity(data):
 			else ""
 		),
 	}
+	try:
+		from tif_customization.tif_customization.api.feedback_studio import _ensure_session_for_field_visit
+
+		feedback = _ensure_session_for_field_visit(doc.name)
+		out["feedback_url"] = feedback.get("feedback_url") or feedback.get("share_url")
+		out["share_token"] = feedback.get("share_token")
+		out["feedback_session"] = feedback.get("session")
+		frappe.db.commit()
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "Feedback session from Field Visit")
+		out["feedback_url"] = ""
+	return out
 
 
 @frappe.whitelist()

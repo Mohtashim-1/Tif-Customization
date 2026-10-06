@@ -446,6 +446,110 @@ frappe.tif_customization.show_enrolment_officer_dialog = function (data) {
 	d.show();
 };
 
+frappe.tif_customization.photo_day_gap = function (clickValue, docCreated) {
+	const click = String(clickValue || "").slice(0, 10);
+	const doc = String(docCreated || "").slice(0, 10);
+	if (!/^\d{4}-\d{2}-\d{2}$/.test(click) || !/^\d{4}-\d{2}-\d{2}$/.test(doc)) return null;
+	const ms = new Date(click + "T00:00:00") - new Date(doc + "T00:00:00");
+	return Math.round(ms / 86400000);
+};
+
+frappe.tif_customization.photo_click_check = function (row) {
+	const images = (row && row.images) || [];
+	if (!images.length) return { label: __("No photo"), tone: "muted" };
+	if (images.some((img) => !img.captured)) return { label: __("No proof — copy image"), tone: "bad" };
+	let worst = 0;
+	let known = false;
+	images.forEach((img) => {
+		const gap = frappe.tif_customization.photo_day_gap(img.captured, row.doc_created);
+		if (gap === null) return;
+		known = true;
+		if (Math.abs(gap) > Math.abs(worst)) worst = gap;
+	});
+	if (!known) return { label: __("Click time found"), tone: "ok" };
+	if (worst === 0) return { label: __("Same day as document"), tone: "ok" };
+	const n = Math.abs(worst);
+	if (worst < 0) {
+		return {
+			label: n === 1 ? __("1 day before document") : __("{0} days before document", [n]),
+			tone: "warn",
+		};
+	}
+	return {
+		label: n === 1 ? __("1 day after document") : __("{0} days after document", [n]),
+		tone: "warn",
+	};
+};
+
+frappe.tif_customization.show_visit_photo_dialog = function (row) {
+	const images = (row && row.images) || [];
+	const when = (value) => {
+		if (!value) return "—";
+		const user = frappe.datetime.str_to_user(value);
+		return user && user !== "Invalid date" ? user : value;
+	};
+	const controlLine = (img) => {
+		const docWhen = frappe.utils.escape_html(row.doc_created ? when(row.doc_created) : "—");
+		if (!img.captured) {
+			return `<div style="margin-top:4px;font-size:13px;color:#b45309;">
+				<strong>${__("Control")}:</strong>
+				${__(
+					"No proof of click time. This is a copy image, so it cannot be checked against the document created on {0}.",
+					[docWhen]
+				)}
+			</div>`;
+		}
+		const gap = frappe.tif_customization.photo_day_gap(img.captured, row.doc_created);
+		let verdict = __("Click time is on the file. Document creation time was not found, so the day gap cannot be calculated.");
+		let color = "#6b7280";
+		if (gap === 0) {
+			verdict = __("Photo click date is the same day the document was created ({0}).", [docWhen]);
+			color = "#047857";
+		} else if (gap < 0) {
+			const n = Math.abs(gap);
+			verdict =
+				n === 1
+					? __("Photo was clicked 1 day before the document was created ({0}).", [docWhen])
+					: __("Photo was clicked {0} days before the document was created ({1}).", [n, docWhen]);
+			color = "#b45309";
+		} else if (gap > 0) {
+			verdict =
+				gap === 1
+					? __("Photo was clicked 1 day after the document was created ({0}).", [docWhen])
+					: __("Photo was clicked {0} days after the document was created ({1}).", [gap, docWhen]);
+			color = "#b45309";
+		}
+		return `<div style="margin-top:4px;font-size:13px;color:${color};"><strong>${__("Control")}:</strong> ${verdict}</div>`;
+	};
+	const body = images.length
+		? images
+				.map((img) => {
+					const captured = img.captured
+						? `${__("Captured on phone")}: <strong>${frappe.utils.escape_html(when(img.captured))}</strong>`
+						: __("Not the original photo. This is a copy image, so the phone capture time is not in the file.");
+					const uploaded = img.uploaded
+						? `${__("Uploaded in ERP")}: ${frappe.utils.escape_html(when(img.uploaded))}`
+						: "";
+					return `<div style="margin-bottom:16px;">
+						<img src="${encodeURI(img.url || "")}" alt="" style="max-width:100%;max-height:420px;border-radius:8px;border:1px solid #e5e7eb;">
+						<div style="margin-top:6px;font-size:13px;">${captured}</div>
+						<div class="text-muted" style="font-size:12px;">${uploaded}</div>
+						${controlLine(img)}
+					</div>`;
+				})
+				.join("")
+		: `<p class="text-muted">${__("No photo on this visit.")}</p>`;
+	const d = new frappe.ui.Dialog({
+		title: __("{0} — Photo", [row.school || row.name || __("School")]),
+		size: "large",
+		fields: [{ fieldtype: "HTML", fieldname: "html" }],
+		primary_action_label: __("Close"),
+		primary_action: () => d.hide(),
+	});
+	d.fields_dict.html.$wrapper.html(body);
+	d.show();
+};
+
 frappe.tif_customization.show_monitoring_officer_dialog = function (data, rows) {
 	const meBucket = (row) => {
 		const c = String(row.category || "")
@@ -542,6 +646,33 @@ frappe.tif_customization.show_monitoring_officer_dialog = function (data, rows) 
 		if (cint(row.school_unapproved) || cint(row.school_missing)) return __("Un Approved");
 		return __("Approved");
 	};
+	const photoCell = (row) => {
+		const images = row.images || [];
+		if (!images.length) return `<span class="text-muted">—</span>`;
+		const first = images[0];
+		const extra = images.length > 1 ? ` <span class="text-muted">+${images.length - 1}</span>` : "";
+		return `<a href="#" class="visit-photo" data-visit="${frappe.utils.escape_html(
+			row.name || ""
+		)}" title="${__("Open school photo")}"><img src="${encodeURI(
+			first.url || ""
+		)}" alt="" style="width:56px;height:42px;object-fit:cover;border-radius:6px;border:1px solid #d1d5db;vertical-align:middle;background:#f3f4f6;"></a>${extra}`;
+	};
+	const photoWhen = (value) => {
+		if (!value) return "";
+		const user = frappe.datetime.str_to_user(value);
+		return user && user !== "Invalid date" ? user : value;
+	};
+	const photoCheckCell = (row) => {
+		const check = frappe.tif_customization.photo_click_check(row);
+		const color = check.tone === "ok" ? "#047857" : check.tone === "bad" ? "#b91c1c" : check.tone === "warn" ? "#b45309" : "#6b7280";
+		const times = (row.images || []).map((img) => photoWhen(img.captured)).filter(Boolean);
+		const timeLine = times.length
+			? `<div style="color:#047857;font-weight:600;margin-bottom:2px;">${times
+					.map((t) => frappe.utils.escape_html(t))
+					.join("<br>")}</div>`
+			: "";
+		return `${timeLine}<span style="color:${color};font-weight:600;">${frappe.utils.escape_html(check.label)}</span>`;
+	};
 
 	const showDetail = (officer, kind) => {
 		const bucket = byOfficer[officer];
@@ -567,13 +698,15 @@ frappe.tif_customization.show_monitoring_officer_dialog = function (data, rows) 
 					<td>${frappe.utils.escape_html(row.officer || "")}</td>
 					<td>${frappe.utils.escape_html(row.status || "")}</td>
 					<td>${frappe.utils.escape_html(row.category || "")}</td>
+					<td>${photoCell(row)}</td>
+					<td style="white-space:normal;">${photoCheckCell(row)}</td>
 					<td style="max-width:320px;white-space:normal;">${frappe.tif_customization.format_visit_remarks(
 						row.remarks
 					)}</td>
 				</tr>`
 					)
 					.join("")
-			: `<tr><td colspan="9" class="text-muted text-center">${__("No Field Visits for this number.")}</td></tr>`;
+			: `<tr><td colspan="11" class="text-muted text-center">${__("No Field Visits for this number.")}</td></tr>`;
 		d.fields_dict.html.$wrapper.html(`
 			<p style="margin-bottom:10px;">
 				<a href="#" class="me-officer-back">${__("← Field officers")}</a>
@@ -589,10 +722,12 @@ frappe.tif_customization.show_monitoring_officer_dialog = function (data, rows) 
 							<th>${__("Visit Date")}</th>
 							<th>${__("Type")}</th>
 							<th>${__("School")}</th>
-							<th>${__("School Status")}</th>
+							<th>${__("Approval")}</th>
 							<th>${__("Officer")}</th>
 							<th>${__("Status")}</th>
-							<th>${__("Category")}</th>
+							<th>${__("School Status")}</th>
+							<th>${__("Image")}</th>
+							<th>${__("Photo check")}</th>
 							<th>${__("Visit Summary")}</th>
 						</tr>
 					</thead>
@@ -602,6 +737,12 @@ frappe.tif_customization.show_monitoring_officer_dialog = function (data, rows) 
 		`);
 	};
 
+	d.$wrapper.on("click", ".visit-photo", (e) => {
+		e.preventDefault();
+		const visit = $(e.currentTarget).attr("data-visit");
+		const row = (rows || []).find((r) => r.name === visit);
+		if (row) frappe.tif_customization.show_visit_photo_dialog(row);
+	});
 	d.$wrapper.on("click", ".me-officer-count", (e) => {
 		e.preventDefault();
 		const officer = $(e.currentTarget).attr("data-officer");

@@ -16,6 +16,7 @@
   "column_break_school",
   "school_opening",
   "sme_response",
+  "field_visit",
   "submitted_on"
  ],
  "fields": [
@@ -90,13 +91,22 @@
    "options": "Feedback Studio Response"
   },
   {
+   "fieldname": "field_visit",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Field Visit",
+   "options": "Field Visit",
+   "search_index": 1
+  },
+  {
    "fieldname": "submitted_on",
    "fieldtype": "Datetime",
    "label": "Submitted On"
   }
  ],
  "links": [],
- "modified": "2026-09-28 18:40:00.000000",
+ "modified": "2026-10-06 15:20:00.000000",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Feedback Studio Session",

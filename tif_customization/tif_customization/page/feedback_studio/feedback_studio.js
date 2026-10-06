@@ -19,9 +19,10 @@ frappe.tif_customization.FeedbackStudio = class FeedbackStudio {
 		this._syncTimer = null;
 		this._syncSeq = 0;
 		this.audMeta = [
-			{ id: "school", label: "School", hint: "Staff & administration", color: "#2f5bd3" },
+			{ id: "school", label: "School", hint: "School-level implementation", color: "#2f5bd3" },
+			{ id: "teacher", label: "Teacher", hint: "Teachers’ training impact", color: "#0f766e" },
 			{ id: "parent", label: "Parent", hint: "Parents & guardians", color: "#1f8a5b" },
-			{ id: "student", label: "Student", hint: "Learners", color: "#c8561f" },
+			{ id: "student", label: "Student", hint: "Storytelling / student impact", color: "#c8561f" },
 			{ id: "sme", label: "SME", hint: "Subject matter experts", color: "#7a4cc2" },
 		];
 		this.state = this.load();
@@ -43,43 +44,147 @@ frappe.tif_customization.FeedbackStudio = class FeedbackStudio {
 	}
 
 	defaults() {
+		const freq = ["Daily", "2–3 times a week", "Once a week", "Occasionally", "Not yet"];
+		const change = ["Significant", "Moderate", "Slight", "No noticeable change"];
+		const storyUse = [
+			"Storytelling activity",
+			"Classroom lesson",
+			"Morning assembly",
+			"Discussion / reflection",
+			"Role-play / activity",
+			"Other",
+		];
+		const values = [
+			["respect", "Respect for teachers / elders"],
+			["honesty", "Honesty and truthfulness"],
+			["kindness", "Kindness and caring"],
+			["helping", "Helping others"],
+			["sharing", "Sharing and cooperation"],
+			["responsibility", "Responsibility"],
+			["manners", "Good manners and polite language"],
+			["empathy", "Empathy"],
+			["cleanliness", "Cleanliness and personal hygiene"],
+			["patience", "Patience and gratitude"],
+			["punctuality", "Punctuality"],
+			["promise", "Keeping a promise"],
+		];
 		return {
 			school: {
-				title: "Staff feedback",
-				intro: "Help us understand how the school is supporting you this term.",
+				title: "School-level implementation",
+				intro: "Complete this when storytelling or teachers’ training has been implemented at school or classroom level. Ratings: 1 = No change / not at all · 5 = Very significant / consistently.",
 				questions: [
-					this.blankQuestion("rating", "How well does leadership communicate school priorities?"),
-					this.blankQuestion("choice", "Which area needs the most support?", [
-						"Resources",
-						"Training",
-						"Workload",
-						"Facilities",
+					this.blankQuestion(
+						"choice",
+						"To what extent have Islamic values been promoted through this session / training?",
+						["Not at all", "Small extent", "Some extent", "Great extent", "Consistently"]
+					),
+					this.blankQuestion("choice", "Which practice has been implemented most?", [
+						"Storytelling",
+						"Classroom activities",
+						"Morning assembly",
+						"Character-building activities",
+						"Appreciation / reward system",
+						"Parent involvement",
+						"Other",
 					]),
-					this.blankQuestion("text", "What one change would make your work easier?"),
+					this.blankQuestion("choice", "Implementation level", [
+						"School-wide",
+						"Some classes",
+						"Individual teacher / classroom",
+					]),
+					this.blankQuestion("choice", "Main challenge or support needed", [
+						"Lack of time",
+						"Lack of resources",
+						"Students’ varying backgrounds",
+						"Lack of parental support",
+						"Lack of follow-up / support",
+						"Other",
+					]),
+					this.blankQuestion("text", "What support would help you implement the learning more effectively?"),
+					this.blankQuestion("choice", "Where have you observed the most significant change?", [
+						"Students",
+						"Teacher / teaching practice",
+						"Classroom environment",
+						"School level",
+						"No significant change yet",
+					]),
+					this.blankQuestion("text", "Which Islamic value should receive more focus in the coming months?"),
+					this.blankQuestion(
+						"text",
+						"Please share one specific example that demonstrates the change you observed."
+					),
+				],
+			},
+			teacher: {
+				title: "Teachers’ training – teacher impact",
+				intro: "Complete this if you attended or implemented a Teachers’ Training Workshop. Rate the change: 1 = No change · 5 = Very significant change.",
+				questions: [
+					this.blankQuestion("rating", "I understand and apply Islamic values more effectively in teaching."),
+					this.blankQuestion("rating", "I apply the teaching techniques learned in the workshop."),
+					this.blankQuestion("rating", "I use storytelling effectively where appropriate."),
+					this.blankQuestion("rating", "I model Islamic values through my own behaviour."),
+					this.blankQuestion("rating", "I show greater patience, kindness and empathy toward students."),
+					this.blankQuestion("rating", "I encourage positive behaviour and good character."),
+					this.blankQuestion("rating", "I use new classroom activities."),
+					this.blankQuestion("rating", "I reflect more consciously on my role as teacher and role model."),
+					this.blankQuestion("choice", "Have you changed any teaching practice after the training?", [
+						"Yes",
+						"Partially",
+						"Not yet",
+					]),
+					this.blankQuestion("text", "If yes, mention one specific change."),
+					this.blankQuestion(
+						"text",
+						"What impact have you observed in students as a result of applying the training?"
+					),
 				],
 			},
 			parent: {
-				title: "Parent feedback",
-				intro: "Your view helps us partner better with families.",
+				title: "Parent follow-up",
+				intro: "Help us understand how storytelling and values work is showing up at home. Ratings: 1 = No change · 5 = Very significant change.",
 				questions: [
-					this.blankQuestion("rating", "How satisfied are you with communication from the school?"),
-					this.blankQuestion("yesno", "Do you feel informed about your child’s progress?"),
-					this.blankQuestion("text", "Anything else you would like us to know?"),
+					this.blankQuestion("choice", "How often does your child talk about value-based stories from school?", freq),
+					this.blankQuestion("choice", "Have you been involved in school character-building or values activities?", [
+						"Yes",
+						"Partially",
+						"Not yet",
+					]),
+					this.blankQuestion("choice", "Observed change in your child’s character after storytelling / training", change),
+					this.blankQuestion("rating", "Change in respect for teachers / elders"),
+					this.blankQuestion("rating", "Change in honesty and truthfulness"),
+					this.blankQuestion("rating", "Change in kindness and caring"),
+					this.blankQuestion("rating", "Change in helping others"),
+					this.blankQuestion("rating", "Change in good manners and polite language"),
+					this.blankQuestion("rating", "Change in cleanliness and personal hygiene"),
+					this.blankQuestion("yesno", "Do you support these Islamic values at home?"),
+					this.blankQuestion("text", "Give one specific example of a positive change you noticed at home."),
+					this.blankQuestion("text", "What support would help you reinforce these values at home?"),
 				],
 			},
 			student: {
-				title: "Student feedback",
-				intro: "Tell us honestly how school is going for you.",
+				title: "Storytelling session – student impact",
+				intro: "Tell us about the value-based stories and any change you noticed. Ratings: 1 = No change · 5 = Very significant change.",
 				questions: [
-					this.blankQuestion("rating", "How much do you enjoy your lessons?"),
-					this.blankQuestion("choice", "How do you learn best?", [
-						"Group work",
-						"On my own",
-						"Hands-on activities",
-						"Listening to the teacher",
+					this.blankQuestion("choice", "How often were value-based stories used with you?", freq),
+					this.blankQuestion("choice", "How were the stories used?", storyUse),
+					this.blankQuestion("choice", "How interested / engaged were you during the stories?", [
+						"Very high",
+						"High",
+						"Moderate",
+						"Low",
+						"Very low",
 					]),
-					this.blankQuestion("yesno", "Do you feel safe at school?"),
-				],
+					this.blankQuestion("choice", "Observed change after storytelling", change),
+				].concat(
+					values.map((pair) => this.blankQuestion("rating", "Change in: " + pair[1])),
+					[
+						this.blankQuestion(
+							"text",
+							"Which Islamic value was most noticeably reflected in you or your class?"
+						),
+						this.blankQuestion("text", "Give one specific example of a positive change after storytelling."),
+					]
+				),
 			},
 			sme: {
 				title: "Subject expert review",
@@ -99,7 +204,7 @@ frappe.tif_customization.FeedbackStudio = class FeedbackStudio {
 
 	storageKey() {
 		const user = (frappe.session && frappe.session.user) || "guest";
-		return "feedback-studio-v1:" + user;
+		return "feedback-studio-v2:" + user;
 	}
 
 	load() {
@@ -1010,7 +1115,7 @@ frappe.tif_customization.FeedbackStudio = class FeedbackStudio {
 					q.type === "rating"
 						? '<div class="fs-scale-preview">' +
 							scale.map((n) => '<span class="fs-pip">' + n + "</span>").join("") +
-							'<span class="fs-hint">Poor → Excellent</span></div>'
+							'<span class="fs-hint">No change → Very significant</span></div>'
 						: "";
 				const yesno = q.type === "yesno" ? '<div class="fs-note">Respondent picks Yes or No</div>' : "";
 				const text =
@@ -1101,7 +1206,7 @@ frappe.tif_customization.FeedbackStudio = class FeedbackStudio {
 				const school = share.school_name || share.customer || "";
 				return (
 					'<div class="fs-stack"><div class="fs-card accent fs-thanks"><h2>Thank you</h2>' +
-					"<p>Your SME feedback is saved. Share this QR or link with parents, the school, or students so they can submit their feedback.</p>" +
+					"<p>Your SME feedback is saved. Share this QR or link with parents, students, teachers, or the school so they can submit their feedback.</p>" +
 					(school
 						? '<div class="fs-share-school">School: <strong>' + this.h(school) + "</strong></div>"
 						: "") +
@@ -1162,9 +1267,9 @@ frappe.tif_customization.FeedbackStudio = class FeedbackStudio {
 								);
 							})
 							.join("") +
-						'</div><div class="fs-scale-caption">1 = Poor · ' +
+						'</div><div class="fs-scale-caption">1 = No change · ' +
 						this.state.ratingScale +
-						" = Excellent</div></div>";
+						" = Very significant change</div></div>";
 				} else if (q.type === "choice") {
 					control =
 						'<div class="fs-choices">' +

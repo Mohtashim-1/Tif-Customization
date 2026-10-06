@@ -460,8 +460,8 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			const short = (col.short_label || col.shortLabel || (col.label || "").split("(")[0]).trim();
 			return {
 				...col,
-				header: `${col.label} (${__("1 Jan to till date")})`,
-				shortHeader: `${short} ${__("1 Jan to till date")}`,
+				header: `${col.label} (${__("1 July to date")})`,
+				shortHeader: `${short} ${__("1 July to date")}`,
 			};
 		});
 	}
@@ -551,7 +551,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 
 	outcome_ytd_columns(data) {
 		return this.outcome_columns(data).filter(
-			(col) => !["model_school_a", "model_school_b"].includes(col.metric || "")
+			(col) => !["model_school_a", "model_school_b", "model_school_c"].includes(col.metric || "")
 		);
 	}
 
@@ -564,7 +564,9 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				value: this.fmt(k.marketing),
 				style: "new",
 				metric: "marketing",
-				hint: __("Field Visit type = Marketing, except category New"),
+				hint: __(
+					"Same as New School Visit: Visits or Marketing with category New, plus Registration of New Schools.",
+				),
 			},
 			{ label: __("Follow up Visit"), value: this.fmt(k.followup), style: "followup", metric: "followup" },
 			{ label: __("Monitoring Visit (M&E)"), value: this.fmt(k.me), style: "me", metric: "monitoring" },
@@ -586,11 +588,11 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				style: (col.key || "activity").replace(/_/g, "-"),
 				metric: col.metric || col.key,
 			})),
-			...this.outcome_ytd_columns(data).map((col) => {
+			...this.outcome_ytd_columns(data).flatMap((col) => {
 				const fyKey = (col.metric || col.key || "").replace(/^outcome_/, "");
 				const fy = (data.outcome_fy || {})[fyKey] || {};
 				const actual = fy.actual != null ? fy.actual : t[col.key];
-				return {
+				const card = {
 					label: col.label,
 					value: this.fmt(actual),
 					style:
@@ -619,8 +621,25 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 								)
 							: data.outcome_fy_label
 								? data.outcome_fy_label
-								: __("1 Jan to till date"),
+								: __("1 July to date"),
 				};
+				if (col.metric === "workshop_registration") {
+					const ws = (data.outcome_fy || {}).workshop_conducted || {};
+					return [
+						{
+							label: __("Workshop"),
+							value: this.fmt(ws.actual),
+							style: "workshop",
+							metric: "workshop_conducted",
+							outcomeFy: true,
+							hint: data.outcome_fy_label
+								? __("Workshop Conducted / Workshop · {0}", [data.outcome_fy_label])
+								: __("Workshop Conducted / Workshop · 1 July to date"),
+						},
+						card,
+					];
+				}
+				return [card];
 			}),
 		];
 		return [
@@ -637,11 +656,17 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					{
 						label: __("Total School Visit"),
 						value: this.fmt(
-							cint(k.marketing) + cint(k.new) + cint(k.followup) + cint(k.me),
+							cint(k.marketing) +
+								cint(k.new) +
+								cint(k.followup) +
+								cint(k.me) -
+								cint(k.marketing_new),
 						),
 						style: "sme",
 						cardKind: "field_emp_summary",
-						hint: __("Marketing + New School + Follow up + Monitoring (M&E)"),
+						hint: __(
+							"Each visit once. A Marketing visit with category New is on both Marketing Visit and New School Visit.",
+						),
 					},
 					{
 						label: __("New School Visit"),
@@ -652,10 +677,10 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					},
 					{
 						label: __("Number of School"),
-						value: this.fmt(cint(k.model_a) + cint(k.model_b) + cint(k.model_c)),
+						value: this.fmt(cint(k.followup) + cint(k.new)),
 						style: "followup",
 						cardKind: "school_visit_officers",
-						hint: __("Model A + Model B + Model C. Same visits as Follow up + New School."),
+						hint: __("Follow up Visit + New School Visit in this period."),
 					},
 					{
 						label: __("Working Days"),
@@ -677,31 +702,34 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				cards: activityCards,
 			},
 			{
-				title: __("Outcomes (1 Jan to till date)"),
+				title: __("Outcomes (1 July to date)"),
 				separator: true,
 				rows: [
 					outcomeCards,
 					[
 						{
 							label: __("Model A"),
-							value: this.fmt(k.model_a),
+							value: this.fmt(((data.outcome_fy || {}).model_school_a || {}).actual),
 							style: "model-a",
-							metric: "model_a",
-							hint: __("School enrolled in 3 TIF departments (QPS / TPS / CEE)"),
+							metric: "model_school_a",
+							outcomeFy: true,
+							hint: __("Registered schools in 3 departments. Model A + B + C = Registered Schools."),
 						},
 						{
 							label: __("Model B"),
-							value: this.fmt(k.model_b),
+							value: this.fmt(((data.outcome_fy || {}).model_school_b || {}).actual),
 							style: "model-b",
-							metric: "model_b",
-							hint: __("School enrolled in 2 TIF departments"),
+							metric: "model_school_b",
+							outcomeFy: true,
+							hint: __("Registered schools in 2 departments. Model A + B + C = Registered Schools."),
 						},
 						{
 							label: __("Model C"),
-							value: this.fmt(k.model_c),
+							value: this.fmt(((data.outcome_fy || {}).model_school_c || {}).actual),
 							style: "model-c",
-							metric: "model_c",
-							hint: __("1 TIF department, or not affiliated. Model A + B + C = Number of School"),
+							metric: "model_school_c",
+							outcomeFy: true,
+							hint: __("Other registered schools. Model A + B + C = Registered Schools."),
 						},
 					],
 				],
@@ -809,7 +837,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				<strong>${__("Rural")} 4</strong>
 				${__("× working days")}
 				&nbsp;|&nbsp;
-				${__("Outcomes from 1 Jan to till date")}: <strong>${frappe.utils.escape_html(
+				${__("Outcomes from 1 July to date")}: <strong>${frappe.utils.escape_html(
 					frappe.datetime.str_to_user(data.ytd_from || data.from_date)
 				)} – ${toLabel}</strong>
 				${data.fiscal_year_label ? `&nbsp;|&nbsp; ${__("FY")}: <strong>${frappe.utils.escape_html(data.fiscal_year_label)}</strong>` : ""}
@@ -825,7 +853,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 							<th rowspan="3">${__("Type / Division")}</th>
 							<th rowspan="3">${__("Province")}</th>
 							<th colspan="${activityCols.length}" class="group activity-group">${__("Activity (period)")}</th>
-							<th colspan="${outcomeCols.length}" class="group outcome-group">${__("Outcomes (1 Jan to till date)")}</th>
+							<th colspan="${outcomeCols.length}" class="group outcome-group">${__("Outcomes (1 July to date)")}</th>
 							<th colspan="3" class="group">${__("Totals")}</th>
 							<th colspan="3" class="group">${__("KPI Points")}</th>
 						</tr>
@@ -861,7 +889,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 								.map(
 									(c) =>
 										`<th class="activity-col visit-col${c.cellClass ? ` ${c.cellClass}` : ""}" title="${frappe.utils.escape_html(
-											c.label
+											c.title || c.label
 										)}">${frappe.utils.escape_html(c.label)}</th>`
 								)
 								.join("")}
@@ -1664,7 +1692,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				metric: col.metric || col.key,
 			})),
 			...this.outcome_ytd_columns(data).map((col) => ({
-				group: __("Outcomes (1 Jan to till date)"),
+				group: __("Outcomes (1 July to date)"),
 				label: col.label,
 				value: row[col.key],
 				metric: col.metric,

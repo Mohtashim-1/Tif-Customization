@@ -163,7 +163,11 @@ def _metric_condition(metric: str, alias: str = "fv") -> str:
 	if m in ("school_visits", "school_visit"):
 		return f"{a}.type IN ('Marketing', 'Visits', 'M&E')"
 	if m == "marketing":
-		return f"{a}.type = 'Marketing' AND IFNULL({a}.marketing_visit_category, '') != 'New'"
+		return f"""(
+			{a}.type = 'Marketing'
+			OR {a}.type = 'Registration of New Schools'
+			OR ({a}.type = 'Visits' AND IFNULL({a}.marketing_visit_category, '') = 'New')
+		)"""
 	if m in ("me", "monitoring"):
 		return f"{a}.type = 'M&E'"
 	if m == "meeting":
@@ -202,9 +206,11 @@ def _metric_condition(metric: str, alias: str = "fv") -> str:
 		# Distinct schools counted in KPI via registered_school_sql; drilldown shows matching visits.
 		return registered_school_sql(a)
 	if m == "model_school_a":
-		return f"{department_count_sql(a)} >= 3"
+		return f"({registered_school_sql(a)}) AND {department_count_sql(a)} >= 3"
 	if m == "model_school_b":
-		return f"{department_count_sql(a)} = 2"
+		return f"({registered_school_sql(a)}) AND {department_count_sql(a)} = 2"
+	if m == "model_school_c":
+		return f"({registered_school_sql(a)}) AND {department_count_sql(a)} <= 1"
 	if m == "model_a":
 		return f"({_number_of_school_sql(a)}) AND {department_count_sql(a)} >= 3"
 	if m == "model_b":
@@ -511,7 +517,7 @@ def _me_status_note(row) -> tuple[str, str]:
 
 
 def _visit_remarks(row) -> str:
-	"""School Status / Workshop / Program / Visit Summary (every card drilldown)."""
+	"""Books / Workshop / Program / Visit Summary (every card drilldown)."""
 	notes = []
 	for key in (
 		"mt_remarks",
@@ -527,7 +533,7 @@ def _visit_remarks(row) -> str:
 			notes.append(val)
 	notes_text = "; ".join(notes) if notes else "—"
 	parts = [
-		f"School Status: {_books_heading(row) or '—'}",
+		f"Books: {_books_heading(row) or '—'}",
 		f"Workshop: {_workshop_heading(row) or '—'}",
 		f"Program: {_program_heading(row) or '—'}",
 		f"Visit Summary: {notes_text}",
@@ -821,6 +827,97 @@ def _workshop_participant_rows(visits: list, sheet_by_visit: dict) -> list[dict]
 	return out
 
 
+_CAMERA_NAME = re.compile(
+	r"(?P<date>20\d{6})[_-](?P<time>\d{6})(?P<ampm>AM|PM)?",
+	re.IGNORECASE,
+)
+_SCREENSHOT_NAME = re.compile(
+	r"(?P<year>20\d{2})-(?P<month>\d{2})-(?P<day>\d{2})[^\d]{1,16}"
+	r"(?P<hour>\d{1,2})[.\-:](?P<minute>\d{2})[.\-:](?P<second>\d{2})(?:\s*(?P<ampm>AM|PM))?",
+	re.IGNORECASE,
+)
+
+
+def _capture_time_from_filename(file_name: str) -> str:
+	"""Camera names and laptop screenshots keep the click time in the file name."""
+	name = file_name or ""
+	match = _CAMERA_NAME.search(name)
+	if match:
+		raw_date = match.group("date")
+		raw_time = match.group("time")
+		ampm = (match.group("ampm") or "").upper()
+		try:
+			year, month, day = int(raw_date[:4]), int(raw_date[4:6]), int(raw_date[6:8])
+			hour, minute, second = int(raw_time[:2]), int(raw_time[2:4]), int(raw_time[4:6])
+		except ValueError:
+			year = month = day = hour = minute = second = 0
+			ampm = ""
+	else:
+		shot = _SCREENSHOT_NAME.search(name)
+		if not shot:
+			return ""
+		try:
+			year = int(shot.group("year"))
+			month = int(shot.group("month"))
+			day = int(shot.group("day"))
+			hour = int(shot.group("hour"))
+			minute = int(shot.group("minute"))
+			second = int(shot.group("second"))
+		except (TypeError, ValueError):
+			return ""
+		ampm = (shot.group("ampm") or "").upper()
+	if ampm == "PM" and hour < 12:
+		hour += 12
+	elif ampm == "AM" and hour == 12:
+		hour = 0
+	if not (1 <= month <= 12 and 1 <= day <= 31 and 0 <= hour <= 23 and 0 <= minute <= 59 and 0 <= second <= 59):
+		return ""
+	return f"{year:04d}-{month:02d}-{day:02d} {hour:02d}:{minute:02d}:{second:02d}"
+
+
+def _visit_images(visit_names: list[str]) -> dict:
+	"""Photos on each Field Visit, with the phone capture time when the file name has it."""
+	if not visit_names:
+		return {}
+	rows = frappe.db.sql(
+		"""
+		SELECT attached_to_name AS visit, file_url, file_name, creation
+		FROM `tabFile`
+		WHERE attached_to_doctype = 'Field Visit'
+		  AND attached_to_name IN %(names)s
+		  AND (
+			LOWER(file_name) LIKE '%%.jpg'
+			OR LOWER(file_name) LIKE '%%.jpeg'
+			OR LOWER(file_name) LIKE '%%.png'
+			OR LOWER(file_name) LIKE '%%.webp'
+		  )
+		ORDER BY creation ASC
+		""",
+		{"names": tuple(visit_names)},
+		as_dict=True,
+	)
+	out: dict[str, list] = {}
+	seen = set()
+	for row in rows:
+		url = (row.file_url or "").strip()
+		if not url:
+			continue
+		key = (row.visit, url)
+		if key in seen:
+			continue
+		seen.add(key)
+		captured = _capture_time_from_filename(row.file_name or "")
+		out.setdefault(row.visit, []).append(
+			{
+				"url": url,
+				"file_name": row.file_name or "",
+				"captured": captured,
+				"uploaded": str(row.creation)[:19] if row.creation else "",
+			}
+		)
+	return out
+
+
 @frappe.whitelist()
 def get_visit_drilldown(filters=None, metric=None, staff=None):
 	"""Return Field Visit rows that make up a report number."""
@@ -879,6 +976,7 @@ def get_visit_drilldown(filters=None, metric=None, staff=None):
 		SELECT
 			fv.name,
 			fv.type,
+			fv.creation AS doc_created,
 			fv.docstatus,
 			fv.owner,
 			fv.visit_by,
@@ -939,6 +1037,7 @@ def get_visit_drilldown(filters=None, metric=None, staff=None):
 				"name": r.name,
 				"type": vtype,
 				"visit_date": str(r.visit_date) if r.visit_date else "",
+				"doc_created": str(r.doc_created)[:19] if r.doc_created else "",
 				"school": r.school or "",
 				"school_unapproved": cint(r.school_unapproved),
 				"school_missing": 0 if (r.school or "").strip() else 1,
@@ -951,8 +1050,13 @@ def get_visit_drilldown(filters=None, metric=None, staff=None):
 				"remarks": remarks,
 				"participants": cint(r.training_no_of_participants),
 				"url": f"/app/field-visit/{r.name}",
+				"images": [],
 			}
 		)
+
+	images_by_visit = _visit_images([v["name"] for v in out])
+	for visit in out:
+		visit["images"] = images_by_visit.get(visit["name"]) or []
 
 	sheet_by_visit = {r.name: r.attendance_sheet_excel or "" for r in rows}
 	if metric == "enrolment":

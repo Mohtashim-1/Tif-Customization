@@ -9,20 +9,22 @@ from frappe import _
 from frappe.rate_limiter import rate_limit
 from frappe.utils import cint, cstr, get_url, now_datetime
 
-AUDIENCES = ("school", "parent", "student", "sme")
-PUBLIC_ROLES = ("school", "parent", "student")
+AUDIENCES = ("school", "teacher", "parent", "student", "sme")
+PUBLIC_ROLES = ("parent", "student", "teacher", "school")
 TYPES = ("rating", "choice", "yesno", "text")
 TOKEN_RE = re.compile(r"^[A-Fa-f0-9]{16,64}$")
 QID_RE = re.compile(r"^[A-Za-z0-9_-]{1,40}$")
 
 LABELS = {
 	"school": "School",
+	"teacher": "Teacher",
 	"parent": "Parent",
 	"student": "Student",
 	"sme": "SME",
 }
 COLORS = {
 	"school": "#2f5bd3",
+	"teacher": "#0f766e",
 	"parent": "#1f8a5b",
 	"student": "#c8561f",
 	"sme": "#7a4cc2",
@@ -52,54 +54,273 @@ def _qid():
 
 
 def _default_forms():
-	def q(qtype, text, options=None):
+	def q(qid, qtype, text, options=None, required=True):
 		return {
-			"id": _qid(),
+			"id": qid,
 			"type": qtype,
 			"text": text,
-			"required": True,
+			"required": required,
 			"options": options or [],
 		}
 
+	freq = ["Daily", "2–3 times a week", "Once a week", "Occasionally", "Not yet"]
+	change = ["Significant", "Moderate", "Slight", "No noticeable change"]
+	story_use = [
+		"Storytelling activity",
+		"Classroom lesson",
+		"Morning assembly",
+		"Discussion / reflection",
+		"Role-play / activity",
+		"Other",
+	]
+	values = [
+		("respect", "Respect for teachers / elders"),
+		("honesty", "Honesty and truthfulness"),
+		("kindness", "Kindness and caring"),
+		("helping", "Helping others"),
+		("sharing", "Sharing and cooperation"),
+		("responsibility", "Responsibility"),
+		("manners", "Good manners and polite language"),
+		("empathy", "Empathy"),
+		("cleanliness", "Cleanliness and personal hygiene"),
+		("patience", "Patience and gratitude"),
+		("punctuality", "Punctuality"),
+		("promise", "Keeping a promise"),
+	]
+
 	return {
 		"school": {
-			"title": "Staff feedback",
-			"intro": "Help us understand how the school is supporting you this term.",
+			"title": "School-level implementation",
+			"intro": (
+				"Complete this when storytelling or teachers’ training has been implemented at school or classroom level. "
+				"Ratings: 1 = No change / not at all · 5 = Very significant / consistently."
+			),
 			"questions": [
-				q("rating", "How well does leadership communicate school priorities?"),
-				q("choice", "Which area needs the most support?", ["Resources", "Training", "Workload", "Facilities"]),
-				q("text", "What one change would make your work easier?"),
+				q(
+					"sch_extent",
+					"choice",
+					"To what extent have Islamic values been promoted through this session / training?",
+					["Not at all", "Small extent", "Some extent", "Great extent", "Consistently"],
+				),
+				q(
+					"sch_practice",
+					"choice",
+					"Which practice has been implemented most?",
+					[
+						"Storytelling",
+						"Classroom activities",
+						"Morning assembly",
+						"Character-building activities",
+						"Appreciation / reward system",
+						"Parent involvement",
+						"Other",
+					],
+				),
+				q(
+					"sch_level",
+					"choice",
+					"Implementation level",
+					["School-wide", "Some classes", "Individual teacher / classroom"],
+				),
+				q(
+					"sch_challenge",
+					"choice",
+					"Main challenge or support needed",
+					[
+						"Lack of time",
+						"Lack of resources",
+						"Students’ varying backgrounds",
+						"Lack of parental support",
+						"Lack of follow-up / support",
+						"Other",
+					],
+				),
+				q(
+					"sch_support",
+					"text",
+					"What support would help you implement the learning more effectively?",
+				),
+				q(
+					"sch_where",
+					"choice",
+					"Where have you observed the most significant change?",
+					[
+						"Students",
+						"Teacher / teaching practice",
+						"Classroom environment",
+						"School level",
+						"No significant change yet",
+					],
+				),
+				q(
+					"sch_focus",
+					"text",
+					"Which Islamic value should receive more focus in the coming months?",
+				),
+				q(
+					"sch_evidence",
+					"text",
+					"Please share one specific example that demonstrates the change you observed.",
+				),
+			],
+		},
+		"teacher": {
+			"title": "Teachers’ training – teacher impact",
+			"intro": (
+				"Complete this if you attended or implemented a Teachers’ Training Workshop. "
+				"Rate the change: 1 = No change · 5 = Very significant change."
+			),
+			"questions": [
+				q(
+					"tch_apply_values",
+					"rating",
+					"I understand and apply Islamic values more effectively in teaching.",
+				),
+				q(
+					"tch_techniques",
+					"rating",
+					"I apply the teaching techniques learned in the workshop.",
+				),
+				q(
+					"tch_storytelling",
+					"rating",
+					"I use storytelling effectively where appropriate.",
+				),
+				q(
+					"tch_model",
+					"rating",
+					"I model Islamic values through my own behaviour.",
+				),
+				q(
+					"tch_patience",
+					"rating",
+					"I show greater patience, kindness and empathy toward students.",
+				),
+				q(
+					"tch_encourage",
+					"rating",
+					"I encourage positive behaviour and good character.",
+				),
+				q(
+					"tch_activities",
+					"rating",
+					"I use new classroom activities.",
+				),
+				q(
+					"tch_reflect",
+					"rating",
+					"I reflect more consciously on my role as teacher and role model.",
+				),
+				q(
+					"tch_changed",
+					"choice",
+					"Have you changed any teaching practice after the training?",
+					["Yes", "Partially", "Not yet"],
+				),
+				q(
+					"tch_change_example",
+					"text",
+					"If yes, mention one specific change.",
+					required=False,
+				),
+				q(
+					"tch_student_impact",
+					"text",
+					"What impact have you observed in students as a result of applying the training?",
+				),
 			],
 		},
 		"parent": {
-			"title": "Parent feedback",
-			"intro": "Your view helps us partner better with families.",
+			"title": "Parent follow-up",
+			"intro": (
+				"Help us understand how storytelling and values work is showing up at home. "
+				"Ratings: 1 = No change · 5 = Very significant change."
+			),
 			"questions": [
-				q("rating", "How satisfied are you with communication from the school?"),
-				q("yesno", "Do you feel informed about your child’s progress?"),
-				q("text", "Anything else you would like us to know?"),
+				q(
+					"par_stories",
+					"choice",
+					"How often does your child talk about value-based stories from school?",
+					freq,
+				),
+				q(
+					"par_involved",
+					"choice",
+					"Have you been involved in school character-building or values activities?",
+					["Yes", "Partially", "Not yet"],
+				),
+				q(
+					"par_change",
+					"choice",
+					"Observed change in your child’s character after storytelling / training",
+					change,
+				),
+				q("par_respect", "rating", "Change in respect for teachers / elders"),
+				q("par_honesty", "rating", "Change in honesty and truthfulness"),
+				q("par_kindness", "rating", "Change in kindness and caring"),
+				q("par_helping", "rating", "Change in helping others"),
+				q("par_manners", "rating", "Change in good manners and polite language"),
+				q("par_cleanliness", "rating", "Change in cleanliness and personal hygiene"),
+				q("par_home", "yesno", "Do you support these Islamic values at home?"),
+				q(
+					"par_example",
+					"text",
+					"Give one specific example of a positive change you noticed at home.",
+				),
+				q(
+					"par_support",
+					"text",
+					"What support would help you reinforce these values at home?",
+					required=False,
+				),
 			],
 		},
 		"student": {
-			"title": "Student feedback",
-			"intro": "Tell us honestly how school is going for you.",
+			"title": "Storytelling session – student impact",
+			"intro": (
+				"Tell us about the value-based stories and any change you noticed. "
+				"Ratings: 1 = No change · 5 = Very significant change."
+			),
 			"questions": [
-				q("rating", "How much do you enjoy your lessons?"),
+				q("stu_freq", "choice", "How often were value-based stories used with you?", freq),
+				q("stu_how", "choice", "How were the stories used?", story_use),
 				q(
+					"stu_engage",
 					"choice",
-					"How do you learn best?",
-					["Group work", "On my own", "Hands-on activities", "Listening to the teacher"],
+					"How interested / engaged were you during the stories?",
+					["Very high", "High", "Moderate", "Low", "Very low"],
 				),
-				q("yesno", "Do you feel safe at school?"),
+				q("stu_change", "choice", "Observed change after storytelling", change),
+			]
+			+ [
+				q("stu_" + key, "rating", "Change in: " + label)
+				for key, label in values
+			]
+			+ [
+				q(
+					"stu_value",
+					"text",
+					"Which Islamic value was most noticeably reflected in you or your class?",
+				),
+				q(
+					"stu_example",
+					"text",
+					"Give one specific example of a positive change after storytelling.",
+				),
 			],
 		},
 		"sme": {
 			"title": "Subject expert review",
 			"intro": "Review of curriculum content and delivery.",
 			"questions": [
-				q("rating", "How accurate and current is the curriculum content?"),
-				q("choice", "Overall recommendation", ["Keep as is", "Minor revisions", "Major revisions"]),
-				q("text", "Specific content recommendations"),
+				q("sme_accuracy", "rating", "How accurate and current is the curriculum content?"),
+				q(
+					"sme_recommend",
+					"choice",
+					"Overall recommendation",
+					["Keep as is", "Minor revisions", "Major revisions"],
+				),
+				q("sme_notes", "text", "Specific content recommendations"),
 			],
 		},
 	}
@@ -278,6 +499,7 @@ def _responses():
 		"ip_address",
 		"mac_address",
 		"user_agent",
+		"field_visit",
 	]
 	try:
 		meta = frappe.get_meta("Feedback Studio Response")
@@ -407,18 +629,25 @@ def _find_session(token):
 		return None
 	if not frappe.db.table_exists("Feedback Studio Session"):
 		return None
+	fields = [
+		"name",
+		"status",
+		"sme_name",
+		"customer",
+		"school_name",
+		"school_opening",
+		"sme_response",
+		"share_token",
+	]
+	try:
+		if frappe.get_meta("Feedback Studio Session").has_field("field_visit"):
+			fields.append("field_visit")
+	except Exception:
+		pass
 	row = frappe.db.get_value(
 		"Feedback Studio Session",
 		{"share_token": token},
-		[
-			"name",
-			"status",
-			"sme_name",
-			"customer",
-			"school_name",
-			"school_opening",
-			"sme_response",
-		],
+		fields,
 		as_dict=True,
 	)
 	return row
@@ -426,6 +655,32 @@ def _find_session(token):
 
 def _share_url(token):
 	return get_url("/feedback-share/" + token)
+
+
+def _share_path(token):
+	return "/feedback-share/" + token
+
+
+def _session_payload(session):
+	token = session.share_token if hasattr(session, "share_token") else session.get("share_token")
+	field_visit = ""
+	if hasattr(session, "field_visit"):
+		field_visit = session.field_visit or ""
+	elif isinstance(session, dict):
+		field_visit = session.get("field_visit") or ""
+	return {
+		"ok": True,
+		"session": session.name if hasattr(session, "name") else session.get("name"),
+		"share_token": token,
+		"share_url": _share_url(token),
+		"feedback_url": _share_path(token),
+		"sme_name": session.sme_name if hasattr(session, "sme_name") else session.get("sme_name") or "",
+		"school_name": (session.school_name if hasattr(session, "school_name") else session.get("school_name"))
+		or (session.customer if hasattr(session, "customer") else session.get("customer"))
+		or "",
+		"customer": session.customer if hasattr(session, "customer") else session.get("customer") or "",
+		"field_visit": field_visit,
+	}
 
 
 def _field_officer_options():
@@ -568,12 +823,13 @@ def _create_school_opening(school_opening, sme_name):
 	return soa
 
 
-def _create_sme_session_and_response(doc, answers, sme_name, customer=None, school_opening=None, client_meta=None):
+def _create_sme_session_and_response(doc, answers, sme_name, customer=None, school_opening=None, client_meta=None, field_visit=None):
 	staff = _resolve_staff_name(sme_name)
 	sme_name = staff.get("display_name") or staff["employee_name"]
 	customer_name = None
 	school_label = ""
 	soa_name = None
+	field_visit = (field_visit or "").strip() or None
 
 	customer = (customer or "").strip() or None
 	soa_payload = _as_obj(school_opening)
@@ -587,18 +843,110 @@ def _create_sme_session_and_response(doc, answers, sme_name, customer=None, scho
 	else:
 		frappe.throw(_("Select a Customer / school, or create one with the School Opening form."))
 
+	extra = {
+		"sme_name": sme_name,
+		"customer": customer_name,
+		"school_name": school_label,
+		"school_opening": soa_name,
+	}
+	if field_visit and frappe.get_meta("Feedback Studio Response").has_field("field_visit"):
+		extra["field_visit"] = field_visit
+
 	response = _store(
 		"sme",
 		answers,
 		doc,
-		extra={
-			"sme_name": sme_name,
-			"customer": customer_name,
-			"school_name": school_label,
-			"school_opening": soa_name,
-		},
+		extra=extra,
 		client_meta=client_meta,
 	)
+
+	token = frappe.generate_hash(length=32)
+	session_payload = {
+		"doctype": "Feedback Studio Session",
+		"share_token": token,
+		"status": "Open",
+		"sme_name": sme_name,
+		"sme_employee": staff.get("employee"),
+		"customer": customer_name,
+		"school_name": school_label,
+		"school_opening": soa_name,
+		"sme_response": response.name,
+		"submitted_on": now_datetime(),
+	}
+	if field_visit and frappe.get_meta("Feedback Studio Session").has_field("field_visit"):
+		session_payload["field_visit"] = field_visit
+	session = frappe.get_doc(session_payload)
+	session.insert(ignore_permissions=True)
+	if frappe.get_meta("Feedback Studio Response").has_field("session"):
+		response.db_set("session", session.name, update_modified=False)
+
+	out = {
+		"ok": True,
+		"session": session.name,
+		"share_token": token,
+		"share_url": _share_url(token),
+		"feedback_url": _share_path(token),
+		"customer": customer_name,
+		"school_name": school_label,
+		"school_opening": soa_name,
+		"sme_name": sme_name,
+		"response": response.name,
+	}
+	if field_visit:
+		out["field_visit"] = field_visit
+	return out
+
+
+def _ensure_session_for_field_visit(name):
+	"""Open (or reuse) a share session tagged to this Field Visit."""
+	name = (name or "").strip()
+	if not name:
+		frappe.throw(_("Field Visit is required."))
+	if not frappe.db.exists("Field Visit", name):
+		frappe.throw(_("Field Visit {0} was not found.").format(name))
+	if not frappe.get_meta("Feedback Studio Session").has_field("field_visit"):
+		frappe.throw(_("Feedback is not linked to Field Visit yet."))
+
+	existing_rows = frappe.get_all(
+		"Feedback Studio Session",
+		filters={"field_visit": name},
+		fields=["name", "share_token", "status", "sme_name", "school_name", "customer", "field_visit"],
+		order_by="creation desc",
+		limit=1,
+	)
+	existing = existing_rows[0] if existing_rows else None
+	if existing:
+		if existing.status == "Closed":
+			frappe.db.set_value("Feedback Studio Session", existing.name, "status", "Open", update_modified=False)
+			existing.status = "Open"
+		return _session_payload(existing)
+
+	visit = frappe.get_doc("Field Visit", name)
+	sme_name = cstr(visit.visit_by).strip()
+	if not sme_name:
+		sme_name = frappe.db.get_value("User", frappe.session.user, "full_name") or frappe.session.user
+
+	employee = ""
+	try:
+		staff = _resolve_staff_name(sme_name)
+		sme_name = staff.get("display_name") or staff.get("employee_name") or sme_name
+		employee = staff.get("employee") or ""
+	except Exception:
+		employee = cstr(getattr(visit, "staff_employee", None) or "")
+
+	customer = cstr(visit.school_name).strip() or None
+	school_label = ""
+	if customer:
+		school_label = frappe.db.get_value("Customer", customer, "customer_name") or customer
+	elif cstr(getattr(visit, "pending_school_name", None)).strip():
+		school_label = cstr(visit.pending_school_name).strip()
+
+	soa_name = None
+	reference = cstr(visit.reference).strip()
+	if reference and frappe.db.exists("School Opening Application", reference):
+		soa_name = reference
+		if not school_label:
+			school_label = frappe.db.get_value("School Opening Application", soa_name, "school_name") or ""
 
 	token = frappe.generate_hash(length=32)
 	session = frappe.get_doc(
@@ -607,29 +955,25 @@ def _create_sme_session_and_response(doc, answers, sme_name, customer=None, scho
 			"share_token": token,
 			"status": "Open",
 			"sme_name": sme_name,
-			"sme_employee": staff.get("employee"),
-			"customer": customer_name,
+			"sme_employee": employee or None,
+			"customer": customer,
 			"school_name": school_label,
 			"school_opening": soa_name,
-			"sme_response": response.name,
+			"field_visit": name,
 			"submitted_on": now_datetime(),
 		}
 	)
 	session.insert(ignore_permissions=True)
-	if frappe.get_meta("Feedback Studio Response").has_field("session"):
-		response.db_set("session", session.name, update_modified=False)
+	return _session_payload(session)
 
-	return {
-		"ok": True,
-		"session": session.name,
-		"share_token": token,
-		"share_url": _share_url(token),
-		"customer": customer_name,
-		"school_name": school_label,
-		"school_opening": soa_name,
-		"sme_name": sme_name,
-		"response": response.name,
-	}
+
+@frappe.whitelist()
+def start_session_from_field_visit(name):
+	"""Desk / easy-form: start community feedback for a saved Field Visit."""
+	_desk()
+	visit = frappe.get_doc("Field Visit", name)
+	visit.check_permission("read")
+	return _ensure_session_for_field_visit(name)
 
 
 @frappe.whitelist()
@@ -877,10 +1221,12 @@ def get_share_session(token):
 		"sme_name": session.sme_name,
 		"school_name": session.school_name or session.customer or "",
 		"customer": session.customer or "",
+		"field_visit": getattr(session, "field_visit", None) or "",
 		"roles": [
 			{"id": "parent", "label": LABELS["parent"], "color": COLORS["parent"], "hint": "I am a parent / guardian"},
-			{"id": "school", "label": LABELS["school"], "color": COLORS["school"], "hint": "I represent the school"},
 			{"id": "student", "label": LABELS["student"], "color": COLORS["student"], "hint": "I am a student"},
+			{"id": "teacher", "label": LABELS["teacher"], "color": COLORS["teacher"], "hint": "I am a teacher"},
+			{"id": "school", "label": LABELS["school"], "color": COLORS["school"], "hint": "I represent the school"},
 		],
 	}
 
@@ -891,7 +1237,7 @@ def get_share_form(token, audience):
 	if not session or session.status == "Closed":
 		return {"ok": False}
 	if audience not in PUBLIC_ROLES:
-		frappe.throw(_("Please choose Parent, School, or Student."))
+		frappe.throw(_("Please choose Parent, Student, Teacher, or School."))
 	doc = _settings()
 	forms = _forms(doc) or _default_forms()
 	form = forms[audience]
@@ -906,6 +1252,7 @@ def get_share_form(token, audience):
 		"ratingScale": _scale(doc.rating_scale),
 		"school_name": session.school_name or session.customer or "",
 		"sme_name": session.sme_name,
+		"field_visit": getattr(session, "field_visit", None) or "",
 	}
 
 
@@ -916,19 +1263,22 @@ def submit_share(token, audience, answers, client_meta=None):
 	if not session or session.status == "Closed":
 		frappe.throw(_("This link is not valid."))
 	if audience not in PUBLIC_ROLES:
-		frappe.throw(_("Please choose Parent, School, or Student."))
+		frappe.throw(_("Please choose Parent, Student, Teacher, or School."))
 	doc = _settings()
-	_store(
-		audience,
-		answers,
-		doc,
-		extra={
+	extra = {
 			"session": session.name,
 			"sme_name": session.sme_name,
 			"customer": session.customer,
 			"school_name": session.school_name,
 			"school_opening": session.school_opening,
-		},
+		}
+	if getattr(session, "field_visit", None):
+		extra["field_visit"] = session.field_visit
+	_store(
+		audience,
+		answers,
+		doc,
+		extra=extra,
 		client_meta=client_meta,
 	)
 	return {"ok": True}

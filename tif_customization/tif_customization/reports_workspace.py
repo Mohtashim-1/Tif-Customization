@@ -3,7 +3,7 @@ import json
 import frappe
 
 
-CARD_ORDER = ["HR", "Supply Chain", "Purchase", "Accounts", "Program", "SME", "Book Purchase and Printing"]
+CARD_ORDER = ["HR", "Supply Chain", "Purchase", "Accounts", "Program", "SME", "School Impact", "Book Purchase and Printing"]
 
 # Website routes that are not Frappe Desk Pages (Dynamic Link cannot store these).
 PORTAL_LINKS = {
@@ -23,7 +23,7 @@ PORTAL_LINKS = {
 			"highlight": False,
 		},
 		{
-			"label": "Teacher Training Dashboard",
+			"label": "Teacher Training Dashboard (UAT)",
 			"link_type": "URL",
 			"link_to": "/app/teacher-training-dashboard",
 			"is_query_report": 0,
