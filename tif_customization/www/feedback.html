@@ -128,6 +128,8 @@ textarea:focus, button:focus-visible, input:focus, select:focus { outline: 2px s
 const TOKEN = {{ token | tojson }};
 const CSRF = {{ csrf_token | tojson }};
 const SME_BOOTSTRAP = {{ sme_bootstrap | tojson }};
+const FIELD_VISIT = {{ field_visit | tojson }};
+const VISIT_PREFILL = {{ visit_prefill | tojson }};
 const API = "/api/method/tif_customization.tif_customization.api.feedback_studio.";
 const app = document.getElementById("app");
 const state = {
@@ -137,10 +139,11 @@ const state = {
 	metaErrors: {},
 	submitted: false,
 	status: TOKEN ? "loading" : "missing",
-	smeName: "",
-	customer: "",
-	customerLabel: "",
+	smeName: (VISIT_PREFILL && VISIT_PREFILL.sme_name) || "",
+	customer: (VISIT_PREFILL && VISIT_PREFILL.customer) || "",
+	customerLabel: (VISIT_PREFILL && (VISIT_PREFILL.school_name || VISIT_PREFILL.customer)) || "",
 	customerQuery: "",
+	fieldVisit: FIELD_VISIT || (VISIT_PREFILL && VISIT_PREFILL.field_visit) || "",
 	schoolHits: [],
 	schoolOpen: false,
 	schoolSearching: false,
@@ -389,6 +392,10 @@ function smeMetaHtml() {
 			"</div></div>"
 		: "";
 	return '<div class="card" id="smeMetaCard" style="border:2px solid #7a4cc2"><div class="kicker">SME + School (required)</div>' +
+		(state.fieldVisit ? ('<div class="meta" style="margin:0 0 10px">Field visit: <strong>' + esc(state.fieldVisit) + "</strong> — fill SME feedback, then share the QR with parents / school / students / teachers.</div>") : "") +
+		((VISIT_PREFILL && VISIT_PREFILL.school_missing) || (state.fieldVisit && !state.customer && !state.createSchool)
+			? '<div class="err" style="margin:0 0 10px">No school was saved on this Field Visit. Search and select Customer / school below (or Create with School Opening).</div>'
+			: "") +
 		'<p class="note">Both fields work like Frappe <strong>Link</strong> fields. SME links to <strong>Field Officer</strong>. School links to <strong>Customer</strong>.</p><div class="meta-grid">' +
 		'<label class="field' + (state.metaErrors.smeName ? " bad" : "") + '"><span>SME name (Field Officer) *</span><div id="smeLinkMount"></div>' +
 		(state.metaErrors.smeName ? '<div class="err">Required — pick a Field Officer</div>' : "") +
@@ -654,6 +661,7 @@ async function submit() {
 	const body = { token: TOKEN, answers: state.answers, client_meta: clientMeta() };
 	if (isSme()) {
 		body.sme_name = state.smeName;
+		if (state.fieldVisit) body.field_visit = state.fieldVisit;
 		if (state.createSchool) {
 			const soa = Object.assign({}, state.schoolOpening);
 			soa.tif_representative = state.smeName;

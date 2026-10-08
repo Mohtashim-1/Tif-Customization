@@ -7,8 +7,14 @@ function csrfToken() {
 }
 
 function raiseIfFailed(json) {
+	if (!json || typeof json !== "object") {
+		throw new Error("Empty response from server");
+	}
 	if (json.exc || json._server_messages) {
 		let msg = json.message;
+		if (msg && typeof msg === "object") {
+			msg = msg.status_message || msg.message || msg.name || "";
+		}
 		if (json._server_messages) {
 			try {
 				const parsed = JSON.parse(json._server_messages);
@@ -35,6 +41,10 @@ function raiseIfFailed(json) {
 			} catch {
 				msg = String(json.exc);
 			}
+		}
+		if (typeof msg === "string" && msg.includes("Traceback")) {
+			const lines = msg.split("\n").map((l) => l.trim()).filter(Boolean);
+			msg = lines[lines.length - 1] || msg;
 		}
 		throw new Error(typeof msg === "string" && msg ? msg : "Request failed");
 	}
@@ -75,8 +85,9 @@ export async function apiPost(method, args = {}) {
 }
 
 export async function uploadFile(file, { doctype, docname, fieldname, isPrivate = true } = {}) {
+	if (!file) throw new Error("No file selected for upload.");
 	const fd = new FormData();
-	fd.append("file", file, file.name);
+	fd.append("file", file, file.name || "attachment");
 	if (doctype) fd.append("doctype", doctype);
 	if (docname) fd.append("docname", docname);
 	if (fieldname) fd.append("fieldname", fieldname);

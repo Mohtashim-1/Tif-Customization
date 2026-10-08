@@ -157,13 +157,17 @@ if (!window.SalaryRegisterPage) {
 		let tbody = "";
 
 		d.sections.forEach((section) => {
-			tbody += `<tr class="section-row"><td colspan="27">${frappe.utils.escape_html(section.label)}</td></tr>`;
+			const isProjectBase = /project\s*base/i.test(section.label || "");
+			const sectionCls = isProjectBase ? "section-row section-row--project-base" : "section-row";
+			tbody += `<tr class="${sectionCls}"><td colspan="28">${frappe.utils.escape_html(section.label)}${
+				isProjectBase ? ` <span class="emp-type-badge">${__("Project Base")}</span>` : ""
+			}</td></tr>`;
 			if (section.header_only) return;
 			(section.rows || []).forEach((row) => {
-				tbody += this.build_data_row(row);
+				tbody += this.build_data_row(row, { projectBase: isProjectBase });
 			});
 			if ((section.rows || []).length) {
-				tbody += this.build_total_row(section.totals, `${section.label} — ${__("Total")}`);
+				tbody += this.build_total_row(section.totals, `${section.label} — ${__("Total")}`, isProjectBase ? "section-total section-total--project-base" : "section-total");
 			}
 		});
 
@@ -193,6 +197,7 @@ if (!window.SalaryRegisterPage) {
 					<th rowspan="2">S.#</th>
 					<th rowspan="2">Section</th>
 					<th rowspan="2">Employee Name</th>
+					<th rowspan="2">Employee Type</th>
 					<th rowspan="2">Head Desig</th>
 					<th rowspan="2">Office/Branch</th>
 					<th rowspan="2">D.O.B</th>
@@ -230,12 +235,17 @@ if (!window.SalaryRegisterPage) {
 		`;
 	}
 
-	build_data_row(row) {
+	build_data_row(row, opts = {}) {
+		const empType = opts.projectBase
+			? __("Project Base")
+			: frappe.utils.escape_html(row.employment_type || row.employee_type || "");
+		const rowCls = opts.projectBase ? " class=\"row-project-base\"" : "";
 		return `
-			<tr>
+			<tr${rowCls}>
 				<td class="text-center">${row.serial || ""}</td>
 				<td class="text-center">${row.section_no || ""}</td>
 				<td class="text-left col-name">${frappe.utils.escape_html(row.employee_name || "")}</td>
+				<td class="text-center">${empType}</td>
 				<td class="text-left col-desig">${frappe.utils.escape_html(row.designation || "")}</td>
 				<td class="text-left">${frappe.utils.escape_html(row.branch || "")}</td>
 				<td class="text-center">${this.fmt_date(row.date_of_birth)}</td>
@@ -270,7 +280,7 @@ if (!window.SalaryRegisterPage) {
 		const t = totals || {};
 		return `
 			<tr class="${row_class}">
-				<td colspan="10" class="text-left">${frappe.utils.escape_html(label)}</td>
+				<td colspan="11" class="text-left">${frappe.utils.escape_html(label)}</td>
 				<td class="text-right">${this.fmt_money(t.perm_gross)}</td>
 				<td class="text-right">${this.fmt_money(t.perm_arrears)}</td>
 				<td class="text-right">${this.fmt_money(t.perm_total)}</td>

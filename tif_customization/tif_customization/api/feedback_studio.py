@@ -732,13 +732,48 @@ def _field_officer_options():
 	return out
 
 
+def _sme_staff_options():
+	"""Field Officers + active Field Staff (so admin / managers appear on the SME form)."""
+	out = list(_field_officer_options())
+	seen = {(o.get("value") or "").strip().lower() for o in out}
+	try:
+		from tif_customization.tif_customization.page.smes_activity_form.smes_activity_form import (
+			get_active_field_officer_staff,
+		)
+
+		for row in get_active_field_officer_staff():
+			label = (row.get("employee_name") or "").strip()
+			if not label or label.lower() in seen:
+				continue
+			seen.add(label.lower())
+			out.append(
+				{
+					"value": label,
+					"label": label,
+					"field_officer": "",
+					"employee": row.get("employee") or "",
+					"employee_name": label,
+					"division": row.get("division") or "",
+				}
+			)
+	except Exception:
+		pass
+	return out
+
+
 def _sme_lookup_payload(default_sme=""):
-	officers = _field_officer_options()
+	officers = _sme_staff_options()
 	staff_names = [o["value"] for o in officers]
+	default = default_sme if default_sme in staff_names else ""
+	if not default and default_sme:
+		for name in staff_names:
+			if name.lower() == default_sme.strip().lower():
+				default = name
+				break
 	return {
 		"staff_options": officers,
 		"staff_names": staff_names,
-		"default_sme": default_sme if default_sme in staff_names else "",
+		"default_sme": default,
 		"provinces": [
 			"Sindh",
 			"Punjab",
@@ -755,10 +790,11 @@ def _resolve_staff_name(sme_name):
 	if not sme_name:
 		frappe.throw(_("Please select the SME name."))
 
-	officers = _field_officer_options()
+	officers = _sme_staff_options()
 	by_value = {o["value"]: o for o in officers}
-	if sme_name in by_value:
-		row = by_value[sme_name]
+	by_value_ci = {(o["value"] or "").strip().lower(): o for o in officers}
+	row = by_value.get(sme_name) or by_value_ci.get(sme_name.lower())
+	if row:
 		return {
 			"employee": row.get("employee") or "",
 			"employee_name": row.get("employee_name") or row["value"],
@@ -790,7 +826,23 @@ def _resolve_staff_name(sme_name):
 				"display_name": fo.name1 or fo.name,
 			}
 
-	frappe.throw(_("SME name must be an active Field Officer."))
+	# Logged-in user's own Employee (Administrator / System Manager testing)
+	if frappe.session.user and frappe.session.user != "Guest":
+		emp = frappe.db.get_value(
+			"Employee",
+			{"user_id": frappe.session.user, "status": "Active"},
+			["name", "employee_name"],
+			as_dict=True,
+		)
+		if emp and (emp.employee_name or "").strip().lower() == sme_name.lower():
+			return {
+				"employee": emp.name,
+				"employee_name": emp.employee_name,
+				"field_officer": "",
+				"display_name": emp.employee_name,
+			}
+
+	frappe.throw(_("SME name must be an active Field Officer or Field Staff."))
 
 
 def _resolve_customer(customer):
@@ -897,83 +949,103 @@ def _create_sme_session_and_response(doc, answers, sme_name, customer=None, scho
 	return out
 
 
-def _ensure_session_for_field_visit(name):
-	"""Open (or reuse) a share session tagged to this Field Visit."""
+def _field_visit_context(name):
+	"""SME + school details from a Field Visit for the SME feedback form."""
 	name = (name or "").strip()
 	if not name:
 		frappe.throw(_("Field Visit is required."))
 	if not frappe.db.exists("Field Visit", name):
 		frappe.throw(_("Field Visit {0} was not found.").format(name))
-	if not frappe.get_meta("Feedback Studio Session").has_field("field_visit"):
-		frappe.throw(_("Feedback is not linked to Field Visit yet."))
-
-	existing_rows = frappe.get_all(
-		"Feedback Studio Session",
-		filters={"field_visit": name},
-		fields=["name", "share_token", "status", "sme_name", "school_name", "customer", "field_visit"],
-		order_by="creation desc",
-		limit=1,
-	)
-	existing = existing_rows[0] if existing_rows else None
-	if existing:
-		if existing.status == "Closed":
-			frappe.db.set_value("Feedback Studio Session", existing.name, "status", "Open", update_modified=False)
-			existing.status = "Open"
-		return _session_payload(existing)
 
 	visit = frappe.get_doc("Field Visit", name)
 	sme_name = cstr(visit.visit_by).strip()
 	if not sme_name:
 		sme_name = frappe.db.get_value("User", frappe.session.user, "full_name") or frappe.session.user
 
-	employee = ""
 	try:
 		staff = _resolve_staff_name(sme_name)
 		sme_name = staff.get("display_name") or staff.get("employee_name") or sme_name
-		employee = staff.get("employee") or ""
 	except Exception:
-		employee = cstr(getattr(visit, "staff_employee", None) or "")
+		pass
 
-	customer = cstr(visit.school_name).strip() or None
+	customer = cstr(visit.school_name).strip() or ""
 	school_label = ""
 	if customer:
 		school_label = frappe.db.get_value("Customer", customer, "customer_name") or customer
-	elif cstr(getattr(visit, "pending_school_name", None)).strip():
-		school_label = cstr(visit.pending_school_name).strip()
+	else:
+		pending = cstr(getattr(visit, "pending_school_name", None)).strip()
+		if pending:
+			school_label = pending
+		else:
+			# Pending school note / School Opening reference from easy form
+			remarks = cstr(visit.school_additional_remarks or "")
+			ref = cstr(visit.reference or "").strip()
+			if ref and frappe.db.exists("School Opening Application", ref):
+				school_label = (
+					frappe.db.get_value("School Opening Application", ref, "school_name") or ""
+				).strip()
+			elif "Pending school" in remarks:
+				# e.g. "Pending school (School Opening SOA-...): School Name"
+				parts = remarks.split(":", 1)
+				if len(parts) > 1:
+					school_label = parts[1].split("\n", 1)[0].strip()
 
-	soa_name = None
-	reference = cstr(visit.reference).strip()
-	if reference and frappe.db.exists("School Opening Application", reference):
-		soa_name = reference
-		if not school_label:
-			school_label = frappe.db.get_value("School Opening Application", soa_name, "school_name") or ""
+	return {
+		"field_visit": name,
+		"sme_name": sme_name,
+		"customer": customer,
+		"school_name": school_label,
+		"school_missing": not bool(customer or school_label),
+	}
 
-	token = frappe.generate_hash(length=32)
-	session = frappe.get_doc(
-		{
-			"doctype": "Feedback Studio Session",
-			"share_token": token,
-			"status": "Open",
-			"sme_name": sme_name,
-			"sme_employee": employee or None,
-			"customer": customer,
-			"school_name": school_label,
-			"school_opening": soa_name,
-			"field_visit": name,
-			"submitted_on": now_datetime(),
-		}
-	)
-	session.insert(ignore_permissions=True)
-	return _session_payload(session)
+
+def _sme_form_url_for_field_visit(name):
+	"""SME feedback form URL (not the public role picker). QR is shown after SME submit."""
+	ctx = _field_visit_context(name)
+	doc = _settings()
+	token = doc.get("sme_token") or ""
+	if not token:
+		token = frappe.generate_hash(length=32)
+		doc.db_set("sme_token", token, update_modified=False)
+	from urllib.parse import quote
+
+	path = "/feedback/" + token + "?field_visit=" + quote(name, safe="")
+	return {
+		"ok": True,
+		"feedback_url": path,
+		"share_url": get_url(path),
+		"sme_form_url": path,
+		"field_visit": ctx["field_visit"],
+		"sme_name": ctx["sme_name"],
+		"customer": ctx["customer"],
+		"school_name": ctx["school_name"],
+	}
 
 
 @frappe.whitelist()
 def start_session_from_field_visit(name):
-	"""Desk / easy-form: start community feedback for a saved Field Visit."""
+	"""After field-visit-easy: open SME feedback form for this visit (QR comes after SME submit)."""
 	_desk()
 	visit = frappe.get_doc("Field Visit", name)
 	visit.check_permission("read")
-	return _ensure_session_for_field_visit(name)
+	return _sme_form_url_for_field_visit(name)
+
+
+@frappe.whitelist(allow_guest=True, methods=["GET"])
+def get_field_visit_prefill(token, field_visit=None):
+	"""Prefill SME form from Field Visit when opened with ?field_visit=."""
+	found = _find(token)
+	if not found or found[0] != "sme":
+		return {"ok": False}
+	name = (field_visit or "").strip()
+	if not name:
+		return {"ok": False}
+	try:
+		ctx = _field_visit_context(name)
+	except Exception:
+		return {"ok": False}
+	ctx["ok"] = True
+	return ctx
 
 
 @frappe.whitelist()
@@ -1062,7 +1134,7 @@ def search_public_link(token, doctype=None, txt=None, limit=40):
 	if doctype == "Field Officer":
 		q = txt.lower()
 		out = []
-		for row in _field_officer_options():
+		for row in _sme_staff_options():
 			value = row.get("value") or ""
 			label = row.get("label") or value
 			division = row.get("division") or ""
@@ -1193,7 +1265,7 @@ def get_public_form(token):
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])
 @rate_limit(limit=30, seconds=600)
-def submit_public(token, answers, client_meta=None, sme_name=None, customer=None, school_opening=None):
+def submit_public(token, answers, client_meta=None, sme_name=None, customer=None, school_opening=None, field_visit=None):
 	found = _find(token)
 	if not found:
 		frappe.throw(_("This link is not valid."))
@@ -1206,6 +1278,7 @@ def submit_public(token, answers, client_meta=None, sme_name=None, customer=None
 			customer=customer,
 			school_opening=school_opening,
 			client_meta=client_meta,
+			field_visit=field_visit,
 		)
 	_store(audience, answers, doc, client_meta=client_meta)
 	return {"ok": True}

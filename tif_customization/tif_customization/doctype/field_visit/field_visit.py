@@ -106,6 +106,58 @@ class FieldVisit(Document):
 	def on_submit(self):
 		if self.type in ("Training", "Workshop", "Teachers Training Meeting"):
 			self.send_training_feedback_invitations()
+		self._assign_field_officer_to_school()
+
+	def _assign_field_officer_to_school(self):
+		"""When a visit is submitted against a school, assign the visiting FO on School."""
+		customer = (self.school_name or "").strip()
+		if not customer:
+			return
+		staff_name = (
+			(self.visit_by or "").strip()
+			or (self.me_visit_by or "").strip()
+			or (self.mt_visit_by or "").strip()
+		)
+		if not staff_name:
+			return
+		user = None
+		# Field Officer master (name1 / name) → User
+		if frappe.db.exists("DocType", "Field Officer"):
+			user = (
+				frappe.db.get_value("Field Officer", {"name1": staff_name, "status": "Active"}, "user")
+				or frappe.db.get_value("Field Officer", {"name": staff_name, "status": "Active"}, "user")
+			)
+			if not user:
+				emp = frappe.db.get_value(
+					"Employee", {"employee_name": staff_name, "status": "Active"}, "name"
+				)
+				if emp:
+					user = frappe.db.get_value(
+						"Field Officer", {"employee": emp, "status": "Active"}, "user"
+					)
+		if not user:
+			user = frappe.db.get_value(
+				"Employee", {"employee_name": staff_name, "status": "Active"}, "user_id"
+			)
+		if not user:
+			return
+		# Prefer School DocType linked to this Customer.
+		if frappe.db.exists("DocType", "School"):
+			school_name = frappe.db.get_value("School", {"customer": customer}, "name")
+			if school_name and frappe.get_meta("School").has_field("field_officer"):
+				current = frappe.db.get_value("School", school_name, "field_officer")
+				if current != user:
+					frappe.db.set_value(
+						"School", school_name, "field_officer", user, update_modified=False
+					)
+				return
+		# Optional Customer custom field if present.
+		if frappe.get_meta("Customer").has_field("custom_field_officer"):
+			current = frappe.db.get_value("Customer", customer, "custom_field_officer")
+			if current != user:
+				frappe.db.set_value(
+					"Customer", customer, "custom_field_officer", user, update_modified=False
+				)
 
 	def _sync_pending_school_name(self):
 		"""Keep a readable school title when Customer link is still empty (School Opening)."""

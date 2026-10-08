@@ -19,7 +19,6 @@ DISPLAY_COLUMNS = [
 	"category",
 	"province",
 	"remarks",
-	"programs",
 	"docstatus",
 	"images",
 ]
@@ -31,8 +30,7 @@ DISPLAY_LABELS = {
 	"officer": "Field Staff",
 	"category": "Category",
 	"province": "Province",
-	"remarks": "Remarks",
-	"programs": "Programs / Books",
+	"remarks": "School Status",
 	"docstatus": "Status",
 	"images": "School Images",
 }
@@ -179,7 +177,7 @@ def download_report_excel(filters=None):
 	for row in rows:
 		xlsx_data.append([_excel_value(row.get(col)) for col in columns])
 
-	xlsx_file = make_xlsx(xlsx_data, "Field Staff Report")
+	xlsx_file = make_xlsx(xlsx_data, "SME Daily Reporting")
 	frappe.response["filename"] = "field_staff_report.xlsx"
 	frappe.response["filecontent"] = xlsx_file.getvalue()
 	frappe.response["type"] = "binary"

@@ -104,9 +104,35 @@
 	font-size: 10px;
 }
 
+.salary-register-table .section-row--project-base td {
+	background: #fde68a !important;
+	color: #78350f;
+}
+
+.salary-register-table .emp-type-badge {
+	display: inline-block;
+	margin-left: 8px;
+	padding: 1px 8px;
+	border-radius: 999px;
+	background: #b45309;
+	color: #fff;
+	font-size: 9px;
+	font-weight: 700;
+	vertical-align: middle;
+}
+
+.salary-register-table .row-project-base td {
+	background: #fffbeb !important;
+}
+
 .salary-register-table .section-total td {
 	background: #e2efda !important;
 	font-weight: 700;
+}
+
+.salary-register-table .section-total--project-base td {
+	background: #fef3c7 !important;
+	color: #78350f;
 }
 
 .salary-register-table .grand-total td {

@@ -159,6 +159,7 @@ def _save_request_attachments(doc):
 			content,
 			doc.doctype,
 			doc.name,
+			df=fieldname,
 			is_private=0,
 		)
 		if ret and ret.file_url:

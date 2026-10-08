@@ -374,6 +374,30 @@ def get_report_data(filters=None):
 	supervisor = (filters.get("supervisor") or "").strip()
 	supervisors = _list_field_supervisors()
 	supervisor_stats = _supervisor_stats(supervisors)
+	# When a supervisor is selected, team data is already scoped; show that one supervisor.
+	if supervisor:
+		matched = [
+			s
+			for s in supervisors
+			if supervisor
+			in {
+				(s.get("value") or "").strip(),
+				(s.get("name") or "").strip(),
+				(s.get("field_officer") or "").strip(),
+				(s.get("employee_name") or "").strip(),
+				(s.get("label") or "").strip(),
+				(s.get("employee") or "").strip(),
+				(s.get("user_id") or "").strip(),
+			}
+		]
+		if matched:
+			supervisors = matched
+		supervisor_stats = {
+			**_supervisor_stats(supervisors if matched else supervisors),
+			"total": 1,
+			"filtered": True,
+		}
+
 	staff_rows = _get_sme_staff(filters)
 	province = (filters.get("province") or "").strip()
 	city = (filters.get("city") or "").strip()
@@ -714,6 +738,19 @@ def _report_outcome_fy_totals(staff_rows, ytd_from, to_date):
 		"metric": "workshop_conducted",
 		"label": _("Workshop"),
 	}
+	for key, label in (
+		("active_schools", _("Active Schools")),
+		("inactive_schools", _("Inactive Schools")),
+		("model_school_0", _("Model 0 (No Program)")),
+		("online_workshop", _("Online Workshop")),
+		("online_participants", _("Online Participants")),
+	):
+		out[key] = {
+			"actual": cint(actuals.get(key) or 0),
+			"yearly_min": 0,
+			"metric": key,
+			"label": label,
+		}
 	return out
 
 

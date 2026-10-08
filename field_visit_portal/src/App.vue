@@ -1314,6 +1314,14 @@ async function saveVisit(submitDoc) {
 		error.value = "Select Visit with enrollment or Visit without enrollment.";
 		return;
 	}
+	if (
+		(selected.value.group === "visits" || selected.value.group === "me" || selected.value.group === "books") &&
+		!creatingSchool.value &&
+		!(visit.schoolName || "").trim()
+	) {
+		error.value = "Select a school (Customer) or use Create School.";
+		return;
+	}
 	if (selected.value.group === "visits" && !attachments.school_picture) {
 		error.value = "School Picture is required.";
 		return;	
@@ -1351,7 +1359,11 @@ async function saveVisit(submitDoc) {
 		const result = await apiPost(`${METHOD}.submit_smes_activity`, {
 			data: buildPayload(false),
 		});
-		if (result?.books_blocked) {
+		if (!result || typeof result !== "object") {
+			error.value = "Visit save returned an empty response. Please try again.";
+			return;
+		}
+		if (result.books_blocked) {
 			savedName.value = result.school_opening || "";
 			await uploadSoaAttachments(result.school_opening);
 			success.value = true;
@@ -1362,14 +1374,19 @@ async function saveVisit(submitDoc) {
 			}, 4500);
 			return;
 		}
-		savedName.value = result.name;
-		await uploadAttachments(result.name);
+		const visitName = result.name || result.field_visit || "";
+		if (!visitName) {
+			error.value = result.status_message || result.message || "Visit was not saved. Please try again.";
+			return;
+		}
+		savedName.value = visitName;
+		await uploadAttachments(visitName);
 		if (result.school_opening) await uploadSoaAttachments(result.school_opening);
 		if (submitDoc) {
-			await apiPost(`${METHOD}.submit_field_visit_doc`, { name: result.name });
+			await apiPost(`${METHOD}.submit_field_visit_doc`, { name: visitName });
 		}
 		success.value = true;
-		const redirected = await goToVisitFeedback(result.name, result.feedback_url);
+		const redirected = await goToVisitFeedback(visitName, result.feedback_url);
 		if (redirected) return;
 		setTimeout(() => {
 			success.value = false;
@@ -1390,9 +1407,9 @@ async function goToVisitFeedback(visitName, feedbackUrl) {
 				"tif_customization.tif_customization.api.feedback_studio.start_session_from_field_visit",
 				{ name: visitName }
 			);
-			url = fb.feedback_url || fb.share_url || "";
+			url = (fb && (fb.feedback_url || fb.sme_form_url)) || "";
 		} catch (e) {
-			error.value = e.message || "Visit saved, but feedback could not be opened.";
+			error.value = e.message || "Visit saved, but SME feedback could not be opened.";
 			return false;
 		}
 	}
@@ -2983,7 +3000,7 @@ const steps = [
 				<div style="font-size: 13px; color: #71717a; margin-top: 8px; line-height: 1.6">
 					Your request has been saved.
 					<strong v-if="savedName"> {{ savedName }}</strong>
-					<div style="margin-top: 8px">Opening feedback for this field visit…</div>
+					<div style="margin-top: 8px">Opening SME feedback form…</div>
 					<div class="urdu">آپ کی درخواست محفوظ ہو گئی ہے۔</div>
 				</div>
 			</div>

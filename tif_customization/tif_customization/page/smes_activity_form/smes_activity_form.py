@@ -187,6 +187,18 @@ PROVINCE_MAP = {
 	"ICT": "Islamabad Capital Territory",
 }
 
+
+def _normalize_quarter(value):
+	"""Accept 'Q4' or labels like 'Q4 - Oct-Dec'."""
+	raw = cstr(value).strip()
+	if not raw:
+		return ""
+	upper = raw.upper()
+	for q in ("Q1", "Q2", "Q3", "Q4"):
+		if upper == q or upper.startswith(q + " ") or upper.startswith(q + "-"):
+			return q
+	return raw
+
 ACTIVITY_TYPE_MAP = {
 	"Visits": "Visits",
 	"M&E": "M&E",
@@ -1316,20 +1328,20 @@ def submit_smes_activity(data):
 	# Shared / marketing-style fields
 	doc.visit_by = data.get("visit_by")
 	doc.month = data.get("month")
-	doc.quarter = data.get("quarter")
-	doc.marketing_visit_category = data.get("marketing_visit_category")
+	doc.quarter = _normalize_quarter(data.get("quarter"))
+	doc.marketing_visit_category = data.get("marketing_visit_category") or None
 	doc.visit_date = getdate(data.get("visit_date"))
 	doc.visiting_starting_time = data.get("starting_time")
 	doc.visit_ending_time = data.get("ending_time")
 	doc.city = data.get("city")
 	doc.area = _resolve_area_link(data.get("area"), city=data.get("city"))
 	doc.province = province
-	doc.frequency_of_visits = data.get("frequency_of_visits")
+	doc.frequency_of_visits = data.get("frequency_of_visits") or None
 	material = data.get("marketing_material_provided")
 	if isinstance(material, str):
 		material = material.strip().lower()
 	doc.marketing_material_provided = 1 if material in (True, 1, "1", "true", "yes") else 0
-	doc.status = data.get("status")
+	doc.status = data.get("status") or None
 	doc.reason_not_agreed = data.get("reasons_if_not_agreed")
 	doc.reasons_if_not_agreed_other = data.get("reasons_if_not_agreed_other")
 	# Keep free-text details column for notes / "Other"
@@ -1362,7 +1374,7 @@ def submit_smes_activity(data):
 				"name": None,
 				"school_opening": soa_doc.name,
 				"books_blocked": True,
-				"message": _(
+				"status_message": _(
 					"School Opening request {0} was saved. Book Demand can be submitted after this school is added to the School Database."
 				).format(soa_doc.name),
 			}
@@ -1613,7 +1625,7 @@ def submit_smes_activity(data):
 		"submitted": submitted,
 		"url": get_url(f"/app/field-visit/{doc.name}"),
 		"school_opening": soa_doc.name if soa_doc else None,
-		"message": _("Activity saved as {0}").format(doc.name)
+		"status_message": _("Activity saved as {0}").format(doc.name)
 		+ (
 			_(" School Opening request {0} was also saved.").format(soa_doc.name)
 			if soa_doc
@@ -1621,15 +1633,14 @@ def submit_smes_activity(data):
 		),
 	}
 	try:
-		from tif_customization.tif_customization.api.feedback_studio import _ensure_session_for_field_visit
+		from tif_customization.tif_customization.api.feedback_studio import _sme_form_url_for_field_visit
 
-		feedback = _ensure_session_for_field_visit(doc.name)
-		out["feedback_url"] = feedback.get("feedback_url") or feedback.get("share_url")
-		out["share_token"] = feedback.get("share_token")
-		out["feedback_session"] = feedback.get("session")
-		frappe.db.commit()
+		feedback = _sme_form_url_for_field_visit(doc.name) or {}
+		# SME form first; public QR is created only after the SME submits that form.
+		out["feedback_url"] = feedback.get("feedback_url") or feedback.get("sme_form_url") or ""
+		out["field_visit"] = doc.name
 	except Exception:
-		frappe.log_error(frappe.get_traceback(), "Feedback session from Field Visit")
+		frappe.log_error(frappe.get_traceback(), "SME feedback URL from Field Visit")
 		out["feedback_url"] = ""
 	return out
 

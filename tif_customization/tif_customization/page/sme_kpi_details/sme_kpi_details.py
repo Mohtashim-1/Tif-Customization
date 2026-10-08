@@ -52,8 +52,8 @@ OUTCOME_TARGETS = (
 	{"key": "co_curricular", "label": _("Stall Activity / Exhibition"), "short_label": _("Stall Activity / Exhibition"), "target": 1, "metric": "co_curricular"},
 	{
 		"key": "new_schools",
-		"label": _("Registered Schools"),
-		"short_label": _("Registered Schools"),
+		"label": _("New Registered School"),
+		"short_label": _("New Registered School"),
 		"target": 24,
 		"metric": "new_schools",
 	},
@@ -363,8 +363,17 @@ def _enriched_actuals(from_date, to_date, staff, tokens):
 	actuals["model_school_a"] = models["model_a"]
 	actuals["model_school_b"] = models["model_b"]
 	actuals["model_school_c"] = models["model_c"]
+	# Active = registered (any program). Model 0 / inactive = visited with no program.
+	actuals["active_schools"] = cint(actuals["new_schools"])
+	actuals["model_school_0"] = _distinct_schools(
+		from_date, to_date, tokens, f"NOT ({NEW_SCHOOL_SQL})"
+	)
+	actuals["inactive_schools"] = actuals["model_school_0"]
 	sum_participants = _training_participants(from_date, to_date, tokens)
 	actuals["workshop_registration"] = max(workshop_children, sum_participants)
+	online = _online_workshop_stats(from_date, to_date, tokens)
+	actuals["online_workshop"] = online["workshops"]
+	actuals["online_participants"] = online["participants"]
 	return actuals
 
 
@@ -434,8 +443,7 @@ def _visit_count(from_date, to_date, tokens, extra_sql):
 def _registered_model_split(from_date, to_date, tokens):
 	"""Registered schools once each: Model A = 3 departments, B = 2, C = the rest.
 
-	A + B + C equals Registered Schools. A school is classified by its highest
-	department count in the date range, so the total is not a sum of visits.
+	A + B + C equals Registered Schools (active / any program).
 	"""
 	visit_day = visit_day_sql("fv")
 	school = _school_expr("fv")
@@ -467,6 +475,32 @@ def _registered_model_split(from_date, to_date, tokens):
 		"model_a": cint(found.get("model_a") or 0),
 		"model_b": cint(found.get("model_b") or 0),
 		"model_c": cint(found.get("model_c") or 0),
+	}
+
+
+def _online_workshop_stats(from_date, to_date, tokens):
+	"""Online workshops and their participants (training_mode contains Online)."""
+	visit_day = visit_day_sql("fv")
+	params = _staff_params(from_date, to_date, tokens)
+	row = frappe.db.sql(
+		f"""
+		SELECT
+			COUNT(*) AS workshops,
+			COALESCE(SUM(IFNULL(fv.training_no_of_participants, 0)), 0) AS participants
+		FROM `tabField Visit` fv
+		WHERE fv.docstatus = 1
+		  AND {visit_day} BETWEEN %(from_date)s AND %(to_date)s
+		  AND {_staff_where(tokens)}
+		  AND fv.type IN ('Workshop Conducted', 'Workshop', 'Workshop Arranged', 'Training')
+		  AND LOWER(IFNULL(fv.training_mode, '')) LIKE '%%online%%'
+		""",
+		params,
+		as_dict=True,
+	)
+	found = row[0] if row else {}
+	return {
+		"workshops": cint(found.get("workshops") or 0),
+		"participants": cint(found.get("participants") or 0),
 	}
 
 

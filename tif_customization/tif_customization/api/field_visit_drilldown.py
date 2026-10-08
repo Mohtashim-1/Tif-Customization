@@ -202,9 +202,17 @@ def _metric_condition(metric: str, alias: str = "fv") -> str:
 			{a}.type = 'Registration of New Schools'
 			OR ({a}.type IN ('Marketing', 'Visits') AND {a}.marketing_visit_category = 'New')
 		)"""
-	if m in ("new_schools", "new_school"):
+	if m in ("new_schools", "new_school", "active_schools"):
 		# Distinct schools counted in KPI via registered_school_sql; drilldown shows matching visits.
 		return registered_school_sql(a)
+	if m in ("inactive_schools", "model_school_0", "model_0"):
+		return f"NOT ({registered_school_sql(a)})"
+	if m == "online_workshop":
+		return f"""{a}.type IN ('Workshop Conducted', 'Workshop', 'Workshop Arranged', 'Training')
+			AND LOWER(IFNULL({a}.training_mode, '')) LIKE '%%online%%'"""
+	if m == "online_participants":
+		return f"""{a}.type IN ('Workshop Conducted', 'Workshop', 'Workshop Arranged', 'Training')
+			AND LOWER(IFNULL({a}.training_mode, '')) LIKE '%%online%%'"""
 	if m == "model_school_a":
 		return f"({registered_school_sql(a)}) AND {department_count_sql(a)} >= 3"
 	if m == "model_school_b":

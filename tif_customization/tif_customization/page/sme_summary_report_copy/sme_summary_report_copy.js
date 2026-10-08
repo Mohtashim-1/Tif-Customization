@@ -406,18 +406,22 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		return cint(row.active) + cint(row.inactive);
 	}
 
-	/** Visits block: Marketing (all), Monitoring (M&E), Follow up. */
+	/** Visits block: New School Visit (Marketing), Follow up, Total, Monitoring. */
 	visit_columns() {
 		return [
 			{
-				label: __("Marketing Visit"),
-				metric: "marketing",
-				value: (r) => r.marketing,
+				label: __("New School Visit (Marketing Visit)"),
+				metric: "new",
+				value: (r) => r.new,
 			},
-			{ label: __("New School Visit"), metric: "new", value: (r) => r.new },
 			{ label: __("Follow up Visit"), metric: "followup", value: (r) => r.followup },
+			{
+				label: __("Total Visit"),
+				metric: "marketing",
+				value: (r) => cint(r.marketing) + cint(r.followup),
+				hint: __("Marketing Visit + Follow up Visit"),
+			},
 			{ label: __("Monitoring Visit (M&E)"), metric: "monitoring", value: (r) => this.me_visits(r), cellClass: "visit-mon-col" },
-			// { label: __("Meetings"), metric: "meeting", value: (r) => r.meetings },
 		];
 	}
 
@@ -443,8 +447,8 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				{ key: "outcome_co_curricular", label: __("Stall Activity / Exhibition"), short_label: __("Stall Activity / Exhibition"), metric: "co_curricular" },
 				{
 					key: "outcome_new_schools",
-					label: __("Registered Schools"),
-					short_label: __("Registered Schools"),
+					label: __("New Registered School"),
+					short_label: __("New Registered School"),
 					metric: "new_schools",
 				},
 				{ key: "outcome_workshop_registration", label: __("Workshop Participants"), short_label: __("Workshop Participants"), metric: "workshop_registration" },
@@ -456,14 +460,17 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 	}
 
 	outcome_subcolumns(data) {
-		return this.outcome_columns(data).map((col) => {
-			const short = (col.short_label || col.shortLabel || (col.label || "").split("(")[0]).trim();
-			return {
-				...col,
-				header: `${col.label} (${__("1 July to date")})`,
-				shortHeader: `${short} ${__("1 July to date")}`,
-			};
-		});
+		return this.outcome_columns(data)
+			.filter((col) => !["model_school_a", "model_school_b", "model_school_c"].includes(col.metric || ""))
+			.map((col) => {
+				const short = (col.short_label || col.shortLabel || (col.label || "").split("(")[0]).trim();
+				const isNewReg = col.metric === "new_schools";
+				return {
+					...col,
+					header: isNewReg ? short : `${col.label} (${__("1 July to date")})`,
+					shortHeader: isNewReg ? short : `${short} ${__("1 July to date")}`,
+				};
+			});
 	}
 
 	outcome_tds(src, staff, data) {
@@ -551,7 +558,10 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 
 	outcome_ytd_columns(data) {
 		return this.outcome_columns(data).filter(
-			(col) => !["model_school_a", "model_school_b", "model_school_c"].includes(col.metric || "")
+			(col) =>
+				!["model_school_a", "model_school_b", "model_school_c", "new_schools"].includes(
+					col.metric || ""
+				)
 		);
 	}
 
@@ -669,7 +679,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						),
 					},
 					{
-						label: __("New School Visit"),
+						label: __("New School Visit (Marketing Visit)"),
 						value: this.fmt(k.new),
 						style: "new",
 						metric: "new",
@@ -708,12 +718,38 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					outcomeCards,
 					[
 						{
+							label: __("New Registered School"),
+							value: this.fmt(((data.outcome_fy || {}).new_schools || {}).actual),
+							style: "outcome",
+							cardKind: "active_school_by_staff",
+							outcomeFy: true,
+							hint: __("Click for field staff and their school counts."),
+						},
+						{
+							label: __("Active Schools"),
+							value: this.fmt(((data.outcome_fy || {}).active_schools || {}).actual),
+							style: "model-a",
+							cardKind: "active_school_models",
+							outcomeFy: true,
+							hint: __("Click for Model A / B / C counts. Schools with any program running."),
+						},
+						{
+							label: __("Inactive Schools"),
+							value: this.fmt(((data.outcome_fy || {}).inactive_schools || {}).actual),
+							style: "me",
+							metric: "inactive_schools",
+							outcomeFy: true,
+							hint: __("Visited schools where no program is running."),
+						},
+					],
+					[
+						{
 							label: __("Model A"),
 							value: this.fmt(((data.outcome_fy || {}).model_school_a || {}).actual),
 							style: "model-a",
 							metric: "model_school_a",
 							outcomeFy: true,
-							hint: __("Registered schools in 3 departments. Model A + B + C = Registered Schools."),
+							hint: __("Registered schools in 3 departments. Model A + B + C = Active Schools."),
 						},
 						{
 							label: __("Model B"),
@@ -721,7 +757,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 							style: "model-b",
 							metric: "model_school_b",
 							outcomeFy: true,
-							hint: __("Registered schools in 2 departments. Model A + B + C = Registered Schools."),
+							hint: __("Registered schools in 2 departments. Model A + B + C = Active Schools."),
 						},
 						{
 							label: __("Model C"),
@@ -729,7 +765,31 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 							style: "model-c",
 							metric: "model_school_c",
 							outcomeFy: true,
-							hint: __("Other registered schools. Model A + B + C = Registered Schools."),
+							hint: __("Other registered schools. Model A + B + C = Active Schools."),
+						},
+						{
+							label: __("Model 0 (No Program)"),
+							value: this.fmt(((data.outcome_fy || {}).model_school_0 || {}).actual),
+							style: "model-c",
+							metric: "model_school_0",
+							outcomeFy: true,
+							hint: __("Schools with no TIF program running."),
+						},
+						{
+							label: __("Online Workshop"),
+							value: this.fmt(((data.outcome_fy || {}).online_workshop || {}).actual),
+							style: "workshop",
+							metric: "online_workshop",
+							outcomeFy: true,
+							hint: __("Workshops / trainings with mode Online."),
+						},
+						{
+							label: __("Online Participants"),
+							value: this.fmt(((data.outcome_fy || {}).online_participants || {}).actual),
+							style: "workshop-participants",
+							metric: "online_participants",
+							outcomeFy: true,
+							hint: __("Participants on Online workshops."),
 						},
 					],
 				],
@@ -994,6 +1054,8 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			else if (kind === "supervisor_list") me.show_supervisor_list();
 			else if (kind === "field_emp_summary") me.show_field_emp_summary();
 			else if (kind === "school_visit_officers") me.show_school_visits_by_officer();
+			else if (kind === "active_school_models") me.show_active_school_models();
+			else if (kind === "active_school_by_staff") me.show_active_schools_by_staff();
 		});
 
 		$root.on("click.smeSumExpense", "[data-expense-detail]", function (e) {
@@ -1001,6 +1063,113 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			e.stopPropagation();
 			me.show_expense_detail($(this).attr("data-expense-staff") || "");
 		});
+	}
+
+	show_active_school_models() {
+		const fy = (this.data || {}).outcome_fy || {};
+		const a = cint((fy.model_school_a || {}).actual);
+		const b = cint((fy.model_school_b || {}).actual);
+		const c = cint((fy.model_school_c || {}).actual);
+		const active = cint((fy.active_schools || {}).actual) || a + b + c;
+		const d = new frappe.ui.Dialog({
+			title: __("Active Schools — Model A / B / C"),
+			size: "large",
+			fields: [{ fieldtype: "HTML", fieldname: "html" }],
+			primary_action_label: __("Close"),
+			primary_action: () => d.hide(),
+		});
+		d.fields_dict.html.$wrapper.html(`
+			<p class="text-muted" style="font-size:12px;margin-bottom:12px;">
+				${__("Active / registered schools with any program running")}:
+				<strong>${this.fmt(active)}</strong>
+				${(this.data || {}).outcome_fy_label ? ` · ${frappe.utils.escape_html(this.data.outcome_fy_label)}` : ""}
+			</p>
+			<div style="display:flex;flex-wrap:wrap;gap:12px;">
+				<div class="sme-sum-kpi sme-sum-kpi--model-a" data-visit-metric="model_school_a" data-outcome-fy="1" style="min-width:140px;cursor:pointer;">
+					<div class="sme-sum-kpi__label">${__("Model A")}</div>
+					<div class="sme-sum-kpi__value">${this.fmt(a)}</div>
+					<div class="sme-sum-kpi__hint">${__("3 departments")}</div>
+				</div>
+				<div class="sme-sum-kpi sme-sum-kpi--model-b" data-visit-metric="model_school_b" data-outcome-fy="1" style="min-width:140px;cursor:pointer;">
+					<div class="sme-sum-kpi__label">${__("Model B")}</div>
+					<div class="sme-sum-kpi__value">${this.fmt(b)}</div>
+					<div class="sme-sum-kpi__hint">${__("2 departments")}</div>
+				</div>
+				<div class="sme-sum-kpi sme-sum-kpi--model-c" data-visit-metric="model_school_c" data-outcome-fy="1" style="min-width:140px;cursor:pointer;">
+					<div class="sme-sum-kpi__label">${__("Model C")}</div>
+					<div class="sme-sum-kpi__value">${this.fmt(c)}</div>
+					<div class="sme-sum-kpi__hint">${__("Other registered")}</div>
+				</div>
+			</div>
+			<p class="text-muted" style="font-size:11px;margin-top:12px;">${__("Click a model card to open Field Visits.")}</p>
+		`);
+		if (frappe.tif_customization && frappe.tif_customization.bind_clickable_numbers) {
+			frappe.tif_customization.bind_clickable_numbers(d.$wrapper, () => {
+				const f = this.get_filters();
+				const data = this.data || {};
+				return {
+					...f,
+					from_date: data.outcome_fy_from || f.from_date,
+					to_date: data.outcome_fy_to || f.to_date,
+				};
+			});
+		}
+		d.show();
+	}
+
+	show_active_schools_by_staff() {
+		const data = this.data || {};
+		const rows = [...(data.rows || [])]
+			.map((r) => ({
+				name: r.employee_name || r.user_id || r.employee || "",
+				count: cint(r.outcome_new_schools),
+				staff: r.user_id || r.employee_name || r.employee || "",
+			}))
+			.filter((r) => r.count > 0)
+			.sort((a, b) => b.count - a.count);
+		const total = rows.reduce((s, r) => s + r.count, 0);
+		const body = rows.length
+			? rows
+					.map(
+						(r) => `<tr>
+				<td>${frappe.utils.escape_html(r.name)}</td>
+				<td class="num sme-click" data-visit-metric="new_schools" data-visit-staff="${frappe.utils.escape_html(
+					r.staff
+				)}" data-outcome-fy="1">${this.fmt(r.count)}</td>
+			</tr>`
+					)
+					.join("")
+			: `<tr><td colspan="2" class="text-muted text-center">${__("No registered schools in this period")}</td></tr>`;
+		const d = new frappe.ui.Dialog({
+			title: __("New Registered School — by Field Staff"),
+			size: "large",
+			fields: [{ fieldtype: "HTML", fieldname: "html" }],
+			primary_action_label: __("Close"),
+			primary_action: () => d.hide(),
+		});
+		d.fields_dict.html.$wrapper.html(`
+			<p class="text-muted" style="font-size:12px;margin-bottom:10px;">
+				${__("Total")}: <strong>${this.fmt(total)}</strong>
+				${data.outcome_fy_label ? ` · ${frappe.utils.escape_html(data.outcome_fy_label)}` : ""}
+			</p>
+			<div class="table-responsive" style="max-height:420px;overflow:auto;">
+				<table class="table table-bordered table-hover" style="font-size:12px;margin:0;">
+					<thead><tr><th>${__("Field Staff")}</th><th class="text-right">${__("Schools")}</th></tr></thead>
+					<tbody>${body}</tbody>
+				</table>
+			</div>
+		`);
+		if (frappe.tif_customization && frappe.tif_customization.bind_clickable_numbers) {
+			frappe.tif_customization.bind_clickable_numbers(d.$wrapper, () => {
+				const f = this.get_filters();
+				return {
+					...f,
+					from_date: data.outcome_fy_from || f.from_date,
+					to_date: data.outcome_fy_to || f.to_date,
+				};
+			});
+		}
+		d.show();
 	}
 
 	show_supervisor_list() {

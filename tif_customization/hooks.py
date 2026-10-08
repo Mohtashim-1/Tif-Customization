@@ -183,6 +183,9 @@ override_doctype_class = {
 # Hook on document methods and events
 
 doc_events = {
+	"File": {
+		"after_insert": "tif_customization.tif_customization.overrides.file_attach_sync.sync_attach_field_from_file",
+	},
 	"Workspace": {
 		"validate": "tif_customization.tif_customization.overrides.workspace.sanitize_card_break_links",
 	},

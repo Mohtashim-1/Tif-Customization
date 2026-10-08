@@ -10,7 +10,7 @@ class FieldStaffReportPage {
 		this.suspend_filter_change = false;
 		this.page = frappe.ui.make_app_page({
 			parent: wrapper,
-			title: __("Field Staff Report"),
+			title: __("SME Daily Reporting"),
 			single_column: true
 		});
 
@@ -465,8 +465,8 @@ class FieldStaffReportPage {
 			.join("");
 
 		this.body.find(".fsr-table").html(`
-			<div class="table-responsive">
-				<table class="table table-bordered table-hover mb-0">
+			<div class="table-responsive fsr-table-scroll">
+				<table class="table table-bordered table-hover mb-0 fsr-data-table">
 					<thead><tr>${head}</tr></thead>
 					<tbody>${body}</tbody>
 				</table>

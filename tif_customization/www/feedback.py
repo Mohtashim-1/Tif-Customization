@@ -20,14 +20,18 @@ def get_context(context):
 	token = (frappe.form_dict.get("token") or "").strip()
 	if not re.fullmatch(r"[A-Za-z0-9]{16,64}", token):
 		token = ""
+	field_visit = (frappe.form_dict.get("field_visit") or "").strip()
 	context.token = token
+	context.field_visit = field_visit
 	context.csrf_token = get_csrf_token()
 	context.title = "Feedback"
 	context.sme_bootstrap = None
+	context.visit_prefill = None
 
 	if token:
 		try:
 			from tif_customization.tif_customization.api.feedback_studio import (
+				_field_visit_context,
 				_find,
 				_sme_lookup_payload,
 			)
@@ -36,5 +40,10 @@ def get_context(context):
 			if found and found[0] == "sme":
 				context.sme_bootstrap = _sme_lookup_payload()
 				context.title = "Subject expert review"
+				if field_visit:
+					try:
+						context.visit_prefill = _field_visit_context(field_visit)
+					except Exception:
+						context.visit_prefill = None
 		except Exception:
 			frappe.log_error(title="Feedback page SME bootstrap")
