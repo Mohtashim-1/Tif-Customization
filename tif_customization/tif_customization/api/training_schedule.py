@@ -441,20 +441,42 @@ def _available_fields():
 	return [f for f in FIELDS if f == "name" or meta.get_field(f)]
 
 
+def _seconds_to_hhmm(secs: int) -> str:
+	"""Format second-of-day as HH:MM (clamped to a valid clock time)."""
+	secs = int(secs) % (24 * 3600)
+	if secs < 0:
+		secs = 0
+	h = secs // 3600
+	m = (secs % 3600) // 60
+	return f"{h:02d}:{m:02d}"
+
+
 def _time_to_seconds(value) -> int | None:
 	if value is None or value == "":
 		return None
+	if isinstance(value, bool):
+		return None
+	# Bare numbers are second-of-day (e.g. from timedelta math), not hours.
+	if isinstance(value, (int, float)):
+		n = int(value)
+		if n < 0:
+			return None
+		return n % (24 * 3600)
 	if isinstance(value, timedelta):
-		return int(value.total_seconds())
+		return int(value.total_seconds()) % (24 * 3600)
 	if isinstance(value, time):
 		return value.hour * 3600 + value.minute * 60 + value.second
-	text = str(value).split(".")[0]
+	text = str(value).strip().split(".")[0]
 	parts = text.split(":")
 	try:
 		h = int(parts[0])
 		m = int(parts[1]) if len(parts) > 1 else 0
 		s = int(parts[2]) if len(parts) > 2 else 0
-		return h * 3600 + m * 60 + s
+		# Guard against already-broken values like "45000:00"
+		if h > 23 and len(parts) <= 2 and m == 0 and s == 0:
+			# Treat leading number as seconds-of-day
+			return h % (24 * 3600)
+		return (h * 3600 + m * 60 + s) % (24 * 3600)
 	except Exception:
 		return None
 
@@ -463,16 +485,25 @@ def _format_time(value) -> str:
 	secs = _time_to_seconds(value)
 	if secs is None:
 		return ""
-	h = secs // 3600
-	m = (secs % 3600) // 60
-	return f"{h:02d}:{m:02d}"
+	return _seconds_to_hhmm(secs)
 
 
 def _default_end_time(start) -> str:
 	secs = _time_to_seconds(start)
 	if secs is None:
 		return "12:00"
-	return _format_time(secs + 2 * 3600)
+	return _seconds_to_hhmm(secs + 2 * 3600)
+
+
+def _normalize_clock_time(value, fallback: str | None = None) -> str | None:
+	"""Return HH:MM[:SS]-safe string for MySQL TIME, or fallback/None."""
+	formatted = _format_time(value)
+	if formatted:
+		return formatted
+	if fallback:
+		return _format_time(fallback) or fallback
+	return None
+
 
 
 def _format_time_range(start, end=None) -> str:
@@ -1146,11 +1177,18 @@ def save_session(values=None):
 			if city and frappe.db.exists("City", city):
 				values.city = city
 
-	if values.get("training_time"):
-		end_secs = _time_to_seconds(values.get("training_end_time"))
+	if "training_time" in values:
+		values.training_time = _normalize_clock_time(values.get("training_time"), "10:00")
+	if "training_end_time" in values or values.get("training_time"):
 		start_secs = _time_to_seconds(values.get("training_time"))
+		end_secs = _time_to_seconds(values.get("training_end_time"))
 		if start_secs is not None and (end_secs is None or end_secs <= start_secs):
 			values.training_end_time = _default_end_time(values.training_time)
+		else:
+			values.training_end_time = _normalize_clock_time(
+				values.get("training_end_time"),
+				_default_end_time(values.get("training_time")),
+			)
 
 	if "schedule_status" in values:
 		mapped = {

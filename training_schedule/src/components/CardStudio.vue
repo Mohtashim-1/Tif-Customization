@@ -471,11 +471,8 @@ onMounted(load);
 						<label>Date
 							<DatePicker v-model="sessionForm.training_date" required />
 						</label>
-						<label>Start
-							<TimePicker v-model="sessionForm.training_time" />
-						</label>
-						<label>End
-							<TimePicker v-model="sessionForm.training_end_time" />
+						<label class="full">Time
+							<TimePicker v-model="sessionForm.training_time" v-model:end="sessionForm.training_end_time" />
 						</label>
 						<label>Trainer
 							<input v-model="sessionForm.trainer_name" list="card-trainers" />

@@ -1288,10 +1288,43 @@ async function uploadSoaAttachments(docname) {
 	await Promise.all(jobs);
 }
 
+function activityRemarksText() {
+	const g = selected.value?.group;
+	if (g === "visits" || g === "me" || g === "books") {
+		return (visit.schoolAdditionalRemarks || "").trim();
+	}
+	if (g === "meeting" || g === "internal_meeting" || g === "enrolment") {
+		return (meeting.remarks || "").trim();
+	}
+	if (g === "training") {
+		return (meeting.remarks || training.academicWorkDetail || "").trim();
+	}
+	if (g === "academic") {
+		return (training.academicWorkDetail || "").trim();
+	}
+	if (g === "volunteer") {
+		return (volunteerVisit.remarks || "").trim();
+	}
+	if (g === "ambassador") {
+		return (ambassadorVisit.remarks || "").trim();
+	}
+	return "";
+}
+
+function assertRemarksFilled() {
+	if (!selected.value || selected.value.group === "report") return true;
+	if (activityRemarksText()) return true;
+	error.value = "Remarks are required. Please enter remarks before continuing.";
+	return false;
+}
+
 async function saveVisit(submitDoc) {
 	error.value = "";
 	if (!selected.value) {
 		error.value = "Please select an activity type first.";
+		return;
+	}
+	if (!assertRemarksFilled()) {
 		return;
 	}
 	if (selected.value.group === "internal_meeting" && !meeting.meetingDate) {
@@ -1419,11 +1452,14 @@ async function goToVisitFeedback(visitName, feedbackUrl) {
 }
 
 function continueToTravel() {
+	error.value = "";
 	if (selected.value?.group === "visits" && !attachments.school_picture) {
 		error.value = "School Picture is required.";
 		return;
 	}
-	error.value = "";
+	if (!assertRemarksFilled()) {
+		return;
+	}
 	step.value = 3;
 }
 
@@ -1715,7 +1751,7 @@ const steps = [
 							/>
 							<FieldSelect :mode="lang" label-en="School Type" label-ur="اسکول کی قسم" :options="schoolTypeOptions" placeholder-en="Select" placeholder-ur="منتخب کریں" v-model="visit.schoolType" />
 							<FieldTextarea :mode="lang" label-en="School Address" label-ur="اسکول کا پتہ" v-model="visit.schoolAddress" />
-							<FieldTextarea :mode="lang" label-en="Any Additional Remarks regarding School" label-ur="اسکول کے بارے میں اضافی ریمارکس" v-model="visit.schoolAdditionalRemarks" />
+							<FieldTextarea :mode="lang" label-en="Any Additional Remarks regarding School" label-ur="اسکول کے بارے میں اضافی ریمارکس" required v-model="visit.schoolAdditionalRemarks" />
 							<FieldInput :mode="lang" label-en="Reference" label-ur="حوالہ" v-model="visit.reference" />
 							<label class="check-row" style="margin-top: 0">
 								<input type="checkbox" v-model="visit.marketingMaterial" />
@@ -2001,6 +2037,7 @@ const steps = [
 								label-en="Remarks"
 								label-ur="ریمارکس"
 								placeholder="Any additional remarks regarding this monitoring visit"
+								required
 								v-model="visit.schoolAdditionalRemarks"
 							/>
 						</div>
@@ -2030,7 +2067,7 @@ const steps = [
 						<div style="margin-top: 16px">
 							<FieldTextarea :mode="lang" label-en="Agenda" label-ur="ایجنڈا" v-model="meeting.agenda" />
 							<FieldTextarea :mode="lang" label-en="Resolution" label-ur="قرارداد" v-model="meeting.resolution" />
-							<FieldTextarea :mode="lang" label-en="Remarks" label-ur="ریمارکس" v-model="meeting.remarks" />
+							<FieldTextarea :mode="lang" label-en="Remarks" label-ur="ریمارکس" required v-model="meeting.remarks" />
 						</div>
 					</div>
 
@@ -2097,7 +2134,7 @@ const steps = [
 						/>
 						<div class="grid-2" style="margin-top: 24px">
 							<FieldTextarea :mode="lang" label-en="Agenda" label-ur="ایجنڈا" placeholder="Purpose of meeting / ملاقات کا مقصد" v-model="meeting.agenda" />
-							<FieldTextarea :mode="lang" label-en="Remarks" label-ur="ریمارکس / اگلا قدم" placeholder="Next follow-up?" v-model="meeting.remarks" />
+							<FieldTextarea :mode="lang" label-en="Remarks" label-ur="ریمارکس / اگلا قدم" placeholder="Next follow-up?" required v-model="meeting.remarks" />
 						</div>
 						<label class="check-row">
 							<input type="checkbox" v-model="meeting.mutalaeSample" />
@@ -2171,6 +2208,16 @@ const steps = [
 							<FieldInput :mode="lang" label-en="Topics / Detail" label-ur="موضوعات / تفصیل" v-model="training.topics" />
 							<FieldSelect :mode="lang" label-en="Mode" label-ur="طریقہ" :options="['Onsite / In Person', 'Online', 'Hybrid']" v-model="training.mode" />
 						</div>
+						<div v-if="selected.group === 'training'" style="margin-top: 16px">
+							<FieldTextarea
+								:mode="lang"
+								label-en="Remarks"
+								label-ur="ریمارکس"
+								placeholder="Remarks about this training / workshop"
+								required
+								v-model="meeting.remarks"
+							/>
+						</div>
 						<div v-else-if="isAcademicWorkTask" class="academic-work" style="margin-top: 16px">
 							<div class="field">
 								<label>
@@ -2200,6 +2247,7 @@ const steps = [
 								label-en="Details of Academic work"
 								label-ur="تعلیمی کام کی تفصیل"
 								placeholder="Describe the academic work / تعلیمی کام کی تفصیل لکھیں"
+								required
 								v-model="training.academicWorkDetail"
 							/>
 						</div>
@@ -2255,6 +2303,7 @@ const steps = [
 								label-en="Additional details of follow up calls"
 								label-ur="فالو اپ کالز کی اضافی تفصیل"
 								placeholder="Any extra notes / اضافی نوٹس"
+								required
 								v-model="training.academicWorkDetail"
 							/>
 						</div>
@@ -2287,6 +2336,7 @@ const steps = [
 								label-en="Details of Official Task"
 								label-ur="آفیشل ٹاسک کی تفصیل"
 								placeholder="Describe the official task / آفیشل ٹاسک کی تفصیل لکھیں"
+								required
 								v-model="training.academicWorkDetail"
 							/>
 							<FieldSelect :mode="lang" label-en="Hours Spent" label-ur="صرف شدہ گھنٹے" :options="hoursSpentOptions" v-model="training.academicHours" />
@@ -2297,6 +2347,7 @@ const steps = [
 								label-en="Details of Staff Meeting"
 								label-ur="سٹاف میٹنگ کی تفصیل"
 								placeholder="Agenda, discussion and outcome of the staff meeting / سٹاف میٹنگ کی تفصیل لکھیں"
+								required
 								v-model="training.academicWorkDetail"
 							/>
 							<FieldSelect :mode="lang" label-en="Hours Spent" label-ur="صرف شدہ گھنٹے" :options="hoursSpentOptions" v-model="training.academicHours" />
@@ -2307,6 +2358,7 @@ const steps = [
 								label-en="Details of Visit / Meeting"
 								label-ur="دورہ / میٹنگ کی تفصیل"
 								placeholder="Detail of Head Office / Regional / Out of Station visit"
+								required
 								v-model="training.academicWorkDetail"
 							/>
 							<FieldSelect :mode="lang" label-en="Hours Spent" label-ur="صرف شدہ گھنٹے" :options="hoursSpentOptions" v-model="training.academicHours" />
@@ -2362,6 +2414,7 @@ const steps = [
 									:mode="lang"
 									label-en="Visit / batch remarks"
 									label-ur="دورہ / بیچ نوٹس"
+									required
 									v-model="volunteerVisit.remarks"
 								/>
 							</div>
@@ -2461,6 +2514,7 @@ const steps = [
 									:mode="lang"
 									label-en="Visit / batch remarks"
 									label-ur="دورہ / بیچ نوٹس"
+									required
 									v-model="ambassadorVisit.remarks"
 								/>
 							</div>
@@ -2552,6 +2606,14 @@ const steps = [
 								<FieldSelect :mode="lang" label-en="Course Name" label-ur="کورس کا نام" :options="courseOptions" v-model="training.trainingCategory" />
 								<FieldInput :mode="lang" label-en="School / Institute" label-ur="اسکول / ادارہ" v-model="training.venueName" />
 							</div>
+							<FieldTextarea
+								:mode="lang"
+								label-en="Remarks"
+								label-ur="ریمارکس"
+								placeholder="Remarks about this enrolment"
+								required
+								v-model="meeting.remarks"
+							/>
 						</div>
 					</div>
 
@@ -2600,7 +2662,7 @@ const steps = [
 							<FieldInput :mode="lang" label-en="Contact Person" label-ur="رابطہ شخص" v-model="visit.meetingWith" />
 							<FieldInput :mode="lang" label-en="Contact No." label-ur="رابطہ نمبر" placeholder="03XX-XXXXXXX" v-model="visit.contactNumber" />
 							<FieldTextarea :mode="lang" label-en="School / Madrasa Address" label-ur="اسکول / مدرسہ کا پتہ" v-model="visit.schoolAddress" />
-							<FieldTextarea :mode="lang" label-en="Remarks" label-ur="ریمارکس" v-model="visit.schoolAdditionalRemarks" />
+							<FieldTextarea :mode="lang" label-en="Remarks" label-ur="ریمارکس" required v-model="visit.schoolAdditionalRemarks" />
 						</div>
 
 						<SchoolOpeningPanel

@@ -9,10 +9,13 @@
   "name1",
   "division",
   "status",
+  "city",
+  "province",
   "column_break_main",
   "employee",
   "user",
   "branch",
+  "area",
   "section_break_team",
   "parent_field_officer",
   "column_break_team",
@@ -141,13 +144,31 @@
    "label": "Old Parent",
    "options": "Field Officer",
    "read_only": 1
+  },
+  {
+   "fieldname": "city",
+   "fieldtype": "Link",
+   "label": "City",
+   "options": "City"
+  },
+  {
+   "fieldname": "area",
+   "fieldtype": "Link",
+   "label": "Area",
+   "options": "Area"
+  },
+  {
+   "fieldname": "province",
+   "fieldtype": "Link",
+   "label": "Province",
+   "options": "Province"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_tree": 1,
  "links": [],
- "modified": "2026-09-15 19:45:47.328802",
+ "modified": "2026-10-12 18:12:19.934450",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Field Officer",

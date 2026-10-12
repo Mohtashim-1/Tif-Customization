@@ -406,7 +406,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		return cint(row.active) + cint(row.inactive);
 	}
 
-	/** Visits block: New School Visit (Marketing), Follow up, Total, Monitoring. */
+	/** Visits block: New School Visit, Follow up, Monitoring, then Total. */
 	visit_columns() {
 		return [
 			{
@@ -415,13 +415,13 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				value: (r) => r.new,
 			},
 			{ label: __("Follow up Visit"), metric: "followup", value: (r) => r.followup },
+			{ label: __("Monitoring Visit (M&E)"), metric: "monitoring", value: (r) => this.me_visits(r), cellClass: "visit-mon-col" },
 			{
 				label: __("Total Visit"),
 				metric: "marketing",
 				value: (r) => cint(r.marketing) + cint(r.followup),
 				hint: __("Marketing Visit + Follow up Visit"),
 			},
-			{ label: __("Monitoring Visit (M&E)"), metric: "monitoring", value: (r) => this.me_visits(r), cellClass: "visit-mon-col" },
 		];
 	}
 
@@ -499,7 +499,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				},
 				{
 					key: "workshop",
-					label: __("Workshop Conducted Onsite"),
+					label: __("Workshop Conducted (Onsite)"),
 					metric: "workshop_conducted",
 					value: (r) => cint(r.workshop),
 				},
@@ -776,7 +776,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 							hint: __("Schools with no TIF program running."),
 						},
 						{
-							label: __("Online Workshop"),
+							label: __("Online Workshop Participants through SME"),
 							value: this.fmt(((data.outcome_fy || {}).online_workshop || {}).actual),
 							style: "workshop",
 							metric: "online_workshop",
@@ -844,7 +844,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		const kpiCols = this.kpi_columns(data);
 		const activityCols = [...visitCols, ...kpiCols];
 		const outcomeCols = this.outcome_subcolumns(data);
-		const colCount = 3 + activityCols.length + outcomeCols.length + 3 + 3;
+		const colCount = 4 + activityCols.length + outcomeCols.length + 3 + 3;
 
 		const tail_tds = (src, visitStaff, expenseStaff) => `
 					${this.expense_td(src, expenseStaff)}
@@ -860,6 +860,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						return `
 				<tr class="${low ? "sme-low" : ""}">
 					<td class="left">${frappe.utils.escape_html(r.label || "")}</td>
+					<td>${frappe.utils.escape_html(r.employment_type || "—")}</td>
 					<td>${frappe.utils.escape_html(r.division || r.region_label || "—")}</td>
 					<td>${frappe.utils.escape_html(r.province || "—")}</td>
 					${this.activity_tds(r, staff, data)}
@@ -910,6 +911,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					<thead>
 						<tr>
 							<th rowspan="3" class="left">${__("Name")}</th>
+							<th rowspan="3">${__("Employee Type")}</th>
 							<th rowspan="3">${__("Type / Division")}</th>
 							<th rowspan="3">${__("Province")}</th>
 							<th colspan="${activityCols.length}" class="group activity-group">${__("Activity (period)")}</th>
@@ -959,6 +961,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					<tfoot>
 						<tr>
 							<th class="left">${__("Total")}</th>
+							<th></th>
 							<th></th>
 							<th></th>
 							${this.activity_tds(t, "", data)}
@@ -1557,12 +1560,14 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						)}"`;
 						return `<tr>
 				<td><a ${linkAttrs}>${frappe.utils.escape_html(r.label || r.employee_name || "")}</a></td>
+				<td><a ${linkAttrs}>${frappe.utils.escape_html(r.employment_type || "—")}</a></td>
 				<td><a ${linkAttrs}>${frappe.utils.escape_html(r.province || "—")}</a></td>
+				<td><a ${linkAttrs}>${frappe.utils.escape_html(r.city || "—")}</a></td>
 				<td><a ${linkAttrs}>${frappe.utils.escape_html(r.area || "—")}</a></td>
 			</tr>`;
 					})
 					.join("")
-			: `<tr><td colspan="3" class="text-muted text-center">${__("No SMEs found")}</td></tr>`;
+			: `<tr><td colspan="5" class="text-muted text-center">${__("No SMEs found")}</td></tr>`;
 
 		const sumSchools = rows.reduce((a, r) => a + r.school_total, 0);
 		const d = new frappe.ui.Dialog({
@@ -1578,14 +1583,16 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				– ${frappe.utils.escape_html(frappe.datetime.str_to_user(data.to_date || ""))}
 				&nbsp;·&nbsp; ${__("SMEs")}: <strong>${rows.length}</strong>
 				&nbsp;·&nbsp; ${__("Total school visits")}: <strong>${this.fmt(sumSchools)}</strong>
-				<br>${__("Click Name, Province, or Area for school visit detail.")}
+				<br>${__("Province / City / Area from Field Officer document. Click a row for school visit detail.")}
 			</p>
 			<div class="table-responsive" style="max-height:420px;overflow:auto;">
 				<table class="table table-bordered table-hover" style="font-size:12px;margin:0;">
 					<thead>
 						<tr>
 							<th>${__("Name of SME")}</th>
+							<th>${__("Employee Type")}</th>
 							<th>${__("Province")}</th>
+							<th>${__("City")}</th>
 							<th>${__("Area")}</th>
 						</tr>
 					</thead>
@@ -2211,8 +2218,11 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		}
 		const headers = [
 			"Name",
+			"Employee Type",
 			"Type / Division",
 			"Province",
+			"City",
+			"Area",
 			...this.activity_table_columns(this.data).map((c) => c.label),
 			...this.outcome_subcolumns(this.data).map((c) => c.header || c.shortHeader),
 			"Expenses",
@@ -2230,8 +2240,11 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			lines.push(
 				[
 					`"${(r.label || "").replace(/"/g, '""')}"`,
+					`"${(r.employment_type || "").replace(/"/g, '""')}"`,
 					`"${(r.division || r.region_label || "").replace(/"/g, '""')}"`,
 					`"${(r.province || "").replace(/"/g, '""')}"`,
+					`"${(r.city || "").replace(/"/g, '""')}"`,
+					`"${(r.area || "").replace(/"/g, '""')}"`,
 					...this.activity_table_columns(this.data).map((c) =>
 						c.value ? c.value(r) : r[c.key] || 0
 					),

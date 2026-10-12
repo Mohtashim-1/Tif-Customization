@@ -1305,6 +1305,18 @@ def submit_smes_activity(data):
 	if not data.get("visit_date"):
 		frappe.throw(_("Date is required."))
 
+	remarks_text = (
+		cstr(data.get("school_additional_remarks") or "").strip()
+		or cstr(data.get("mt_remarks") or "").strip()
+		or cstr(data.get("mt_meeting_detail") or "").strip()
+		or cstr(data.get("ot_remarks") or "").strip()
+		or cstr(data.get("ot_academic_work_detail") or "").strip()
+		or cstr(data.get("ot_visit_meeting_detail") or "").strip()
+		or cstr(data.get("travel_remarks") or "").strip()
+	)
+	if not remarks_text:
+		frappe.throw(_("Remarks are required for every activity. Please enter remarks before submitting."))
+
 	activity_label = data.get("activity_type")
 	doc_type = ACTIVITY_TYPE_MAP.get(activity_label, activity_label)
 	for_officer = _officer_for_academic_card(doc_type, data)

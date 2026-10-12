@@ -73,7 +73,7 @@ SUMMARY_TYPES = (
 # Activity (period) columns — aligned with SME KPI Details / Target Base KPI sheet
 KPI_COLUMNS = (
 	{"key": "workshop_arranged", "label": "Workshop Arranged", "metric": "workshop_arranged"},
-	{"key": "workshop", "label": "Workshop Conducted Onsite", "metric": "workshop_conducted"},
+	{"key": "workshop", "label": "Workshop Conducted (Onsite)", "metric": "workshop_conducted"},
 	{"key": "meeting_ulama", "label": "Meeting / Ulama and Educationist", "metric": "meeting_ulama"},
 	{"key": "teachers_training_meeting", "label": "Teachers Training Meeting (Onsite School)", "metric": "teachers_training_meeting"},
 	{
@@ -459,8 +459,10 @@ def get_report_data(filters=None):
 		participants = cint(stats.get("participants") or 0)
 		visited_days = cint(stats.get("visited_days") or 0)
 		present_days = flt(present_days_map.get(staff.get("employee")) or 0, 1)
-		province = (stats.get("province") or "").strip()
-		area = (stats.get("area") or "").strip()
+		# Province / City / Area come only from Field Officer master (not visit data).
+		province = _clean_location(staff.get("fo_province"))
+		city = _clean_location(staff.get("fo_city"))
+		area = _clean_location(staff.get("fo_area"))
 		# Category New on a Marketing visit is in both cards. Count that visit once here.
 		grand_total = followup + new + marketing + meetings + me - marketing_new
 		expense_amt = flt(expenses.get(key) or 0)
@@ -481,9 +483,11 @@ def get_report_data(filters=None):
 			"region": staff_region,
 			"region_label": REGION_LABELS.get(staff_region, staff_region),
 			"province": province,
+			"city": city,
 			"area": area,
 			"user_id": staff.get("user_id"),
-			"label": f"SME - {staff.get('employee_name') or staff.get('user_id') or staff.get('employee')}",
+			"employment_type": (staff.get("employment_type") or "").strip(),
+			"label": _sme_display_label(staff),
 			"followup": followup,
 			"new": new,
 			"marketing": marketing,
@@ -912,7 +916,8 @@ def get_followup_schools_by_officer(filters=None):
 			{
 				"key": key,
 				"employee_name": name,
-				"label": f"SME - {name}",
+				"employment_type": (staff.get("employment_type") or "").strip(),
+				"label": _sme_display_label(staff),
 				"school_count": len(school_rows),
 				"visit_count": sum(s["visit_count"] for s in school_rows),
 				"schools": school_rows,
@@ -963,10 +968,18 @@ def _weekday_count(from_date, to_date):
 def _get_sme_staff(filters):
 	"""Active SMEs plus Active Field Officers (so all rostered officers appear)."""
 	employee_filter = (filters.get("employee") or "").strip() or None
+	emp_fields = [
+		"name",
+		"employee_name",
+		"user_id",
+		"department",
+		"employment_type",
+		"status",
+	]
 	rows = frappe.get_all(
 		"Employee",
 		filters={"status": "Active", "designation": SME_DESIGNATION},
-		fields=["name", "employee_name", "user_id", "department"],
+		fields=[f for f in emp_fields if f != "status"],
 		order_by="employee_name asc",
 	)
 	seen = {r.name for r in rows}
@@ -985,14 +998,14 @@ def _get_sme_staff(filters):
 				emp = frappe.db.get_value(
 					"Employee",
 					emp_name,
-					["name", "employee_name", "user_id", "department", "status"],
+					emp_fields,
 					as_dict=True,
 				)
 			if not emp and fo.user:
 				emp = frappe.db.get_value(
 					"Employee",
 					{"user_id": fo.user},
-					["name", "employee_name", "user_id", "department", "status"],
+					emp_fields,
 					as_dict=True,
 				)
 			if not emp or emp.status != "Active" or emp.name in seen:
@@ -1048,7 +1061,11 @@ def _get_sme_staff(filters):
 				"employee_name": r.employee_name,
 				"user_id": r.user_id,
 				"department": r.department,
+				"employment_type": (r.get("employment_type") or "").strip(),
 				"division": fo.get("division") or "",
+				"fo_city": fo.get("city") or "",
+				"fo_area": fo.get("area") or "",
+				"fo_province": fo.get("province") or "",
 				"match_values": _staff_match_values(r, full_names.get(r.user_id)),
 			}
 		)
@@ -1090,21 +1107,54 @@ def _present_days_by_employee(from_date, to_date, employee_ids):
 	return {r.employee: flt(r.present_days, 1) for r in rows}
 
 
+def _clean_location(value) -> str:
+	"""Drop placeholder / junk location labels (e.g. literal 'city')."""
+	text = (value or "").strip()
+	if not text:
+		return ""
+	if text.lower() in ("city", "area", "province", "-", "—", "n/a", "na", "none", "null"):
+		return ""
+	return text
+
+
+def _sme_display_label(staff) -> str:
+	"""SME display name only (employment type is a separate column)."""
+	name = (
+		(staff or {}).get("employee_name")
+		or (staff or {}).get("user_id")
+		or (staff or {}).get("employee")
+		or ""
+	).strip()
+	return f"SME - {name}" if name else "SME"
+
+
 def _field_officer_map(employees, user_ids):
-	"""Map employee/user → Field Officer division."""
+	"""Map employee/user → Field Officer division + location fields."""
 	out = {}
 	if not frappe.db.exists("DocType", "Field Officer"):
 		return out
 	filters = {"status": "Active"}
+	meta = frappe.get_meta("Field Officer")
+	fields = ["name", "name1", "employee", "user", "division"]
+	for f in ("city", "area", "province"):
+		if meta.has_field(f):
+			fields.append(f)
 	rows = frappe.get_all(
 		"Field Officer",
 		filters=filters,
-		fields=["name", "name1", "employee", "user", "division"],
+		fields=fields,
 	)
 	emp_set = set(employees or [])
 	user_set = set(user_ids or [])
 	for r in rows:
-		payload = {"division": r.division, "officer": r.name, "name1": r.name1}
+		payload = {
+			"division": r.division,
+			"officer": r.name,
+			"name1": r.name1,
+			"city": _clean_location(r.get("city")),
+			"area": _clean_location(r.get("area")),
+			"province": _clean_location(r.get("province")),
+		}
 		if r.employee and r.employee in emp_set:
 			out[r.employee] = payload
 		if r.user and r.user in user_set:
@@ -1210,6 +1260,7 @@ def _load_visit_stats(from_date, to_date, staff_rows, city=None, province=None):
 				NULLIF(TRIM(fv.me_province), ''),
 				NULLIF(TRIM(fv.training_province), '')
 			) AS province,
+			({_city_sql("fv")}) AS city,
 			COALESCE(
 				NULLIF(TRIM(fv.area), ''),
 				NULLIF(TRIM(fv.me_area), '')
@@ -1245,9 +1296,11 @@ def _load_visit_stats(from_date, to_date, staff_rows, city=None, province=None):
 			"workshop_conducted": 0,
 			"workshop_arranged": 0,
 			"province": "",
+			"city": "",
 			"area": "",
 			"_days": set(),
 			"_province_counts": {},
+			"_city_counts": {},
 			"_area_counts": {},
 		}
 		for s in staff_rows
@@ -1303,11 +1356,14 @@ def _load_visit_stats(from_date, to_date, staff_rows, city=None, province=None):
 			if vtype == "Workshop Arranged":
 				bucket["workshop_arranged"] += 1
 
-		# Province / area from any visit type that has them (not only school visits).
-		prov = (row.get("province") or "").strip()
-		area = (row.get("area") or "").strip()
+		# Province / city / area from any visit type that has them (not only school visits).
+		prov = _clean_location(row.get("province"))
+		city = _clean_location(row.get("city"))
+		area = _clean_location(row.get("area"))
 		if prov:
 			bucket["_province_counts"][prov] = bucket["_province_counts"].get(prov, 0) + 1
+		if city:
+			bucket["_city_counts"][city] = bucket["_city_counts"].get(city, 0) + 1
 		if area:
 			bucket["_area_counts"][area] = bucket["_area_counts"].get(area, 0) + 1
 
@@ -1317,8 +1373,10 @@ def _load_visit_stats(from_date, to_date, staff_rows, city=None, province=None):
 	for key, bucket in stats.items():
 		bucket["visited_days"] = len(bucket.pop("_days"))
 		p_counts = bucket.pop("_province_counts")
+		c_counts = bucket.pop("_city_counts")
 		a_counts = bucket.pop("_area_counts")
 		bucket["province"] = max(p_counts, key=p_counts.get) if p_counts else ""
+		bucket["city"] = max(c_counts, key=c_counts.get) if c_counts else ""
 		bucket["area"] = max(a_counts, key=a_counts.get) if a_counts else ""
 
 	return stats
