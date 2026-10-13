@@ -1,5 +1,7 @@
 frappe.pages["sme-summary-report-copy"].on_page_load = function (wrapper) {
 	frappe.require("/assets/tif_customization/js/field_visit_drilldown.js", () => {
+		frappe.tif_customization = frappe.tif_customization || {};
+		frappe.tif_customization.hide_school_unapproved = true;
 		const page = frappe.ui.make_app_page({
 			parent: wrapper,
 			title: __("SME Summary Report (Copy)"),
@@ -7,6 +9,11 @@ frappe.pages["sme-summary-report-copy"].on_page_load = function (wrapper) {
 		});
 		new frappe.tif_customization.SMESummaryReportCopy(page).make();
 	});
+};
+
+frappe.pages["sme-summary-report-copy"].on_page_show = function () {
+	frappe.tif_customization = frappe.tif_customization || {};
+	frappe.tif_customization.hide_school_unapproved = true;
 };
 
 frappe.tif_customization = frappe.tif_customization || {};
@@ -63,6 +70,30 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					.sme-sum-table thead tr:nth-child(3) th{top:var(--sme-sum-thead-row2,76px);z-index:3}
 					.sme-sum-table thead tr:first-child th[rowspan="3"],
 					.sme-sum-table thead tr:nth-child(2) th[rowspan="2"]{z-index:6}
+					/* Freeze Name → Province on horizontal scroll (Excel-style) */
+					.sme-sum-table th.freeze-col,
+					.sme-sum-table td.freeze-col{
+						position:sticky;
+						left:0;
+						background:#fff;
+						z-index:2;
+					}
+					.sme-sum-table thead th.freeze-col{
+						background:#f3f4f6;
+						z-index:8;
+					}
+					.sme-sum-table tfoot th.freeze-col{
+						background:#f9fafb;
+						z-index:3;
+					}
+					.sme-sum-table .freeze-0{left:0}
+					.sme-sum-table .freeze-1{left:var(--sme-freeze-1,140px)}
+					.sme-sum-table .freeze-2{left:var(--sme-freeze-2,280px)}
+					.sme-sum-table .freeze-3{
+						left:var(--sme-freeze-3,400px);
+						box-shadow:2px 0 6px rgba(15,23,42,.12);
+					}
+					.sme-sum-table .sme-low td.freeze-col{background:#fef2f2}
 					.sme-sum-table thead tr:first-child th.group,
 					.sme-sum-table thead tr:first-child th.kpi-group{background:#e5e7eb}
 					.sme-sum-table thead tr:nth-child(2) th.me-col{background:#f5f3ff}
@@ -140,6 +171,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						.sme-sum-kpi{box-shadow:none;break-inside:avoid}
 						.sme-sum-table-wrap{overflow:visible!important;border:none;border-radius:0}
 						.sme-sum-table{width:100%!important;min-width:0!important;font-size:8px;table-layout:fixed}
+						.sme-sum-table th.freeze-col,.sme-sum-table td.freeze-col{position:static!important;left:auto!important;box-shadow:none!important}
 						.sme-sum-table th,.sme-sum-table td{padding:4px 5px;word-wrap:break-word;overflow-wrap:anywhere}
 						.sme-sum-table .sme-click{color:#0f172a!important;text-decoration:none!important}
 						.sme-sum-title{font-size:14px;margin:0 0 6px}
@@ -882,10 +914,10 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						const low = flt(r.percentage) < 50;
 						return `
 				<tr class="${low ? "sme-low" : ""}">
-					<td class="left">${frappe.utils.escape_html(r.label || "")}</td>
-					<td>${frappe.utils.escape_html(r.employment_type || "—")}</td>
-					<td>${frappe.utils.escape_html(r.division || r.region_label || "—")}</td>
-					<td>${frappe.utils.escape_html(r.province || "—")}</td>
+					<td class="left freeze-col freeze-0">${frappe.utils.escape_html(r.label || "")}</td>
+					<td class="freeze-col freeze-1">${frappe.utils.escape_html(r.employment_type || "—")}</td>
+					<td class="freeze-col freeze-2">${frappe.utils.escape_html(r.division || r.region_label || "—")}</td>
+					<td class="freeze-col freeze-3">${frappe.utils.escape_html(r.province || "—")}</td>
 					${this.activity_tds(r, staff, data)}
 					${this.outcome_tds(r, staff, data)}
 					${tail_tds(r, staff, expenseStaff)}
@@ -927,16 +959,16 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				${data.fiscal_year_label ? `&nbsp;|&nbsp; ${__("FY")}: <strong>${frappe.utils.escape_html(data.fiscal_year_label)}</strong>` : ""}
 			</div>
 			<p class="text-muted small" style="margin:0 0 6px;">${__(
-				"Scroll inside the table box below — column headers stay fixed while you move through rows."
+				"Scroll inside the table box below — headers stay fixed vertically; Name through Province stay frozen while you scroll sideways."
 			)}</p>
 			<div class="sme-sum-table-wrap">
 				<table class="sme-sum-table">
 					<thead>
 						<tr>
-							<th rowspan="3" class="left">${__("Name")}</th>
-							<th rowspan="3">${__("Employee Type")}</th>
-							<th rowspan="3">${__("Type / Division")}</th>
-							<th rowspan="3">${__("Province")}</th>
+							<th rowspan="3" class="left freeze-col freeze-0">${__("Name")}</th>
+							<th rowspan="3" class="freeze-col freeze-1">${__("Employee Type")}</th>
+							<th rowspan="3" class="freeze-col freeze-2">${__("Type / Division")}</th>
+							<th rowspan="3" class="freeze-col freeze-3">${__("Province")}</th>
 							<th colspan="${activityCols.length}" class="group activity-group">${__("Activity (period)")}</th>
 							<th colspan="${outcomeCols.length}" class="group outcome-group">${__("Outcomes (1 July to date)")}</th>
 							<th colspan="3" class="group">${__("Totals")}</th>
@@ -983,10 +1015,10 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					<tbody>${body}</tbody>
 					<tfoot>
 						<tr>
-							<th class="left">${__("Total")}</th>
-							<th></th>
-							<th></th>
-							<th></th>
+							<th class="left freeze-col freeze-0">${__("Total")}</th>
+							<th class="freeze-col freeze-1"></th>
+							<th class="freeze-col freeze-2"></th>
+							<th class="freeze-col freeze-3"></th>
 							${this.activity_tds(t, "", data)}
 							${this.outcome_tds(t, "", data)}
 							${tail_tds(t, "", "")}
@@ -1016,6 +1048,17 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		if (h1 > 0 && h2 > 0) {
 			wrap.style.setProperty("--sme-sum-thead-row2", `${h1 + h2}px`);
 		}
+		// Left offsets for frozen Name → Province columns
+		const freezeCells = [0, 1, 2, 3].map((i) =>
+			wrap.querySelector(`thead tr:first-child th.freeze-${i}`)
+		);
+		let left = 0;
+		freezeCells.forEach((cell, i) => {
+			if (i > 0) {
+				wrap.style.setProperty(`--sme-freeze-${i}`, `${Math.ceil(left)}px`);
+			}
+			if (cell) left += cell.getBoundingClientRect().width;
+		});
 		const resize = () => this.sync_sticky_table_header();
 		if (!this._stickyHeaderResizeBound) {
 			this._stickyHeaderResizeBound = true;
@@ -1068,6 +1111,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				province: ctx.province || "",
 				city: ctx.city || "",
 				submitted_only: ctx.submitted_only || 1,
+				hideUnapproved: true,
 			});
 		});
 
@@ -1743,12 +1787,9 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				const visits = detail.rows || [];
 				const schoolBadge = (label) =>
 					`<span style="display:inline-block;margin-left:6px;padding:1px 6px;border:1px solid #dc2626;border-radius:999px;background:#fef2f2;color:#b91c1c;font-size:11px;font-weight:700;white-space:nowrap;">${label}</span>`;
-				const schoolCell = (school, unapproved, missing) => {
-					const badge = unapproved
-						? schoolBadge(__("Un Approved"))
-						: missing
-						? schoolBadge(__("School Detail Missing"))
-						: "";
+				const schoolCell = (school, _unapproved, missing) => {
+					// Do not show Un Approved on this report; keep missing-school hint only.
+					const badge = missing ? schoolBadge(__("School Detail Missing")) : "";
 					return `${frappe.utils.escape_html(school || "—")}${badge}`;
 				};
 				const bySchool = {};
@@ -1930,6 +1971,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						province: filters.province || "",
 						city: filters.city || "",
 						submitted_only: filters.submitted_only || 1,
+						hideUnapproved: true,
 					});
 				});
 				d.show();

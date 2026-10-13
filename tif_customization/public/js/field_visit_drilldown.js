@@ -1,5 +1,9 @@
 frappe.tif_customization = frappe.tif_customization || {};
 
+frappe.tif_customization.should_hide_school_unapproved = function (opts) {
+	return !!(opts && opts.hideUnapproved) || !!frappe.tif_customization.hide_school_unapproved;
+};
+
 frappe.tif_customization.format_visit_remarks = function (remarks) {
 	const text = (remarks || "").trim();
 	if (!text) return "—";
@@ -71,10 +75,12 @@ frappe.tif_customization.open_visit_drilldown = function (opts) {
 };
 
 frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
+	opts = opts || {};
+	const hideUnapproved = frappe.tif_customization.should_hide_school_unapproved(opts);
 	const rows = data.rows || [];
 	const isMonitoring = data.metric === "monitoring" || data.metric === "me";
 	if (isMonitoring && !data.staff) {
-		frappe.tif_customization.show_monitoring_officer_dialog(data, rows);
+		frappe.tif_customization.show_monitoring_officer_dialog(data, rows, opts);
 		return;
 	}
 	if (data.metric === "enrolment") {
@@ -82,7 +88,7 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 		return;
 	}
 	if (data.metric === "workshop_registration") {
-		frappe.tif_customization.show_workshop_participant_dialog(data);
+		frappe.tif_customization.show_workshop_participant_dialog(data, opts);
 		return;
 	}
 	const breakdown = (data.breakdown || [])
@@ -101,7 +107,7 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 	const schoolCell = (row) => {
 		const school = frappe.utils.escape_html(row.school || "—");
 		let badge = "";
-		if (cint(row.school_unapproved)) {
+		if (!hideUnapproved && cint(row.school_unapproved)) {
 			badge = __("Un Approved");
 		} else if (cint(row.school_missing)) {
 			badge = __("School Detail Missing");
@@ -178,7 +184,9 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 	d.show();
 };
 
-frappe.tif_customization.show_workshop_participant_dialog = function (data) {
+frappe.tif_customization.show_workshop_participant_dialog = function (data, opts) {
+	opts = opts || {};
+	const hideUnapproved = frappe.tif_customization.should_hide_school_unapproved(opts);
 	const visits = data.rows || [];
 	const people = data.participants || [];
 	const byVisit = {};
@@ -210,7 +218,7 @@ frappe.tif_customization.show_workshop_participant_dialog = function (data) {
 	const schoolCell = (row) => {
 		const school = frappe.utils.escape_html(row.school || "—");
 		let badge = "";
-		if (cint(row.school_unapproved)) badge = __("Un Approved");
+		if (!hideUnapproved && cint(row.school_unapproved)) badge = __("Un Approved");
 		else if (cint(row.school_missing)) badge = __("School Detail Missing");
 		badge = badge
 			? `<span style="display:inline-block;margin-left:6px;padding:1px 6px;border:1px solid #dc2626;border-radius:999px;background:#fef2f2;color:#b91c1c;font-size:11px;font-weight:700;white-space:nowrap;">${badge}</span>`
@@ -552,7 +560,9 @@ frappe.tif_customization.show_visit_photo_dialog = function (row) {
 	d.show();
 };
 
-frappe.tif_customization.show_monitoring_officer_dialog = function (data, rows) {
+frappe.tif_customization.show_monitoring_officer_dialog = function (data, rows, opts) {
+	opts = opts || {};
+	const hideUnapproved = frappe.tif_customization.should_hide_school_unapproved(opts);
 	const meBucket = (row) => {
 		const c = String(row.category || "")
 			.toLowerCase()
@@ -645,6 +655,10 @@ frappe.tif_customization.show_monitoring_officer_dialog = function (data, rows) 
 	};
 
 	const approvalLabel = (row) => {
+		if (hideUnapproved) {
+			if (cint(row.school_missing)) return __("School Detail Missing");
+			return __("Approved");
+		}
 		if (cint(row.school_unapproved) || cint(row.school_missing)) return __("Un Approved");
 		return __("Approved");
 	};
@@ -779,6 +793,7 @@ frappe.tif_customization.bind_clickable_numbers = function ($root, get_ctx) {
 			city: ctx.city || "",
 			metric,
 			submitted_only: ctx.submitted_only || ctx.submitted || 0,
+			hideUnapproved: !!(ctx.hideUnapproved || frappe.tif_customization.hide_school_unapproved),
 		});
 	});
 };
