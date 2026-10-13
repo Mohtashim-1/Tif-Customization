@@ -2216,7 +2216,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 									? row.url
 									: String(row.source || "").indexOf("Expense Claim") >= 0
 										? `/app/expense-claim/${encodeURIComponent(n)}`
-										: `/app/field-visit/${encodeURIComponent(n)}`;
+										: `/field-visit-easy?name=${encodeURIComponent(n)}`;
 							return `<a href="${frappe.utils.escape_html(href)}">${frappe.utils.escape_html(n)}</a>`;
 						})
 						.join(", ");

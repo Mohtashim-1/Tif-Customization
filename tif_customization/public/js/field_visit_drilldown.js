@@ -1,5 +1,17 @@
 frappe.tif_customization = frappe.tif_customization || {};
 
+frappe.tif_customization.field_visit_easy_url = function (name) {
+	const n = String(name || "").trim();
+	if (!n) return "";
+	return `/field-visit-easy?name=${encodeURIComponent(n)}`;
+};
+
+frappe.tif_customization.open_field_visit_easy = function (name) {
+	const url = frappe.tif_customization.field_visit_easy_url(name);
+	if (!url) return;
+	window.open(url, "_blank");
+};
+
 frappe.tif_customization.should_hide_school_unapproved = function (opts) {
 	return !!(opts && opts.hideUnapproved) || !!frappe.tif_customization.hide_school_unapproved;
 };
@@ -223,8 +235,7 @@ frappe.tif_customization.show_school_metric_drilldown_dialog = function (data, o
 		e.stopPropagation();
 		const name = $(e.currentTarget).attr("data-visit");
 		if (!name) return;
-		d.hide();
-		frappe.set_route("Form", "Field Visit", name);
+		frappe.tif_customization.open_field_visit_easy(name);
 	});
 	d.$wrapper.on("click", ".tif-school-row", (e) => {
 		if ($(e.target).closest(".tif-open-visit").length) return;
@@ -362,8 +373,7 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 		e.preventDefault();
 		const name = $(e.currentTarget).attr("data-visit");
 		if (!name) return;
-		d.hide();
-		frappe.set_route("Form", "Field Visit", name);
+		frappe.tif_customization.open_field_visit_easy(name);
 	});
 	d.show();
 };

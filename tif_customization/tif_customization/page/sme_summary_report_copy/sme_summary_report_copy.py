@@ -908,7 +908,7 @@ def get_followup_schools_by_officer(filters=None):
 			{
 				"name": row.name,
 				"visit_date": str(row.visit_date) if row.visit_date else "",
-				"url": f"/app/field-visit/{row.name}",
+				"url": f"/field-visit-easy?name={row.name}",
 				"province": (row.get("province") or "").strip(),
 				"area": (row.get("area") or "").strip(),
 				"remarks": _visit_remarks(row),
@@ -1570,7 +1570,7 @@ def _field_visit_expense_rows(from_date, to_date, staff_rows):
 				"travel_mode": ", ".join(modes) or "—",
 				"computation": "; ".join(bits) or _("Recorded travel cost"),
 				"status": visits[0].get("type") if len(visits) == 1 else _("{0} visits").format(len(visits)),
-				"url": f"/app/field-visit/{names[0]}" if names else "",
+				"url": f"/field-visit-easy?name={names[0]}" if names else "",
 			}
 		)
 	return out

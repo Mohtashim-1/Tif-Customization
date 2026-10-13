@@ -37,6 +37,8 @@ const showParticipant = ref(false);
 const showVolunteer = ref(false);
 const showAmbassador = ref(false);
 const selectedId = ref("");
+const viewMode = ref(false);
+const viewDoc = ref(null);
 const meta = ref({
 	staff_name: "",
 	staff_employee: "",
@@ -598,15 +600,42 @@ const travelModeOptions = computed(() =>
 
 let clockTimer;
 
+function visitNameFromUrl() {
+	try {
+		const params = new URLSearchParams(window.location.search || "");
+		const fromQuery = (params.get("name") || params.get("visit") || "").trim();
+		if (fromQuery) return fromQuery;
+		const parts = (window.location.pathname || "").split("/").filter(Boolean);
+		// /field-visit-easy/FV-09-26-00001
+		if (parts.length >= 2 && parts[0] === "field-visit-easy") {
+			const candidate = decodeURIComponent(parts[1] || "").trim();
+			if (candidate && candidate.toUpperCase().startsWith("FV-")) return candidate;
+		}
+	} catch {
+		/* ignore */
+	}
+	return "";
+}
+
+function isImageUrl(url) {
+	return /\.(png|jpe?g|gif|webp)(\?|$)/i.test(String(url || ""));
+}
+
 onMounted(async () => {
 	tickClock();
 	clockTimer = setInterval(tickClock, 60000);
+	const viewName = visitNameFromUrl();
 	try {
-		meta.value = { ...meta.value, ...(await apiGet(`${METHOD}.get_form_meta`)) };
-		training.entryFilledBy = meta.value.staff_name || training.entryFilledBy;
-		training.trainerName = meta.value.staff_name || training.trainerName;
-		visit.visitBy = visit.visitBy || meta.value.staff_name || "";
-		if (!participantForm.course && courseOptions.value[0]) participantForm.course = courseOptions.value[0];
+		if (viewName) {
+			viewMode.value = true;
+			viewDoc.value = await apiGet(`${METHOD}.get_field_visit_easy_view`, { name: viewName });
+		} else {
+			meta.value = { ...meta.value, ...(await apiGet(`${METHOD}.get_form_meta`)) };
+			training.entryFilledBy = meta.value.staff_name || training.entryFilledBy;
+			training.trainerName = meta.value.staff_name || training.trainerName;
+			visit.visitBy = visit.visitBy || meta.value.staff_name || "";
+			if (!participantForm.course && courseOptions.value[0]) participantForm.course = courseOptions.value[0];
+		}
 	} catch (e) {
 		error.value = e.message || "Could not load form.";
 	} finally {
@@ -1586,7 +1615,7 @@ const steps = [
 			</div>
 		</header>
 
-		<div class="wrap">
+		<div v-if="!viewMode" class="wrap">
 			<div class="stepper">
 				<template v-for="(s, i) in steps" :key="s.n">
 					<div class="step">
@@ -1608,6 +1637,60 @@ const steps = [
 		<main class="wrap page">
 			<div v-if="error" class="error-banner">{{ error }}</div>
 			<div v-if="loading" class="hero-p">Loading…</div>
+
+			<section v-else-if="viewMode" class="fade">
+				<div class="view-toolbar">
+					<a class="btn btn-ghost" href="/app/sme-summary-report-copy">← Back to report</a>
+					<a class="btn btn-ghost" href="/field-visit-easy">New visit</a>
+					<a
+						v-if="viewDoc?.desk_url"
+						class="btn btn-ghost"
+						:href="viewDoc.desk_url"
+						target="_blank"
+						rel="noopener"
+					>Desk form</a>
+				</div>
+				<div v-if="viewDoc" class="view-sheet">
+					<div class="view-head">
+						<div class="view-kicker">Field Visit — Easy view</div>
+						<h1 class="view-title">{{ viewDoc.name }}</h1>
+						<p class="view-sub">
+							<span v-if="viewDoc.type">{{ viewDoc.type }}</span>
+							<span v-if="viewDoc.status"> · {{ viewDoc.status }}</span>
+							<span v-if="viewDoc.visit_date"> · {{ viewDoc.visit_date }}</span>
+						</p>
+						<p v-if="viewDoc.school || viewDoc.officer" class="view-sub">
+							<span v-if="viewDoc.school"><strong>School:</strong> {{ viewDoc.school }}</span>
+							<span v-if="viewDoc.officer"><strong> · Officer:</strong> {{ viewDoc.officer }}</span>
+						</p>
+					</div>
+					<div v-for="section in viewDoc.sections || []" :key="section.title" class="view-section">
+						<div class="view-section-title">{{ section.title }}</div>
+						<div class="view-grid">
+							<div v-for="field in section.fields || []" :key="field.label" class="view-field">
+								<div class="view-label">{{ field.label }}</div>
+								<div class="view-value">{{ field.value }}</div>
+							</div>
+						</div>
+					</div>
+					<div v-if="(viewDoc.images || []).length" class="view-section">
+						<div class="view-section-title">Attachments</div>
+						<div class="view-images">
+							<a
+								v-for="img in viewDoc.images"
+								:key="img.url"
+								class="view-image-card"
+								:href="img.url"
+								target="_blank"
+								rel="noopener"
+							>
+								<img v-if="isImageUrl(img.url)" :src="img.url" :alt="img.label" />
+								<span>{{ img.label }}</span>
+							</a>
+						</div>
+					</div>
+				</div>
+			</section>
 
 			<section v-else-if="step === 1" class="fade">
 				<h1 class="hero">

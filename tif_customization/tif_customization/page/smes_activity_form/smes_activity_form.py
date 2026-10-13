@@ -1676,8 +1676,182 @@ def submit_field_visit_doc(name):
 	return {
 		"name": doc.name,
 		"submitted": True,
-		"url": get_url(f"/app/field-visit/{doc.name}"),
+		"url": get_url(f"/field-visit-easy?name={doc.name}"),
+		"desk_url": get_url(f"/app/field-visit/{doc.name}"),
 		"message": _("Visit submitted as {0}").format(doc.name),
+	}
+
+
+def field_visit_easy_path(name):
+	from urllib.parse import quote
+
+	return f"/field-visit-easy?name={quote(cstr(name), safe='')}"
+
+
+@frappe.whitelist()
+def get_field_visit_easy_view(name=None):
+	"""Read-only Field Visit payload for /field-visit-easy?name=… view mode."""
+	name = cstr(name or "").strip()
+	if not name:
+		frappe.throw(_("Field Visit name is required."))
+	if not frappe.db.exists("Field Visit", name):
+		frappe.throw(_("Field Visit {0} not found.").format(name))
+	if not frappe.has_permission("Field Visit", "read", name):
+		frappe.throw(_("Not permitted to view this Field Visit."), frappe.PermissionError)
+
+	doc = frappe.get_doc("Field Visit", name)
+	status_map = {0: _("Draft"), 1: _("Submitted"), 2: _("Cancelled")}
+	school = (
+		cstr(doc.school_name).strip()
+		or cstr(getattr(doc, "pending_school_name", None)).strip()
+		or cstr(getattr(doc, "me_school_name", None)).strip()
+		or cstr(getattr(doc, "mt_institute_or_organization_name", None)).strip()
+		or cstr(getattr(doc, "training_venue_name", None)).strip()
+	)
+	officer = (
+		cstr(doc.visit_by).strip()
+		or cstr(doc.me_visit_by).strip()
+		or cstr(doc.mt_visit_by).strip()
+		or cstr(doc.training_entry_filled_by).strip()
+	)
+	visit_date = ""
+	try:
+		d = doc.get_visit_date()
+		visit_date = str(getdate(d)) if d else ""
+	except Exception:
+		visit_date = cstr(doc.visit_date or doc.me_visit_date or doc.mt_meeting_date or "")
+
+	def row(label, value):
+		text = cstr(value).strip()
+		if not text:
+			return None
+		return {"label": label, "value": text}
+
+	sections = []
+
+	def add_section(title, items):
+		fields = [f for f in items if f]
+		if fields:
+			sections.append({"title": title, "fields": fields})
+
+	add_section(
+		_("Visit"),
+		[
+			row(_("Document No"), doc.name),
+			row(_("Type"), doc.type),
+			row(_("Status"), status_map.get(doc.docstatus, doc.docstatus)),
+			row(_("Visit Date"), visit_date),
+			row(_("Officer / Visit By"), officer),
+			row(_("School"), school),
+			row(_("Province"), getattr(doc, "province", None) or getattr(doc, "me_province", None)),
+			row(
+				_("City"),
+				getattr(doc, "city", None)
+				or getattr(doc, "me_city", None)
+				or getattr(doc, "mt_city", None),
+			),
+			row(
+				_("Area"),
+				getattr(doc, "area", None)
+				or getattr(doc, "me_area", None)
+				or getattr(doc, "mt_area", None),
+			),
+			row(
+				_("Category"),
+				getattr(doc, "marketing_visit_category", None) or getattr(doc, "me_activity_status", None),
+			),
+			row(_("Frequency"), getattr(doc, "frequency_of_visits", None)),
+			row(_("Status (Follow-up)"), getattr(doc, "status", None)),
+		],
+	)
+	add_section(
+		_("Meeting"),
+		[
+			row(
+				_("Meeting With"),
+				getattr(doc, "mt_person_name", None) or getattr(doc, "meeting_with", None),
+			),
+			row(
+				_("Contact"),
+				getattr(doc, "mt_contact_number", None) or getattr(doc, "contact_number", None),
+			),
+			row(
+				_("Designation"),
+				getattr(doc, "mt_designation", None) or getattr(doc, "designation", None),
+			),
+			row(
+				_("Venue / Institute"),
+				getattr(doc, "mt_venue", None) or getattr(doc, "mt_institute_or_organization_name", None),
+			),
+			row(_("Agenda"), getattr(doc, "mt_agenda", None)),
+			row(_("Remarks"), getattr(doc, "mt_remarks", None)),
+			row(_("Resolution"), getattr(doc, "mt_resolution", None)),
+		],
+	)
+	add_section(
+		_("Monitoring & Evaluation"),
+		[
+			row(_("Activity Status"), getattr(doc, "me_activity_status", None)),
+			row(_("Inactive Reasons"), getattr(doc, "me_inactive_reasons", None)),
+			row(_("Book Status"), getattr(doc, "me_mqh_book_status", None)),
+			row(_("Teachers Training"), getattr(doc, "me_teachers_training_session", None)),
+			row(_("Reason"), getattr(doc, "me_reason_of_above", None)),
+		],
+	)
+	add_section(
+		_("Training / Workshop"),
+		[
+			row(_("Trainer"), getattr(doc, "training_trainer_name", None)),
+			row(_("Entry Filled By"), getattr(doc, "training_entry_filled_by", None)),
+			row(_("Venue"), getattr(doc, "training_venue_name", None)),
+			row(_("Mode"), getattr(doc, "training_mode", None)),
+			row(_("Topic"), getattr(doc, "training_workshop_topic", None)),
+			row(_("Participants"), getattr(doc, "training_no_of_participants", None)),
+			row(_("Schools"), getattr(doc, "training_no_of_schools", None)),
+		],
+	)
+	add_section(
+		_("Travel"),
+		[
+			row(_("Mode"), getattr(doc, "travel_mode", None)),
+			row(
+				_("Distance (km)"),
+				getattr(doc, "travel_distance_km", None) or getattr(doc, "distance_km", None),
+			),
+			row(_("Remarks"), getattr(doc, "travel_remarks", None)),
+		],
+	)
+	add_section(
+		_("Remarks"),
+		[
+			row(_("School Remarks"), getattr(doc, "school_remarks_follow_up", None)),
+			row(_("Additional Remarks"), getattr(doc, "school_additional_remarks", None)),
+			row(_("OT Remarks"), getattr(doc, "ot_remarks", None)),
+		],
+	)
+
+	images = []
+	for field, label in (
+		("school_picture", _("School Picture")),
+		("visiting_card", _("Visiting Card")),
+		("meeting_picture", _("Meeting Picture")),
+		("attendance_sheet_excel", _("Attendance Sheet")),
+	):
+		path = cstr(doc.get(field) or "").strip()
+		if path:
+			images.append({"label": label, "url": path})
+
+	return {
+		"name": doc.name,
+		"type": doc.type or "",
+		"status": status_map.get(doc.docstatus, str(doc.docstatus)),
+		"visit_date": visit_date,
+		"school": school,
+		"officer": officer,
+		"sections": sections,
+		"images": images,
+		"easy_url": field_visit_easy_path(doc.name),
+		"desk_url": f"/app/field-visit/{doc.name}",
 	}
 
 

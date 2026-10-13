@@ -593,6 +593,63 @@ def _visit_remarks(row) -> str:
 	return " | ".join(parts)
 
 
+# Free-text "Visit By" fields sometimes get a meeting/visit date typed in by mistake.
+_DATE_LIKE_OFFICER = re.compile(
+	r"^(?:"
+	r"\d{4}[-/]\d{1,2}[-/]\d{1,2}"  # 2026-09-14
+	r"|\d{1,2}[-/]\d{1,2}[-/]\d{2,4}"  # 14/09/2026
+	r"|\d{1,2}\s+[A-Za-z]{3,9}\s+\d{2,4}"  # 14 Sep 2026 / 14 September 2026
+	r")$"
+)
+
+
+def looks_like_date_value(value) -> bool:
+	"""True when a Visit By / officer field holds a date typed by mistake."""
+	text = cstr(value or "").strip()
+	return bool(text and _DATE_LIKE_OFFICER.match(text))
+
+
+def _resolve_visit_officer(*candidates) -> str:
+	"""First non-empty Visit By that is not a date; used in drilldown Officer column."""
+	for raw in candidates:
+		text = cstr(raw or "").strip()
+		if text and not looks_like_date_value(text):
+			return text
+	return ""
+
+
+def _owner_display_names(owners) -> dict:
+	"""Map User email → Employee / Field Officer display name."""
+	owners = [cstr(o).strip() for o in (owners or []) if cstr(o).strip()]
+	if not owners:
+		return {}
+	out = {}
+	for row in frappe.db.sql(
+		"""
+		SELECT user_id, employee_name
+		FROM `tabEmployee`
+		WHERE user_id IN %(owners)s AND IFNULL(employee_name, '') != ''
+		""",
+		{"owners": tuple(owners)},
+		as_dict=True,
+	):
+		out[row.user_id] = row.employee_name
+	missing = [o for o in owners if o not in out]
+	if missing and frappe.db.exists("DocType", "Field Officer"):
+		for row in frappe.db.sql(
+			"""
+			SELECT user, COALESCE(NULLIF(TRIM(name1), ''), NULLIF(TRIM(name), '')) AS label
+			FROM `tabField Officer`
+			WHERE user IN %(owners)s
+			""",
+			{"owners": tuple(missing)},
+			as_dict=True,
+		):
+			if row.label:
+				out[row.user] = row.label
+	return out
+
+
 def _school_sql(alias="fv"):
 	a = alias
 	return f"""COALESCE(
@@ -747,7 +804,7 @@ def _enrolment_participant_rows(visits: list) -> list[dict]:
 				"officer": visit.get("officer") or "",
 				"school": visit.get("school") or "",
 				"visit": row.visit,
-				"url": visit.get("url") or f"/app/field-visit/{row.visit}",
+				"url": visit.get("url") or f"/field-visit-easy?name={row.visit}",
 			}
 		)
 	return out
@@ -892,7 +949,7 @@ def _workshop_participant_rows(visits: list, sheet_by_visit: dict) -> list[dict]
 					"date": str(row.get(date_key)) if row.get(date_key) else (visit.get("visit_date") or ""),
 					"officer": visit.get("officer") or "",
 					"visit": row.parent,
-					"url": visit.get("url") or f"/app/field-visit/{row.parent}",
+					"url": visit.get("url") or f"/field-visit-easy?name={row.parent}",
 				}
 			)
 
@@ -1128,16 +1185,16 @@ def get_visit_drilldown(filters=None, metric=None, staff=None):
 	status_map = {0: "Draft", 1: "Submitted", 2: "Cancelled"}
 	out = []
 	by_type = {}
+	owner_names = _owner_display_names([r.owner for r in rows if r.owner])
 	for r in rows:
 		vtype = r.type or "Other"
 		by_type[vtype] = by_type.get(vtype, 0) + 1
-		officer = (
-			r.visit_by
-			or r.me_visit_by
-			or r.mt_visit_by
-			or r.training_entry_filled_by
-			or r.owner
-			or ""
+		officer = _resolve_visit_officer(
+			r.visit_by,
+			r.me_visit_by,
+			r.mt_visit_by,
+			r.training_entry_filled_by,
+			owner_names.get(r.owner) or r.owner,
 		)
 		if vtype == "M&E":
 			category, why = _me_status_note(r)
@@ -1165,7 +1222,7 @@ def get_visit_drilldown(filters=None, metric=None, staff=None):
 				"category": category,
 				"remarks": remarks,
 				"participants": cint(r.training_no_of_participants),
-				"url": f"/app/field-visit/{r.name}",
+				"url": f"/field-visit-easy?name={r.name}",
 				"images": [],
 			}
 		)

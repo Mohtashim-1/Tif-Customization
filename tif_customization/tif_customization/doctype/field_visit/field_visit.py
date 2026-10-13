@@ -88,6 +88,7 @@ class FieldVisit(Document):
 		sync_model_school_field(self)
 		sync_travel_cost(self)
 		self._sync_pending_school_name()
+		self._clear_date_typed_as_officer()
 		validate_supervisor_only_field_visit(self)
 		validate_farhan_only_field_visit(self)
 		if self.type in ("Training", "Workshop", "Teachers Training Meeting"):
@@ -108,16 +109,34 @@ class FieldVisit(Document):
 			self.send_training_feedback_invitations()
 		self._assign_field_officer_to_school()
 
+	def _clear_date_typed_as_officer(self):
+		"""Visit By is a free-text name field — reject dates typed by mistake."""
+		date_like = re.compile(
+			r"^(?:"
+			r"\d{4}[-/]\d{1,2}[-/]\d{1,2}"
+			r"|\d{1,2}[-/]\d{1,2}[-/]\d{2,4}"
+			r"|\d{1,2}\s+[A-Za-z]{3,9}\s+\d{2,4}"
+			r")$"
+		)
+		for field in ("visit_by", "me_visit_by", "mt_visit_by", "training_entry_filled_by"):
+			val = (self.get(field) or "").strip()
+			if val and date_like.match(val):
+				self.set(field, None)
+
 	def _assign_field_officer_to_school(self):
 		"""When a visit is submitted against a school, assign the visiting FO on School."""
 		customer = (self.school_name or "").strip()
 		if not customer:
 			return
-		staff_name = (
-			(self.visit_by or "").strip()
-			or (self.me_visit_by or "").strip()
-			or (self.mt_visit_by or "").strip()
+		date_like = re.compile(
+			r"^(?:\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[-/]\d{1,2}[-/]\d{2,4}|\d{1,2}\s+[A-Za-z]{3,9}\s+\d{2,4})$"
 		)
+		staff_name = ""
+		for candidate in (self.visit_by, self.me_visit_by, self.mt_visit_by):
+			text = (candidate or "").strip()
+			if text and not date_like.match(text):
+				staff_name = text
+				break
 		if not staff_name:
 			return
 		user = None
