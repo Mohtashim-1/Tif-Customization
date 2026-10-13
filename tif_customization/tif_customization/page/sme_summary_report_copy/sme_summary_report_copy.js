@@ -752,7 +752,9 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 							style: "model-a",
 							cardKind: "active_school_models",
 							outcomeFy: true,
-							hint: __("Click for Model A / B / C counts. Schools with any program running."),
+							hint: __(
+								"Click for Model A / B / C totals and a table of SME school counts. Schools with any program running."
+							),
 						},
 						{
 							label: __("Inactive Schools"),
@@ -1096,14 +1098,53 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 	}
 
 	show_active_school_models() {
-		const fy = (this.data || {}).outcome_fy || {};
+		const data = this.data || {};
+		const fy = data.outcome_fy || {};
 		const a = cint((fy.model_school_a || {}).actual);
 		const b = cint((fy.model_school_b || {}).actual);
 		const c = cint((fy.model_school_c || {}).actual);
 		const active = cint((fy.active_schools || {}).actual) || a + b + c;
+		const smeRows = [...(data.rows || [])]
+			.map((r) => {
+				const modelA = cint(r.outcome_model_school_a);
+				const modelB = cint(r.outcome_model_school_b);
+				const modelC = cint(r.outcome_model_school_c);
+				return {
+					name: r.label || r.employee_name || r.user_id || r.employee || "",
+					staff: r.user_id || r.employee_name || r.employee || "",
+					modelA,
+					modelB,
+					modelC,
+					total: modelA + modelB + modelC,
+				};
+			})
+			.filter((r) => r.total > 0)
+			.sort((x, y) => y.total - x.total || String(x.name).localeCompare(String(y.name)));
+		const sumA = smeRows.reduce((s, r) => s + r.modelA, 0);
+		const sumB = smeRows.reduce((s, r) => s + r.modelB, 0);
+		const sumC = smeRows.reduce((s, r) => s + r.modelC, 0);
+		const body = smeRows.length
+			? smeRows
+					.map(
+						(r) => `<tr>
+				<td class="left">${frappe.utils.escape_html(r.name)}</td>
+				<td class="num sme-click" data-visit-metric="model_school_a" data-visit-staff="${frappe.utils.escape_html(
+					r.staff
+				)}" data-outcome-fy="1">${this.fmt(r.modelA)}</td>
+				<td class="num sme-click" data-visit-metric="model_school_b" data-visit-staff="${frappe.utils.escape_html(
+					r.staff
+				)}" data-outcome-fy="1">${this.fmt(r.modelB)}</td>
+				<td class="num sme-click" data-visit-metric="model_school_c" data-visit-staff="${frappe.utils.escape_html(
+					r.staff
+				)}" data-outcome-fy="1">${this.fmt(r.modelC)}</td>
+				<td class="num">${this.fmt(r.total)}</td>
+			</tr>`
+					)
+					.join("")
+			: `<tr><td colspan="5" class="text-muted text-center">${__("No Model A / B / C schools for SMEs in this period")}</td></tr>`;
 		const d = new frappe.ui.Dialog({
 			title: __("Active Schools — Model A / B / C"),
-			size: "large",
+			size: "extra-large",
 			fields: [{ fieldtype: "HTML", fieldname: "html" }],
 			primary_action_label: __("Close"),
 			primary_action: () => d.hide(),
@@ -1112,7 +1153,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			<p class="text-muted" style="font-size:12px;margin-bottom:12px;">
 				${__("Active / registered schools with any program running")}:
 				<strong>${this.fmt(active)}</strong>
-				${(this.data || {}).outcome_fy_label ? ` · ${frappe.utils.escape_html(this.data.outcome_fy_label)}` : ""}
+				${data.outcome_fy_label ? ` · ${frappe.utils.escape_html(data.outcome_fy_label)}` : ""}
 			</p>
 			<div style="display:flex;flex-wrap:wrap;gap:12px;">
 				<div class="sme-sum-kpi sme-sum-kpi--model-a" data-visit-metric="model_school_a" data-outcome-fy="1" style="min-width:140px;cursor:pointer;">
@@ -1131,12 +1172,38 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					<div class="sme-sum-kpi__hint">${__("Other registered")}</div>
 				</div>
 			</div>
-			<p class="text-muted" style="font-size:11px;margin-top:12px;">${__("Click a model card to open Field Visits.")}</p>
+			<p class="text-muted" style="font-size:11px;margin:14px 0 8px;">
+				${__("SME — Model A / B / C school counts")} · ${__("Click a count to open Field Visits.")}
+			</p>
+			<div class="table-responsive" style="max-height:420px;overflow:auto;">
+				<table class="table table-bordered table-hover" style="font-size:12px;margin:0;">
+					<thead>
+						<tr>
+							<th>${__("SME")}</th>
+							<th class="text-right">${__("Model A")}</th>
+							<th class="text-right">${__("Model B")}</th>
+							<th class="text-right">${__("Model C")}</th>
+							<th class="text-right">${__("Total")}</th>
+						</tr>
+					</thead>
+					<tbody>${body}</tbody>
+					${
+						smeRows.length
+							? `<tfoot><tr>
+						<th>${__("Total")}</th>
+						<th class="text-right">${this.fmt(sumA)}</th>
+						<th class="text-right">${this.fmt(sumB)}</th>
+						<th class="text-right">${this.fmt(sumC)}</th>
+						<th class="text-right">${this.fmt(sumA + sumB + sumC)}</th>
+					</tr></tfoot>`
+							: ""
+					}
+				</table>
+			</div>
 		`);
 		if (frappe.tif_customization && frappe.tif_customization.bind_clickable_numbers) {
 			frappe.tif_customization.bind_clickable_numbers(d.$wrapper, () => {
 				const f = this.get_filters();
-				const data = this.data || {};
 				return {
 					...f,
 					from_date: data.outcome_fy_from || f.from_date,
