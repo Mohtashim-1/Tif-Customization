@@ -52,7 +52,9 @@ export const ACTIVITY_CARDS = [
 	{
 		id: "workshop_conducted",
 		type: "Workshop Conducted",
+		altTypes: ["Workshop"],
 		group: "training",
+		farhanOnly: true,
 		emoji: "🛠️",
 		titleEn: "Workshop Conducted",
 		titleUr: "ورکشاپ منعقد",
