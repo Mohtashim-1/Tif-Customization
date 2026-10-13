@@ -347,9 +347,19 @@ def list_school_customers(
 	city=None,
 	address_search=None,
 ):
-	"""Paginated school customers for the registry (single query + count)."""
+	"""Paginated school customers (or pending applications) for the registry."""
 	limit = min(max(int(limit or 50), 1), 200)
 	start = max(int(start or 0), 0)
+
+	form_data_norm = (form_data or "").strip().lower()
+	if form_data_norm in ("pending", "pending_approval", "draft"):
+		return _list_pending_applications(
+			search=search,
+			limit=limit,
+			start=start,
+			city=city,
+			address_search=address_search,
+		)
 
 	where, filter_values = _school_registry_filter_clause(
 		search=search,
@@ -398,9 +408,259 @@ def list_school_customers(
 	addr_map = _addresses_for_customers(customers)
 	for row in rows:
 		row.has_application = bool(row.pop("has_application", 0))
+		row.application = None
+		row.row_type = "customer"
 		_apply_registry_location(row, addr_map.get(row.customer))
 
-	return {"rows": rows, "total": total, "start": start, "page_length": limit}
+	return {"rows": rows, "total": total, "start": start, "page_length": limit, "mode": "customer"}
+
+
+def _list_pending_applications(search=None, limit=50, start=0, city=None, address_search=None):
+	"""Draft School Opening Applications waiting for HO approval."""
+	conditions = ["docstatus = 0"]
+	values = {"limit": limit, "start": start}
+
+	search = (search or "").strip()
+	if search:
+		conditions.append(
+			"(name LIKE %(search)s OR IFNULL(school_name, '') LIKE %(search)s OR IFNULL(city, '') LIKE %(search)s)"
+		)
+		values["search"] = f"%{search}%"
+
+	city = (city or "").strip()
+	if city:
+		conditions.append("IFNULL(city, '') LIKE %(city)s")
+		values["city"] = f"%{city}%"
+
+	address_search = (address_search or "").strip()
+	if address_search:
+		conditions.append(
+			"""(
+			IFNULL(address, '') LIKE %(addr_pat)s
+			OR IFNULL(area, '') LIKE %(addr_pat)s
+			OR IFNULL(city, '') LIKE %(addr_pat)s
+			OR IFNULL(province, '') LIKE %(addr_pat)s
+		)"""
+		)
+		values["addr_pat"] = f"%{address_search}%"
+
+	where = " AND ".join(conditions)
+	total = frappe.db.sql(
+		f"SELECT COUNT(*) FROM `tabSchool Opening Application` WHERE {where}",
+		values,
+	)[0][0]
+
+	rows = frappe.db.sql(
+		f"""
+		SELECT
+			name AS application,
+			school_name AS customer_name,
+			IFNULL(institution_category, '') AS govt_private,
+			'Pending' AS status,
+			'' AS territory,
+			modified,
+			IFNULL(address, '') AS address,
+			IFNULL(area, '') AS area,
+			IFNULL(city, '') AS city,
+			IFNULL(province, '') AS province,
+			IFNULL(country, '') AS country
+		FROM `tabSchool Opening Application`
+		WHERE {where}
+		ORDER BY modified DESC, name DESC
+		LIMIT %(limit)s OFFSET %(start)s
+		""",
+		values,
+		as_dict=True,
+	)
+
+	for row in rows:
+		row.customer = ""
+		row.has_application = False
+		row.row_type = "pending"
+		row.full_address = ", ".join(
+			p for p in [row.address, row.area, row.city, row.province, row.country] if p
+		)
+
+	return {"rows": rows, "total": total, "start": start, "page_length": limit, "mode": "pending"}
+
+
+@frappe.whitelist()
+def get_school_opening_neighbors(
+	customer=None,
+	application=None,
+	search=None,
+	govt_private=None,
+	status=None,
+	territory=None,
+	form_data=None,
+	city=None,
+	address_search=None,
+):
+	"""Previous / next document keys for the print toolbar (same order as registry)."""
+	application = (application or "").strip()
+	customer = resolve_customer_name(customer) if customer else ""
+	form_data_norm = (form_data or "").strip().lower()
+
+	if application or form_data_norm in ("pending", "pending_approval", "draft"):
+		return _neighbors_pending(
+			application=application,
+			search=search,
+			city=city,
+			address_search=address_search,
+		)
+
+	if not customer:
+		frappe.throw(_("Customer or application is required."))
+
+	where, filter_values = _school_registry_filter_clause(
+		search=search,
+		govt_private=govt_private,
+		status=status,
+		territory=territory,
+		form_data=form_data,
+		city=city,
+		address_search=address_search,
+	)
+	keys = frappe.db.sql(
+		f"""
+		SELECT c.name
+		FROM `tabCustomer` c
+		{_SCHOOL_OPENING_APP_JOIN}
+		WHERE {where}
+		ORDER BY c.customer_name
+		""",
+		filter_values,
+		as_list=True,
+	)
+	names = [r[0] for r in keys]
+	return _neighbor_payload(names, customer, key_field="customer")
+
+
+def _neighbors_pending(application=None, search=None, city=None, address_search=None):
+	conditions = ["docstatus = 0"]
+	values = {}
+	search = (search or "").strip()
+	if search:
+		conditions.append(
+			"(name LIKE %(search)s OR IFNULL(school_name, '') LIKE %(search)s OR IFNULL(city, '') LIKE %(search)s)"
+		)
+		values["search"] = f"%{search}%"
+	city = (city or "").strip()
+	if city:
+		conditions.append("IFNULL(city, '') LIKE %(city)s")
+		values["city"] = f"%{city}%"
+	address_search = (address_search or "").strip()
+	if address_search:
+		conditions.append(
+			"""(
+			IFNULL(address, '') LIKE %(addr_pat)s
+			OR IFNULL(area, '') LIKE %(addr_pat)s
+			OR IFNULL(city, '') LIKE %(addr_pat)s
+			OR IFNULL(province, '') LIKE %(addr_pat)s
+		)"""
+		)
+		values["addr_pat"] = f"%{address_search}%"
+
+	where = " AND ".join(conditions)
+	keys = frappe.db.sql(
+		f"""
+		SELECT name
+		FROM `tabSchool Opening Application`
+		WHERE {where}
+		ORDER BY modified DESC, name DESC
+		""",
+		values,
+		as_list=True,
+	)
+	names = [r[0] for r in keys]
+	current = (application or "").strip()
+	if current and current not in names:
+		# Draft may have just been approved — fall back to position among all drafts + current
+		names = [current] + names
+	return _neighbor_payload(names, current, key_field="application")
+
+
+def _neighbor_payload(names, current, key_field="customer"):
+	total = len(names)
+	if not current or current not in names:
+		return {
+			"mode": key_field,
+			"current": current or "",
+			"prev": None,
+			"next": None,
+			"index": 0,
+			"total": total,
+			"label": "",
+		}
+	idx = names.index(current)
+	prev_key = names[idx - 1] if idx > 0 else None
+	next_key = names[idx + 1] if idx + 1 < total else None
+	return {
+		"mode": key_field,
+		"current": current,
+		"prev": prev_key,
+		"next": next_key,
+		"index": idx + 1,
+		"total": total,
+		"label": f"{idx + 1} / {total}" if total else "",
+	}
+
+
+@frappe.whitelist()
+def approve_school_opening(application=None, customer=None):
+	"""Submit a draft School Opening Application (creates ERP Customer)."""
+	application = (application or "").strip()
+	customer = (customer or "").strip()
+
+	if not application and customer:
+		customer = resolve_customer_name(customer)
+		application = frappe.db.get_value(
+			"School Opening Application",
+			{"customer": customer, "docstatus": 0},
+			"name",
+			order_by="modified desc",
+		)
+		if not application:
+			# Match draft by school name when FO created SOA before customer existed
+			school_name = frappe.db.get_value("Customer", customer, "customer_name")
+			if school_name:
+				application = frappe.db.get_value(
+					"School Opening Application",
+					{"school_name": school_name, "docstatus": 0},
+					"name",
+					order_by="modified desc",
+				)
+
+	if not application:
+		frappe.throw(_("No pending School Opening Application to approve."))
+
+	if not frappe.db.exists("School Opening Application", application):
+		frappe.throw(_("School Opening Application {0} not found.").format(application))
+
+	doc = frappe.get_doc("School Opening Application", application)
+	if not frappe.has_permission("School Opening Application", "submit", doc):
+		frappe.throw(_("Not permitted to approve this application."), frappe.PermissionError)
+
+	if doc.docstatus == 1:
+		return {
+			"ok": True,
+			"already_approved": True,
+			"application": doc.name,
+			"customer": doc.customer,
+			"message": _("Already approved."),
+		}
+	if doc.docstatus == 2:
+		frappe.throw(_("Cancelled applications cannot be approved."))
+
+	doc.submit()
+	doc.reload()
+	return {
+		"ok": True,
+		"already_approved": False,
+		"application": doc.name,
+		"customer": doc.customer,
+		"message": _("School Opening approved. Customer {0} created.").format(doc.customer or ""),
+	}
 
 
 _EXPORT_MAX_ROWS = 5000
@@ -496,9 +756,26 @@ def export_school_registry(
 
 
 @frappe.whitelist()
-def get_school_opening_view(customer):
+def get_school_opening_view(customer=None, application=None):
+	application = (application or "").strip()
+	customer = (customer or "").strip()
+	if application:
+		return build_school_opening_view_from_application(application)
 	customer = _ensure_customer_access(customer)
 	return build_school_opening_view(customer)
+
+
+def build_school_opening_view_from_application(application):
+	"""Build SC-1.2 view from a School Opening Application (draft or submitted)."""
+	if not application or not frappe.db.exists("School Opening Application", application):
+		frappe.throw(_("School Opening Application {0} not found.").format(application))
+	if not frappe.has_permission("School Opening Application", "read", application):
+		frappe.throw(_("Not permitted to view this application."), frappe.PermissionError)
+	app = frappe.get_doc("School Opening Application", application)
+	view = _view_from_application(app)
+	if app.customer:
+		_enrich_location_from_customer(view, app.customer)
+	return view
 
 
 def build_school_opening_view(customer):
@@ -531,9 +808,18 @@ def _view_from_application(app):
 		contacts.setdefault(role, {"name": "", "cell": ""})
 
 	form_date = app.form_date or getdate()
+	can_approve = int(app.docstatus or 0) == 0 and frappe.has_permission(
+		"School Opening Application", "submit", app.name
+	)
+	is_approved = int(app.docstatus or 0) == 1 and bool(app.customer)
 	return {
 		"source": "application",
 		"application": app.name,
+		"docstatus": int(app.docstatus or 0),
+		"approved_by": app.approved_by or "",
+		"approved_on": cstr(app.approved_on or ""),
+		"can_approve": bool(can_approve),
+		"is_approved": bool(is_approved),
 		"customer": app.customer,
 		"erp_school_code": app.erp_school_code or app.customer,
 		"form_no": "SC-1.2",
@@ -596,11 +882,17 @@ def _view_from_customer(cust):
 	return {
 		"source": "customer",
 		"application": None,
+		"docstatus": 1,
+		"approved_by": "",
+		"approved_on": "",
+		"can_approve": False,
+		"is_approved": True,
 		"customer": cust.name,
 		"erp_school_code": cust.name,
 		"form_no": "SC-1.2",
 		"form_date": form_date,
 		"form_date_display": formatdate(form_date, "dd/mm/yyyy"),
+		"visit_type": "Visit with enrollment",
 		"school_name": cust.customer_name,
 		"tif_representative": "",
 		"institution_types": ["School"] if cust.customer_type == "School" else [],
@@ -868,9 +1160,15 @@ def _safe_pdf_filename(customer):
 
 
 @frappe.whitelist()
-def download_school_opening_pdf(customer):
-	customer = _ensure_customer_access(customer)
-	data = build_school_opening_view(customer)
+def download_school_opening_pdf(customer=None, application=None):
+	application = (application or "").strip()
+	if application:
+		data = build_school_opening_view_from_application(application)
+		file_key = data.get("school_name") or application
+	else:
+		customer = _ensure_customer_access(customer)
+		data = build_school_opening_view(customer)
+		file_key = customer
 	html = render_school_opening_pdf_html(data)
 	from frappe.utils.pdf import get_pdf
 
@@ -891,7 +1189,7 @@ def download_school_opening_pdf(customer):
 	if not pdf or not pdf.startswith(b"%PDF") or len(pdf) < 8000:
 		frappe.log_error(
 			title="School Opening PDF blank or invalid",
-			message=f"customer={customer}\nhtml_len={len(html)}\npdf_len={len(pdf) if pdf else 0}",
+			message=f"customer={customer}\napplication={application}\nhtml_len={len(html)}\npdf_len={len(pdf) if pdf else 0}",
 		)
 		frappe.throw(
 			_(
@@ -900,6 +1198,6 @@ def download_school_opening_pdf(customer):
 			)
 		)
 
-	frappe.local.response.filename = _safe_pdf_filename(customer)
+	frappe.local.response.filename = _safe_pdf_filename(file_key)
 	frappe.local.response.filecontent = pdf
 	frappe.local.response.type = "pdf"

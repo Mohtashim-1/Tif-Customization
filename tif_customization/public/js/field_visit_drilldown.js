@@ -74,6 +74,173 @@ frappe.tif_customization.open_visit_drilldown = function (opts) {
 	});
 };
 
+frappe.tif_customization.show_school_metric_drilldown_dialog = function (data, opts) {
+	opts = opts || {};
+	const hideUnapproved = frappe.tif_customization.should_hide_school_unapproved(opts);
+	const rows = (data.rows || []).filter((r) => (r.school || "").trim());
+	const schoolMap = {};
+	rows.forEach((row) => {
+		const school = (row.school || "").trim();
+		const province = (row.province || "").trim();
+		const area = (row.area || "").trim();
+		const key = `${school}||${province}||${area}`;
+		if (!schoolMap[key]) {
+			schoolMap[key] = {
+				key,
+				school,
+				province,
+				area,
+				visits: 0,
+				docs: [],
+			};
+		}
+		schoolMap[key].visits += 1;
+		schoolMap[key].docs.push(row);
+	});
+	const schoolRows = Object.values(schoolMap).sort(
+		(a, b) => b.visits - a.visits || String(a.school).localeCompare(String(b.school))
+	);
+	const label = data.label || data.title || __("Schools");
+	const d = new frappe.ui.Dialog({
+		title: __("{0}: {1} schools", [label, schoolRows.length]),
+		size: "extra-large",
+		fields: [{ fieldtype: "HTML", fieldname: "html" }],
+		primary_action_label: __("Close"),
+		primary_action: () => d.hide(),
+	});
+
+	const renderSchools = () => {
+		const body = schoolRows.length
+			? schoolRows
+					.map((s) => {
+						const latest = s.docs[0] || {};
+						return `<tr class="tif-school-row" data-school-key="${frappe.utils.escape_html(
+							s.key
+						)}" style="cursor:pointer;">
+					<td style="font-weight:600;color:#0f766e;">${frappe.utils.escape_html(s.school)}</td>
+					<td>${frappe.utils.escape_html(s.province || "—")}</td>
+					<td>${frappe.utils.escape_html(s.area || "—")}</td>
+					<td class="text-right">${cint(s.visits).toLocaleString()}</td>
+					<td><a href="#" class="tif-open-visit" data-visit="${frappe.utils.escape_html(
+						latest.name || ""
+					)}">${frappe.utils.escape_html(latest.name || "—")}</a></td>
+					<td>${frappe.utils.escape_html(latest.visit_date || "")}</td>
+					<td>${frappe.utils.escape_html(latest.officer || "")}</td>
+				</tr>`;
+					})
+					.join("")
+			: `<tr><td colspan="7" class="text-muted text-center">${__("No schools found")}</td></tr>`;
+		d.set_title(__("{0}: {1} schools", [label, schoolRows.length]));
+		d.fields_dict.html.$wrapper.html(`
+			<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px;">
+				<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;">
+					<span class="text-muted" style="font-size:11px;">${__("Schools")}</span>
+					<div style="font-size:20px;font-weight:700;">${cint(schoolRows.length).toLocaleString()}</div>
+				</div>
+				<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;">
+					<span class="text-muted" style="font-size:11px;">${__("Field Visits")}</span>
+					<div style="font-size:20px;font-weight:700;">${cint(rows.length).toLocaleString()}</div>
+				</div>
+				<p class="text-muted" style="font-size:12px;margin:0;flex:1;min-width:200px;">
+					${__("Click a school row for its visits. Click Document No to open the Field Visit.")}
+				</p>
+			</div>
+			<div class="table-responsive" style="max-height:480px;overflow:auto;">
+				<table class="table table-bordered table-hover" style="font-size:12px;margin:0;">
+					<thead>
+						<tr>
+							<th>${__("School Name")}</th>
+							<th>${__("Province")}</th>
+							<th>${__("Area")}</th>
+							<th class="text-right">${__("Visits")}</th>
+							<th>${__("Latest Document")}</th>
+							<th>${__("Visit Date")}</th>
+							<th>${__("Officer")}</th>
+						</tr>
+					</thead>
+					<tbody>${body}</tbody>
+				</table>
+			</div>
+		`);
+	};
+
+	const renderSchoolVisits = (schoolKey) => {
+		const bucket = schoolMap[schoolKey];
+		if (!bucket) return;
+		const visitBody = (bucket.docs || [])
+			.map((row) => {
+				let badge = "";
+				if (!hideUnapproved && cint(row.school_unapproved)) badge = __("Un Approved");
+				badge = badge
+					? ` <span style="display:inline-block;margin-left:4px;padding:1px 6px;border:1px solid #dc2626;border-radius:999px;background:#fef2f2;color:#b91c1c;font-size:10px;font-weight:700;">${badge}</span>`
+					: "";
+				return `<tr>
+				<td><a href="#" class="tif-open-visit" data-visit="${frappe.utils.escape_html(
+					row.name || ""
+				)}">${frappe.utils.escape_html(row.name || "")}</a></td>
+				<td>${frappe.utils.escape_html(row.visit_date || "")}</td>
+				<td>${frappe.utils.escape_html(row.type || "")}</td>
+				<td>${frappe.utils.escape_html(row.school || "")}${badge}</td>
+				<td>${frappe.utils.escape_html(row.officer || "")}</td>
+				<td>${frappe.utils.escape_html(row.status || "")}</td>
+				<td>${frappe.utils.escape_html(row.category || "")}</td>
+				<td style="max-width:280px;white-space:normal;">${frappe.tif_customization.format_visit_remarks(
+					row.remarks
+				)}</td>
+			</tr>`;
+			})
+			.join("");
+		d.set_title(__("{0} — {1}", [bucket.school, __("{0} visits", [bucket.visits])]));
+		d.fields_dict.html.$wrapper.html(`
+			<p style="margin-bottom:10px;">
+				<a href="#" class="tif-school-back">${__("← All schools")}</a>
+				&nbsp;·&nbsp; <strong>${frappe.utils.escape_html(bucket.school)}</strong>
+				${bucket.province ? ` · ${frappe.utils.escape_html(bucket.province)}` : ""}
+				${bucket.area ? ` · ${frappe.utils.escape_html(bucket.area)}` : ""}
+			</p>
+			<div class="table-responsive" style="max-height:480px;overflow:auto;">
+				<table class="table table-bordered table-hover" style="font-size:12px;margin:0;">
+					<thead>
+						<tr>
+							<th>${__("Document No")}</th>
+							<th>${__("Visit Date")}</th>
+							<th>${__("Type")}</th>
+							<th>${__("School")}</th>
+							<th>${__("Officer")}</th>
+							<th>${__("Status")}</th>
+							<th>${__("Category")}</th>
+							<th>${__("Visit Summary")}</th>
+						</tr>
+					</thead>
+					<tbody>${visitBody}</tbody>
+				</table>
+			</div>
+		`);
+	};
+
+	d.$wrapper.on("click", ".tif-open-visit", (e) => {
+		e.preventDefault();
+		e.stopPropagation();
+		const name = $(e.currentTarget).attr("data-visit");
+		if (!name) return;
+		d.hide();
+		frappe.set_route("Form", "Field Visit", name);
+	});
+	d.$wrapper.on("click", ".tif-school-row", (e) => {
+		if ($(e.target).closest(".tif-open-visit").length) return;
+		e.preventDefault();
+		const key = $(e.currentTarget).attr("data-school-key");
+		if (key) renderSchoolVisits(key);
+	});
+	d.$wrapper.on("click", ".tif-school-back", (e) => {
+		e.preventDefault();
+		renderSchools();
+	});
+
+	renderSchools();
+	d.show();
+};
+
 frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 	opts = opts || {};
 	const hideUnapproved = frappe.tif_customization.should_hide_school_unapproved(opts);
@@ -89,6 +256,20 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 	}
 	if (data.metric === "workshop_registration") {
 		frappe.tif_customization.show_workshop_participant_dialog(data, opts);
+		return;
+	}
+	const schoolListMetrics = new Set([
+		"model_school_a",
+		"model_school_b",
+		"model_school_c",
+		"model_school_0",
+		"model_0",
+		"inactive_schools",
+		"new_schools",
+		"active_schools",
+	]);
+	if (schoolListMetrics.has(data.metric)) {
+		frappe.tif_customization.show_school_metric_drilldown_dialog(data, opts);
 		return;
 	}
 	const breakdown = (data.breakdown || [])
@@ -123,7 +304,9 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 		? rows
 				.map(
 					(row) => `<tr>
-				<td><a href="${frappe.utils.escape_html(row.url)}">${frappe.utils.escape_html(row.name)}</a></td>
+				<td><a href="#" class="tif-open-visit" data-visit="${frappe.utils.escape_html(
+					row.name || ""
+				)}">${frappe.utils.escape_html(row.name)}</a></td>
 				<td>${frappe.utils.escape_html(row.visit_date || "")}</td>
 				${hideType ? "" : `<td>${frappe.utils.escape_html(row.type || "")}</td>`}
 				${hideSchool ? "" : `<td>${schoolCell(row)}</td>`}
@@ -146,24 +329,16 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 		title: data.title || __("Visit details"),
 		size: "extra-large",
 		fields: [{ fieldtype: "HTML", fieldname: "html" }],
-		primary_action_label: __("Open Field Staff Report"),
-		primary_action: () => {
-			d.hide();
-			frappe.route_options = {
-				from_date: data.from_date,
-				to_date: data.to_date,
-				user: data.staff || "",
-			};
-			frappe.set_route("field-staff-report");
-		},
+		primary_action_label: __("Close"),
+		primary_action: () => d.hide(),
 	});
 	d.fields_dict.html.$wrapper.html(`
-		<div class="mb-2">
-			${__("This number is")} <strong>${data.count || 0}</strong>
-			${data.subtitle ? ` — ${frappe.utils.escape_html(data.subtitle)}` : ""}
-		</div>
+		${
+			breakdown
+				? `<p class="text-muted" style="margin-bottom:10px;font-size:12px;">${breakdown}</p>`
+				: ""
+		}
 		${categoryHint}
-		${breakdown ? `<p class="text-muted" style="margin-bottom:10px;">${__("Detail")}: ${breakdown}</p>` : ""}
 		<p class="text-muted" style="font-size:12px;">${__("Click a Document No to open that Field Visit.")}</p>
 		<div class="table-responsive" style="max-height:420px;overflow:auto;">
 			<table class="table table-bordered table-hover" style="font-size:12px;margin:0;">
@@ -183,6 +358,13 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 			</table>
 		</div>
 	`);
+	d.$wrapper.on("click", ".tif-open-visit", (e) => {
+		e.preventDefault();
+		const name = $(e.currentTarget).attr("data-visit");
+		if (!name) return;
+		d.hide();
+		frappe.set_route("Form", "Field Visit", name);
+	});
 	d.show();
 };
 

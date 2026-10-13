@@ -5,11 +5,22 @@
 	margin: 0 auto 12px;
 	display: flex;
 	flex-wrap: wrap;
+	align-items: center;
 	gap: 8px;
 	padding: 10px 12px;
 	background: #fff;
 	border: 1px solid #d1d8dd;
 	border-radius: 8px;
+}
+
+.soa-print-toolbar .soa-nav-label {
+	min-width: 4.5rem;
+	text-align: center;
+	font-variant-numeric: tabular-nums;
+}
+
+.soa-print-toolbar .soa-approve-btn:disabled {
+	opacity: 0.85;
 }
 
 .soa-readonly-form input[readonly],

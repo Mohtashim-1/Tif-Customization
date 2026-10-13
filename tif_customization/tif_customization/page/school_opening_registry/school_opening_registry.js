@@ -1,4 +1,4 @@
-/* School Opening Registry v20260915 */
+/* School Opening Registry v20261013 */
 frappe.pages["school-opening-registry"].on_page_load = function (wrapper) {
 	frappe.tif_customization.SchoolOpeningRegistry.clear_stuck_freeze();
 	const page = frappe.ui.make_app_page({
@@ -14,6 +14,7 @@ frappe.tif_customization = frappe.tif_customization || {};
 frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 	static PAGE_LENGTH_OPTIONS = [20, 50, 100, 200];
 	static PAGE_LENGTH_STORAGE_KEY = "soa_registry_page_length";
+	static FILTER_STORAGE_KEY = "soa_registry_print_filters";
 	static TABLE_COLS = 10;
 
 	static clear_stuck_freeze() {
@@ -95,7 +96,12 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 			label: __("Form Data"),
 			fieldtype: "Select",
 			fieldname: "form_data",
-			options: ["", "full:Full SC-1.2", "customer_only:Customer only"].join("\n"),
+			options: [
+				"",
+				"full:Full SC-1.2",
+				"customer_only:Customer only",
+				"pending:Pending approval",
+			].join("\n"),
 		});
 
 		this.filter_fields.city = this.make_filter({
@@ -176,7 +182,7 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 					</p>
 				</div>
 				<p class="text-muted small">${__(
-					"Open a school customer to view the SC-1.2 form layout, print, or download PDF."
+					"Open a school to view the SC-1.2 form. Use Form Data → Pending approval to review drafts, then Approve / Previous / Next on the form page."
 				)}</p>
 				<div id="soa-registry-pager" class="flex justify-between align-center text-muted small" style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;"></div>
 				<div class="table-responsive" style="background:#fff;border:1px solid #d1d8dd;border-radius:8px;">
@@ -206,16 +212,18 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 		`);
 
 		const $registry = $(this.page.body).find(".school-opening-registry");
-		$registry.on("click", ".soa-open-view", function () {
-			window.open($(this).data("url"), "_blank");
+		$registry.on("click", ".soa-open-view", (e) => {
+			this.persist_print_filters();
+			window.open($(e.currentTarget).data("url"), "_blank");
 		});
-		$registry.on("click", ".soa-print", function () {
-			const w = window.open($(this).data("url"), "_blank");
+		$registry.on("click", ".soa-print", (e) => {
+			this.persist_print_filters();
+			const w = window.open($(e.currentTarget).data("url"), "_blank");
 			if (w) {
 				w.addEventListener("load", () => {
 					try {
 						w.print();
-					} catch (e) {
+					} catch (err) {
 						/* user prints from toolbar */
 					}
 				});
@@ -223,8 +231,9 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 		});
 		$registry.on("click", ".soa-pdf-btn", (e) => {
 			const customer = decodeURIComponent($(e.currentTarget).attr("data-customer") || "");
+			const application = decodeURIComponent($(e.currentTarget).attr("data-application") || "");
 			this.ensure_pdf_download_script().then(() => {
-				window.downloadSchoolOpeningPdf?.(customer);
+				window.downloadSchoolOpeningPdf?.(customer, application);
 			});
 		});
 		$registry.on("click", ".soa-page-prev", () => {
@@ -301,12 +310,23 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 		$all.prop("indeterminate", checkedCount > 0 && checkedCount < $rows.length);
 	}
 
+	persist_print_filters() {
+		try {
+			sessionStorage.setItem(
+				SchoolOpeningRegistry.FILTER_STORAGE_KEY,
+				JSON.stringify(this.get_filter_args())
+			);
+		} catch (e) {
+			/* ignore quota / private mode */
+		}
+	}
+
 	ensure_pdf_download_script() {
 		if (window.downloadSchoolOpeningPdf) {
 			return Promise.resolve();
 		}
 		return new Promise((resolve) => {
-			frappe.require("/assets/tif_customization/js/school_opening_pdf_download.js?v=20260914", resolve);
+			frappe.require("/assets/tif_customization/js/school_opening_pdf_download.js?v=20261013a", resolve);
 		});
 	}
 
@@ -500,17 +520,36 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 
 		const html = rows
 			.map((row) => {
-				const printUrl = `/school-opening-print?customer=${encodeURIComponent(row.customer)}`;
-				const custEnc = encodeURIComponent(row.customer);
-				const formBadge = row.has_application
-					? `<span class="indicator-pill green">${__("Full SC-1.2")}</span>`
-					: `<span class="indicator-pill orange">${__("Customer only")}</span>`;
-				const checked = this.selectedCustomers.has(row.customer) ? "checked" : "";
+				const isPending = row.row_type === "pending" || !!row.application;
+				const printUrl = isPending
+					? `/school-opening-print?application=${encodeURIComponent(row.application)}`
+					: `/school-opening-print?customer=${encodeURIComponent(row.customer)}`;
+				const custEnc = encodeURIComponent(row.customer || "");
+				const appEnc = encodeURIComponent(row.application || "");
+				let formBadge;
+				if (isPending) {
+					formBadge = `<span class="indicator-pill yellow">${__("Pending approval")}</span>`;
+				} else if (row.has_application) {
+					formBadge = `<span class="indicator-pill green">${__("Full SC-1.2")}</span>`;
+				} else {
+					formBadge = `<span class="indicator-pill orange">${__("Customer only")}</span>`;
+				}
+				const checked =
+					!isPending && row.customer && this.selectedCustomers.has(row.customer) ? "checked" : "";
+				const idCell = isPending
+					? `<a href="/app/school-opening-application/${appEnc}">${frappe.utils.escape_html(
+							row.application || ""
+					  )}</a>`
+					: `<a href="/app/customer/${custEnc}">${frappe.utils.escape_html(row.customer)}</a>`;
+				const checkbox = isPending
+					? `<input type="checkbox" disabled title="${__("Export uses customers only")}" />`
+					: `<input type="checkbox" class="soa-row-select" data-customer="${custEnc}" ${checked} />`;
+				const pdfAttrs = isPending
+					? `data-application="${appEnc}" data-customer=""`
+					: `data-customer="${custEnc}" data-application=""`;
 				return `<tr>
-					<td>
-						<input type="checkbox" class="soa-row-select" data-customer="${custEnc}" ${checked} />
-					</td>
-					<td><a href="/app/customer/${custEnc}">${frappe.utils.escape_html(row.customer)}</a></td>
+					<td>${checkbox}</td>
+					<td>${idCell}</td>
 					<td>${frappe.utils.escape_html(row.customer_name || "")}</td>
 					<td class="small">${this.format_address_cell(row)}</td>
 					<td class="small">${this.format_city_cell(row)}</td>
@@ -521,9 +560,7 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 					<td>
 						<button type="button" class="btn btn-xs btn-primary soa-open-view" data-url="${printUrl}">${__("Open Form")}</button>
 						<button type="button" class="btn btn-xs btn-default soa-print" data-url="${printUrl}">${__("Print")}</button>
-						<button type="button" class="btn btn-xs btn-default soa-pdf-btn" data-customer="${encodeURIComponent(
-							row.customer
-						)}">${__("PDF")}</button>
+						<button type="button" class="btn btn-xs btn-default soa-pdf-btn" ${pdfAttrs}>${__("PDF")}</button>
 					</td>
 				</tr>`;
 			})

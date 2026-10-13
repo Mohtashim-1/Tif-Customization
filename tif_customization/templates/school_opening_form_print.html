@@ -32,9 +32,22 @@
 
 <div id="school-opening-portal" class="school-opening-portal">
 	{% if not print_mode %}
-	<div class="soa-print-toolbar no-print">
+	<div class="soa-print-toolbar no-print"
+		data-customer="{{ data.customer or '' }}"
+		data-application="{{ data.application or '' }}"
+		data-can-approve="{{ 1 if data.can_approve else 0 }}"
+		data-is-approved="{{ 1 if data.is_approved else 0 }}">
+		<button type="button" class="btn btn-success btn-sm soa-approve-btn"
+			{% if data.is_approved %}disabled{% elif not data.can_approve %}disabled{% endif %}>
+			{% if data.is_approved %}{{ _("Approved") }}{% else %}{{ _("Approve") }}{% endif %}
+		</button>
+		<button type="button" class="btn btn-default btn-sm soa-prev-doc" disabled>{{ _("Previous document") }}</button>
+		<span class="soa-nav-label text-muted small" aria-live="polite"></span>
+		<button type="button" class="btn btn-default btn-sm soa-next-doc" disabled>{{ _("Next document") }}</button>
 		<button type="button" class="btn btn-primary btn-sm" onclick="window.print()">{{ _("Print") }}</button>
-		<a class="btn btn-default btn-sm soa-pdf-download" href="#" data-customer="{{ data.customer or '' }}">{{ _("Download PDF") }}</a>
+		<a class="btn btn-default btn-sm soa-pdf-download" href="#"
+			data-customer="{{ data.customer or '' }}"
+			data-application="{{ data.application or '' }}">{{ _("Download PDF") }}</a>
 		<a class="btn btn-default btn-sm" href="/app/school-opening-registry">{{ _("Back to list") }}</a>
 	</div>
 	{% endif %}

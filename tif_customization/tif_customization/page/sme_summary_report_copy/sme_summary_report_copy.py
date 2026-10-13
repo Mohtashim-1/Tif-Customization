@@ -126,8 +126,8 @@ def _summary_outcome_columns():
 	)
 	online_participants_col = {
 		"key": "outcome_online_participants",
-		"label": _("Workshop Participants (Online)"),
-		"short_label": _("Workshop Participants (Online)"),
+		"label": _("Online Workshop Participants through SME"),
+		"short_label": _("Online Workshop Participants through SME"),
 		"metric": "online_participants",
 		"yearly_min": 0,
 	}
@@ -138,8 +138,8 @@ def _summary_outcome_columns():
 			continue
 		item = dict(col)
 		if item.get("metric") == "workshop_registration":
-			item["label"] = _("Workshop Participants (Onsite)")
-			item["short_label"] = _("Workshop Participants (Onsite)")
+			item["label"] = _("Onsite Workshop Participants through SME")
+			item["short_label"] = _("Onsite Workshop Participants through SME")
 		out.append(item)
 		seen.add(item["key"])
 		if item.get("metric") == "new_schools":
@@ -800,6 +800,7 @@ def _outcome_row_fields(staff, ytd_from, to_date):
 		fields[f"outcome_{key}_pct"] = flt(pct, 2)
 		pcts.append(pct)
 	fields["outcome_model_school_c"] = cint(ytd.get("model_school_c") or 0)
+	fields["outcome_model_school_0"] = cint(ytd.get("model_school_0") or 0)
 	# Online workshop participants (training_mode Online) — same source as KPI card.
 	fields["outcome_online_participants"] = cint(ytd.get("online_participants") or 0)
 	fields["outcome_pct"] = flt(sum(pcts) / len(pcts), 2) if pcts else 0.0

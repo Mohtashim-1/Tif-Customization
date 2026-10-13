@@ -10,8 +10,8 @@
 		return match ? decodeURIComponent(match[1]) : "";
 	}
 
-	function downloadSchoolOpeningPdf(customer) {
-		if (!customer) {
+	function downloadSchoolOpeningPdf(customer, application) {
+		if (!customer && !application) {
 			return;
 		}
 		const headers = { "Content-Type": "application/json" };
@@ -20,11 +20,18 @@
 			headers["X-Frappe-CSRF-Token"] = csrf;
 		}
 
+		const payload = {};
+		if (application) {
+			payload.application = application;
+		} else {
+			payload.customer = customer;
+		}
+
 		return fetch(API, {
 			method: "POST",
 			credentials: "include",
 			headers,
-			body: JSON.stringify({ customer }),
+			body: JSON.stringify(payload),
 		})
 			.then((response) => {
 				const contentType = (response.headers.get("content-type") || "").toLowerCase();
@@ -43,7 +50,7 @@
 				return response.blob();
 			})
 			.then((blob) => {
-				const safeName = String(customer).replace(/[\\/:*?"<>|]+/g, "-");
+				const safeName = String(application || customer).replace(/[\\/:*?"<>|]+/g, "-");
 				const url = URL.createObjectURL(blob);
 				const a = document.createElement("a");
 				a.href = url;
@@ -74,6 +81,7 @@
 		}
 		event.preventDefault();
 		const customer = link.getAttribute("data-customer") || "";
-		downloadSchoolOpeningPdf(customer);
+		const application = link.getAttribute("data-application") || "";
+		downloadSchoolOpeningPdf(customer, application);
 	});
 })();

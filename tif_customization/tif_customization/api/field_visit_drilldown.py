@@ -61,6 +61,10 @@ METRIC_LABELS = {
 	"visited_days": _("Distinct visit days (Marketing / Meeting / M&E / Training)"),
 	"model_school_a": _("Model School A"),
 	"model_school_b": _("Model School B"),
+	"model_school_c": _("Model School C"),
+	"model_school_0": _("Model 0 (No Program)"),
+	"model_0": _("Model 0 (No Program)"),
+	"inactive_schools": _("Inactive Schools / Model 0"),
 	"model_a": _("Model A (3 departments)"),
 	"model_b": _("Model B (2 departments)"),
 	"model_c": _("Model C (1 department or not affiliated)"),
@@ -236,11 +240,13 @@ def _metric_condition(metric: str, alias: str = "fv") -> str:
 			{a}.type = 'Registration of New Schools'
 			OR ({a}.type IN ('Marketing', 'Visits') AND {a}.marketing_visit_category = 'New')
 		)"""
+	named = _has_named_school_sql(a)
 	if m in ("new_schools", "new_school", "active_schools"):
 		# Distinct schools counted in KPI via registered_school_sql; drilldown shows matching visits.
-		return registered_school_sql(a)
+		return f"({registered_school_sql(a)}) AND ({named})"
 	if m in ("inactive_schools", "model_school_0", "model_0"):
-		return f"NOT ({registered_school_sql(a)})"
+		# Same as KPI: visits with a school name and no program running (exclude HO/meeting-only rows).
+		return f"NOT ({registered_school_sql(a)}) AND ({named})"
 	if m == "online_workshop":
 		return f"""{a}.type IN ('Workshop Conducted', 'Workshop', 'Workshop Arranged', 'Training')
 			AND LOWER(IFNULL({a}.training_mode, '')) LIKE '%%online%%'"""
@@ -248,11 +254,11 @@ def _metric_condition(metric: str, alias: str = "fv") -> str:
 		return f"""{a}.type IN ('Workshop Conducted', 'Workshop', 'Workshop Arranged', 'Training')
 			AND LOWER(IFNULL({a}.training_mode, '')) LIKE '%%online%%'"""
 	if m == "model_school_a":
-		return f"({registered_school_sql(a)}) AND {department_count_sql(a)} >= 3"
+		return f"({registered_school_sql(a)}) AND {department_count_sql(a)} >= 3 AND ({named})"
 	if m == "model_school_b":
-		return f"({registered_school_sql(a)}) AND {department_count_sql(a)} = 2"
+		return f"({registered_school_sql(a)}) AND {department_count_sql(a)} = 2 AND ({named})"
 	if m == "model_school_c":
-		return f"({registered_school_sql(a)}) AND {department_count_sql(a)} <= 1"
+		return f"({registered_school_sql(a)}) AND {department_count_sql(a)} <= 1 AND ({named})"
 	if m == "model_a":
 		return f"({_number_of_school_sql(a)}) AND {department_count_sql(a)} >= 3"
 	if m == "model_b":
@@ -602,6 +608,11 @@ def _school_sql(alias="fv"):
 			LIMIT 1
 		)
 	)"""
+
+
+def _has_named_school_sql(alias="fv"):
+	"""Match KPI distinct-school counts: only rows that resolve to a school name."""
+	return f"NULLIF(({_school_sql(alias)}), '') IS NOT NULL"
 
 
 def _school_unapproved_sql(alias="fv"):
