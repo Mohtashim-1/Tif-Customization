@@ -417,8 +417,8 @@ const assignedFieldOfficerOptions = computed(() => {
 			searchText: `${name} ${staffSearchAlias(name)} supervisor`,
 		});
 	}
-	// Supervisors / managers: also offer full staff_options so names outside the FO tree appear
-	if (meta.value.can_manage_supervisor_only) {
+	// Supervisors / enrolment managers: also offer full staff_options so names outside the FO tree appear
+	if (meta.value.can_manage_supervisor_only || meta.value.can_manage_enrolment_participants) {
 		for (const s of meta.value.staff_options || []) {
 			if (!s?.employee || byEmp.has(s.employee)) continue;
 			const name = (s.employee_name || s.employee || "").trim();
@@ -440,7 +440,9 @@ const assignedFieldOfficerOptions = computed(() => {
 		});
 });
 const showFieldOfficerPick = computed(
-	() => selected.value?.group === "academic" && assignedFieldOfficerOptions.value.length > 0
+	() =>
+		(selected.value?.group === "academic" || selected.value?.group === "enrolment") &&
+		assignedFieldOfficerOptions.value.length > 0
 );
 const staffName = computed(() => visit.visitBy || meta.value.staff_name || boot.full_name || "");
 function nonempty(list, fallback) {
@@ -1158,6 +1160,14 @@ function buildPayload(submitDoc) {
 	}
 
 	if (card?.id === "enrolment") {
+		const officer =
+			assignedFieldOfficers.value.find((o) => o.employee === training.fieldOfficer) ||
+			(meta.value.staff_options || []).find((o) => o.employee === training.fieldOfficer);
+		if (officer) {
+			payload.field_officer = officer.employee;
+			payload.visit_by = officer.employee_name;
+			payload.staff_employee = officer.employee;
+		}
 		payload.enrolment_participants = participants.value.map((p) => ({
 			participant_name: p.name,
 			contact_number: p.contact,
@@ -2578,6 +2588,19 @@ const steps = [
 								<Bi :mode="lang" en="+ Add Participant" ur="شریک شامل کریں" />
 							</button>
 						</div>
+						<div v-if="showFieldOfficerPick" style="margin-top: 16px; max-width: 420px">
+							<FieldSelect
+								:mode="lang"
+								label-en="Field Officer"
+								label-ur="فیلڈ آفیسر"
+								:options="assignedFieldOfficerOptions"
+								placeholder-en="Select field officer"
+								placeholder-ur="فیلڈ آفیسر منتخب کریں"
+								searchable
+								required
+								v-model="training.fieldOfficer"
+							/>
+						</div>
 						<div v-if="!participants.length" class="empty">
 							<div style="font-size: 28px">👥</div>
 							<div style="margin-top: 8px; font-weight: 600">
@@ -2784,6 +2807,14 @@ const steps = [
 						<div class="summary-row">
 							<span style="opacity: 0.7">City / Province</span>
 							<span>{{ selected?.group === "visits" || selected?.group === "books" || selected?.group === "me" ? visit.city || "-" : meeting.city || training.city || "-" }} • {{ selected?.group === "visits" || selected?.group === "books" || selected?.group === "me" ? visit.province : training.province || "-" }}</span>
+						</div>
+						<div v-if="selected?.group === 'enrolment'" class="summary-row">
+							<span style="opacity: 0.7">Field Officer</span>
+							<span>{{
+								assignedFieldOfficerOptions.find((o) => o.value === training.fieldOfficer)?.label ||
+								staffName ||
+								"-"
+							}}</span>
 						</div>
 						<div v-if="selected?.group === 'enrolment'" class="summary-row">
 							<span style="opacity: 0.7">Participants</span>

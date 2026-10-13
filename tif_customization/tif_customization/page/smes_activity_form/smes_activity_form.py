@@ -91,6 +91,11 @@ OFFICIAL_TASK_DOC_TYPES = (
 	"Headoffice/ Regional Office/ Out of Station Visit",
 )
 
+# Activity types where portal can file on behalf of a selected field officer
+DELEGATED_FIELD_OFFICER_DOC_TYPES = OFFICIAL_TASK_DOC_TYPES + (
+	"Enrolment of Participants",
+)
+
 MEETING_DOC_TYPES = ("Meeting", "Meeting with Ulama and Educationist", "Internal Meeting")
 
 DESIGNATION_SELECT_OPTIONS = frozenset(
@@ -1269,12 +1274,14 @@ def _apply_official_task_fields(doc, data):
 
 
 def _officer_for_academic_card(doc_type, data):
-	"""On Academic Task / HO / RO Visit, a supervisor files the visit for an assigned officer."""
-	if doc_type not in OFFICIAL_TASK_DOC_TYPES:
+	"""On Academic / Enrolment cards, a manager files the visit for a selected field officer."""
+	if doc_type not in DELEGATED_FIELD_OFFICER_DOC_TYPES:
 		return None
 	assigned = {o["employee"]: o for o in get_assigned_field_officers()}
 	# Managers may pick any active field-officer staff (role-based), not only FO tree
-	if can_manage_supervisor_only_field_visits():
+	if can_manage_supervisor_only_field_visits() or (
+		doc_type == "Enrolment of Participants" and can_manage_farhan_only_field_visit()
+	):
 		for row in get_active_field_officer_staff():
 			assigned.setdefault(row["employee"], row)
 	if not assigned:
