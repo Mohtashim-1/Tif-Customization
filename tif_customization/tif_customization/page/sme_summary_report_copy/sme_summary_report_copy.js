@@ -68,32 +68,72 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					.sme-sum-table thead tr:first-child th{top:0;z-index:5}
 					.sme-sum-table thead tr:nth-child(2) th{top:var(--sme-sum-thead-row1,38px);z-index:4}
 					.sme-sum-table thead tr:nth-child(3) th{top:var(--sme-sum-thead-row2,76px);z-index:3}
-					.sme-sum-table thead tr:first-child th[rowspan="3"],
 					.sme-sum-table thead tr:nth-child(2) th[rowspan="2"]{z-index:6}
-					/* Freeze Name → Province on horizontal scroll (Excel-style) */
+					/* Freeze Name → Province. No rowspan on these cells — sticky+rowspan breaks in Chrome. */
 					.sme-sum-table th.freeze-col,
 					.sme-sum-table td.freeze-col{
 						position:sticky;
-						left:0;
 						background:#fff;
 						z-index:2;
+						box-sizing:border-box;
+						white-space:nowrap;
+						overflow:hidden;
+						text-overflow:ellipsis;
+						vertical-align:middle;
 					}
 					.sme-sum-table thead th.freeze-col{
-						background:#f3f4f6;
-						z-index:8;
+						background:#f3f4f6 !important;
+						/* Above scrolling sticky headers so sideways scroll does not cover labels */
+						z-index:20;
+						white-space:normal;
+					}
+					.sme-sum-table thead tr:first-child th.freeze-col{top:0;z-index:22}
+					.sme-sum-table thead tr:nth-child(2) th.freeze-col{top:var(--sme-sum-thead-row1,38px);z-index:21}
+					.sme-sum-table thead tr:nth-child(3) th.freeze-col{top:var(--sme-sum-thead-row2,76px);z-index:20}
+					.sme-sum-table thead th.freeze-pad{
+						/* Spacer cells under Name→Province labels (no rowspan — Chrome sticky bug) */
+						color:transparent;
+						user-select:none;
+						pointer-events:none;
 					}
 					.sme-sum-table tfoot th.freeze-col{
-						background:#f9fafb;
-						z-index:3;
+						background:#f9fafb !important;
+						z-index:15;
 					}
-					.sme-sum-table .freeze-0{left:0}
-					.sme-sum-table .freeze-1{left:var(--sme-freeze-1,140px)}
-					.sme-sum-table .freeze-2{left:var(--sme-freeze-2,280px)}
-					.sme-sum-table .freeze-3{
-						left:var(--sme-freeze-3,400px);
+					.sme-sum-table th.freeze-0,
+					.sme-sum-table td.freeze-0{
+						left:0;
+						min-width:170px;
+						width:170px;
+						max-width:170px;
+					}
+					.sme-sum-table th.freeze-1,
+					.sme-sum-table td.freeze-1{
+						left:170px;
+						min-width:140px;
+						width:140px;
+						max-width:140px;
+					}
+					.sme-sum-table th.freeze-2,
+					.sme-sum-table td.freeze-2{
+						left:310px;
+						min-width:120px;
+						width:120px;
+						max-width:120px;
+					}
+					.sme-sum-table th.freeze-3,
+					.sme-sum-table td.freeze-3{
+						left:430px;
+						min-width:140px;
+						width:140px;
+						max-width:140px;
 						box-shadow:2px 0 6px rgba(15,23,42,.12);
 					}
-					.sme-sum-table .sme-low td.freeze-col{background:#fef2f2}
+					.sme-sum-table td.freeze-0,
+					.sme-sum-table td.freeze-1,
+					.sme-sum-table td.freeze-2,
+					.sme-sum-table td.freeze-3{z-index:8}
+					.sme-sum-table .sme-low td.freeze-col{background:#fef2f2 !important}
 					.sme-sum-table thead tr:first-child th.group,
 					.sme-sum-table thead tr:first-child th.kpi-group{background:#e5e7eb}
 					.sme-sum-table thead tr:nth-child(2) th.me-col{background:#f5f3ff}
@@ -965,16 +1005,20 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				<table class="sme-sum-table">
 					<thead>
 						<tr>
-							<th rowspan="3" class="left freeze-col freeze-0">${__("Name")}</th>
-							<th rowspan="3" class="freeze-col freeze-1">${__("Employee Type")}</th>
-							<th rowspan="3" class="freeze-col freeze-2">${__("Type / Division")}</th>
-							<th rowspan="3" class="freeze-col freeze-3">${__("Province")}</th>
+							<th class="left freeze-col freeze-0">${__("Name")}</th>
+							<th class="freeze-col freeze-1">${__("Employee Type")}</th>
+							<th class="freeze-col freeze-2">${__("Type / Division")}</th>
+							<th class="freeze-col freeze-3">${__("Province")}</th>
 							<th colspan="${activityCols.length}" class="group activity-group">${__("Activity (period)")}</th>
 							<th colspan="${outcomeCols.length}" class="group outcome-group">${__("Outcomes (1 July to date)")}</th>
 							<th colspan="3" class="group">${__("Totals")}</th>
 							<th colspan="3" class="group">${__("KPI Points")}</th>
 						</tr>
 						<tr>
+							<th class="left freeze-col freeze-0 freeze-pad" aria-hidden="true"></th>
+							<th class="freeze-col freeze-1 freeze-pad" aria-hidden="true"></th>
+							<th class="freeze-col freeze-2 freeze-pad" aria-hidden="true"></th>
+							<th class="freeze-col freeze-3 freeze-pad" aria-hidden="true"></th>
 							<th colspan="${visitCols.length}" class="group visit-group">${__("Visit")}</th>
 							${kpiCols
 								.map(
@@ -1002,6 +1046,10 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 							<th rowspan="2">${__("Percentage")}</th>
 						</tr>
 						<tr>
+							<th class="left freeze-col freeze-0 freeze-pad" aria-hidden="true"></th>
+							<th class="freeze-col freeze-1 freeze-pad" aria-hidden="true"></th>
+							<th class="freeze-col freeze-2 freeze-pad" aria-hidden="true"></th>
+							<th class="freeze-col freeze-3 freeze-pad" aria-hidden="true"></th>
 							${visitCols
 								.map(
 									(c) =>
@@ -1048,17 +1096,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		if (h1 > 0 && h2 > 0) {
 			wrap.style.setProperty("--sme-sum-thead-row2", `${h1 + h2}px`);
 		}
-		// Left offsets for frozen Name → Province columns
-		const freezeCells = [0, 1, 2, 3].map((i) =>
-			wrap.querySelector(`thead tr:first-child th.freeze-${i}`)
-		);
-		let left = 0;
-		freezeCells.forEach((cell, i) => {
-			if (i > 0) {
-				wrap.style.setProperty(`--sme-freeze-${i}`, `${Math.ceil(left)}px`);
-			}
-			if (cell) left += cell.getBoundingClientRect().width;
-		});
+		// Freeze left offsets are fixed in CSS (Name 170 + Emp 140 + Div 120 + Prov 140).
 		const resize = () => this.sync_sticky_table_header();
 		if (!this._stickyHeaderResizeBound) {
 			this._stickyHeaderResizeBound = true;
