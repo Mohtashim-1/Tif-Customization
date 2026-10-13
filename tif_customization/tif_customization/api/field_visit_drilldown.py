@@ -9,7 +9,7 @@ import re
 
 import frappe
 from frappe import _
-from frappe.utils import cint, getdate
+from frappe.utils import cint, cstr, getdate
 
 from tif_customization.tif_customization.field_visit_permissions import (
 	apply_team_scope_to_conditions,
@@ -619,6 +619,61 @@ def _school_unapproved_sql(alias="fv"):
 	END"""
 
 
+def _row_has_running_program(row) -> bool:
+	"""True when any book / workshop / program indicator is set (Active Schools logic)."""
+	vtype = _clean(row.get("type"))
+	if vtype in (
+		"Workshop Conducted",
+		"Workshop",
+		"Workshop Arranged",
+		"Training",
+		"Teachers Training Meeting",
+	):
+		return True
+	if cstr(row.get("me_mqh_book_status") or "").strip():
+		return True
+	teachers = _clean(row.get("me_teachers_training_session"))
+	if teachers.lower() in ("1", "yes", "y", "true"):
+		return True
+	for field, _label in PROGRAM_SERVICE_LABELS:
+		if _yes(row.get(field)):
+			return True
+	if _yes(row.get("mt_mqh_sample_provided")):
+		return True
+	for key in ("qps_affiliated", "tps_affiliated", "cee_affiliated"):
+		aff = _clean(row.get(key))
+		if aff.lower().startswith("yes"):
+			return True
+	return False
+
+
+def _visit_active_inactive_label(row, vtype: str) -> str:
+	"""Active / Inactive suffix for Category on school-related visits."""
+	if vtype not in ("Visits", "Marketing", "Registration of New Schools", "M&E"):
+		return ""
+	book = _me_norm(row.get("me_mqh_book_status"))
+	activity = _me_norm(row.get("me_activity_status"))
+	if book == "active" or activity == "active":
+		return "Active"
+	if book == "inactive" or activity == "inactive":
+		return "Inactive"
+	return "Active" if _row_has_running_program(row) else "Inactive"
+
+
+def _with_active_inactive_bracket(category: str, row, vtype: str) -> str:
+	label = _visit_active_inactive_label(row, vtype)
+	if not label:
+		return category or ""
+	base = (category or "").strip()
+	# Avoid doubling if already present
+	low = base.lower()
+	if low.endswith("(active)") or low.endswith("(inactive)") or low.endswith("(in-active)"):
+		return base
+	if base:
+		return f"{base} ({label})"
+	return label
+
+
 def _me_activity_bucket(status: str | None, book_status: str | None = None) -> str:
 	"""M&E status. Active book status is not treated as In-Active when activity is blank."""
 	label, _why = _me_status_note(
@@ -1078,7 +1133,9 @@ def get_visit_drilldown(filters=None, metric=None, staff=None):
 			if why and category == "In-Active":
 				category = f"In-Active — {why}"
 		else:
-			category = r.marketing_visit_category or r.me_activity_status or ""
+			category = _with_active_inactive_bracket(
+				r.marketing_visit_category or r.me_activity_status or "", r, vtype
+			)
 		remarks = _visit_remarks(r)
 		out.append(
 			{
