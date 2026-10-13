@@ -101,7 +101,9 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 				)}</p>`
 			: "";
 	const showRemarks = true;
-	const hideSchool = data.metric === "academic_task";
+	// Official / HO / Academic tasks are not school visits — no school column or missing badge.
+	const noSchoolMetrics = new Set(["academic_task", "headoffice_visit", "other_official"]);
+	const hideSchool = noSchoolMetrics.has(data.metric);
 	const hideType = false;
 	const colCount = (hideSchool ? 6 : 7) - (hideType ? 1 : 0) + (showRemarks ? 1 : 0);
 	const schoolCell = (row) => {
@@ -109,7 +111,7 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 		let badge = "";
 		if (!hideUnapproved && cint(row.school_unapproved)) {
 			badge = __("Un Approved");
-		} else if (cint(row.school_missing)) {
+		} else if (!hideSchool && cint(row.school_missing)) {
 			badge = __("School Detail Missing");
 		}
 		badge = badge
