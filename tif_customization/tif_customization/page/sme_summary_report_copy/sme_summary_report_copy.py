@@ -124,18 +124,33 @@ def _summary_outcome_columns():
 			"yearly_min": 0,
 		},
 	)
+	online_participants_col = {
+		"key": "outcome_online_participants",
+		"label": _("Workshop Participants (Online)"),
+		"short_label": _("Workshop Participants (Online)"),
+		"metric": "online_participants",
+		"yearly_min": 0,
+	}
 	out = []
 	seen = set()
 	for col in OUTCOME_COLUMNS:
 		if col.get("metric") in ("model_school_a", "model_school_b"):
 			continue
-		out.append(dict(col))
-		seen.add(col["key"])
-		if col.get("metric") == "new_schools":
+		item = dict(col)
+		if item.get("metric") == "workshop_registration":
+			item["label"] = _("Workshop Participants (Onsite)")
+			item["short_label"] = _("Workshop Participants (Onsite)")
+		out.append(item)
+		seen.add(item["key"])
+		if item.get("metric") == "new_schools":
 			for model in models:
 				if model["key"] not in seen:
 					out.append(dict(model))
 					seen.add(model["key"])
+		if item.get("metric") == "workshop_registration":
+			if online_participants_col["key"] not in seen:
+				out.append(dict(online_participants_col))
+				seen.add(online_participants_col["key"])
 	return out
 
 
@@ -596,6 +611,9 @@ def get_report_data(filters=None):
 	totals_out["outcome_model_school_c"] = cint(
 		(period_outcome.get("model_school_c") or {}).get("actual") or 0
 	)
+	totals_out["outcome_online_participants"] = cint(
+		(period_outcome.get("online_participants") or {}).get("actual") or 0
+	)
 
 	# Outcome cards: 1 July of the current fiscal year through today.
 	report_day = getdate(today())
@@ -782,6 +800,8 @@ def _outcome_row_fields(staff, ytd_from, to_date):
 		fields[f"outcome_{key}_pct"] = flt(pct, 2)
 		pcts.append(pct)
 	fields["outcome_model_school_c"] = cint(ytd.get("model_school_c") or 0)
+	# Online workshop participants (training_mode Online) — same source as KPI card.
+	fields["outcome_online_participants"] = cint(ytd.get("online_participants") or 0)
 	fields["outcome_pct"] = flt(sum(pcts) / len(pcts), 2) if pcts else 0.0
 	return fields
 

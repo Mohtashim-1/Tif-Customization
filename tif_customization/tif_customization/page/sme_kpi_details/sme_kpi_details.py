@@ -59,8 +59,8 @@ OUTCOME_TARGETS = (
 	},
 	{
 		"key": "workshop_registration",
-		"label": _("Workshop Participants"),
-		"short_label": _("Workshop Participants"),
+		"label": _("Workshop Participants (Onsite)"),
+		"short_label": _("Workshop Participants (Onsite)"),
 		"target": 148,
 		"metric": "workshop_registration",
 	},

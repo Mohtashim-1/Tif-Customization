@@ -5,7 +5,7 @@ frappe.ui.form.on("School Opening Application", {
 				frappe.set_route("Form", "Customer", frm.doc.customer);
 			});
 		}
-		if (frm.doc.docstatus === 0) {
+		if (frm.doc.docstatus === 0 && frm.dashboard) {
 			frm.dashboard.set_headline_alert(
 				__(
 					"Review the guest submission, then Submit to create the ERP Customer (type School)."
@@ -17,13 +17,12 @@ frappe.ui.form.on("School Opening Application", {
 	},
 });
 
-const SOA_ATTACH_FIELDS = ["visiting_card", "school_picture", "meeting_picture"];
-
 function sync_soa_attach_fields(frm) {
-	if (frm.is_new() || frm.doc.docstatus === 2) {
+	if (!frm || frm.is_new() || frm.doc.docstatus === 2) {
 		return;
 	}
-	const missing = SOA_ATTACH_FIELDS.filter((f) => !frm.doc[f]);
+	const attach_fields = ["visiting_card", "school_picture", "meeting_picture"];
+	const missing = attach_fields.filter((f) => !frm.doc[f]);
 	if (!missing.length) {
 		return;
 	}

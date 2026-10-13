@@ -54,7 +54,8 @@ app_include_js = [
 
 # include js in doctype views
 doctype_js = {
-	"School Opening Application": "tif_customization/doctype/school_opening_application/school_opening_application.js",
+	# School Opening Application JS is auto-loaded from the doctype folder.
+	# Do not list it here — double-loading redeclares `const` and breaks the form.
 	"Delivery Note": "public/js/delivery_note.js",
 	"Leave Application": "public/js/leave_application.js",
 	"Loan Application": "tif_customization/doctype/loan_application/loan_application.js",
@@ -76,6 +77,7 @@ page_js = {
 	"funds-dashboard" : "tif_customization/page/funds_dashboard/funds_dashboard.js",
 	"school-opening-registry": "tif_customization/page/school_opening_registry/school_opening_registry.js",
 	"user-system-usage-report": "tif_customization/page/user_system_usage_report/user_system_usage_report.js",
+	"field-visit-by-customer": "tif_customization/page/field_visit_by_customer/field_visit_by_customer.js",
 }
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 doctype_list_js = {

@@ -39,18 +39,20 @@ frappe.tif_customization.open_visit_drilldown = function (opts) {
 	const from_date = opts.from_date;
 	const to_date = opts.to_date;
 	const staff = opts.staff || opts.user || "";
+	const supervisor = opts.supervisor || "";
 	const metric = opts.metric || "visits";
 	if (!from_date || !to_date) {
 		frappe.msgprint(__("Set From Date and To Date first."));
 		return;
 	}
 	frappe.call({
-		method: "tif_customization.tif_customization.api.field_visit_drilldown.get_visit_drilldown",
+		method: "tif_customization.tif_customization.api.visit_drilldown_report.get_visit_drilldown",
 		args: {
 			filters: {
 				from_date,
 				to_date,
 				staff,
+				supervisor,
 				metric,
 				province: opts.province || "",
 				city: opts.city || "",
@@ -764,10 +766,17 @@ frappe.tif_customization.bind_clickable_numbers = function ($root, get_ctx) {
 		if (!metric) return;
 		const staff = $(this).attr("data-visit-staff") || "";
 		const ctx = (typeof get_ctx === "function" ? get_ctx() : get_ctx) || {};
+		// KPI totals: staff attr empty → do not fall back to a stale employee filter when
+		// a supervisor is selected (otherwise officer list shows the whole org).
+		const supervisor = (ctx.supervisor || "").trim();
+		const resolvedStaff = staff || (!supervisor ? ctx.staff || ctx.user || ctx.employee || "" : "");
 		frappe.tif_customization.open_visit_drilldown({
 			from_date: ctx.from_date,
 			to_date: ctx.to_date,
-			staff: staff || ctx.staff || ctx.user || ctx.employee || "",
+			staff: resolvedStaff,
+			supervisor,
+			province: ctx.province || "",
+			city: ctx.city || "",
 			metric,
 			submitted_only: ctx.submitted_only || ctx.submitted || 0,
 		});

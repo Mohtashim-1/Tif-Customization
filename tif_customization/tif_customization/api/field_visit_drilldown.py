@@ -93,6 +93,40 @@ def _parse(filters):
 	return filters or {}
 
 
+def _supervisor_team_tokens(supervisor: str) -> list[str]:
+	"""Match tokens for Field Officers under a supervisor (plus the supervisor)."""
+	supervisor = (supervisor or "").strip()
+	if not supervisor:
+		return []
+	from tif_customization.tif_customization.doctype.field_officer.field_officer import (
+		get_field_supervisor_subordinate_employees,
+		resolve_supervisor_field_officer,
+	)
+
+	emp_ids = set(get_field_supervisor_subordinate_employees(supervisor) or [])
+	supervisor_fo = resolve_supervisor_field_officer(supervisor)
+	if supervisor_fo:
+		sup_emp = frappe.db.get_value("Field Officer", supervisor_fo, "employee")
+		if sup_emp:
+			emp_ids.add(sup_emp)
+
+	tokens: set[str] = set()
+	for emp_id in emp_ids:
+		if not emp_id:
+			continue
+		tokens.update(expand_staff_tokens(emp_id))
+		row = frappe.db.get_value(
+			"Employee", emp_id, ["employee_name", "user_id"], as_dict=True
+		)
+		if not row:
+			continue
+		if row.employee_name:
+			tokens.update(expand_staff_tokens(row.employee_name))
+		if row.user_id:
+			tokens.update(expand_staff_tokens(row.user_id))
+	return [t for t in tokens if t]
+
+
 def _school_visit_sql(alias: str) -> str:
 	"""Marketing + follow-up Visits + M&E. Same set as Total School Visit."""
 	a = alias
@@ -954,9 +988,15 @@ def get_visit_drilldown(filters=None, metric=None, staff=None):
 	]
 	params = {"from_date": from_date, "to_date": to_date}
 	apply_team_scope_to_conditions(conditions, params, alias="fv")
+	supervisor = (filters.get("supervisor") or "").strip()
 	if staff:
 		tokens = expand_staff_tokens(staff)
 		params["staff_tokens"] = tuple(t.lower() for t in tokens) or ("__none__",)
+		conditions.append(staff_match_sql("fv", "staff_tokens"))
+	elif supervisor:
+		# KPI / total clicks with a supervisor filter: only that supervisor's assigned FOs.
+		team_tokens = _supervisor_team_tokens(supervisor)
+		params["staff_tokens"] = tuple(t.lower() for t in team_tokens) or ("__none__",)
 		conditions.append(staff_match_sql("fv", "staff_tokens"))
 	if province:
 		conditions.append(

@@ -440,35 +440,56 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 	}
 
 	outcome_columns(data) {
-		return (
-			(data && data.outcome_columns) || [
-				{ key: "outcome_enrolment", label: __("Enrollment of Participants in Mutal e quran Course"), short_label: __("Enrollment of Participants in Multi-media Course"), metric: "enrolment" },
-				{ key: "outcome_quiz", label: __("Quiz Arranged"), short_label: __("Quiz Arranged"), metric: "quiz" },
-				{ key: "outcome_co_curricular", label: __("Stall Activity / Exhibition"), short_label: __("Stall Activity / Exhibition"), metric: "co_curricular" },
-				{
-					key: "outcome_new_schools",
-					label: __("New Registered School"),
-					short_label: __("New Registered School"),
-					metric: "new_schools",
-				},
-				{ key: "outcome_workshop_registration", label: __("Workshop Participants"), short_label: __("Workshop Participants"), metric: "workshop_registration" },
-				{ key: "outcome_volunteers", label: __("Volunteers Enrolled"), short_label: __("Volunteers Enrolled"), metric: "volunteers" },
-				// { key: "outcome_model_school_a", label: __("Model School A"), metric: "model_school_a" },
-				// { key: "outcome_model_school_b", label: __("Model School B"), metric: "model_school_b" },
-			]
-		);
+		const onlineCol = {
+			key: "outcome_online_participants",
+			label: __("Workshop Participants (Online)"),
+			short_label: __("Workshop Participants (Online)"),
+			metric: "online_participants",
+		};
+		const fallback = [
+			{ key: "outcome_enrolment", label: __("Enrollment of Participants in Mutal e quran Course"), short_label: __("Enrollment of Participants in Multi-media Course"), metric: "enrolment" },
+			{ key: "outcome_quiz", label: __("Quiz Arranged"), short_label: __("Quiz Arranged"), metric: "quiz" },
+			{ key: "outcome_co_curricular", label: __("Stall Activity / Exhibition"), short_label: __("Stall Activity / Exhibition"), metric: "co_curricular" },
+			{
+				key: "outcome_new_schools",
+				label: __("New Registered School"),
+				short_label: __("New Registered School"),
+				metric: "new_schools",
+			},
+			{ key: "outcome_workshop_registration", label: __("Workshop Participants (Onsite)"), short_label: __("Workshop Participants (Onsite)"), metric: "workshop_registration" },
+			onlineCol,
+			{ key: "outcome_volunteers", label: __("Volunteers Enrolled"), short_label: __("Volunteers Enrolled"), metric: "volunteers" },
+		];
+		const cols = [...((data && data.outcome_columns) || fallback)];
+		// Always keep Online column right after Workshop Participants.
+		if (!cols.some((c) => c.key === onlineCol.key || c.metric === "online_participants")) {
+			const idx = cols.findIndex(
+				(c) => c.key === "outcome_workshop_registration" || c.metric === "workshop_registration"
+			);
+			if (idx >= 0) cols.splice(idx + 1, 0, onlineCol);
+			else cols.push(onlineCol);
+		}
+		return cols;
 	}
 
 	outcome_subcolumns(data) {
 		return this.outcome_columns(data)
 			.filter((col) => !["model_school_a", "model_school_b", "model_school_c"].includes(col.metric || ""))
 			.map((col) => {
-				const short = (col.short_label || col.shortLabel || (col.label || "").split("(")[0]).trim();
+				// Keep (Onsite)/(Online) in the label; do not strip at first "(".
+				let label = (col.short_label || col.shortLabel || col.label || "").trim();
+				if (col.metric === "workshop_registration") {
+					label = __("Workshop Participants (Onsite)");
+				} else if (col.metric === "online_participants") {
+					label = __("Workshop Participants (Online)");
+				}
 				const isNewReg = col.metric === "new_schools";
 				return {
 					...col,
-					header: isNewReg ? short : `${col.label} (${__("1 July to date")})`,
-					shortHeader: isNewReg ? short : `${short} ${__("1 July to date")}`,
+					label,
+					short_label: label,
+					header: isNewReg ? label : `${label} (${__("1 July to date")})`,
+					shortHeader: isNewReg ? label : `${label} ${__("1 July to date")}`,
 				};
 			});
 	}
@@ -1031,10 +1052,16 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			const to_date = outcomeFy
 				? (me.data && me.data.outcome_fy_to) || ctx.to_date
 				: ctx.to_date;
+			const supervisor =
+				ctx.supervisor ||
+				(me.data && me.data.supervisor) ||
+				(me.supervisor && me.supervisor.get_value && me.supervisor.get_value()) ||
+				"";
 			frappe.tif_customization.open_visit_drilldown({
 				from_date,
 				to_date,
-				staff: staff || ctx.staff || ctx.employee || "",
+				staff: staff || "",
+				supervisor: String(supervisor || "").trim(),
 				metric,
 				province: ctx.province || "",
 				city: ctx.city || "",
@@ -1629,12 +1656,13 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		const filters = this.get_filters();
 
 		frappe.call({
-			method: "tif_customization.tif_customization.api.field_visit_drilldown.get_visit_drilldown",
+			method: "tif_customization.tif_customization.api.visit_drilldown_report.get_visit_drilldown",
 			args: {
 				filters: {
 					from_date: filters.from_date,
 					to_date: filters.to_date,
 					staff,
+					supervisor: filters.supervisor || (this.data && this.data.supervisor) || "",
 					metric: "school_visits",
 					submitted_only: filters.submitted_only || 1,
 				},
@@ -1830,6 +1858,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						from_date: filters.from_date,
 						to_date: filters.to_date,
 						staff,
+						supervisor: filters.supervisor || (this.data && this.data.supervisor) || "",
 						metric,
 						province: filters.province || "",
 						city: filters.city || "",

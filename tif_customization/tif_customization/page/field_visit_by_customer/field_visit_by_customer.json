@@ -1,0 +1,50 @@
+{
+ "content": null,
+ "creation": "2026-10-12 00:00:00.000000",
+ "docstatus": 0,
+ "doctype": "Page",
+ "idx": 0,
+ "modified": "2026-10-12 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Tif Customization",
+ "name": "field-visit-by-customer",
+ "owner": "Administrator",
+ "page_name": "field-visit-by-customer",
+ "roles": [
+  {
+   "role": "System Manager"
+  },
+  {
+   "role": "HR Manager"
+  },
+  {
+   "role": "Field Staff Manager"
+  },
+  {
+   "role": "HOD"
+  },
+  {
+   "role": "COO"
+  },
+  {
+   "role": "SME User"
+  },
+  {
+   "role": "Field Staff"
+  },
+  {
+   "role": "Supervisor Field Staff"
+  },
+  {
+   "role": "SME Manager"
+  },
+  {
+   "role": "Staff Reporting Manager"
+  }
+ ],
+ "script": null,
+ "standard": "Yes",
+ "style": null,
+ "system_page": 0,
+ "title": "Field Visits by Customer"
+}
