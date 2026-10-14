@@ -145,49 +145,41 @@
    "options": "\nMorning\nEvening\nBoth"
   },
   {
-   "depends_on": "eval:doc.visit_type=='Visit with enrollment'",
    "fieldname": "section_services",
    "fieldtype": "Section Break",
    "label": "2 Services of Interest"
   },
   {
-   "depends_on": "eval:doc.visit_type=='Visit with enrollment'",
    "fieldname": "teacher_training_services",
    "fieldtype": "Small Text",
    "label": "Teacher Training Services"
   },
   {
-   "depends_on": "eval:doc.visit_type=='Visit with enrollment'",
    "fieldname": "tilawat_services",
    "fieldtype": "Small Text",
    "label": "Tilawat Program Services"
   },
   {
-   "depends_on": "eval:doc.visit_type=='Visit with enrollment'",
    "fieldname": "quran_program_services",
    "fieldtype": "Small Text",
    "label": "Quran Program for Student Services"
   },
   {
-   "depends_on": "eval:doc.visit_type=='Visit with enrollment'",
    "fieldname": "section_engagement",
    "fieldtype": "Section Break",
    "label": "3 Current Engagement with TIF"
   },
   {
-   "depends_on": "eval:doc.visit_type=='Visit with enrollment'",
    "fieldname": "running_tif_services",
    "fieldtype": "Small Text",
    "label": "School Already Running TIF Services"
   },
   {
-   "depends_on": "eval:doc.visit_type=='Visit with enrollment'",
    "fieldname": "curriculum_in_use",
    "fieldtype": "Small Text",
    "label": "Curriculum Currently in Use"
   },
   {
-   "depends_on": "eval:doc.visit_type=='Visit with enrollment'",
    "fieldname": "curriculum_others",
    "fieldtype": "Data",
    "label": "Curriculum — Others"

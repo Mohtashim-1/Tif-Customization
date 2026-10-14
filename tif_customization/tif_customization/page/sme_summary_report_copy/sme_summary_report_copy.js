@@ -490,9 +490,11 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			{ label: __("Monitoring Visit (M&E)"), metric: "monitoring", value: (r) => this.me_visits(r), cellClass: "visit-mon-col" },
 			{
 				label: __("Total Visit"),
-				metric: "marketing",
-				value: (r) => cint(r.marketing) + cint(r.followup),
-				hint: __("Marketing Visit + Follow up Visit"),
+				metric: "school_visits",
+				value: (r) => cint(r.new) + cint(r.followup) + this.me_visits(r),
+				hint: __(
+					"New School Visit + Follow up Visit + Monitoring Visit (M&E)"
+				),
 			},
 		];
 	}
