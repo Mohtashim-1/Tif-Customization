@@ -100,7 +100,7 @@ OUTCOME_KEYS = tuple(c["key"] for c in OUTCOME_COLUMNS) + ("outcome_pct",)
 
 
 def _summary_outcome_columns():
-	"""Registered Schools, then Model A / B / C as that total split. Not visit sums."""
+	"""New Registered + outcomes, then Model A / B / C as Active Schools split."""
 	models = (
 		{
 			"key": "outcome_model_school_a",

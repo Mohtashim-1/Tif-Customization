@@ -160,14 +160,17 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					.sme-sum-kpi-groups{display:flex;flex-direction:column;gap:12px;margin:0 0 14px}
 					.sme-sum-kpi-sep{border:0;border-top:1px solid #cbd5e1;margin:6px 0 2px;width:100%}
 					.sme-sum-kpi-group__title{font-size:12px;font-weight:700;color:#475569;margin:0 0 8px;text-transform:uppercase;letter-spacing:.04em}
-					.sme-sum-kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,150px));gap:10px;justify-content:start}
+					.sme-sum-kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,160px));gap:10px;justify-content:start}
 					.sme-sum-kpis + .sme-sum-kpis{margin-top:10px}
-					.sme-sum-kpi{border:1px solid var(--border-color,#e5e7eb);border-top:4px solid #64748b;border-radius:10px;background:#fff;padding:12px 14px;box-shadow:0 2px 8px rgba(15,23,42,.05);max-width:150px;min-width:132px}
+					.sme-sum-kpi{border:1px solid var(--border-color,#e5e7eb);border-top:4px solid #64748b;border-radius:10px;background:#fff;padding:12px 12px;box-shadow:0 2px 8px rgba(15,23,42,.05);max-width:160px;min-width:140px;overflow:hidden;box-sizing:border-box}
 					.sme-sum-kpi[data-visit-metric],.sme-sum-kpi[data-points-kind],.sme-sum-kpi[data-card-kind]{cursor:pointer}
 					.sme-sum-kpi[data-visit-metric]:hover,.sme-sum-kpi[data-points-kind]:hover,.sme-sum-kpi[data-card-kind]:hover{box-shadow:0 4px 14px rgba(15,23,42,.12)}
-					.sme-sum-kpi__label{color:#64748b;font-size:11px;margin-bottom:6px;line-height:1.25}
+					.sme-sum-kpi__label{color:#64748b;font-size:11px;margin-bottom:6px;line-height:1.25;overflow-wrap:anywhere;word-break:break-word}
+					.sme-sum-kpi__label-row{display:flex;flex-direction:column;align-items:flex-start;gap:4px;margin-bottom:6px}
+					.sme-sum-kpi__label-row .sme-sum-kpi__label{margin-bottom:0;width:100%}
+					.sme-sum-kpi__badge{display:inline-block;max-width:100%;padding:1px 6px;border-radius:999px;border:1px solid #f59e0b;background:#fffbeb;color:#b45309;font-size:9px;font-weight:700;letter-spacing:.02em;text-transform:uppercase;line-height:1.4;white-space:nowrap}
 					.sme-sum-kpi__value{color:#0f172a;font-size:22px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums}
-					.sme-sum-kpi__hint{margin-top:6px;font-size:10px;color:#94a3b8}
+					.sme-sum-kpi__hint{margin-top:6px;font-size:10px;color:#94a3b8;overflow-wrap:anywhere;word-break:break-word}
 					.sme-sum-kpi--followup,.sme-sum-kpi--new,.sme-sum-kpi--marketing{border-top-color:#0d9488}
 					.sme-sum-kpi--workshop-arranged,.sme-sum-kpi--workshop{border-top-color:#d97706}
 					.sme-sum-kpi--meeting{border-top-color:#ca8a04}
@@ -670,16 +673,21 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			},
 			{ label: __("Follow up Visit"), value: this.fmt(k.followup), style: "followup", metric: "followup" },
 			{ label: __("Monitoring Visit (M&E)"), value: this.fmt(k.me), style: "me", metric: "monitoring" },
-			...this.activity_extra_columns(data).map((col) => ({
-				label: col.label,
-				value: this.fmt(k[col.key]),
-				style: (col.key || "activity").replace(/_/g, "-"),
-				metric: col.metric || col.key,
-				hint:
-					col.key === "workshop"
-						? __("Field Visit type = Workshop Conducted or Workshop")
-						: undefined,
-			})),
+			...this.activity_extra_columns(data).map((col) => {
+				const metric = col.metric || col.key;
+				return {
+					label: col.label,
+					value: this.fmt(k[col.key]),
+					style: (col.key || "activity").replace(/_/g, "-"),
+					metric,
+					inProgress: ["workshop", "teachers_training_meeting"].includes(col.key) ||
+						["workshop", "workshop_conducted", "teachers_training_meeting"].includes(metric),
+					hint:
+						col.key === "workshop"
+							? __("Field Visit type = Workshop Conducted or Workshop")
+							: undefined,
+				};
+			}),
 		];
 		const outcomeCards = [
 			...this.outcome_period_columns(data).map((col) => ({
@@ -692,6 +700,13 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				const fyKey = (col.metric || col.key || "").replace(/^outcome_/, "");
 				const fy = (data.outcome_fy || {})[fyKey] || {};
 				const actual = fy.actual != null ? fy.actual : t[col.key];
+				const inProgressMetrics = new Set([
+					"enrolment",
+					"quiz",
+					"co_curricular",
+					"online_participants",
+					"workshop_registration",
+				]);
 				const card = {
 					label: col.label,
 					value: this.fmt(actual),
@@ -706,13 +721,16 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 										? "enrolment"
 										: col.metric === "workshop_registration"
 											? "workshop-participants"
-											: "outcome",
+											: col.metric === "online_participants"
+												? "workshop-participants"
+												: "outcome",
 					metric: col.metric,
 					outcomeFy: true,
+					inProgress: inProgressMetrics.has(col.metric),
 					hint:
 						col.metric === "new_schools"
 							? __(
-									"Schools with any book, workshop, or program running{0}",
+									"Onboarded schools (Registration of New Schools / New visits){0}",
 									[
 										data.outcome_fy_label
 											? ` · ${data.outcome_fy_label}`
@@ -813,7 +831,9 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 							style: "outcome",
 							cardKind: "active_school_by_staff",
 							outcomeFy: true,
-							hint: __("Click for field staff and their school counts."),
+							hint: __(
+								"Onboarded schools (Registration of New Schools / New visits). Click for field staff counts."
+							),
 						},
 						{
 							label: __("Active Schools"),
@@ -822,7 +842,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 							cardKind: "active_school_models",
 							outcomeFy: true,
 							hint: __(
-								"Click for Model A / B / C totals and a table of SME school counts. Schools with any program running."
+								"Schools with any program running. Model A + B + C. Click for model split."
 							),
 						},
 						{
@@ -832,6 +852,19 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 							metric: "inactive_schools",
 							outcomeFy: true,
 							hint: __("Visited schools where no program is running."),
+						},
+						{
+							label: __("Total Schools"),
+							value: this.fmt(
+								cint(((data.outcome_fy || {}).new_schools || {}).actual) +
+									cint(((data.outcome_fy || {}).active_schools || {}).actual) +
+									cint(((data.outcome_fy || {}).inactive_schools || {}).actual)
+							),
+							style: "grand",
+							outcomeFy: true,
+							hint: __(
+								"New Registered + Active + Inactive (sum of the three cards)."
+							),
 						},
 					],
 					[
@@ -882,9 +915,15 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		if (card.cardKind) attrs.push(`data-card-kind="${frappe.utils.escape_html(card.cardKind)}"`);
 		const clickable = card.metric || card.pointsKind || card.cardKind;
 		const hint = card.hint != null ? card.hint : clickable ? __("Click to see details") : __("Period total");
+		const badge = card.inProgress
+			? `<span class="sme-sum-kpi__badge">${__("In progress")}</span>`
+			: "";
+		const labelBlock = badge
+			? `<div class="sme-sum-kpi__label-row"><div class="sme-sum-kpi__label">${card.label}</div>${badge}</div>`
+			: `<div class="sme-sum-kpi__label">${card.label}</div>`;
 		return `
 			<div class="sme-sum-kpi sme-sum-kpi--${card.style}" ${attrs.join(" ")} title="${clickable ? __("Click to see details") : ""}">
-				<div class="sme-sum-kpi__label">${card.label}</div>
+				${labelBlock}
 				<div class="sme-sum-kpi__value">${card.value}</div>
 				${hint ? `<div class="sme-sum-kpi__hint">${hint}</div>` : ""}
 			</div>`;
@@ -1258,7 +1297,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		});
 		d.fields_dict.html.$wrapper.html(`
 			<p class="text-muted" style="font-size:12px;margin-bottom:12px;">
-				${__("Active / registered schools with any program running")}:
+				${__("Active schools with any program running")}:
 				<strong>${this.fmt(active)}</strong>
 				${data.outcome_fy_label ? ` · ${frappe.utils.escape_html(data.outcome_fy_label)}` : ""}
 			</p>

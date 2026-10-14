@@ -48,9 +48,10 @@ METRIC_LABELS = {
 	"other_official": _("Other Official Tasks"),
 	"co_curricular": _("Stall Activity / Exhibition"),
 	"quiz": _("Quiz Arranged"),
-	"new_school_registration": _("Registered Schools"),
-	"new_schools": _("Registered Schools"),
-	"new_school": _("Registered Schools"),
+	"new_school_registration": _("New Registered Schools"),
+	"new_schools": _("New Registered Schools"),
+	"new_school": _("New Registered Schools"),
+	"active_schools": _("Active Schools"),
 	"workshop_registration": _("Workshop Participants"),
 	"enrolment": _("Enrollment of Participants in Online Course"),
 	"volunteers": _("Volunteer visits"),
@@ -155,6 +156,17 @@ def _yes_field_sql(field: str, alias: str = "fv") -> str:
 	return f"LOWER(TRIM(IFNULL({alias}.{field},''))) IN ('1','yes','true','y')"
 
 
+def school_field_visit_type_sql(alias: str = "fv") -> str:
+	"""Field-staff school visits only (not meetings / HO / academic / admin)."""
+	a = alias
+	return f"""{a}.type IN (
+		'Marketing',
+		'Visits',
+		'M&E',
+		'Registration of New Schools'
+	)"""
+
+
 def registered_school_sql(alias: str = "fv") -> str:
 	"""School where any book, workshop, or program is running on the visit."""
 	a = alias
@@ -241,12 +253,21 @@ def _metric_condition(metric: str, alias: str = "fv") -> str:
 			OR ({a}.type IN ('Marketing', 'Visits') AND {a}.marketing_visit_category = 'New')
 		)"""
 	named = _has_named_school_sql(a)
-	if m in ("new_schools", "new_school", "active_schools"):
-		# Distinct schools counted in KPI via registered_school_sql; drilldown shows matching visits.
+	if m in ("new_schools", "new_school"):
+		# Onboarded schools: Registration of New Schools / New marketing visits.
+		return f"""(
+			{a}.type = 'Registration of New Schools'
+			OR ({a}.type IN ('Marketing', 'Visits') AND IFNULL({a}.marketing_visit_category, '') = 'New')
+		) AND ({named})"""
+	if m == "active_schools":
+		# Schools with any book / workshop / program running.
 		return f"({registered_school_sql(a)}) AND ({named})"
 	if m in ("inactive_schools", "model_school_0", "model_0"):
-		# Same as KPI: visits with a school name and no program running (exclude HO/meeting-only rows).
-		return f"NOT ({registered_school_sql(a)}) AND ({named})"
+		# Field-staff school visits only: school name + no program (exclude meetings / admin).
+		return (
+			f"NOT ({registered_school_sql(a)}) AND ({named})"
+			f" AND ({school_field_visit_type_sql(a)})"
+		)
 	if m == "online_workshop":
 		return f"""{a}.type IN ('Workshop Conducted', 'Workshop', 'Workshop Arranged', 'Training')
 			AND LOWER(IFNULL({a}.training_mode, '')) LIKE '%%online%%'"""
@@ -810,6 +831,122 @@ def _enrolment_participant_rows(visits: list) -> list[dict]:
 	return out
 
 
+# Types where school on the parent Field Visit is optional (child rows may have school).
+OPTIONAL_SCHOOL_TYPES = frozenset(
+	{
+		"Enrolment of Volunteers",
+		"Enrolment of Ambassadors",
+		"Enrolment of Participants",
+		"Enrolment of Participant in ELP/ TECC/ TTC/ Online Tajweed",
+	}
+)
+
+
+def _volunteer_school_by_visit(names: list[str]) -> dict[str, str]:
+	"""First non-empty volunteer/ambassador school per visit (Customer name or label)."""
+	if not names:
+		return {}
+	out: dict[str, str] = {}
+	if frappe.db.table_exists("Field Visit Volunteer"):
+		rows = frappe.db.sql(
+			"""
+			SELECT vv.parent AS visit,
+				COALESCE(
+					NULLIF(TRIM(c.customer_name), ''),
+					NULLIF(TRIM(vv.school), '')
+				) AS school
+			FROM `tabField Visit Volunteer` vv
+			LEFT JOIN `tabCustomer` c ON c.name = vv.school
+			WHERE vv.parent IN %(names)s
+			  AND NULLIF(TRIM(vv.school), '') IS NOT NULL
+			ORDER BY vv.idx ASC
+			""",
+			{"names": tuple(names)},
+			as_dict=True,
+		)
+		for row in rows:
+			if row.visit not in out and (row.school or "").strip():
+				out[row.visit] = (row.school or "").strip()
+	if frappe.db.table_exists("Field Visit Ambassador"):
+		rows = frappe.db.sql(
+			"""
+			SELECT aa.parent AS visit,
+				COALESCE(
+					NULLIF(TRIM(c.customer_name), ''),
+					NULLIF(TRIM(aa.school), '')
+				) AS school
+			FROM `tabField Visit Ambassador` aa
+			LEFT JOIN `tabCustomer` c ON c.name = aa.school
+			WHERE aa.parent IN %(names)s
+			  AND NULLIF(TRIM(aa.school), '') IS NOT NULL
+			ORDER BY aa.idx ASC
+			""",
+			{"names": tuple(names)},
+			as_dict=True,
+		)
+		for row in rows:
+			if row.visit not in out and (row.school or "").strip():
+				out[row.visit] = (row.school or "").strip()
+	return out
+
+
+def _volunteer_participant_rows(visits: list) -> list[dict]:
+	"""One row per Field Visit Volunteer, tagged with officer / visit."""
+	if not visits or not frappe.db.table_exists("Field Visit Volunteer"):
+		return []
+	by_visit = {v["name"]: v for v in visits if v.get("name")}
+	if not by_visit:
+		return []
+	rows = frappe.db.sql(
+		"""
+		SELECT
+			vv.parent AS visit,
+			vv.volunteer_name,
+			vv.contact_number,
+			vv.email,
+			vv.profession,
+			vv.contribution,
+			vv.city,
+			vv.province,
+			vv.area,
+			vv.address,
+			vv.volunteer_form_submitted,
+			vv.remarks,
+			COALESCE(NULLIF(TRIM(c.customer_name), ''), NULLIF(TRIM(vv.school), '')) AS school
+		FROM `tabField Visit Volunteer` vv
+		LEFT JOIN `tabCustomer` c ON c.name = vv.school
+		WHERE vv.parent IN %(names)s
+		ORDER BY vv.idx ASC
+		""",
+		{"names": tuple(by_visit)},
+		as_dict=True,
+	)
+	out = []
+	for row in rows:
+		visit = by_visit.get(row.visit) or {}
+		out.append(
+			{
+				"name": (row.volunteer_name or "").strip(),
+				"contact": (row.contact_number or "").strip(),
+				"email": (row.email or "").strip(),
+				"profession": (row.profession or "").strip(),
+				"contribution": (row.contribution or "").strip(),
+				"city": (row.city or "").strip() or (visit.get("city") or ""),
+				"province": (row.province or "").strip() or (visit.get("province") or ""),
+				"area": (row.area or "").strip() or (visit.get("area") or ""),
+				"address": (row.address or "").strip(),
+				"form_submitted": (row.volunteer_form_submitted or "").strip(),
+				"remarks": (row.remarks or "").strip(),
+				"school": (row.school or "").strip() or (visit.get("school") or ""),
+				"date": visit.get("visit_date") or "",
+				"officer": visit.get("officer") or "",
+				"visit": row.visit,
+				"url": visit.get("url") or f"/field-visit-easy?name={row.visit}",
+			}
+		)
+	return out
+
+
 def _attendance_file_path(file_url: str) -> str | None:
 	url = (file_url or "").split("?")[0].strip()
 	if url.startswith("/private/files/"):
@@ -1186,6 +1323,7 @@ def get_visit_drilldown(filters=None, metric=None, staff=None):
 	out = []
 	by_type = {}
 	owner_names = _owner_display_names([r.owner for r in rows if r.owner])
+	child_schools = _volunteer_school_by_visit([r.name for r in rows])
 	for r in rows:
 		vtype = r.type or "Other"
 		by_type[vtype] = by_type.get(vtype, 0) + 1
@@ -1205,15 +1343,18 @@ def get_visit_drilldown(filters=None, metric=None, staff=None):
 				r.marketing_visit_category or r.me_activity_status or "", r, vtype
 			)
 		remarks = _visit_remarks(r)
+		school = (r.school or "").strip() or child_schools.get(r.name, "")
+		# Volunteer / ambassador / participant enrolment: school is optional on the visit.
+		school_optional = vtype in OPTIONAL_SCHOOL_TYPES or metric == "volunteers"
 		out.append(
 			{
 				"name": r.name,
 				"type": vtype,
 				"visit_date": str(r.visit_date) if r.visit_date else "",
 				"doc_created": str(r.doc_created)[:19] if r.doc_created else "",
-				"school": r.school or "",
+				"school": school,
 				"school_unapproved": cint(r.school_unapproved),
-				"school_missing": 0 if (r.school or "").strip() else 1,
+				"school_missing": 0 if school or school_optional else 1,
 				"province": r.province or "",
 				"area": r.area or "",
 				"city": r.city or "",
@@ -1234,6 +1375,8 @@ def get_visit_drilldown(filters=None, metric=None, staff=None):
 	sheet_by_visit = {r.name: r.attendance_sheet_excel or "" for r in rows}
 	if metric == "enrolment":
 		participants = _enrolment_participant_rows(out)
+	elif metric == "volunteers":
+		participants = _volunteer_participant_rows(out)
 	elif metric == "workshop_registration":
 		participants = _workshop_participant_rows(out, sheet_by_visit)
 	else:
@@ -1241,7 +1384,7 @@ def get_visit_drilldown(filters=None, metric=None, staff=None):
 
 	if metric in ("monitoring", "me"):
 		breakdown = _monitoring_category_breakdown(rows)
-	elif metric == "enrolment":
+	elif metric in ("enrolment", "volunteers"):
 		breakdown = []
 	else:
 		breakdown = [{"type": k, "count": v} for k, v in sorted(by_type.items(), key=lambda x: (-x[1], x[0]))]
@@ -1250,6 +1393,8 @@ def get_visit_drilldown(filters=None, metric=None, staff=None):
 	subtitle = " · ".join(parts) if parts else _("No documents")
 	if metric == "enrolment":
 		count = len(participants)
+	elif metric == "volunteers":
+		count = len(participants) or len(out)
 	elif metric == "workshop_registration":
 		count = sum(cint(v.get("participants")) for v in out)
 	else:

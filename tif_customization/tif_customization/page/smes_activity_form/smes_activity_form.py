@@ -1708,6 +1708,19 @@ def get_field_visit_easy_view(name=None):
 		or cstr(getattr(doc, "mt_institute_or_organization_name", None)).strip()
 		or cstr(getattr(doc, "training_venue_name", None)).strip()
 	)
+	# Volunteer / ambassador child rows may carry the school when parent is blank.
+	if not school:
+		for child in getattr(doc, "volunteer_enrolments", None) or []:
+			school = cstr(getattr(child, "school", None)).strip()
+			if school:
+				break
+	if not school:
+		for child in getattr(doc, "ambassador_enrolments", None) or []:
+			school = cstr(getattr(child, "school", None)).strip()
+			if school:
+				break
+	if school and frappe.db.exists("Customer", school):
+		school = cstr(frappe.db.get_value("Customer", school, "customer_name") or school).strip()
 	officer = (
 		cstr(doc.visit_by).strip()
 		or cstr(doc.me_visit_by).strip()
@@ -1798,18 +1811,85 @@ def get_field_visit_easy_view(name=None):
 			row(_("Reason"), getattr(doc, "me_reason_of_above", None)),
 		],
 	)
-	add_section(
-		_("Training / Workshop"),
-		[
-			row(_("Trainer"), getattr(doc, "training_trainer_name", None)),
-			row(_("Entry Filled By"), getattr(doc, "training_entry_filled_by", None)),
-			row(_("Venue"), getattr(doc, "training_venue_name", None)),
-			row(_("Mode"), getattr(doc, "training_mode", None)),
-			row(_("Topic"), getattr(doc, "training_workshop_topic", None)),
-			row(_("Participants"), getattr(doc, "training_no_of_participants", None)),
-			row(_("Schools"), getattr(doc, "training_no_of_schools", None)),
-		],
-	)
+	# Skip empty training block for volunteer / ambassador enrolments (Participants: 0 noise).
+	doc_type = cstr(doc.type or "")
+	if doc_type not in ("Enrolment of Volunteers", "Enrolment of Ambassadors"):
+		add_section(
+			_("Training / Workshop"),
+			[
+				row(_("Trainer"), getattr(doc, "training_trainer_name", None)),
+				row(_("Entry Filled By"), getattr(doc, "training_entry_filled_by", None)),
+				row(_("Venue"), getattr(doc, "training_venue_name", None)),
+				row(_("Mode"), getattr(doc, "training_mode", None)),
+				row(_("Topic"), getattr(doc, "training_workshop_topic", None)),
+				row(_("Participants"), getattr(doc, "training_no_of_participants", None)),
+				row(_("Schools"), getattr(doc, "training_no_of_schools", None)),
+			],
+		)
+
+	volunteer_rows = list(getattr(doc, "volunteer_enrolments", None) or [])
+	if volunteer_rows:
+		add_section(
+			_("Volunteers"),
+			[
+				row(_("Registered with TIF as Volunteer"), getattr(doc, "registered_volunteer", None)),
+				row(_("Volunteers Enrolled"), len(volunteer_rows)),
+			],
+		)
+		for idx, vol in enumerate(volunteer_rows, start=1):
+			vol_school = cstr(getattr(vol, "school", None)).strip()
+			if vol_school and frappe.db.exists("Customer", vol_school):
+				vol_school = cstr(
+					frappe.db.get_value("Customer", vol_school, "customer_name") or vol_school
+				).strip()
+			add_section(
+				_("Volunteer {0}").format(idx),
+				[
+					row(_("Name"), getattr(vol, "volunteer_name", None)),
+					row(_("Contact"), getattr(vol, "contact_number", None)),
+					row(_("Email"), getattr(vol, "email", None)),
+					row(_("Profession"), getattr(vol, "profession", None)),
+					row(_("Contribution / Role"), getattr(vol, "contribution", None)),
+					row(_("Province"), getattr(vol, "province", None)),
+					row(_("City"), getattr(vol, "city", None)),
+					row(_("Area"), getattr(vol, "area", None)),
+					row(_("Address"), getattr(vol, "address", None)),
+					row(_("School"), vol_school),
+					row(_("Form Submitted"), getattr(vol, "volunteer_form_submitted", None)),
+					row(_("Remarks"), getattr(vol, "remarks", None)),
+				],
+			)
+
+	ambassador_rows = list(getattr(doc, "ambassador_enrolments", None) or [])
+	if ambassador_rows:
+		add_section(
+			_("Ambassadors"),
+			[row(_("Ambassadors Enrolled"), len(ambassador_rows))],
+		)
+		for idx, amb in enumerate(ambassador_rows, start=1):
+			amb_school = cstr(getattr(amb, "school", None)).strip()
+			if amb_school and frappe.db.exists("Customer", amb_school):
+				amb_school = cstr(
+					frappe.db.get_value("Customer", amb_school, "customer_name") or amb_school
+				).strip()
+			add_section(
+				_("Ambassador {0}").format(idx),
+				[
+					row(
+						_("Name"),
+						getattr(amb, "ambassador_name", None) or getattr(amb, "volunteer_name", None),
+					),
+					row(_("Contact"), getattr(amb, "contact_number", None)),
+					row(_("Email"), getattr(amb, "email", None)),
+					row(_("Profession"), getattr(amb, "profession", None)),
+					row(_("Province"), getattr(amb, "province", None)),
+					row(_("City"), getattr(amb, "city", None)),
+					row(_("Area"), getattr(amb, "area", None)),
+					row(_("School"), amb_school),
+					row(_("Remarks"), getattr(amb, "remarks", None)),
+				],
+			)
+
 	add_section(
 		_("Travel"),
 		[

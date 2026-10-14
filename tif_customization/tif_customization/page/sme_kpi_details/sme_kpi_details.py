@@ -14,6 +14,7 @@ from tif_customization.tif_customization.api.field_visit_drilldown import (
 	_metric_condition,
 	get_visit_type_breakdown,
 	registered_school_sql,
+	school_field_visit_type_sql,
 )
 from tif_customization.tif_customization.doctype.reporting.reporting import (
 	_gazetted_holiday_dates,
@@ -86,8 +87,18 @@ VISIT_DETAIL_PARTS = (
 	{"key": "visit_other", "label": _("Other"), "metric": "meeting", "count_key": "meeting"},
 )
 
-# Schools where any book, workshop, or program is running (distinct school names).
-NEW_SCHOOL_SQL = registered_school_sql("fv")
+# Active: schools where any book, workshop, or program is running (distinct school names).
+ACTIVE_SCHOOL_SQL = registered_school_sql("fv")
+# Kept for model A/B/C split (same as Active Schools).
+NEW_SCHOOL_SQL = ACTIVE_SCHOOL_SQL
+# New Registered: onboarded schools (Registration of New Schools / New marketing visits).
+ONBOARDED_SCHOOL_SQL = """(
+	fv.type = 'Registration of New Schools'
+	OR (fv.type IN ('Marketing', 'Visits') AND IFNULL(fv.marketing_visit_category, '') = 'New')
+)"""
+# Model 0: school field visits only (not Internal Meeting / Meeting / HO / academic).
+SCHOOL_FIELD_VISIT_SQL = school_field_visit_type_sql("fv")
+MODEL_0_SQL = f"NOT ({ACTIVE_SCHOOL_SQL}) AND ({SCHOOL_FIELD_VISIT_SQL})"
 
 QUIZ_SQL = """
 	fv.type = 'Quiz Arranged'
@@ -357,17 +368,15 @@ def _enriched_actuals(from_date, to_date, staff, tokens):
 	)
 	actuals["quiz"] = _visit_count(from_date, to_date, tokens, QUIZ_SQL)
 	actuals["co_curricular"] = _visit_count(from_date, to_date, tokens, CO_CURRICULAR_SQL)
-	actuals["new_schools"] = _distinct_schools(from_date, to_date, tokens, NEW_SCHOOL_SQL)
+	# New Registered = onboarded schools; Active = any program running (Model A+B+C).
+	actuals["new_schools"] = _distinct_schools(from_date, to_date, tokens, ONBOARDED_SCHOOL_SQL)
 	actuals["new_school_registration"] = actuals["new_schools"]
 	models = _registered_model_split(from_date, to_date, tokens)
 	actuals["model_school_a"] = models["model_a"]
 	actuals["model_school_b"] = models["model_b"]
 	actuals["model_school_c"] = models["model_c"]
-	# Active = registered (any program). Model 0 / inactive = visited with no program.
-	actuals["active_schools"] = cint(actuals["new_schools"])
-	actuals["model_school_0"] = _distinct_schools(
-		from_date, to_date, tokens, f"NOT ({NEW_SCHOOL_SQL})"
-	)
+	actuals["active_schools"] = _distinct_schools(from_date, to_date, tokens, ACTIVE_SCHOOL_SQL)
+	actuals["model_school_0"] = _distinct_schools(from_date, to_date, tokens, MODEL_0_SQL)
 	actuals["inactive_schools"] = actuals["model_school_0"]
 	sum_participants = _training_participants(from_date, to_date, tokens)
 	actuals["workshop_registration"] = max(workshop_children, sum_participants)
