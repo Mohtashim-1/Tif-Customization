@@ -6,19 +6,38 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "city"
+  "city",
+  "province"
  ],
  "fields": [
   {
    "fieldname": "city",
    "fieldtype": "Data",
-   "label": "City"
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "City",
+   "reqd": 1
+  },
+  {
+   "description": "Used to auto-fill Province on Field Visit / Easy Form when this City is selected. Chain: Area \u2192 City \u2192 Province.",
+   "fieldname": "province",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Province",
+   "options": "Province",
+   "reqd": 0
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
- "links": [],
- "modified": "2026-09-18 18:35:00.000000",
+ "links": [
+  {
+   "link_doctype": "Area",
+   "link_fieldname": "city"
+  }
+ ],
+ "modified": "2026-10-14 18:30:00.000000",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "City",
@@ -35,6 +54,16 @@
    "report": 1,
    "role": "System Manager",
    "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Accounts Manager",
    "write": 1
   },
   {
@@ -58,8 +87,11 @@
  ],
  "row_format": "Dynamic",
  "rows_threshold_for_grid_search": 20,
- "search_fields": "city",
+ "search_fields": "city,province",
+ "show_title_field_in_link": 0,
  "sort_field": "modified",
  "sort_order": "DESC",
- "states": []
+ "states": [],
+ "title_field": "city",
+ "track_changes": 1
 }

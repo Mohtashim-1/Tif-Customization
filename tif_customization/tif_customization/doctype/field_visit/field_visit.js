@@ -966,6 +966,17 @@ function clear_area_if_city_changed(frm, area_field) {
 	}
 }
 
+function set_province_from_city(frm, city_field, province_field) {
+	const city = (frm.doc[city_field] || "").trim();
+	if (!city || !frm.fields_dict[province_field]) return;
+	frappe.db.get_value("City", city, "province", (r) => {
+		const province = (r && r.province) || "";
+		if (province && frm.doc[province_field] !== province) {
+			frm.set_value(province_field, province);
+		}
+	});
+}
+
 frappe.ui.form.on("Field Visit", {
 	onload(frm) {
 		apply_visible_type_options(frm);
@@ -1253,12 +1264,18 @@ frappe.ui.form.on("Field Visit", {
 	status: apply_field_visit_logic,
 	city(frm) {
 		clear_area_if_city_changed(frm, "area");
+		set_province_from_city(frm, "city", "province");
 	},
 	me_city(frm) {
 		clear_area_if_city_changed(frm, "me_area");
+		set_province_from_city(frm, "me_city", "me_province");
 	},
 	mt_city(frm) {
 		clear_area_if_city_changed(frm, "mt_area");
+		set_province_from_city(frm, "mt_city", "mt_province");
+	},
+	training_city(frm) {
+		set_province_from_city(frm, "training_city", "training_province");
 	},
 	reason_not_agreed: apply_field_visit_logic,
 	qps_affiliated: apply_field_visit_logic,

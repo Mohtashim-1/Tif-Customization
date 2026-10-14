@@ -17,6 +17,7 @@ CONTACT_ROLES = [
 	"Admin Person",
 	"Receptionist",
 	"Coordinator",
+	"Ambassador",
 ]
 
 FILE_FIELD_MAP = {

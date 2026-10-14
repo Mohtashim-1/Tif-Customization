@@ -30,7 +30,7 @@ const runningTif = list("school_opening_running_tif", ["Quran Program for Studen
 const curriculum = list("school_opening_curriculum", ["Oral Nazra", "Qaida", "Afaq", "National Book Foundation", "Noorani Qaida (Not TPS)", "Iqra Qaida", "Spectrum", "Rehmani Qaida", "Madni Qaida", "Gaba", "Jamiat Qaida", "Qurani Qaida", "Moonlight", "Islamic Values", "CEF", "Zia ul Quran"]);
 const fees = list("school_opening_fee", ["Above 15K", "Between 5K – 15K", "Below 5K"]);
 const provinces = list("school_opening_provinces", ["Sindh", "Punjab", "KPK", "Balochistan", "Gilgit-Baltistan", "Azad Jammu & Kashmir"]);
-const roles = list("school_opening_contact_roles", ["Director", "Administrator", "Principal", "Vice Principal", "Academic Manager", "Academic Coordinator", "Admin Person", "Receptionist", "Coordinator"]);
+const roles = list("school_opening_contact_roles", ["Director", "Administrator", "Principal", "Vice Principal", "Academic Manager", "Academic Coordinator", "Admin Person", "Receptionist", "Coordinator", "Ambassador"]);
 
 function toggle(arr, value) {
 	const listVal = Array.isArray(arr) ? arr : [];

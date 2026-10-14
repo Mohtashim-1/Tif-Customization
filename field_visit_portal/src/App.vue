@@ -169,6 +169,7 @@ const SOA_CONTACT_ROLES = [
 	"Admin Person",
 	"Receptionist",
 	"Coordinator",
+	"Ambassador",
 ];
 const SOA_PROVINCE_FROM_VISIT = {
 	Sindh: "Sindh",
@@ -385,11 +386,17 @@ const areaOptions = computed(() => {
 			return {
 				value,
 				label,
-				description: a.description || a.city || "",
+				description: a.description || [a.city, a.province].filter(Boolean).join(" · ") || a.city || "",
 				city: a.city || "",
+				province: a.province || "",
 			};
 		})
-		.filter((a) => a.value && (!city || !a.city || a.city === city));
+		.filter((a) => {
+			if (!a.value) return false;
+			// Prefer areas for selected city; if no city yet, show linked areas for Area→City cascade.
+			if (city) return a.city === city;
+			return !!a.city;
+		});
 });
 const staffOptions = computed(() =>
 	(meta.value.staff_options || []).map((s) => s.employee_name || s.employee).filter(Boolean)
@@ -491,10 +498,7 @@ const isOfficialVisitTask = computed(() => {
 });
 const assignedByOptions = ["Head Office", "Regional Office", "Supervisor", "Out of Station", "Other"];
 const marketingCategories = computed(() =>
-	nonempty(meta.value.marketing_visit_categories, ["New", "Followup & Other Visits", "TPS Visits"])
-);
-const frequencyOptions = computed(() =>
-	nonempty(meta.value.frequencies, [
+	nonempty(meta.value.marketing_visit_categories, [
 		"New",
 		"1st Follow up visit",
 		"2nd Follow up visit",
@@ -713,12 +717,49 @@ async function searchCities(txt) {
 }
 
 async function searchAreas(txt) {
+	const city = visit.city || meeting.city || training.city || volunteerVisit.city || ambassadorVisit.city || "";
 	const rows = await apiGet(`${METHOD}.search_areas`, {
 		txt: txt || "",
-		city: visit.city || meeting.city || training.city || "",
+		city: city || "",
 		limit: 80,
 	});
 	return Array.isArray(rows) ? rows : [];
+}
+
+let skipAreaClearOnCity = false;
+
+async function applyProvinceFromCity(city, target) {
+	const name = (city || "").trim();
+	if (!name || !target) return;
+	try {
+		const row = await apiGet(`${METHOD}.get_city_province`, { city: name });
+		const province = (row && row.province) || "";
+		if (province) target.province = province;
+	} catch {
+		/* ignore */
+	}
+}
+
+async function applyLocationFromArea(area, target) {
+	const name = (area || "").trim();
+	if (!name || !target) return;
+	try {
+		const row = await apiGet(`${METHOD}.get_area_location`, { area: name });
+		if (!row) return;
+		const city = (row.city || "").trim();
+		const province = (row.province || "").trim();
+		if (!city && !province) return;
+		skipAreaClearOnCity = true;
+		try {
+			if (city) target.city = city;
+			if (province) target.province = province;
+			else if (city) await applyProvinceFromCity(city, target);
+		} finally {
+			skipAreaClearOnCity = false;
+		}
+	} catch {
+		skipAreaClearOnCity = false;
+	}
 }
 
 watch(
@@ -731,9 +772,16 @@ watch(
 			if (!row || !row.value) return;
 			creatingSchool.value = false;
 			visit.schoolNameLabel = row.label || visit.schoolNameLabel || name;
-			if (row.address && !visit.schoolAddress) visit.schoolAddress = row.address;
-			if (row.school_type && !visit.schoolType) visit.schoolType = row.school_type;
-			if (row.city && cityOptions.value.includes(row.city) && !visit.city) visit.city = row.city;
+			// Always refresh from Customer when school changes (type / address / city / province).
+			if (row.address) visit.schoolAddress = row.address;
+			if (row.school_type) visit.schoolType = row.school_type;
+			if (row.city) {
+				const prevCity = visit.city;
+				visit.city = row.city;
+				if (prevCity && prevCity !== row.city) visit.area = "";
+			}
+			if (row.province) visit.province = row.province;
+			else if (row.city) await applyProvinceFromCity(row.city, visit);
 		} catch {
 			/* ignore */
 		}
@@ -758,13 +806,46 @@ watch(
 watch(
 	() => visit.city,
 	(city, prev) => {
-		if (prev && city !== prev) visit.area = "";
+		if (!skipAreaClearOnCity && prev && city !== prev) visit.area = "";
+		if (city) applyProvinceFromCity(city, visit);
 	},
 );
 watch(
 	() => meeting.city,
 	(city, prev) => {
-		if (prev && city !== prev) meeting.area = "";
+		if (!skipAreaClearOnCity && prev && city !== prev) meeting.area = "";
+		if (city) applyProvinceFromCity(city, meeting);
+	},
+);
+watch(
+	() => training.city,
+	(city) => {
+		if (city) applyProvinceFromCity(city, training);
+	},
+);
+watch(
+	() => volunteerVisit.city,
+	(city) => {
+		if (city) applyProvinceFromCity(city, volunteerVisit);
+	},
+);
+watch(
+	() => ambassadorVisit.city,
+	(city) => {
+		if (city) applyProvinceFromCity(city, ambassadorVisit);
+	},
+);
+
+watch(
+	() => visit.area,
+	(area) => {
+		if (area) applyLocationFromArea(area, visit);
+	},
+);
+watch(
+	() => meeting.area,
+	(area) => {
+		if (area) applyLocationFromArea(area, meeting);
 	},
 );
 
@@ -1009,7 +1090,9 @@ function buildPayload(submitDoc) {
 		designation: schoolForm ? visit.designation : "",
 		designation_other: card?.group === "visits" ? visit.designationOther : "",
 		school_additional_remarks: schoolForm ? visit.schoolAdditionalRemarks : meeting.remarks,
-		frequency_of_visits: card?.group === "visits" ? visit.frequency : meeting.frequency,
+		// Frequency field removed from Easy Form — mirror Marketing Visit Category for desk/reports.
+		frequency_of_visits:
+			card?.group === "visits" ? visit.marketingVisitCategory || "" : meeting.frequency || "",
 		status: card?.group === "visits" ? visit.status : meeting.status,
 		mutalae_sample: meeting.mutalaeSample,
 		submit_doc: submitDoc,
@@ -1458,6 +1541,12 @@ async function saveVisit(submitDoc) {
 			await apiPost(`${METHOD}.submit_field_visit_doc`, { name: visitName });
 		}
 		success.value = true;
+		// Volunteer / Ambassador: open Easy View so enrolled people details are visible.
+		const enrolmentGroup = selected.value?.group;
+		if (enrolmentGroup === "volunteer" || enrolmentGroup === "ambassador") {
+			window.location.assign(`/field-visit-easy?name=${encodeURIComponent(visitName)}`);
+			return;
+		}
 		const redirected = await goToVisitFeedback(visitName, result.feedback_url);
 		if (redirected) return;
 		setTimeout(() => {
@@ -1788,7 +1877,6 @@ const steps = [
 							<FieldSelect :mode="lang" label-en="Quarter" label-ur="سہ ماہی" :options="QUARTER_OPTIONS" v-model="visit.quarter" />
 							<FieldSelect :mode="lang" label-en="Name of Staff" label-ur="سٹاف کا نام" :options="staffOptions" required v-model="visit.visitBy" />
 							<FieldSelect :mode="lang" label-en="Marketing Visit Category" label-ur="مارکیٹنگ وزٹ کیٹیگری" :options="marketingCategories" placeholder-en="Select" placeholder-ur="منتخب کریں" v-model="visit.marketingVisitCategory" />
-							<FieldSelect :mode="lang" label-en="Frequency of Visits" label-ur="وزٹ کی فریکوئنسی" :options="frequencyOptions" placeholder-en="Select" placeholder-ur="منتخب کریں" v-model="visit.frequency" />
 							<FieldSelect :mode="lang" label-en="Status" label-ur="سٹیٹس" :options="statusOptions" placeholder-en="Select" placeholder-ur="منتخب کریں" v-model="visit.status" />
 							<FieldDate :mode="lang" label-en="Visit Date" label-ur="وزٹ کی تاریخ" required v-model="visit.visitDate" />
 							<FieldTime :mode="lang" label-en="Visiting Starting Time" label-ur="آغاز کا وقت" required v-model="visit.startTime" />

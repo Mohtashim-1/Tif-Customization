@@ -778,7 +778,7 @@
    "fieldname": "marketing_visit_category",
    "fieldtype": "Select",
    "label": "Marketing Visit Category",
-   "options": "\nNew\nFollowup & Other Visits\nTPS Visits",
+   "options": "\nNew\n1st Follow up visit\n2nd Follow up visit\n3rd Follow up visit\n4th Follow up visit\nOther Visits\nFollowup & Other Visits\nTPS Visits",
    "allow_on_submit": 1
   },
   {

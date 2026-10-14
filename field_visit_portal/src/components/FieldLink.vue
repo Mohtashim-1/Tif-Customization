@@ -31,11 +31,19 @@ const display = computed(() => label.value || model.value || "");
 
 function asItem(opt) {
 	if (opt && typeof opt === "object") {
+		const city = opt.city || "";
+		const province = opt.province || "";
+		const desc =
+			opt.description ||
+			[city, province].filter(Boolean).join(" · ") ||
+			city ||
+			"";
 		return {
 			value: String(opt.value ?? opt.name ?? ""),
 			label: String(opt.label || opt.value || opt.name || ""),
-			description: String(opt.description || opt.city || ""),
-			city: opt.city || "",
+			description: String(desc),
+			city,
+			province,
 			school_type: opt.school_type || "",
 		};
 	}

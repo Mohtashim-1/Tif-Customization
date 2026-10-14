@@ -20,7 +20,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Role",
-   "options": "Director\nAdministrator\nPrincipal\nVice Principal\nAcademic Manager\nAcademic Coordinator\nAdmin Person\nReceptionist\nCoordinator",
+   "options": "Director\nAdministrator\nPrincipal\nVice Principal\nAcademic Manager\nAcademic Coordinator\nAdmin Person\nReceptionist\nCoordinator\nAmbassador",
    "reqd": 1
   },
   {

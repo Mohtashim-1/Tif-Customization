@@ -424,8 +424,11 @@ def get_form_meta():
 		],
 		"marketing_visit_categories": [
 			"New",
-			"Followup & Other Visits",
-			"TPS Visits",
+			"1st Follow up visit",
+			"2nd Follow up visit",
+			"3rd Follow up visit",
+			"4th Follow up visit",
+			"Other Visits",
 		],
 		"frequencies": [
 			"New",
@@ -837,19 +840,23 @@ def _city_link_options(txt="", limit=80):
 	txt = (txt or "").strip()
 	limit = max(1, min(cint(limit) or 80, 500))
 	has_city = frappe.db.has_column("City", "city")
+	has_province = frappe.db.has_column("City", "province")
 	params = {}
 	where = ["1=1"]
 	tokens = [t for t in txt.split() if t]
 	for i, token in enumerate(tokens):
 		key = f"t{i}"
+		parts = [f"name LIKE %({key})s"]
 		if has_city:
-			where.append(f"(name LIKE %({key})s OR IFNULL(city, '') LIKE %({key})s)")
-		else:
-			where.append(f"name LIKE %({key})s")
+			parts.append(f"IFNULL(city, '') LIKE %({key})s")
+		if has_province:
+			parts.append(f"IFNULL(province, '') LIKE %({key})s")
+		where.append(f"({' OR '.join(parts)})")
 		params[key] = f"%{token}%"
+	province_sql = "IFNULL(province, '')" if has_province else "''"
 	rows = frappe.db.sql(
 		f"""
-		SELECT name
+		SELECT name, {province_sql} AS province
 		FROM `tabCity`
 		WHERE {" AND ".join(where)}
 		ORDER BY name ASC
@@ -865,13 +872,59 @@ def _city_link_options(txt="", limit=80):
 		if not name or name in seen:
 			continue
 		seen.add(name)
-		out.append({"value": name, "label": name, "name": name})
+		province = (row.get("province") or "").strip()
+		out.append(
+			{
+				"value": name,
+				"label": name,
+				"name": name,
+				"province": province,
+				"description": province,
+			}
+		)
 	return out
 
 
 @frappe.whitelist()
+def get_city_province(city=None):
+	"""Return Province for a City (Area → City → Province cascade)."""
+	if frappe.session.user == "Guest":
+		frappe.throw(_("Please log in"), frappe.AuthenticationError)
+	city = cstr(city or "").strip()
+	if not city or not frappe.db.exists("DocType", "City"):
+		return {"city": city, "province": ""}
+	province = ""
+	if frappe.db.has_column("City", "province"):
+		province = cstr(frappe.db.get_value("City", city, "province") or "").strip()
+	return {"city": city, "province": province}
+
+
+@frappe.whitelist()
+def get_area_location(area=None):
+	"""Return City + Province for an Area (select Area → auto City / Province)."""
+	if frappe.session.user == "Guest":
+		frappe.throw(_("Please log in"), frappe.AuthenticationError)
+	area = cstr(area or "").strip()
+	if not area or not frappe.db.exists("DocType", "Area"):
+		return {"area": area, "city": "", "province": ""}
+	fields = ["name"]
+	if frappe.db.has_column("Area", "city"):
+		fields.append("city")
+	if frappe.db.has_column("Area", "province"):
+		fields.append("province")
+	row = frappe.db.get_value("Area", area, fields, as_dict=True) or {}
+	city = cstr(row.get("city") or "").strip()
+	province = cstr(row.get("province") or "").strip()
+	if city and not province and frappe.db.exists("DocType", "City") and frappe.db.has_column(
+		"City", "province"
+	):
+		province = cstr(frappe.db.get_value("City", city, "province") or "").strip()
+	return {"area": area, "city": city, "province": province}
+
+
+@frappe.whitelist()
 def search_areas(txt=None, city=None, limit=80):
-	"""Typeahead for Area Link field."""
+	"""Typeahead for Area Link field — filtered by selected City when provided."""
 	if frappe.session.user == "Guest":
 		frappe.throw(_("Please log in"), frappe.AuthenticationError)
 	return _area_link_options(txt=txt, city=city, limit=max(1, min(cint(limit) or 80, 200)))
@@ -885,6 +938,7 @@ def _area_link_options(txt="", city="", limit=80):
 	limit = max(1, min(cint(limit) or 80, 5000))
 	has_area = frappe.db.has_column("Area", "area")
 	has_city = frappe.db.has_column("Area", "city")
+	has_province = frappe.db.has_column("Area", "province")
 	where = ["1=1"]
 	params = {}
 	tokens = [t for t in txt.split() if t]
@@ -895,14 +949,20 @@ def _area_link_options(txt="", city="", limit=80):
 		else:
 			where.append(f"name LIKE %({key})s")
 		params[key] = f"%{token}%"
+	# Prefer areas for the selected city; without city, allow search so Area
+	# can drive City + Province autofill on Easy Form.
 	if city and has_city:
-		where.append("(IFNULL(city, '') = '' OR city = %(city)s)")
+		where.append("city = %(city)s")
 		params["city"] = city
+	elif has_city and not tokens:
+		# No city + empty query: only areas that already have a city (usable cascade).
+		where.append("IFNULL(TRIM(city), '') != ''")
 	area_sql = "IFNULL(area, name)" if has_area else "name"
 	city_sql = "IFNULL(city, '')" if has_city else "''"
+	province_sql = "IFNULL(province, '')" if has_province else "''"
 	rows = frappe.db.sql(
 		f"""
-		SELECT name, {area_sql} AS area_label, {city_sql} AS city
+		SELECT name, {area_sql} AS area_label, {city_sql} AS city, {province_sql} AS province
 		FROM `tabArea`
 		WHERE {" AND ".join(where)}
 		ORDER BY area_label ASC
@@ -919,14 +979,17 @@ def _area_link_options(txt="", city="", limit=80):
 		if not name or name in seen:
 			continue
 		seen.add(name)
-		desc = (row.get("city") or "").strip()
+		city_name = (row.get("city") or "").strip()
+		province = (row.get("province") or "").strip()
+		desc = " · ".join([p for p in (city_name, province) if p])
 		out.append(
 			{
 				"value": name,
 				"label": label,
 				"name": name,
 				"description": desc,
-				"city": desc,
+				"city": city_name,
+				"province": province,
 			}
 		)
 	return out
@@ -934,39 +997,75 @@ def _area_link_options(txt="", city="", limit=80):
 
 @frappe.whitelist()
 def get_school_customer(name=None):
-	"""Load Customer details to fill School Address / Type on the easy form."""
+	"""Load Customer details to fill School Type / Address / City / Province on the easy form."""
 	if frappe.session.user == "Guest":
 		frappe.throw(_("Please log in"), frappe.AuthenticationError)
 	name = (name or "").strip()
 	if not name or not frappe.db.exists("Customer", name):
 		return {}
-	cust_fields = ["name", "customer_name", "territory"]
+	cust_fields = ["name", "customer_name", "territory", "customer_type"]
 	meta = frappe.get_meta("Customer")
 	if meta.has_field("custom_category"):
 		cust_fields.append("custom_category")
+	if meta.has_field("custom_type_of_customer"):
+		cust_fields.append("custom_type_of_customer")
 	if meta.has_field("customer_primary_address"):
 		cust_fields.append("customer_primary_address")
 	cust = frappe.db.get_value("Customer", name, cust_fields, as_dict=True) or {}
-	address = _customer_address_text(name, cust.get("customer_primary_address"))
+	addr = _customer_address_row(name, cust.get("customer_primary_address"))
+	address = _format_address_row(addr) if addr else ""
+	city = (
+		cstr(cust.get("territory") or "").strip()
+		or cstr((addr or {}).get("city") or "").strip()
+	)
+	# Prefer City master name when address city matches a City doc.
+	if city and frappe.db.exists("DocType", "City") and not frappe.db.exists("City", city):
+		alt = frappe.db.get_value("City", {"city": city}, "name")
+		if alt:
+			city = alt
+	province = ""
+	if city and frappe.db.exists("DocType", "City") and frappe.db.has_column("City", "province"):
+		province = cstr(frappe.db.get_value("City", city, "province") or "").strip()
+	if not province:
+		raw_state = cstr((addr or {}).get("state") or "").strip()
+		if raw_state:
+			province = PROVINCE_MAP.get(raw_state) or PROVINCE_MAP.get(raw_state.title()) or ""
+			if not province:
+				for key, full in PROVINCE_MAP.items():
+					if raw_state.lower() == key.lower() or raw_state.lower() == full.lower():
+						province = full
+						break
+			if not province:
+				province = raw_state
+	school_type = _school_type_from_customer(
+		cust.get("custom_category"),
+		cust.get("customer_type"),
+		cust.get("custom_type_of_customer"),
+	)
 	return {
 		"value": cust.get("name") or name,
 		"label": (cust.get("customer_name") or name).strip(),
-		"city": (cust.get("territory") or "").strip(),
-		"school_type": _school_type_from_customer(cust.get("custom_category")),
+		"city": city,
+		"province": province,
+		"school_type": school_type,
 		"address": address,
 	}
 
 
-def _school_type_from_customer(category):
-	cat = (category or "").strip().lower()
-	if cat in ("chain school", "chains of school", "chain of school"):
-		return "Chains of School"
-	if cat in ("individual school", "individual"):
-		return "Individual School"
+def _school_type_from_customer(category=None, customer_type=None, type_of_customer=None):
+	"""Map Customer fields → Easy Form school type options."""
+	for raw in (category, type_of_customer, customer_type):
+		cat = cstr(raw or "").strip().lower()
+		if not cat:
+			continue
+		if cat in ("chain school", "chains of school", "chain of school", "company"):
+			return "Chains of School"
+		if cat in ("individual school", "individual", "school", "person"):
+			return "Individual School"
 	return ""
 
 
-def _customer_address_text(customer, primary_name=None):
+def _customer_address_row(customer, primary_name=None):
 	if primary_name and frappe.db.exists("Address", primary_name):
 		addr = frappe.get_cached_value(
 			"Address",
@@ -975,9 +1074,7 @@ def _customer_address_text(customer, primary_name=None):
 			as_dict=True,
 		)
 		if addr:
-			return ", ".join(
-				[cstr(addr.get(k)).strip() for k in ("address_line1", "address_line2", "city", "state", "pincode") if cstr(addr.get(k)).strip()]
-			)
+			return addr
 	rows = frappe.db.sql(
 		"""
 		SELECT addr.address_line1, addr.address_line2, addr.city, addr.state, addr.pincode
@@ -991,12 +1088,23 @@ def _customer_address_text(customer, primary_name=None):
 		customer,
 		as_dict=True,
 	)
-	if not rows:
+	return rows[0] if rows else None
+
+
+def _format_address_row(addr):
+	if not addr:
 		return ""
-	addr = rows[0]
 	return ", ".join(
-		[cstr(addr.get(k)).strip() for k in ("address_line1", "address_line2", "city", "state", "pincode") if cstr(addr.get(k)).strip()]
+		[
+			cstr(addr.get(k)).strip()
+			for k in ("address_line1", "address_line2", "city", "state", "pincode")
+			if cstr(addr.get(k)).strip()
+		]
 	)
+
+
+def _customer_address_text(customer, primary_name=None):
+	return _format_address_row(_customer_address_row(customer, primary_name))
 
 
 def _resolve_customer_link(value):
@@ -1827,7 +1935,30 @@ def get_field_visit_easy_view(name=None):
 			],
 		)
 
-	volunteer_rows = list(getattr(doc, "volunteer_enrolments", None) or [])
+	def _child_school_label(school_id):
+		school_id = cstr(school_id or "").strip()
+		if not school_id:
+			return ""
+		if frappe.db.exists("Customer", school_id):
+			return cstr(
+				frappe.db.get_value("Customer", school_id, "customer_name") or school_id
+			).strip()
+		return school_id
+
+	def _load_child_rows(doctype, parentfield):
+		"""Prefer DB rows so Easy View always shows saved enrolments."""
+		if not frappe.db.exists("DocType", doctype):
+			return []
+		return frappe.get_all(
+			doctype,
+			filters={"parent": doc.name, "parentfield": parentfield},
+			fields=["*"],
+			order_by="idx asc",
+		)
+
+	volunteer_rows = _load_child_rows("Field Visit Volunteer", "volunteer_enrolments")
+	if not volunteer_rows:
+		volunteer_rows = list(getattr(doc, "volunteer_enrolments", None) or [])
 	if volunteer_rows:
 		add_section(
 			_("Volunteers"),
@@ -1837,11 +1968,7 @@ def get_field_visit_easy_view(name=None):
 			],
 		)
 		for idx, vol in enumerate(volunteer_rows, start=1):
-			vol_school = cstr(getattr(vol, "school", None)).strip()
-			if vol_school and frappe.db.exists("Customer", vol_school):
-				vol_school = cstr(
-					frappe.db.get_value("Customer", vol_school, "customer_name") or vol_school
-				).strip()
+			vol = frappe._dict(vol) if isinstance(vol, dict) else vol
 			add_section(
 				_("Volunteer {0}").format(idx),
 				[
@@ -1854,24 +1981,24 @@ def get_field_visit_easy_view(name=None):
 					row(_("City"), getattr(vol, "city", None)),
 					row(_("Area"), getattr(vol, "area", None)),
 					row(_("Address"), getattr(vol, "address", None)),
-					row(_("School"), vol_school),
+					row(_("School"), _child_school_label(getattr(vol, "school", None))),
 					row(_("Form Submitted"), getattr(vol, "volunteer_form_submitted", None)),
 					row(_("Remarks"), getattr(vol, "remarks", None)),
 				],
 			)
 
-	ambassador_rows = list(getattr(doc, "ambassador_enrolments", None) or [])
-	if ambassador_rows:
+	ambassador_rows = _load_child_rows("Field Visit Ambassador", "ambassador_enrolments")
+	if not ambassador_rows:
+		ambassador_rows = list(getattr(doc, "ambassador_enrolments", None) or [])
+	if ambassador_rows or doc_type == "Enrolment of Ambassadors":
 		add_section(
 			_("Ambassadors"),
-			[row(_("Ambassadors Enrolled"), len(ambassador_rows))],
+			[
+				row(_("Ambassadors Enrolled"), len(ambassador_rows)),
+			],
 		)
 		for idx, amb in enumerate(ambassador_rows, start=1):
-			amb_school = cstr(getattr(amb, "school", None)).strip()
-			if amb_school and frappe.db.exists("Customer", amb_school):
-				amb_school = cstr(
-					frappe.db.get_value("Customer", amb_school, "customer_name") or amb_school
-				).strip()
+			amb = frappe._dict(amb) if isinstance(amb, dict) else amb
 			add_section(
 				_("Ambassador {0}").format(idx),
 				[
@@ -1882,10 +2009,13 @@ def get_field_visit_easy_view(name=None):
 					row(_("Contact"), getattr(amb, "contact_number", None)),
 					row(_("Email"), getattr(amb, "email", None)),
 					row(_("Profession"), getattr(amb, "profession", None)),
+					row(_("Contribution / Role"), getattr(amb, "contribution", None)),
 					row(_("Province"), getattr(amb, "province", None)),
 					row(_("City"), getattr(amb, "city", None)),
 					row(_("Area"), getattr(amb, "area", None)),
-					row(_("School"), amb_school),
+					row(_("Address"), getattr(amb, "address", None)),
+					row(_("School"), _child_school_label(getattr(amb, "school", None))),
+					row(_("Form Submitted"), getattr(amb, "ambassador_form_submitted", None)),
 					row(_("Remarks"), getattr(amb, "remarks", None)),
 				],
 			)
@@ -2085,12 +2215,7 @@ def _append_enrolment_rows(doc, data):
 
 def _append_volunteer_rows(doc, data):
 	"""Child table Field Visit Volunteer — contact, location, school, profession."""
-	rows = data.get("volunteer_enrolments") or data.get("volunteers") or []
-	if isinstance(rows, str):
-		try:
-			rows = frappe.parse_json(rows) or []
-		except Exception:
-			rows = []
+	rows = _parse_rows(data.get("volunteer_enrolments") or data.get("volunteers"))
 	meta = frappe.get_meta("Field Visit Volunteer")
 	has = {df.fieldname for df in meta.fields}
 	for row in rows:
@@ -2144,12 +2269,7 @@ def _append_volunteer_rows(doc, data):
 
 def _append_ambassador_rows(doc, data):
 	"""Child table Field Visit Ambassador — same shape as volunteers."""
-	rows = data.get("ambassador_enrolments") or data.get("ambassadors") or []
-	if isinstance(rows, str):
-		try:
-			rows = frappe.parse_json(rows) or []
-		except Exception:
-			rows = []
+	rows = _parse_rows(data.get("ambassador_enrolments") or data.get("ambassadors"))
 	meta = frappe.get_meta("Field Visit Ambassador")
 	has = {df.fieldname for df in meta.fields}
 	for row in rows:

@@ -65,7 +65,7 @@ OUTCOME_TARGETS = (
 		"target": 148,
 		"metric": "workshop_registration",
 	},
-	{"key": "volunteers", "label": _("Volunteers Enrolled"), "short_label": _("Volunteers Enrolled"), "target": 25, "metric": "volunteers"},
+	{"key": "volunteers", "label": _("Volunteers enrolled through SME"), "short_label": _("Volunteers enrolled through SME"), "target": 25, "metric": "volunteers"},
 	{"key": "model_school_a", "label": _("Model School A"), "target": 6, "metric": "model_school_a"},
 	{"key": "model_school_b", "label": _("Model School B"), "target": 12, "metric": "model_school_b"},
 )

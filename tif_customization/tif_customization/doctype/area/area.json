@@ -8,13 +8,15 @@
  "field_order": [
   "area",
   "column_break_iqck",
-  "city"
+  "city",
+  "province"
  ],
  "fields": [
   {
    "fieldname": "area",
    "fieldtype": "Data",
    "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Area",
    "reqd": 1,
    "unique": 1
@@ -24,18 +26,30 @@
    "fieldtype": "Column Break"
   },
   {
+   "description": "Select City first. Areas are filtered by City on Field Visit / Easy Form.",
    "fieldname": "city",
    "fieldtype": "Link",
    "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "City",
    "options": "City",
    "reqd": 1
+  },
+  {
+   "fetch_from": "city.province",
+   "fieldname": "province",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Province",
+   "options": "Province",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-09-18 18:40:00.000000",
+ "modified": "2026-10-14 18:30:00.000000",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Area",
@@ -52,6 +66,16 @@
    "report": 1,
    "role": "System Manager",
    "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Accounts Manager",
    "write": 1
   },
   {
@@ -74,8 +98,10 @@
   }
  ],
  "row_format": "Dynamic",
- "search_fields": "area,city",
+ "search_fields": "area,city,province",
  "sort_field": "modified",
  "sort_order": "DESC",
- "states": []
+ "states": [],
+ "title_field": "area",
+ "track_changes": 1
 }

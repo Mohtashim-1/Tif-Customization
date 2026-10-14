@@ -763,7 +763,7 @@ def _report_outcome_fy_totals(staff_rows, ytd_from, to_date):
 	for key, label in (
 		("active_schools", _("Active Schools")),
 		("inactive_schools", _("Inactive Schools")),
-		("model_school_0", _("Model 0 (No Program)")),
+		("model_school_0", _("Model 0 (No Program Selected)")),
 		("online_workshop", _("Online Workshop")),
 		("online_participants", _("Online Participants")),
 	):

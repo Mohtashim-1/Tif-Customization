@@ -532,7 +532,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			},
 			{ key: "outcome_workshop_registration", label: __("Onsite Workshop Participants through SME"), short_label: __("Onsite Workshop Participants through SME"), metric: "workshop_registration" },
 			onlineCol,
-			{ key: "outcome_volunteers", label: __("Volunteers Enrolled"), short_label: __("Volunteers Enrolled"), metric: "volunteers" },
+			{ key: "outcome_volunteers", label: __("Volunteers enrolled through SME"), short_label: __("Volunteers enrolled through SME"), metric: "volunteers" },
 		];
 		const cols = [...((data && data.outcome_columns) || fallback)];
 		// Always keep Online column right after Workshop Participants.
@@ -895,7 +895,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 							hint: __("Other registered schools. Model A + B + C = Active Schools."),
 						},
 						{
-							label: __("Model 0 (No Program)"),
+							label: __("Model 0 (No Program Selected)"),
 							value: this.fmt(((data.outcome_fy || {}).model_school_0 || {}).actual),
 							style: "model-c",
 							metric: "model_school_0",
@@ -1202,37 +1202,6 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 	}
 
 	show_active_school_models() {
-		const data = this.data || {};
-		const fy = data.outcome_fy || {};
-		const m0Card = cint((fy.model_school_0 || {}).actual);
-		const rowSum0 = (data.rows || []).reduce(
-			(s, r) => s + cint(r.outcome_model_school_0),
-			0
-		);
-		// Rows loaded before Model 0 was added per SME — refresh once then open.
-		if (m0Card > 0 && rowSum0 === 0 && !this._reloading_model0) {
-			this._reloading_model0 = true;
-			frappe.call({
-				method:
-					"tif_customization.tif_customization.page.sme_summary_report_copy.sme_summary_report_copy.get_report_data",
-				args: { filters: this.get_filters() },
-				freeze: true,
-				freeze_message: __("Loading Model 0 by SME…"),
-				callback: (r) => {
-					this._reloading_model0 = false;
-					if (r.message) {
-						this.data = r.message;
-						this.render(r.message);
-					}
-					this._open_active_school_models_dialog();
-				},
-				error: () => {
-					this._reloading_model0 = false;
-					this._open_active_school_models_dialog();
-				},
-			});
-			return;
-		}
 		this._open_active_school_models_dialog();
 	}
 
@@ -1242,22 +1211,19 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		const a = cint((fy.model_school_a || {}).actual);
 		const b = cint((fy.model_school_b || {}).actual);
 		const c = cint((fy.model_school_c || {}).actual);
-		const m0 = cint((fy.model_school_0 || {}).actual);
 		const active = cint((fy.active_schools || {}).actual) || a + b + c;
 		const smeRows = [...(data.rows || [])]
 			.map((r) => {
 				const modelA = cint(r.outcome_model_school_a);
 				const modelB = cint(r.outcome_model_school_b);
 				const modelC = cint(r.outcome_model_school_c);
-				const model0 = cint(r.outcome_model_school_0);
 				return {
 					name: r.label || r.employee_name || r.user_id || r.employee || "",
 					staff: r.user_id || r.employee_name || r.employee || "",
 					modelA,
 					modelB,
 					modelC,
-					model0,
-					total: modelA + modelB + modelC + model0,
+					total: modelA + modelB + modelC,
 				};
 			})
 			.filter((r) => r.total > 0)
@@ -1265,7 +1231,6 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		const sumA = smeRows.reduce((s, r) => s + r.modelA, 0);
 		const sumB = smeRows.reduce((s, r) => s + r.modelB, 0);
 		const sumC = smeRows.reduce((s, r) => s + r.modelC, 0);
-		const sum0 = smeRows.reduce((s, r) => s + r.model0, 0);
 		const body = smeRows.length
 			? smeRows
 					.map(
@@ -1280,18 +1245,15 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				<td class="num sme-click" data-visit-metric="model_school_c" data-visit-staff="${frappe.utils.escape_html(
 					r.staff
 				)}" data-outcome-fy="1">${this.fmt(r.modelC)}</td>
-				<td class="num sme-click" data-visit-metric="model_school_0" data-visit-staff="${frappe.utils.escape_html(
-					r.staff
-				)}" data-outcome-fy="1">${this.fmt(r.model0)}</td>
 				<td class="num">${this.fmt(r.total)}</td>
 			</tr>`
 					)
 					.join("")
-			: `<tr><td colspan="6" class="text-muted text-center">${__(
-					"No Model A / B / C / 0 schools for SMEs in this period"
+			: `<tr><td colspan="5" class="text-muted text-center">${__(
+					"No Model A / B / C schools for SMEs in this period"
 				)}</td></tr>`;
 		const d = new frappe.ui.Dialog({
-			title: __("Active Schools — Model A / B / C / 0"),
+			title: __("Active Schools — Model A / B / C"),
 			size: "extra-large",
 			fields: [{ fieldtype: "HTML", fieldname: "html" }],
 			primary_action_label: __("Close"),
@@ -1319,14 +1281,9 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					<div class="sme-sum-kpi__value">${this.fmt(c)}</div>
 					<div class="sme-sum-kpi__hint">${__("Other registered")}</div>
 				</div>
-				<div class="sme-sum-kpi sme-sum-kpi--model-c" data-visit-metric="model_school_0" data-outcome-fy="1" style="min-width:140px;cursor:pointer;">
-					<div class="sme-sum-kpi__label">${__("Model 0")}</div>
-					<div class="sme-sum-kpi__value">${this.fmt(m0)}</div>
-					<div class="sme-sum-kpi__hint">${__("No program")}</div>
-				</div>
 			</div>
 			<p class="text-muted" style="font-size:11px;margin:14px 0 8px;">
-				${__("SME — Model A / B / C / 0 school counts")} · ${__(
+				${__("SME — Model A / B / C school counts")} · ${__(
 					"Click a count to open school / visit detail."
 				)}
 			</p>
@@ -1338,7 +1295,6 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 							<th class="text-right">${__("Model A")}</th>
 							<th class="text-right">${__("Model B")}</th>
 							<th class="text-right">${__("Model C")}</th>
-							<th class="text-right">${__("Model 0")}</th>
 							<th class="text-right">${__("Total")}</th>
 						</tr>
 					</thead>
@@ -1350,8 +1306,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						<th class="text-right">${this.fmt(sumA)}</th>
 						<th class="text-right">${this.fmt(sumB)}</th>
 						<th class="text-right">${this.fmt(sumC)}</th>
-						<th class="text-right">${this.fmt(sum0)}</th>
-						<th class="text-right">${this.fmt(sumA + sumB + sumC + sum0)}</th>
+						<th class="text-right">${this.fmt(sumA + sumB + sumC)}</th>
 					</tr></tfoot>`
 							: ""
 					}

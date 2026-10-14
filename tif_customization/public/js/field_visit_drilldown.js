@@ -373,7 +373,7 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 					<tr>
 						<th>${__("Document No")}</th>
 						<th>${__("Visit Date")}</th>
-						${hideType ? "" : `<th>${__("Type")}</th>`}
+						${hideType ? "" : `<th>${__("Type / Task")}</th>`}
 						${hideSchool ? "" : `<th>${__("School / Venue")}</th>`}
 						<th>${__("Officer")}</th>
 						<th>${__("Status")}</th>
@@ -562,7 +562,7 @@ frappe.tif_customization.show_volunteer_enrolment_dialog = function (data) {
 	);
 	const total = people.length;
 	const d = new frappe.ui.Dialog({
-		title: data.title || __("Volunteers Enrolled"),
+		title: data.title || __("Volunteers enrolled through SME"),
 		size: "extra-large",
 		fields: [{ fieldtype: "HTML", fieldname: "html" }],
 		primary_action_label: __("Close"),
@@ -591,7 +591,7 @@ frappe.tif_customization.show_volunteer_enrolment_dialog = function (data) {
 			.join("");
 	};
 	const showOfficers = () => {
-		d.set_title(data.title || __("Volunteers Enrolled"));
+		d.set_title(data.title || __("Volunteers enrolled through SME"));
 		const body = officers.length
 			? officers
 					.map(
@@ -1073,7 +1073,7 @@ frappe.tif_customization.show_monitoring_officer_dialog = function (data, rows, 
 						<tr>
 							<th>${__("Document No")}</th>
 							<th>${__("Visit Date")}</th>
-							<th>${__("Type")}</th>
+							<th>${__("Type / Task")}</th>
 							<th>${__("School")}</th>
 							<th>${__("Approval")}</th>
 							<th>${__("Officer")}</th>
