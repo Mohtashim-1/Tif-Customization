@@ -687,11 +687,10 @@ def get_report_data(filters=None):
 			"marketing_new": cint(totals.get("marketing_new") or 0),
 			"me": cint(totals.get("me") or 0),
 			"training": cint(totals.get("workshop") or 0),
-			"school_visits": cint(totals.get("followup") or 0)
-			+ cint(totals.get("new") or 0)
-			+ cint(totals.get("marketing") or 0)
-			+ cint(totals.get("me") or 0)
-			- cint(totals.get("marketing_new") or 0),
+			# Same as Overview card / SME Summary dialog: Marketing + Follow up + M&E
+			"school_visits": cint(totals.get("marketing") or 0)
+			+ cint(totals.get("followup") or 0)
+			+ cint(totals.get("me") or 0),
 			"total_points": flt(totals.get("total_points") or 0, 2),
 			"earned_points": flt(totals.get("earned_points") or 0, 2),
 			"percentage": totals_out["percentage"],

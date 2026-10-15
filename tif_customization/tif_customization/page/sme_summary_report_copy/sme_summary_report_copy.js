@@ -775,18 +775,10 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					},
 					{
 						label: __("Total School Visit"),
-						value: this.fmt(
-							cint(k.marketing) +
-								cint(k.new) +
-								cint(k.followup) +
-								cint(k.me) -
-								cint(k.marketing_new),
-						),
+						value: this.fmt(cint(k.marketing) + cint(k.followup) + cint(k.me)),
 						style: "sme",
 						cardKind: "field_emp_summary",
-						hint: __(
-							"Each visit once. A Marketing visit with category New is on both Marketing Visit and New School Visit.",
-						),
+						hint: __("Marketing Visit + Follow up Visit + Monitoring Visit (M&E)"),
 					},
 					{
 						label: __("New School Visit (Marketing Visit)"),
@@ -1457,23 +1449,24 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 
 	field_emp_with_visits(data) {
 		const rows = (data && data.rows) || [];
-		return rows.filter((r) => cint(r.followup) > 0 || cint(r.new) > 0 || cint(r.me) > 0).length;
+		return rows.filter(
+			(r) => cint(r.followup) > 0 || cint(r.marketing) > 0 || cint(r.me) > 0,
+		).length;
 	}
 
 	show_field_emp_summary() {
 		const data = this.data || {};
-		const k = data.kpis || {};
 		const rows = [...(data.rows || [])]
 			.map((r) => {
-				const neu = cint(r.new);
+				const marketing = cint(r.marketing);
 				const followup = cint(r.followup);
 				const monitoring = this.me_visits(r);
 				return {
 					...r,
-					new_count: neu,
+					marketing_count: marketing,
 					followup_count: followup,
 					monitoring_count: monitoring,
-					total_count: neu + followup + monitoring,
+					total_count: marketing + followup + monitoring,
 				};
 			})
 			.filter((r) => r.total_count > 0)
@@ -1484,7 +1477,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			);
 
 		const sumTotal = rows.reduce((a, r) => a + r.total_count, 0);
-		const sumNew = rows.reduce((a, r) => a + r.new_count, 0);
+		const sumMarketing = rows.reduce((a, r) => a + r.marketing_count, 0);
 		const sumMon = rows.reduce((a, r) => a + r.monitoring_count, 0);
 		const sumFollow = rows.reduce((a, r) => a + r.followup_count, 0);
 
@@ -1500,12 +1493,12 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				</td>
 				<td class="num sme-click" data-visit-metric="school_visits" data-visit-staff="${frappe.utils.escape_html(
 					staff,
-				)}" title="${__("Total = New + Follow up + Monitoring")}"><strong>${this.fmt(
+				)}" title="${__("Total = Marketing + Follow up + Monitoring")}"><strong>${this.fmt(
 					r.total_count,
 				)}</strong></td>
-				<td class="num sme-click" data-visit-metric="new" data-visit-staff="${frappe.utils.escape_html(
+				<td class="num sme-click" data-visit-metric="marketing" data-visit-staff="${frappe.utils.escape_html(
 					staff,
-				)}">${this.fmt(r.new_count)}</td>
+				)}">${this.fmt(r.marketing_count)}</td>
 				<td class="num sme-click" data-visit-metric="monitoring" data-visit-staff="${frappe.utils.escape_html(
 					staff,
 				)}">${this.fmt(r.monitoring_count)}</td>
@@ -1534,11 +1527,11 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				<div style="border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;min-width:110px;">
 					<div style="font-size:11px;color:#64748b;">${__("Total")}</div>
 					<div style="font-size:18px;font-weight:700;">${this.fmt(sumTotal)}</div>
-					<div style="font-size:10px;color:#94a3b8;">${__("New + Follow up + Monitoring")}</div>
+					<div style="font-size:10px;color:#94a3b8;">${__("Marketing + Follow up + Monitoring")}</div>
 				</div>
 				<div style="border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;min-width:110px;">
-					<div style="font-size:11px;color:#64748b;">${__("New")}</div>
-					<div style="font-size:18px;font-weight:700;">${this.fmt(sumNew)}</div>
+					<div style="font-size:11px;color:#64748b;">${__("Marketing")}</div>
+					<div style="font-size:18px;font-weight:700;">${this.fmt(sumMarketing)}</div>
 				</div>
 				<div style="border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;min-width:110px;">
 					<div style="font-size:11px;color:#64748b;">${__("Monitoring")}</div>
@@ -1550,7 +1543,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				</div>
 			</div>
 			<p class="text-muted" style="font-size:12px;margin-bottom:10px;">
-				${__("Officer-wise Total, New, Monitoring and Follow up. Click a name for full KPI detail, or a number for documents.")}
+				${__("Officer-wise Total, Marketing, Monitoring and Follow up. Click a name for full KPI detail, or a number for documents.")}
 			</p>
 			<div class="table-responsive" style="max-height:420px;overflow:auto;">
 				<table class="table table-bordered table-hover" style="font-size:12px;margin:0;min-width:560px;">
@@ -1558,7 +1551,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						<tr>
 							<th style="position:sticky;left:0;background:#f8fafc;z-index:2;">${__("Field Officer / SME")}</th>
 							<th class="text-right">${__("Total")}</th>
-							<th class="text-right">${__("New")}</th>
+							<th class="text-right">${__("Marketing")}</th>
 							<th class="text-right">${__("Monitoring")}</th>
 							<th class="text-right">${__("Follow up")}</th>
 						</tr>
@@ -1568,7 +1561,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						<tr>
 							<th style="position:sticky;left:0;background:#f8fafc;">${__("Total")}</th>
 							<th class="text-right">${this.fmt(sumTotal)}</th>
-							<th class="text-right">${this.fmt(sumNew)}</th>
+							<th class="text-right">${this.fmt(sumMarketing)}</th>
 							<th class="text-right">${this.fmt(sumMon)}</th>
 							<th class="text-right">${this.fmt(sumFollow)}</th>
 						</tr>
@@ -2060,7 +2053,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 	officer_kpi_rows(row, data) {
 		const staff = row.user_id || row.employee_name || row.employee || "";
 		const items = [
-			{ group: __("Overview"), label: __("Total School Visits"), value: cint(row.new) + cint(row.followup) + this.me_visits(row), metric: "school_visits" },
+			{ group: __("Overview"), label: __("Total School Visits"), value: cint(row.marketing) + cint(row.followup) + this.me_visits(row), metric: "school_visits" },
 			{ group: __("Overview"), label: __("New School Visit"), value: row.new, metric: "new" },
 			{ group: __("Overview"), label: __("Number of School Visit"), value: row.followup, metric: "followup" },
 			{ group: __("Overview"), label: __("Visited Days"), value: row.visited_days, metric: "visited_days" },
