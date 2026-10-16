@@ -747,7 +747,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					const ws = (data.outcome_fy || {}).workshop_conducted || {};
 					return [
 						{
-							label: __("Workshop"),
+							label: __("Workshop Conducted"),
 							value: this.fmt(ws.actual),
 							style: "workshop",
 							metric: "workshop_conducted",
