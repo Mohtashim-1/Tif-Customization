@@ -820,16 +820,6 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					outcomeCards,
 					[
 						{
-							label: __("New Registered School"),
-							value: this.fmt(((data.outcome_fy || {}).new_schools || {}).actual),
-							style: "outcome",
-							cardKind: "active_school_by_staff",
-							outcomeFy: true,
-							hint: __(
-								"Onboarded schools (Registration of New Schools / New visits). Click for field staff counts."
-							),
-						},
-						{
 							label: __("Active Schools"),
 							value: this.fmt(((data.outcome_fy || {}).active_schools || {}).actual),
 							style: "model-a",
@@ -838,14 +828,6 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 							hint: __(
 								"Schools with any program running. Model A + B + C. Click for model split."
 							),
-						},
-						{
-							label: __("Inactive Schools"),
-							value: this.fmt(((data.outcome_fy || {}).inactive_schools || {}).actual),
-							style: "me",
-							metric: "inactive_schools",
-							outcomeFy: true,
-							hint: __("Visited schools where no program is running."),
 						},
 						{
 							label: __("Total Schools"),
@@ -859,6 +841,24 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 							hint: __(
 								"New Registered + Active + Inactive (sum of the three cards)."
 							),
+						},
+						{
+							label: __("New Registered School"),
+							value: this.fmt(((data.outcome_fy || {}).new_schools || {}).actual),
+							style: "outcome",
+							cardKind: "active_school_by_staff",
+							outcomeFy: true,
+							hint: __(
+								"Onboarded schools (Registration of New Schools / New visits). Click for field staff counts."
+							),
+						},
+						{
+							label: __("Inactive Schools"),
+							value: this.fmt(((data.outcome_fy || {}).inactive_schools || {}).actual),
+							style: "me",
+							metric: "inactive_schools",
+							outcomeFy: true,
+							hint: __("Visited schools where no program is running."),
 						},
 					],
 					[

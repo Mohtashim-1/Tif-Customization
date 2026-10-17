@@ -339,9 +339,12 @@ def get_active_field_officer_staff():
 @frappe.whitelist()
 def get_form_meta():
 	"""Lookups for the easy SMEs Activity Form portal."""
+	city_fields = ["name"]
+	if frappe.db.has_column("City", "province"):
+		city_fields.append("province")
 	cities = frappe.get_all(
 		"City",
-		fields=["name"],
+		fields=city_fields,
 		order_by="name",
 		limit_page_length=500,
 		ignore_permissions=True,
@@ -378,7 +381,16 @@ def get_form_meta():
 		"can_manage_farhan_only": can_manage_farhan_only_field_visit(),
 		"bulk_import_template_url": get_bulk_import_template_url(),
 		"today": today(),
-		"cities": [c.name for c in cities],
+		"cities": [
+			{
+				"value": c.name,
+				"label": c.name,
+				"name": c.name,
+				"province": cstr(c.get("province") or "").strip(),
+			}
+			for c in cities
+			if c.name
+		],
 		"areas": areas,
 		"months": [
 			"January",
@@ -827,22 +839,30 @@ def search_school_customers(txt=None, city=None, limit=50):
 
 
 @frappe.whitelist()
-def search_cities(txt=None, limit=80):
-	"""Typeahead for City Link field."""
+def search_cities(txt=None, province=None, limit=80):
+	"""Typeahead for City Link field, limited to the selected Province."""
 	if frappe.session.user == "Guest":
 		frappe.throw(_("Please log in"), frappe.AuthenticationError)
-	return _city_link_options(txt=txt, limit=max(1, min(cint(limit) or 80, 200)))
+	return _city_link_options(
+		txt=txt,
+		province=province,
+		limit=max(1, min(cint(limit) or 80, 200)),
+	)
 
 
-def _city_link_options(txt="", limit=80):
+def _city_link_options(txt="", province="", limit=80):
 	if not frappe.db.exists("DocType", "City"):
 		return []
 	txt = (txt or "").strip()
+	province = (province or "").strip()
 	limit = max(1, min(cint(limit) or 80, 500))
 	has_city = frappe.db.has_column("City", "city")
 	has_province = frappe.db.has_column("City", "province")
 	params = {}
 	where = ["1=1"]
+	if province and has_province:
+		where.append("province = %(province)s")
+		params["province"] = province
 	tokens = [t for t in txt.split() if t]
 	for i, token in enumerate(tokens):
 		key = f"t{i}"
@@ -922,19 +942,101 @@ def get_area_location(area=None):
 	return {"area": area, "city": city, "province": province}
 
 
+def _user_can_create_area(user=None):
+	"""Field officers (and their supervisors) may add Area records from the easy form."""
+	user = user or frappe.session.user
+	if not user or user == "Guest":
+		return False
+	roles = set(frappe.get_roles(user))
+	if roles & set(FIELD_OFFICER_ROLES):
+		return True
+	if roles & {"System Manager", "Accounts Manager"}:
+		return True
+	if frappe.db.exists("DocType", "Field Officer"):
+		if frappe.db.exists("Field Officer", {"user": user, "status": "Active"}):
+			return True
+		employee = frappe.db.get_value("Employee", {"user_id": user, "status": "Active"}, "name")
+		if employee and frappe.db.exists("Field Officer", {"employee": employee, "status": "Active"}):
+			return True
+	return False
+
+
 @frappe.whitelist()
-def search_areas(txt=None, city=None, limit=80):
-	"""Typeahead for Area Link field — filtered by selected City when provided."""
+def create_area(area=None, city=None, province=None):
+	"""Create an Area under the selected City. Field officers are allowed to add areas."""
 	if frappe.session.user == "Guest":
 		frappe.throw(_("Please log in"), frappe.AuthenticationError)
-	return _area_link_options(txt=txt, city=city, limit=max(1, min(cint(limit) or 80, 200)))
+	if not _user_can_create_area():
+		frappe.throw(_("You are not allowed to add an Area"), frappe.PermissionError)
+	area_name = cstr(area or "").strip()
+	city = cstr(city or "").strip()
+	province = cstr(province or "").strip()
+	if len(area_name) < 2:
+		frappe.throw(_("Enter an area name"))
+	if not city or not frappe.db.exists("City", city):
+		frappe.throw(_("Select a city before adding an area"))
+	city_province = ""
+	if frappe.db.has_column("City", "province"):
+		city_province = cstr(frappe.db.get_value("City", city, "province") or "").strip()
+	if province and city_province and province != city_province:
+		frappe.throw(_("City {0} belongs to {1}").format(city, city_province))
+	province = province or city_province
+	existing = frappe.db.exists("Area", area_name)
+	if existing:
+		row = frappe.db.get_value("Area", area_name, ["name", "area", "city", "province"], as_dict=True) or {}
+		if cstr(row.get("city") or "").strip() == city:
+			return _area_payload(row)
+		frappe.throw(
+			_("Area '{0}' already exists under {1}. Choose it from the list or use a different name.").format(
+				area_name, row.get("city") or _("another city")
+			)
+		)
+	doc = frappe.get_doc(
+		{
+			"doctype": "Area",
+			"area": area_name,
+			"city": city,
+			"province": province,
+		}
+	)
+	doc.insert(ignore_permissions=True)
+	return _area_payload(doc)
 
 
-def _area_link_options(txt="", city="", limit=80):
+def _area_payload(row):
+	name = cstr(getattr(row, "name", None) or row.get("name") or "").strip()
+	label = cstr(getattr(row, "area", None) or row.get("area") or name).strip() or name
+	city_name = cstr(getattr(row, "city", None) or row.get("city") or "").strip()
+	province = cstr(getattr(row, "province", None) or row.get("province") or "").strip()
+	return {
+		"value": name,
+		"label": label,
+		"name": name,
+		"description": " · ".join([p for p in (city_name, province) if p]),
+		"city": city_name,
+		"province": province,
+	}
+
+
+@frappe.whitelist()
+def search_areas(txt=None, city=None, province=None, limit=80):
+	"""Typeahead for Area — filtered by City, or by Province when City is not chosen yet."""
+	if frappe.session.user == "Guest":
+		frappe.throw(_("Please log in"), frappe.AuthenticationError)
+	return _area_link_options(
+		txt=txt,
+		city=city,
+		province=province,
+		limit=max(1, min(cint(limit) or 80, 200)),
+	)
+
+
+def _area_link_options(txt="", city="", province="", limit=80):
 	if not frappe.db.exists("DocType", "Area"):
 		return []
 	txt = (txt or "").strip()
 	city = (city or "").strip()
+	province = (province or "").strip()
 	limit = max(1, min(cint(limit) or 80, 5000))
 	has_area = frappe.db.has_column("Area", "area")
 	has_city = frappe.db.has_column("Area", "city")
@@ -949,13 +1051,14 @@ def _area_link_options(txt="", city="", limit=80):
 		else:
 			where.append(f"name LIKE %({key})s")
 		params[key] = f"%{token}%"
-	# Prefer areas for the selected city; without city, allow search so Area
-	# can drive City + Province autofill on Easy Form.
+	# Province narrows City; City narrows Area.
 	if city and has_city:
 		where.append("city = %(city)s")
 		params["city"] = city
+	elif province and has_province:
+		where.append("province = %(province)s")
+		params["province"] = province
 	elif has_city and not tokens:
-		# No city + empty query: only areas that already have a city (usable cascade).
 		where.append("IFNULL(TRIM(city), '') != ''")
 	area_sql = "IFNULL(area, name)" if has_area else "name"
 	city_sql = "IFNULL(city, '')" if has_city else "''"
@@ -1905,7 +2008,7 @@ def get_field_visit_easy_view(name=None):
 				getattr(doc, "mt_venue", None) or getattr(doc, "mt_institute_or_organization_name", None),
 			),
 			row(_("Agenda"), getattr(doc, "mt_agenda", None)),
-			row(_("Remarks"), getattr(doc, "mt_remarks", None)),
+			row(_("Visit Summary"), getattr(doc, "mt_remarks", None)),
 			row(_("Resolution"), getattr(doc, "mt_resolution", None)),
 		],
 	)
@@ -2031,13 +2134,18 @@ def get_field_visit_easy_view(name=None):
 			row(_("Remarks"), getattr(doc, "travel_remarks", None)),
 		],
 	)
+	visit_summary_notes = []
+	for note in (
+		getattr(doc, "school_remarks_follow_up", None),
+		getattr(doc, "school_additional_remarks", None),
+		getattr(doc, "ot_remarks", None),
+	):
+		text = cstr(note).strip()
+		if text and text not in visit_summary_notes:
+			visit_summary_notes.append(text)
 	add_section(
-		_("Remarks"),
-		[
-			row(_("School Remarks"), getattr(doc, "school_remarks_follow_up", None)),
-			row(_("Additional Remarks"), getattr(doc, "school_additional_remarks", None)),
-			row(_("OT Remarks"), getattr(doc, "ot_remarks", None)),
-		],
+		_("Visit Summary"),
+		[row(_("Visit Summary"), "\n".join(visit_summary_notes))],
 	)
 
 	images = []

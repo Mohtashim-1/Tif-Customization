@@ -11,6 +11,7 @@ const props = defineProps({
 	allowCustom: { type: Boolean, default: false },
 	allowCreate: { type: Boolean, default: false },
 	createLabel: { type: String, default: "Create School" },
+	createHint: { type: String, default: "Not in School Database — fill School Opening form" },
 	required: { type: Boolean, default: false },
 	options: { type: Array, default: () => [] },
 	search: Function,
@@ -213,7 +214,7 @@ onBeforeUnmount(() => {
 					@click="emitCreate"
 				>
 					<div class="title">+ {{ createLabel }} “{{ query.trim() }}”</div>
-					<div class="desc">Not in School Database — fill School Opening form</div>
+					<div class="desc">{{ createHint }}</div>
 				</button>
 			</div>
 		</div>

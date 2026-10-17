@@ -43,8 +43,9 @@ frappe.tif_customization.format_visit_remarks = function (remarks) {
 			}
 			const body = part.slice(heading.length).trim() || "—";
 			const muted = body === "—" ? ' style="color:#9ca3af;"' : "";
+			const shown = heading === "Remarks:" ? "Visit Summary:" : heading;
 			return `<div style="margin-bottom:3px;line-height:1.35;"><strong>${frappe.utils.escape_html(
-				heading
+				shown
 			)}</strong> <span${muted}>${frappe.utils.escape_html(body)}</span></div>`;
 		})
 		.join("");

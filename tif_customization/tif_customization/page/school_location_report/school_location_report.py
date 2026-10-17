@@ -2,7 +2,8 @@ from collections import defaultdict
 import json
 
 import frappe
-from frappe.utils import cint, flt
+from frappe import _
+from frappe.utils import cint, cstr, flt
 
 
 PROGRAMS = ("tps", "qps", "cee")
@@ -315,3 +316,138 @@ def _display_province(value):
 
 def _norm(value):
 	return (value or "").strip().lower()
+
+
+@frappe.whitelist()
+def get_school_visits(school=None):
+	"""Field visits for one School: officer, remarks, document name, and date."""
+	school = cstr(school).strip()
+	if not school or not frappe.db.exists("School", school):
+		frappe.throw(_("School not found"))
+
+	doc = frappe.db.get_value(
+		"School",
+		school,
+		["name", "school_name", "customer", "field_officer", "remarks", "creation"],
+		as_dict=True,
+	) or {}
+	school_name = cstr(doc.get("school_name")).strip()
+	customer = cstr(doc.get("customer")).strip()
+
+	from tif_customization.tif_customization.field_visit_permissions import visit_day_sql
+
+	visit_day = visit_day_sql("fv")
+	rows = frappe.db.sql(
+		f"""
+		SELECT
+			fv.name,
+			{visit_day} AS visit_date,
+			fv.owner,
+			fv.visit_by,
+			fv.me_visit_by,
+			fv.mt_visit_by,
+			fv.training_entry_filled_by,
+			fv.mt_remarks,
+			fv.ot_remarks,
+			fv.school_remarks_follow_up,
+			fv.school_additional_remarks,
+			fv.travel_remarks
+		FROM `tabField Visit` fv
+		LEFT JOIN `tabCustomer` c ON c.name = fv.school_name
+		LEFT JOIN `tabCustomer` mc ON mc.name = fv.me_school_name
+		WHERE fv.docstatus < 2
+		  AND (
+			(%(customer)s != '' AND (fv.school_name = %(customer)s OR fv.me_school_name = %(customer)s))
+			OR (
+				%(school_name)s != ''
+				AND (
+					LOWER(TRIM(c.customer_name)) = LOWER(%(school_name)s)
+					OR LOWER(TRIM(mc.customer_name)) = LOWER(%(school_name)s)
+					OR LOWER(TRIM(fv.pending_school_name)) = LOWER(%(school_name)s)
+					OR LOWER(TRIM(fv.school_name)) = LOWER(%(school_name)s)
+					OR LOWER(TRIM(fv.me_school_name)) = LOWER(%(school_name)s)
+					OR LOWER(TRIM(fv.mt_institute_or_organization_name)) = LOWER(%(school_name)s)
+					OR LOWER(TRIM(fv.training_venue_name)) = LOWER(%(school_name)s)
+				)
+			)
+		  )
+		ORDER BY visit_date DESC, fv.creation DESC
+		LIMIT 200
+		""",
+		{"customer": customer, "school_name": school_name},
+		as_dict=True,
+	)
+
+	owners = [row.owner for row in rows if row.owner]
+	if doc.get("field_officer"):
+		owners.append(doc.field_officer)
+	owner_names = _user_display_names(owners)
+
+	visits = []
+	for row in rows:
+		officer = ""
+		for key in ("visit_by", "me_visit_by", "mt_visit_by", "training_entry_filled_by"):
+			officer = cstr(row.get(key)).strip()
+			if officer:
+				break
+		if not officer:
+			officer = owner_names.get(row.owner) or cstr(row.owner).strip()
+		visits.append(
+			{
+				"name": row.name,
+				"visit_date": str(row.visit_date) if row.visit_date else "",
+				"field_officer": officer,
+				"remarks": _visit_notes(row),
+			}
+		)
+
+	if not visits and (cstr(doc.get("field_officer")).strip() or cstr(doc.get("remarks")).strip()):
+		created = doc.get("creation")
+		visits.append(
+			{
+				"name": doc.get("name"),
+				"visit_date": str(created)[:10] if created else "",
+				"field_officer": owner_names.get(doc.field_officer) or cstr(doc.field_officer).strip(),
+				"remarks": cstr(doc.get("remarks")).strip(),
+				"doctype": "School",
+			}
+		)
+
+	return {
+		"school": doc.get("name"),
+		"school_name": school_name or doc.get("name"),
+		"visits": visits,
+	}
+
+
+def _visit_notes(row):
+	notes = []
+	for key in (
+		"school_additional_remarks",
+		"school_remarks_follow_up",
+		"mt_remarks",
+		"ot_remarks",
+		"travel_remarks",
+	):
+		text = cstr(row.get(key)).strip()
+		if text and text not in notes:
+			notes.append(text)
+	return "\n".join(notes)
+
+
+def _user_display_names(users):
+	users = [cstr(user).strip() for user in (users or []) if cstr(user).strip()]
+	if not users:
+		return {}
+	out = {}
+	for row in frappe.db.sql(
+		"""
+		SELECT name, full_name
+		FROM `tabUser`
+		WHERE name IN %(users)s AND IFNULL(full_name, '') != ''
+		""",
+		{"users": tuple(users)},
+		as_dict=True,
+	):
+		out[row.name] = row.full_name
+	return out

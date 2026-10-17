@@ -195,9 +195,9 @@ function contact(role) {
 		<div class="academic-work">
 			<FieldTextarea :mode="mode" label-en="Address" label-ur="پتہ" v-model="model.address" />
 			<div class="grid-2" style="margin-top: 0">
-				<FieldInput :mode="mode" label-en="Area" label-ur="علاقہ" v-model="model.area" />
-				<FieldInput :mode="mode" label-en="City" label-ur="شہر" v-model="model.city" />
 				<FieldSelect :mode="mode" label-en="Province" label-ur="صوبہ" :options="provinces" v-model="model.province" />
+				<FieldInput :mode="mode" label-en="City" label-ur="شہر" v-model="model.city" />
+				<FieldInput :mode="mode" label-en="Area" label-ur="علاقہ" v-model="model.area" />
 				<FieldInput :mode="mode" label-en="Country" v-model="model.country" />
 			</div>
 			<div class="field">

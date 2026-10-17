@@ -49,7 +49,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-14 18:30:00.000000",
+ "modified": "2026-10-17 11:40:00.000000",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Area",
@@ -95,6 +95,36 @@
    "report": 1,
    "role": "Employee",
    "share": 0
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Field Staff",
+   "share": 0,
+   "write": 0
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Field Staff Manager",
+   "share": 0,
+   "write": 0
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Supervisor Field Staff",
+   "share": 0,
+   "write": 0
   }
  ],
  "row_format": "Dynamic",

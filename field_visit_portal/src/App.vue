@@ -88,6 +88,7 @@ const meeting = reactive({
 	institute: "",
 	instituteLabel: "",
 	meetingDate: todayISO(),
+	province: "Punjab",
 	city: "",
 	area: "",
 	startTime: "10:00",
@@ -361,25 +362,42 @@ const attachments = reactive({
 });
 
 const selected = computed(() => ACTIVITY_CARDS.find((c) => c.id === selectedId.value) || null);
+const summaryLocation = computed(() => {
+	const group = selected.value?.group;
+	if (group === "visits" || group === "books" || group === "me") return visit;
+	if (group === "meeting") return meeting;
+	if (group === "volunteer") return volunteerVisit;
+	if (group === "ambassador") return ambassadorVisit;
+	return training;
+});
+const summaryCity = computed(() => summaryLocation.value.city || "-");
+const summaryProvince = computed(() => summaryLocation.value.province || "-");
 const visibleCards = computed(() => cardsForUser(meta.value.activity_types || []));
 const customerOptions = computed(() => meta.value.customers || []);
-const cityOptions = computed(() => meta.value.cities || []);
-const cityLinkOptions = computed(() =>
+const cityRecords = computed(() =>
 	(meta.value.cities || [])
 		.map((c) => {
-			const name = typeof c === "object" ? c.value || c.name || c.label : c;
-			return { value: String(name || ""), label: String(name || "") };
+			if (c && typeof c === "object") {
+				const name = c.value || c.name || c.label || "";
+				return { value: String(name), label: String(c.label || name), province: c.province || "" };
+			}
+			return { value: String(c || ""), label: String(c || ""), province: "" };
 		})
 		.filter((c) => c.value)
 );
+const cityOptions = computed(() => cityRecords.value.map((c) => c.value));
 const provinceOptions = computed(() => meta.value.province_options_full || meta.value.provinces || []);
 const courseOptions = computed(() => meta.value.enrolment_courses || []);
 const travelModes = computed(() => meta.value.travel_modes || Object.keys(TRAVEL_MODE_UR));
 const bookTitles = computed(() => meta.value.book_titles || ["Noorani Qaida"]);
-const areaOptions = computed(() => {
-	const city = visit.city || meeting.city || training.city;
-	const rows = meta.value.areas || [];
-	return rows
+function cityOptionsFor(target) {
+	const province = (target?.province || "").trim();
+	return cityRecords.value.filter((c) => !province || !c.province || c.province === province);
+}
+function areaOptionsFor(target) {
+	const city = (target?.city || "").trim();
+	if (!city) return [];
+	return (meta.value.areas || [])
 		.map((a) => {
 			const value = a.value || a.name || "";
 			const label = a.label || a.area || value;
@@ -391,13 +409,8 @@ const areaOptions = computed(() => {
 				province: a.province || "",
 			};
 		})
-		.filter((a) => {
-			if (!a.value) return false;
-			// Prefer areas for selected city; if no city yet, show linked areas for Area→City cascade.
-			if (city) return a.city === city;
-			return !!a.city;
-		});
-});
+		.filter((a) => a.value && a.city === city);
+}
 const staffOptions = computed(() =>
 	(meta.value.staff_options || []).map((s) => s.employee_name || s.employee).filter(Boolean)
 );
@@ -708,57 +721,63 @@ async function searchSchools(txt) {
 	return Array.isArray(rows) ? rows : [];
 }
 
-async function searchCities(txt) {
-	const rows = await apiGet(`${METHOD}.search_cities`, {
-		txt: txt || "",
-		limit: 80,
-	});
-	return Array.isArray(rows) ? rows : [];
+function searchCitiesFor(target) {
+	return async (txt) => {
+		const rows = await apiGet(`${METHOD}.search_cities`, {
+			txt: txt || "",
+			province: target?.province || "",
+			limit: 80,
+		});
+		return Array.isArray(rows) ? rows : [];
+	};
 }
 
-async function searchAreas(txt) {
-	const city = visit.city || meeting.city || training.city || volunteerVisit.city || ambassadorVisit.city || "";
-	const rows = await apiGet(`${METHOD}.search_areas`, {
-		txt: txt || "",
-		city: city || "",
-		limit: 80,
-	});
-	return Array.isArray(rows) ? rows : [];
+function searchAreasFor(target) {
+	return async (txt) => {
+		const city = (target?.city || "").trim();
+		if (!city) return [];
+		const rows = await apiGet(`${METHOD}.search_areas`, {
+			txt: txt || "",
+			city,
+			province: target?.province || "",
+			limit: 80,
+		});
+		return Array.isArray(rows) ? rows : [];
+	};
 }
 
-let skipAreaClearOnCity = false;
-
-async function applyProvinceFromCity(city, target) {
+function cityBelongsToProvince(city, province) {
 	const name = (city || "").trim();
-	if (!name || !target) return;
-	try {
-		const row = await apiGet(`${METHOD}.get_city_province`, { city: name });
-		const province = (row && row.province) || "";
-		if (province) target.province = province;
-	} catch {
-		/* ignore */
-	}
+	const prov = (province || "").trim();
+	if (!name || !prov) return true;
+	const row = cityRecords.value.find((c) => c.value === name);
+	if (!row || !row.province) return true;
+	return row.province === prov;
 }
 
-async function applyLocationFromArea(area, target) {
-	const name = (area || "").trim();
-	if (!name || !target) return;
+let skipLocationReset = false;
+
+async function addArea(name, target) {
+	const area = (name || "").trim();
+	const city = (target?.city || "").trim();
+	const province = (target?.province || "").trim();
+	if (!province) {
+		error.value = "Select a province first.";
+		return;
+	}
+	if (!city) {
+		error.value = "Select a city first.";
+		return;
+	}
+	error.value = "";
 	try {
-		const row = await apiGet(`${METHOD}.get_area_location`, { area: name });
-		if (!row) return;
-		const city = (row.city || "").trim();
-		const province = (row.province || "").trim();
-		if (!city && !province) return;
-		skipAreaClearOnCity = true;
-		try {
-			if (city) target.city = city;
-			if (province) target.province = province;
-			else if (city) await applyProvinceFromCity(city, target);
-		} finally {
-			skipAreaClearOnCity = false;
-		}
-	} catch {
-		skipAreaClearOnCity = false;
+		const row = await apiPost(`${METHOD}.create_area`, { area, city, province });
+		if (!row?.value) return;
+		if (!Array.isArray(meta.value.areas)) meta.value.areas = [];
+		meta.value.areas = [...meta.value.areas.filter((a) => (a.value || a.name) !== row.value), row];
+		target.area = row.value;
+	} catch (e) {
+		error.value = e.message || "Could not add this area.";
 	}
 }
 
@@ -775,13 +794,16 @@ watch(
 			// Always refresh from Customer when school changes (type / address / city / province).
 			if (row.address) visit.schoolAddress = row.address;
 			if (row.school_type) visit.schoolType = row.school_type;
-			if (row.city) {
-				const prevCity = visit.city;
-				visit.city = row.city;
-				if (prevCity && prevCity !== row.city) visit.area = "";
+			skipLocationReset = true;
+			try {
+				if (row.province) visit.province = row.province;
+				if (row.city) {
+					if (visit.city && visit.city !== row.city) visit.area = "";
+					visit.city = row.city;
+				}
+			} finally {
+				skipLocationReset = false;
 			}
-			if (row.province) visit.province = row.province;
-			else if (row.city) await applyProvinceFromCity(row.city, visit);
 		} catch {
 			/* ignore */
 		}
@@ -803,51 +825,33 @@ watch(
 	},
 );
 
-watch(
-	() => visit.city,
-	(city, prev) => {
-		if (!skipAreaClearOnCity && prev && city !== prev) visit.area = "";
-		if (city) applyProvinceFromCity(city, visit);
-	},
-);
-watch(
-	() => meeting.city,
-	(city, prev) => {
-		if (!skipAreaClearOnCity && prev && city !== prev) meeting.area = "";
-		if (city) applyProvinceFromCity(city, meeting);
-	},
-);
-watch(
-	() => training.city,
-	(city) => {
-		if (city) applyProvinceFromCity(city, training);
-	},
-);
-watch(
-	() => volunteerVisit.city,
-	(city) => {
-		if (city) applyProvinceFromCity(city, volunteerVisit);
-	},
-);
-watch(
-	() => ambassadorVisit.city,
-	(city) => {
-		if (city) applyProvinceFromCity(city, ambassadorVisit);
-	},
-);
-
-watch(
-	() => visit.area,
-	(area) => {
-		if (area) applyLocationFromArea(area, visit);
-	},
-);
-watch(
-	() => meeting.area,
-	(area) => {
-		if (area) applyLocationFromArea(area, meeting);
-	},
-);
+function bindLocationCascade(target) {
+	watch(
+		() => target.province,
+		(province, prev) => {
+			if (skipLocationReset || !prev || province === prev) return;
+			if (target.city && !cityBelongsToProvince(target.city, province)) {
+				target.city = "";
+				target.area = "";
+			}
+		},
+	);
+	watch(
+		() => target.city,
+		(city, prev) => {
+			if (skipLocationReset || !prev || city === prev) return;
+			target.area = "";
+		},
+	);
+}
+bindLocationCascade(visit);
+bindLocationCascade(meeting);
+bindLocationCascade(training);
+bindLocationCascade(volunteerVisit);
+bindLocationCascade(ambassadorVisit);
+bindLocationCascade(volunteerForm);
+bindLocationCascade(ambassadorForm);
+bindLocationCascade(participantForm);
 
 async function refreshTravelCost() {
 	if (!travel.needed) {
@@ -1077,7 +1081,9 @@ function buildPayload(submitDoc) {
 				? volunteerVisit.province
 				: ambassadorFormGroup
 					? ambassadorVisit.province
-					: training.province,
+					: card?.group === "meeting"
+						? meeting.province
+						: training.province,
 		school_name: schoolForm
 			? visit.schoolName
 			: volunteerFormGroup
@@ -1881,14 +1887,15 @@ const steps = [
 							<FieldDate :mode="lang" label-en="Visit Date" label-ur="وزٹ کی تاریخ" required v-model="visit.visitDate" />
 							<FieldTime :mode="lang" label-en="Visiting Starting Time" label-ur="آغاز کا وقت" required v-model="visit.startTime" />
 							<FieldTime :mode="lang" label-en="Visit Ending Time" label-ur="اختتام کا وقت" required v-model="visit.endTime" />
+							<FieldSelect :mode="lang" label-en="Province" label-ur="صوبہ" :options="provinceOptions" required v-model="visit.province" />
 							<FieldLink
 								:mode="lang"
 								label-en="City"
 								label-ur="شہر"
 								placeholder="Type to search city"
-								empty-text="No cities found"
-								:options="cityLinkOptions"
-								:search="searchCities"
+								empty-text="No cities for this province"
+								:options="cityOptionsFor(visit)"
+								:search="searchCitiesFor(visit)"
 								required
 								v-model="visit.city"
 							/>
@@ -1896,14 +1903,17 @@ const steps = [
 								:mode="lang"
 								label-en="Area"
 								label-ur="علاقہ"
-								placeholder="Select area"
-								empty-text="No areas found"
-								:options="areaOptions"
-								:search="searchAreas"
+								placeholder="Select area or type to add"
+								empty-text="No areas for this city"
+								allow-create
+								create-label="Add Area"
+								create-hint="Saves this area under the selected city"
+								:options="areaOptionsFor(visit)"
+								:search="searchAreasFor(visit)"
 								required
 								v-model="visit.area"
+								@create="(name) => addArea(name, visit)"
 							/>
-							<FieldSelect :mode="lang" label-en="Province" label-ur="صوبہ" :options="provinceOptions" required v-model="visit.province" />
 						</div>
 						<FieldSelect
 							v-if="visit.status === 'Not Agree' || visit.status === 'Other'"
@@ -2048,9 +2058,9 @@ const steps = [
 								label-en="City"
 								label-ur="شہر"
 								placeholder="Type to search city"
-								empty-text="No cities found"
-								:options="cityLinkOptions"
-								:search="searchCities"
+								empty-text="No cities for this province"
+								:options="cityOptionsFor(visit)"
+								:search="searchCitiesFor(visit)"
 								required
 								v-model="visit.city"
 							/>
@@ -2058,12 +2068,16 @@ const steps = [
 								:mode="lang"
 								label-en="Area"
 								label-ur="علاقہ"
-								placeholder="Select area"
-								empty-text="No areas found"
-								:options="areaOptions"
-								:search="searchAreas"
+								placeholder="Select area or type to add"
+								empty-text="No areas for this city"
+								allow-create
+								create-label="Add Area"
+								create-hint="Saves this area under the selected city"
+								:options="areaOptionsFor(visit)"
+								:search="searchAreasFor(visit)"
 								required
 								v-model="visit.area"
+								@create="(name) => addArea(name, visit)"
 							/>
 							<FieldLink
 								:mode="lang"
@@ -2280,14 +2294,15 @@ const steps = [
 								@create="startCreateSchool"
 							/>
 							<FieldDate :mode="lang" label-en="Date" label-ur="تاریخ" required v-model="meeting.meetingDate" />
+							<FieldSelect :mode="lang" label-en="Province" label-ur="صوبہ" :options="provinceOptions" required v-model="meeting.province" />
 							<FieldLink
 								:mode="lang"
 								label-en="City"
 								label-ur="شہر"
 								placeholder="Type to search city"
-								empty-text="No cities found"
-								:options="cityLinkOptions"
-								:search="searchCities"
+								empty-text="No cities for this province"
+								:options="cityOptionsFor(meeting)"
+								:search="searchCitiesFor(meeting)"
 								required
 								v-model="meeting.city"
 							/>
@@ -2295,11 +2310,15 @@ const steps = [
 								:mode="lang"
 								label-en="Area"
 								label-ur="علاقہ"
-								placeholder="Select area"
-								empty-text="No areas found"
-								:options="areaOptions"
-								:search="searchAreas"
+								placeholder="Select area or type to add"
+								empty-text="No areas for this city"
+								allow-create
+								create-label="Add Area"
+								create-hint="Saves this area under the selected city"
+								:options="areaOptionsFor(meeting)"
+								:search="searchAreasFor(meeting)"
 								v-model="meeting.area"
+								@create="(name) => addArea(name, meeting)"
 							/>
 							<div class="grid-2" style="margin-top: 0">
 								<FieldTime :mode="lang" label-en="Start Time" label-ur="آغاز کا وقت" v-model="meeting.startTime" />
@@ -2346,18 +2365,18 @@ const steps = [
 							<FieldSelect :mode="lang" label-en="Month" label-ur="مہینہ" :options="meta.months" v-model="training.month" />
 							<FieldSelect :mode="lang" label-en="Quarter" label-ur="سہ ماہی" :options="QUARTER_OPTIONS" v-model="training.quarter" />
 							<FieldInput v-if="selected.group !== 'academic'" :mode="lang" label-en="School Category" label-ur="اسکول کی کیٹیگری" v-model="training.schoolCategory" />
+							<FieldSelect :mode="lang" label-en="Province" label-ur="صوبہ" :options="provinceOptions" required v-model="training.province" />
 							<FieldLink
 								:mode="lang"
 								label-en="City"
 								label-ur="شہر"
 								placeholder="Type to search city"
-								empty-text="No cities found"
-								:options="cityLinkOptions"
-								:search="searchCities"
+								empty-text="No cities for this province"
+								:options="cityOptionsFor(training)"
+								:search="searchCitiesFor(training)"
 								required
 								v-model="training.city"
 							/>
-							<FieldSelect :mode="lang" label-en="Province" label-ur="صوبہ" :options="provinceOptions" required v-model="training.province" />
 							<FieldInput v-if="selected.group !== 'academic' && selected.id !== 'training'" :mode="lang" label-en="No. of Schools" label-ur="اسکولوں کی تعداد" v-model="training.noOfSchools" />
 							<FieldDate :mode="lang" label-en="Date" label-ur="تاریخ" required v-model="training.date" />
 							<FieldSelect
@@ -2570,17 +2589,6 @@ const steps = [
 								required
 								v-model="volunteerVisit.registered"
 							/>
-							<FieldLink
-								:mode="lang"
-								label-en="City"
-								label-ur="شہر"
-								placeholder="Type to search city"
-								empty-text="No cities found"
-								:options="cityLinkOptions"
-								:search="searchCities"
-								required
-								v-model="volunteerVisit.city"
-							/>
 							<FieldSelect
 								:mode="lang"
 								label-en="Province"
@@ -2589,7 +2597,31 @@ const steps = [
 								required
 								v-model="volunteerVisit.province"
 							/>
-							<FieldInput :mode="lang" label-en="Area / Locality" label-ur="علاقہ" v-model="volunteerVisit.area" />
+							<FieldLink
+								:mode="lang"
+								label-en="City"
+								label-ur="شہر"
+								placeholder="Type to search city"
+								empty-text="No cities for this province"
+								:options="cityOptionsFor(volunteerVisit)"
+								:search="searchCitiesFor(volunteerVisit)"
+								required
+								v-model="volunteerVisit.city"
+							/>
+							<FieldLink
+								:mode="lang"
+								label-en="Area"
+								label-ur="علاقہ"
+								placeholder="Select area or type to add"
+								empty-text="No areas for this city"
+								allow-create
+								create-label="Add Area"
+								create-hint="Saves this area under the selected city"
+								:options="areaOptionsFor(volunteerVisit)"
+								:search="searchAreasFor(volunteerVisit)"
+								v-model="volunteerVisit.area"
+								@create="(name) => addArea(name, volunteerVisit)"
+							/>
 							<div style="grid-column: 1 / -1">
 								<FieldTextarea
 									:mode="lang"
@@ -2670,17 +2702,6 @@ const steps = [
 								required
 								v-model="ambassadorVisit.registered"
 							/>
-							<FieldLink
-								:mode="lang"
-								label-en="City"
-								label-ur="شہر"
-								placeholder="Type to search city"
-								empty-text="No cities found"
-								:options="cityLinkOptions"
-								:search="searchCities"
-								required
-								v-model="ambassadorVisit.city"
-							/>
 							<FieldSelect
 								:mode="lang"
 								label-en="Province"
@@ -2689,7 +2710,31 @@ const steps = [
 								required
 								v-model="ambassadorVisit.province"
 							/>
-							<FieldInput :mode="lang" label-en="Area / Locality" label-ur="علاقہ" v-model="ambassadorVisit.area" />
+							<FieldLink
+								:mode="lang"
+								label-en="City"
+								label-ur="شہر"
+								placeholder="Type to search city"
+								empty-text="No cities for this province"
+								:options="cityOptionsFor(ambassadorVisit)"
+								:search="searchCitiesFor(ambassadorVisit)"
+								required
+								v-model="ambassadorVisit.city"
+							/>
+							<FieldLink
+								:mode="lang"
+								label-en="Area"
+								label-ur="علاقہ"
+								placeholder="Select area or type to add"
+								empty-text="No areas for this city"
+								allow-create
+								create-label="Add Area"
+								create-hint="Saves this area under the selected city"
+								:options="areaOptionsFor(ambassadorVisit)"
+								:search="searchAreasFor(ambassadorVisit)"
+								v-model="ambassadorVisit.area"
+								@create="(name) => addArea(name, ambassadorVisit)"
+							/>
 							<div style="grid-column: 1 / -1">
 								<FieldTextarea
 									:mode="lang"
@@ -2829,14 +2874,15 @@ const steps = [
 								@create="startCreateSchool"
 							/>
 							<FieldSelect :mode="lang" label-en="School Type" label-ur="اسکول کی قسم" :options="schoolTypeOptions" placeholder-en="Select" placeholder-ur="منتخب کریں" v-model="visit.schoolType" />
+							<FieldSelect :mode="lang" label-en="Province" label-ur="صوبہ" :options="provinceOptions" required v-model="visit.province" />
 							<FieldLink
 								:mode="lang"
 								label-en="City"
 								label-ur="شہر"
 								placeholder="Type to search city"
-								empty-text="No cities found"
-								:options="cityLinkOptions"
-								:search="searchCities"
+								empty-text="No cities for this province"
+								:options="cityOptionsFor(visit)"
+								:search="searchCitiesFor(visit)"
 								required
 								v-model="visit.city"
 							/>
@@ -2844,14 +2890,17 @@ const steps = [
 								:mode="lang"
 								label-en="Area"
 								label-ur="علاقہ"
-								placeholder="Select area"
-								empty-text="No areas found"
-								:options="areaOptions"
-								:search="searchAreas"
+								placeholder="Select area or type to add"
+								empty-text="No areas for this city"
+								allow-create
+								create-label="Add Area"
+								create-hint="Saves this area under the selected city"
+								:options="areaOptionsFor(visit)"
+								:search="searchAreasFor(visit)"
 								required
 								v-model="visit.area"
+								@create="(name) => addArea(name, visit)"
 							/>
-							<FieldSelect :mode="lang" label-en="Province" label-ur="صوبہ" :options="provinceOptions" required v-model="visit.province" />
 							<FieldDate :mode="lang" label-en="Date" label-ur="تاریخ" required v-model="visit.visitDate" />
 							<FieldInput :mode="lang" label-en="Contact Person" label-ur="رابطہ شخص" v-model="visit.meetingWith" />
 							<FieldInput :mode="lang" label-en="Contact No." label-ur="رابطہ نمبر" placeholder="03XX-XXXXXXX" v-model="visit.contactNumber" />
@@ -2977,7 +3026,7 @@ const steps = [
 						</div>
 						<div class="summary-row">
 							<span style="opacity: 0.7">City / Province</span>
-							<span>{{ selected?.group === "visits" || selected?.group === "books" || selected?.group === "me" ? visit.city || "-" : meeting.city || training.city || "-" }} • {{ selected?.group === "visits" || selected?.group === "books" || selected?.group === "me" ? visit.province : training.province || "-" }}</span>
+							<span>{{ summaryCity }} • {{ summaryProvince }}</span>
 						</div>
 						<div v-if="selected?.group === 'enrolment'" class="summary-row">
 							<span style="opacity: 0.7">Field Officer</span>
@@ -3076,8 +3125,17 @@ const steps = [
 							<FieldInput :mode="lang" label-en="Name" label-ur="نام" required v-model="participantForm.name" />
 						</div>
 						<FieldInput :mode="lang" label-en="Contact" label-ur="رابطہ" v-model="participantForm.contact" />
-						<FieldInput :mode="lang" label-en="City" label-ur="شہر" v-model="participantForm.city" />
 						<FieldSelect :mode="lang" label-en="Province" label-ur="صوبہ" :options="provinceOptions" v-model="participantForm.province" />
+						<FieldLink
+							:mode="lang"
+							label-en="City"
+							label-ur="شہر"
+							placeholder="Type to search city"
+							empty-text="No cities for this province"
+							:options="cityOptionsFor(participantForm)"
+							:search="searchCitiesFor(participantForm)"
+							v-model="participantForm.city"
+						/>
 						<FieldSelect :mode="lang" label-en="Course Name" label-ur="کورس کا نام" :options="courseOptions" required v-model="participantForm.course" />
 						<FieldDate :mode="lang" label-en="Date" label-ur="تاریخ" v-model="participantForm.date" />
 					</div>
@@ -3124,16 +3182,6 @@ const steps = [
 								v-model="volunteerForm.contribution"
 							/>
 						</div>
-						<FieldLink
-							:mode="lang"
-							label-en="City"
-							label-ur="شہر"
-							placeholder="Type to search city"
-							empty-text="No cities found"
-							:options="cityLinkOptions"
-							:search="searchCities"
-							v-model="volunteerForm.city"
-						/>
 						<FieldSelect
 							:mode="lang"
 							label-en="Province"
@@ -3141,7 +3189,30 @@ const steps = [
 							:options="provinceOptions"
 							v-model="volunteerForm.province"
 						/>
-						<FieldInput :mode="lang" label-en="Area / Locality" label-ur="علاقہ" v-model="volunteerForm.area" />
+						<FieldLink
+							:mode="lang"
+							label-en="City"
+							label-ur="شہر"
+							placeholder="Type to search city"
+							empty-text="No cities for this province"
+							:options="cityOptionsFor(volunteerForm)"
+							:search="searchCitiesFor(volunteerForm)"
+							v-model="volunteerForm.city"
+						/>
+						<FieldLink
+							:mode="lang"
+							label-en="Area"
+							label-ur="علاقہ"
+							placeholder="Select area or type to add"
+							empty-text="No areas for this city"
+							allow-create
+							create-label="Add Area"
+							create-hint="Saves this area under the selected city"
+							:options="areaOptionsFor(volunteerForm)"
+							:search="searchAreasFor(volunteerForm)"
+							v-model="volunteerForm.area"
+							@create="(name) => addArea(name, volunteerForm)"
+						/>
 						<div style="grid-column: 1 / -1">
 							<FieldTextarea :mode="lang" label-en="Address" label-ur="پتہ" v-model="volunteerForm.address" />
 						</div>
@@ -3205,16 +3276,6 @@ const steps = [
 								v-model="ambassadorForm.contribution"
 							/>
 						</div>
-						<FieldLink
-							:mode="lang"
-							label-en="City"
-							label-ur="شہر"
-							placeholder="Type to search city"
-							empty-text="No cities found"
-							:options="cityLinkOptions"
-							:search="searchCities"
-							v-model="ambassadorForm.city"
-						/>
 						<FieldSelect
 							:mode="lang"
 							label-en="Province"
@@ -3222,7 +3283,30 @@ const steps = [
 							:options="provinceOptions"
 							v-model="ambassadorForm.province"
 						/>
-						<FieldInput :mode="lang" label-en="Area / Locality" label-ur="علاقہ" v-model="ambassadorForm.area" />
+						<FieldLink
+							:mode="lang"
+							label-en="City"
+							label-ur="شہر"
+							placeholder="Type to search city"
+							empty-text="No cities for this province"
+							:options="cityOptionsFor(ambassadorForm)"
+							:search="searchCitiesFor(ambassadorForm)"
+							v-model="ambassadorForm.city"
+						/>
+						<FieldLink
+							:mode="lang"
+							label-en="Area"
+							label-ur="علاقہ"
+							placeholder="Select area or type to add"
+							empty-text="No areas for this city"
+							allow-create
+							create-label="Add Area"
+							create-hint="Saves this area under the selected city"
+							:options="areaOptionsFor(ambassadorForm)"
+							:search="searchAreasFor(ambassadorForm)"
+							v-model="ambassadorForm.area"
+							@create="(name) => addArea(name, ambassadorForm)"
+						/>
 						<div style="grid-column: 1 / -1">
 							<FieldTextarea :mode="lang" label-en="Address" label-ur="پتہ" v-model="ambassadorForm.address" />
 						</div>

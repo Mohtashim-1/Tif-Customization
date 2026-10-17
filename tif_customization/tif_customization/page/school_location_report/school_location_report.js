@@ -326,7 +326,7 @@ frappe.pages["school-location-report"].on_page_load = function (wrapper) {
 					"#school-details",
 					[
 						{ key: "name", label: __("ID"), link: "School" },
-						{ key: "school_name", label: __("School") },
+						{ key: "school_name", label: __("School"), school: true },
 						{ key: "book_items", label: __("Book Detail"), books: true },
 						{ key: "province", label: __("Province") },
 						{ key: "city", label: __("City") },
@@ -371,7 +371,9 @@ frappe.pages["school-location-report"].on_page_load = function (wrapper) {
 									value = this.num(value);
 								} else {
 									value = this.escape(value == null ? "" : String(value));
-									if (column.link && row[column.key]) {
+									if (column.school && row.name && !row._total) {
+										value = `<span class="school-loc-link school-loc-school" data-school="${this.escape(row.name)}">${value}</span>`;
+									} else if (column.link && row[column.key]) {
 										value = `<span class="school-loc-link" data-doctype="${column.link}" data-name="${this.escape(row[column.key])}">${value}</span>`;
 									}
 								}
@@ -390,8 +392,75 @@ frappe.pages["school-location-report"].on_page_load = function (wrapper) {
 					})
 					.join("");
 				element.html(`<table class="school-loc-table"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`);
+				const report = this;
 				element.find(".school-loc-link").on("click", function () {
+					if (this.classList.contains("school-loc-school")) {
+						report.open_school_dialog(this.getAttribute("data-school"));
+						return;
+					}
 					frappe.set_route("Form", this.getAttribute("data-doctype"), this.getAttribute("data-name"));
+				});
+			}
+
+			open_school_dialog(school) {
+				if (!school) return;
+				frappe.call({
+					method: "tif_customization.tif_customization.page.school_location_report.school_location_report.get_school_visits",
+					args: { school },
+					freeze: true,
+					callback: (response) => {
+						const data = response.message || {};
+						const visits = data.visits || [];
+						const body = visits.length
+							? visits
+									.map((row) => {
+										const date = row.visit_date
+											? frappe.datetime.str_to_user(row.visit_date)
+											: "—";
+										const doctype = row.doctype || "Field Visit";
+										return `<tr>
+											<td><span class="school-loc-link school-loc-doc" data-doctype="${frappe.utils.escape_html(doctype)}" data-name="${frappe.utils.escape_html(row.name || "")}">${frappe.utils.escape_html(row.name || "—")}</span></td>
+											<td>${frappe.utils.escape_html(date)}</td>
+											<td>${frappe.utils.escape_html(row.field_officer || "—")}</td>
+											<td class="school-loc-remarks">${frappe.utils.escape_html(row.remarks || "—")}</td>
+										</tr>`;
+									})
+									.join("")
+							: `<tr><td colspan="4" class="text-muted text-center">${__("No field visits for this school")}</td></tr>`;
+						const dialog = new frappe.ui.Dialog({
+							title: __("{0}", [data.school_name || school]),
+							size: "extra-large",
+							fields: [{ fieldtype: "HTML", fieldname: "html" }],
+							primary_action_label: __("Close"),
+							primary_action: () => dialog.hide(),
+						});
+						dialog.fields_dict.html.$wrapper.html(`
+							<p class="text-muted" style="font-size:12px;margin-bottom:10px;">
+								${__("Visits")}: <strong>${visits.length}</strong>
+							</p>
+							<div class="table-responsive" style="max-height:460px;overflow:auto;">
+								<table class="table table-bordered" style="font-size:12px;margin:0;">
+									<thead>
+										<tr>
+											<th>${__("Document Name")}</th>
+											<th>${__("Date")}</th>
+											<th>${__("Field Officer")}</th>
+											<th>${__("Remarks")}</th>
+										</tr>
+									</thead>
+									<tbody>${body}</tbody>
+								</table>
+							</div>
+						`);
+						dialog.$wrapper.find(".school-loc-doc").on("click", function () {
+							frappe.set_route(
+								"Form",
+								this.getAttribute("data-doctype"),
+								this.getAttribute("data-name")
+							);
+						});
+						dialog.show();
+					},
 				});
 			}
 
@@ -461,6 +530,7 @@ frappe.pages["school-location-report"].on_page_load = function (wrapper) {
 						.school-loc-link { color:var(--primary,#2563eb); cursor:pointer; font-weight:700; }
 						.school-loc-link:hover { text-decoration:underline; }
 						.school-loc-address { min-width:320px; max-width:520px; white-space:normal !important; line-height:1.4; }
+						.school-loc-remarks { min-width:240px; max-width:420px; white-space:pre-wrap !important; line-height:1.4; }
 						.school-loc-books-cell { min-width:240px; max-width:360px; white-space:normal !important; }
 						.school-loc-books { display:flex; flex-direction:column; gap:3px; }
 						.school-loc-book { display:flex; justify-content:space-between; gap:10px; align-items:baseline; line-height:1.35; }
