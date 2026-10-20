@@ -1,46 +1,56 @@
-{# Read-only SC-1.2 — same layout/classes as /school-opening guest form #}
-{% macro chk(options, selected) -%}
-<div class="soa-check-grid">
+{# SC-1.2 — readonly for most users; editable for HO (Farhan / Danish / Administrator) #}
+{% set editable = data.can_edit and not print_mode %}
+
+{% macro chk(options, selected, fieldname) -%}
+<div class="soa-check-grid" data-field="{{ fieldname }}">
 	{%- set sel = selected or [] -%}
 	{%- for opt in options -%}
-	<label><input type="checkbox" disabled {% if opt in sel %}checked{% endif %}> {{ opt }}</label>
+	<label><input type="checkbox" name="{{ fieldname }}" value="{{ opt }}" {% if not editable %}disabled{% endif %} {% if opt in sel %}checked{% endif %}> {{ opt }}</label>
 	{%- endfor -%}
 </div>
 {%- endmacro %}
 
 {% macro rad(options, selected, name) -%}
-<div class="soa-check-grid">
+<div class="soa-check-grid" data-field="{{ name }}">
 	{%- for opt in options -%}
-	<label><input type="radio" disabled name="{{ name }}" {% if selected == opt %}checked{% endif %}> {{ opt }}</label>
+	<label><input type="radio" name="{{ name }}" value="{{ opt }}" {% if not editable %}disabled{% endif %} {% if selected == opt %}checked{% endif %}> {{ opt }}</label>
 	{%- endfor -%}
 </div>
 {%- endmacro %}
 
-{% macro ro_input(label, value, required=false) -%}
+{% macro field_input(label, value, fieldname, required=false) -%}
 <div class="soa-field">
 	<label>{{ label }}</label>
-	<input type="text" class="soa-control" readonly value="{{ value if value is not none else '' }}" {% if required %}required{% endif %}>
+	<input type="text" class="soa-control" name="{{ fieldname }}" value="{{ value if value is not none else '' }}" {% if not editable %}readonly{% endif %} {% if required %}required{% endif %}>
 </div>
 {%- endmacro %}
 
-{% macro ro_textarea(label, value) -%}
+{% macro field_textarea(label, value, fieldname) -%}
 <div class="soa-field">
 	<label>{{ label }}</label>
+	{% if editable %}
+	<textarea class="soa-control" name="{{ fieldname }}" rows="3">{{ value if value is not none else '' }}</textarea>
+	{% else %}
 	<div class="soa-control soa-readonly-block">{{ value if value is not none else '' }}</div>
+	{% endif %}
 </div>
 {%- endmacro %}
 
-<div id="school-opening-portal" class="school-opening-portal">
+<div id="school-opening-portal" class="school-opening-portal{% if editable %} soa-editable{% endif %}">
 	{% if not print_mode %}
 	<div class="soa-print-toolbar no-print"
 		data-customer="{{ data.customer or '' }}"
 		data-application="{{ data.application or '' }}"
 		data-can-approve="{{ 1 if data.can_approve else 0 }}"
+		data-can-edit="{{ 1 if data.can_edit else 0 }}"
 		data-is-approved="{{ 1 if data.is_approved else 0 }}">
 		<button type="button" class="btn btn-success btn-sm soa-approve-btn"
 			{% if data.is_approved %}disabled{% elif not data.can_approve %}disabled{% endif %}>
 			{% if data.is_approved %}{{ _("Approved") }}{% else %}{{ _("Approve") }}{% endif %}
 		</button>
+		{% if editable %}
+		<button type="button" class="btn btn-primary btn-sm soa-save-btn">{{ _("Save Changes") }}</button>
+		{% endif %}
 		<button type="button" class="btn btn-default btn-sm soa-prev-doc" disabled>{{ _("Previous document") }}</button>
 		<span class="soa-nav-label text-muted small" aria-live="polite"></span>
 		<button type="button" class="btn btn-default btn-sm soa-next-doc" disabled>{{ _("Next document") }}</button>
@@ -52,7 +62,7 @@
 	</div>
 	{% endif %}
 
-	<div class="soa-sheet soa-readonly-form">
+	<div class="soa-sheet {% if not editable %}soa-readonly-form{% endif %}" id="soa-print-form">
 		<div class="soa-letterhead">
 			<div class="org">THE ILM FOUNDATION</div>
 			<div class="addr">245-1/I, Block-6, PECHS Society, Karachi-75400, Pakistan • Tel: 021-34304450-51 • info@tif.edu.pk</div>
@@ -66,8 +76,9 @@
 				<label class="soa-date-inline">Date:</label>
 				<div class="soa-date-picker">
 					<div class="soa-date-picker-input-wrap">
-						<input type="text" class="soa-control soa-date-display" readonly value="{{ data.form_date_display }}">
-						<button type="button" class="soa-date-picker-btn" disabled tabindex="-1" aria-hidden="true">
+						<input type="text" class="soa-control soa-date-display" name="form_date_display" value="{{ data.form_date_display }}" {% if not editable %}readonly{% endif %}>
+						<input type="hidden" name="form_date" value="{{ data.form_date }}">
+						<button type="button" class="soa-date-picker-btn" {% if not editable %}disabled tabindex="-1" aria-hidden="true"{% endif %}>
 							<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
 						</button>
 					</div>
@@ -83,11 +94,11 @@
 			</div>
 			<div class="soa-block">
 				<div class="soa-label">Type of Institution</div>
-				{{ chk(["School", "College", "University", "Madaris", "Library", "Special School"], data.institution_types) }}
+				{{ chk(["School", "College", "University", "Madaris", "Library", "Special School"], data.institution_types, "institution_types") }}
 			</div>
 			<div class="soa-row-2">
-				{{ ro_input("Name of School *", data.school_name, true) }}
-				{{ ro_input("TIF Representative", data.tif_representative) }}
+				{{ field_input("Name of School *", data.school_name, "school_name", true) }}
+				{{ field_input("TIF Representative", data.tif_representative, "tif_representative") }}
 			</div>
 			<div class="soa-block">
 				<div class="soa-label">Category</div>
@@ -95,12 +106,20 @@
 			</div>
 			<div class="soa-block">
 				<div class="soa-label">Educational System</div>
-				{{ chk(["Pre-Primary", "Primary", "Matric", "Intermediate", "Hifz-o-Nazra", "Cambridge", "O / A Levels"], data.educational_system) }}
+				{{ chk(["Pre-Primary", "Primary", "Matric", "Intermediate", "Hifz-o-Nazra", "Cambridge", "O / A Levels"], data.educational_system, "educational_system") }}
 			</div>
 			<div class="soa-row-3">
-				{{ ro_input("Type of School", data.type_of_school) }}
-				{{ ro_input("No. of Campuses", data.no_of_campuses) }}
-				{{ ro_input("No. of Students", data.no_of_students) }}
+				{{ field_input("Type of School", data.type_of_school, "type_of_school") }}
+				{{ field_input("No. of Campuses", data.no_of_campuses, "no_of_campuses") }}
+				<div class="soa-field">
+					<label>No. of Students</label>
+					<select class="soa-control" name="no_of_students" {% if not editable %}disabled{% endif %}>
+						<option value=""></option>
+						{% for opt in ["1-10", "11-50", "51-200", "201-500", "501-1000", "1000+"] %}
+						<option value="{{ opt }}" {% if (data.no_of_students|string) == opt %}selected{% endif %}>{{ opt }}</option>
+						{% endfor %}
+					</select>
+				</div>
 			</div>
 			<div class="soa-row-2">
 				<div class="soa-block">
@@ -114,7 +133,6 @@
 			</div>
 		</section>
 
-		{% if data.visit_type != 'Visit without enrollment' %}
 		<section class="soa-section">
 			<div class="soa-section-title">2 Services of Interest</div>
 			<div class="soa-block">
@@ -129,7 +147,7 @@
 					"PEF Pakistan",
 					"Intro to Tajweed — One Day Workshop",
 					"Tajweed Training Course",
-				], data.teacher_training_services) }}
+				], data.teacher_training_services, "teacher_training_services") }}
 			</div>
 			<div class="soa-block">
 				<div class="soa-label">Tilawat Program for School Services — Workshops &amp; Trainings</div>
@@ -139,7 +157,7 @@
 					"Teachers Training (Online)",
 					"Teachers Training (On-site)",
 					"Noorani Qaida — NQ Workbook",
-				], data.tilawat_services) }}
+				], data.tilawat_services, "tilawat_services") }}
 			</div>
 			<div class="soa-block">
 				<div class="soa-label">Quran Program for Student Services</div>
@@ -158,7 +176,7 @@
 					"MQH Part-2 — Sindhi Version",
 					"MQH Part-3 — Sindhi Version",
 					"Intro Workshops",
-				], data.quran_program_services) }}
+				], data.quran_program_services, "quran_program_services") }}
 			</div>
 		</section>
 
@@ -166,7 +184,7 @@
 			<div class="soa-section-title">3 Current Engagement with TIF</div>
 			<div class="soa-block">
 				<div class="soa-label">School Already Running TIF Services</div>
-				{{ chk(["Quran Program for Student", "Tilawat Program for School", "Teacher Training"], data.running_tif_services) }}
+				{{ chk(["Quran Program for Student", "Tilawat Program for School", "Teacher Training"], data.running_tif_services, "running_tif_services") }}
 			</div>
 			<div class="soa-block">
 				<div class="soa-label">Curriculum Currently in Use</div>
@@ -176,14 +194,13 @@
 					"Rehmani Qaida", "Madni Qaida", "Gaba",
 					"Jamiat Qaida", "Qurani Qaida", "Moonlight",
 					"Islamic Values", "CEF", "Zia ul Quran",
-				], data.curriculum_in_use) }}
+				], data.curriculum_in_use, "curriculum_in_use") }}
 				<div class="soa-field" style="margin-top:8px">
 					<label>Others</label>
-					<input type="text" class="soa-control" readonly value="{{ data.curriculum_others or '' }}">
+					<input type="text" class="soa-control" name="curriculum_others" value="{{ data.curriculum_others or '' }}" {% if not editable %}readonly{% endif %}>
 				</div>
 			</div>
 		</section>
-		{% endif %}
 
 		<section class="soa-section">
 			<div class="soa-section-title">4 Attachments</div>
@@ -213,27 +230,27 @@
 		<section class="soa-section">
 			<div class="soa-section-title">5 Online Presence</div>
 			<div class="soa-row-2">
-				{{ ro_input("Website", data.website) }}
-				{{ ro_input("Facebook", data.facebook) }}
-				{{ ro_input("Instagram", data.instagram) }}
-				{{ ro_input("LinkedIn", data.linkedin) }}
+				{{ field_input("Website", data.website, "website") }}
+				{{ field_input("Facebook", data.facebook, "facebook") }}
+				{{ field_input("Instagram", data.instagram, "instagram") }}
+				{{ field_input("LinkedIn", data.linkedin, "linkedin") }}
 			</div>
-			{{ ro_textarea("Other Links", data.other_links) }}
+			{{ field_textarea("Other Links", data.other_links, "other_links") }}
 		</section>
 
 		<section class="soa-section">
 			<div class="soa-section-title">6 Location</div>
-			{{ ro_textarea("Address", data.address) }}
+			{{ field_textarea("Address", data.address, "address") }}
 			<div class="soa-row-2">
-				{{ ro_input("Area", data.area) }}
-				{{ ro_input("City", data.city) }}
+				{{ field_input("Area", data.area, "area") }}
+				{{ field_input("City", data.city, "city") }}
 			</div>
 			<div class="soa-block">
 				<div class="soa-label">Province</div>
 				{{ rad(["Sindh", "Punjab", "KPK", "Balochistan", "Gilgit-Baltistan", "Azad Jammu & Kashmir"], data.province, "province") }}
 			</div>
 			<div class="soa-row-2">
-				{{ ro_input("Country", data.country or "Pakistan") }}
+				{{ field_input("Country", data.country or "Pakistan", "country") }}
 				<div class="soa-block">
 					<div class="soa-label">Marketing Sample Provided</div>
 					{{ rad(["Yes", "No"], data.marketing_sample_provided, "marketing_sample_provided") }}
@@ -247,10 +264,10 @@
 				<thead><tr><th>Role</th><th>Name</th><th>Cell No.</th></tr></thead>
 				<tbody>
 				{% for role in data.contact_roles %}
-				<tr>
+				<tr data-contact-role="{{ role }}">
 					<td>{{ role }}</td>
-					<td><input type="text" class="soa-control" readonly value="{{ data.key_contacts.get(role, {}).get('name', '') }}"></td>
-					<td><input type="text" class="soa-control" readonly value="{{ data.key_contacts.get(role, {}).get('cell', '') }}"></td>
+					<td><input type="text" class="soa-control soa-contact-name" value="{{ data.key_contacts.get(role, {}).get('name', '') }}" {% if not editable %}readonly{% endif %}></td>
+					<td><input type="text" class="soa-control soa-contact-cell" value="{{ data.key_contacts.get(role, {}).get('cell', '') }}" {% if not editable %}readonly{% endif %}></td>
 				</tr>
 				{% endfor %}
 				</tbody>
@@ -260,16 +277,17 @@
 		<section class="soa-section">
 			<div class="soa-section-title">8 School Communication Channels</div>
 			<div class="soa-row-2">
-				{{ ro_input("School PTCL", data.school_ptcl) }}
-				{{ ro_input("School Mobile", data.school_mobile) }}
-				{{ ro_input("School WhatsApp", data.school_whatsapp) }}
-				{{ ro_input("School Email", data.school_email) }}
+				{{ field_input("School PTCL", data.school_ptcl, "school_ptcl") }}
+				{{ field_input("School Mobile", data.school_mobile, "school_mobile") }}
+				{{ field_input("School WhatsApp", data.school_whatsapp, "school_whatsapp") }}
+				{{ field_input("School Email", data.school_email, "school_email") }}
 			</div>
 		</section>
 
 		<p class="soa-ho-note">
 			{{ _("Head Office use") }} — {{ _("ERP School Code") }}: <strong>{{ data.erp_school_code or data.customer }}</strong>
 			{% if data.application %} · {{ _("Application") }}: {{ data.application }}{% endif %}
+			{% if editable %} · <span class="text-muted">{{ _("You can edit and save this form.") }}</span>{% endif %}
 		</p>
 	</div>
 </div>

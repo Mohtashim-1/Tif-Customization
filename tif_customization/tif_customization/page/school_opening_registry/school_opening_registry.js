@@ -1,4 +1,4 @@
-/* School Opening Registry v20261020 */
+/* School Opening Registry v20261020d */
 frappe.pages["school-opening-registry"].on_page_load = function (wrapper) {
 	frappe.tif_customization.SchoolOpeningRegistry.clear_stuck_freeze();
 	const page = frappe.ui.make_app_page({
@@ -96,12 +96,7 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 			label: __("Form Data"),
 			fieldtype: "Select",
 			fieldname: "form_data",
-			options: [
-				"",
-				"full:Full SC-1.2",
-				"customer_only:Customer only",
-				"pending:Pending approval",
-			].join("\n"),
+			options: ["", "Full SC-1.2", "Customer only", "Pending approval"].join("\n"),
 		});
 
 		this.filter_fields.city = this.make_filter({
@@ -129,12 +124,7 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 			label: __("Doc Status"),
 			fieldtype: "Select",
 			fieldname: "doc_status",
-			options: [
-				"",
-				"draft:Draft",
-				"pending:Pending for Approval",
-				"approved:Approved",
-			].join("\n"),
+			options: ["", "Draft", "Pending for Approval", "Approved"].join("\n"),
 		});
 
 		frappe.call({
@@ -163,17 +153,48 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 		}
 	}
 
+	_filter_value(field) {
+		let val = (field?.get_value?.() || "").trim();
+		// Some Select widgets return "value:label" — keep only the value/label text we need
+		if (val.includes(":")) {
+			val = val.split(":")[0].trim();
+		}
+		return val;
+	}
+
+	_form_data_arg() {
+		const raw = (this.filter_fields.form_data?.get_value() || "").trim();
+		const label = raw.includes(":") ? raw.split(":").slice(1).join(":").trim() : raw;
+		const key = (raw.includes(":") ? raw.split(":")[0] : raw).trim().toLowerCase();
+		if (key === "full" || label === "Full SC-1.2") return "full";
+		if (key === "customer_only" || key === "customer-only" || label === "Customer only")
+			return "customer_only";
+		if (key === "pending" || label === "Pending approval") return "pending";
+		return "";
+	}
+
+	_doc_status_arg() {
+		const raw = (this.filter_fields.doc_status?.get_value() || "").trim();
+		const label = raw.includes(":") ? raw.split(":").slice(1).join(":").trim() : raw;
+		const key = (raw.includes(":") ? raw.split(":")[0] : raw).trim().toLowerCase().replace(/\s+/g, "_");
+		if (key === "approved" || label === "Approved") return "approved";
+		if (key === "pending" || key === "pending_for_approval" || label === "Pending for Approval")
+			return "pending";
+		if (key === "draft" || label === "Draft") return "draft";
+		return "";
+	}
+
 	get_filter_args() {
 		return {
 			search: this.search_field?.get_value() || "",
 			govt_private: this.filter_fields.govt_private?.get_value() || "",
 			status: this.filter_fields.status?.get_value() || "",
 			territory: this.filter_fields.territory?.get_value() || "",
-			form_data: this.filter_fields.form_data?.get_value() || "",
+			form_data: this._form_data_arg(),
 			city: this.filter_fields.city?.get_value() || "",
 			address_search: this.filter_fields.address_search?.get_value() || "",
 			field_officer: this.filter_fields.field_officer?.get_value() || "",
-			doc_status: this.filter_fields.doc_status?.get_value() || "",
+			doc_status: this._doc_status_arg(),
 		};
 	}
 

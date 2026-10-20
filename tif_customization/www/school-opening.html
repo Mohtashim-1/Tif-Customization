@@ -116,7 +116,18 @@
 			<div class="soa-row-3">
 				<div class="soa-field"><label>Type of School</label><input type="text" name="type_of_school"></div>
 				<div class="soa-field"><label>No. of Campuses</label><input type="number" name="no_of_campuses" min="0"></div>
-				<div class="soa-field"><label>No. of Students</label><input type="number" name="no_of_students" min="0"></div>
+				<div class="soa-field">
+					<label>No. of Students</label>
+					<select class="soa-control" name="no_of_students">
+						<option value=""></option>
+						<option value="1-10">1-10</option>
+						<option value="11-50">11-50</option>
+						<option value="51-200">51-200</option>
+						<option value="201-500">201-500</option>
+						<option value="501-1000">501-1000</option>
+						<option value="1000+">1000+</option>
+					</select>
+				</div>
 			</div>
 			<div class="soa-row-2">
 				<div class="soa-block">

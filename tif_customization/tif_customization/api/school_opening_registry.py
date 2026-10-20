@@ -199,8 +199,17 @@ LEFT JOIN (
 
 
 def _normalize_doc_status(value):
-	"""Map UI filter values to draft | pending | approved."""
-	raw = (value or "").strip().lower().replace("-", "_").replace(" ", "_")
+	"""Map UI filter values to draft | pending | approved.
+
+	Accepts plain values (approved) or Select value:label strings (approved:Approved).
+	"""
+	raw = cstr(value or "").strip()
+	if not raw:
+		return ""
+	# Frappe Select sometimes returns "value:label" as the whole string
+	if ":" in raw:
+		raw = raw.split(":", 1)[0].strip()
+	raw = raw.lower().replace("-", "_").replace(" ", "_")
 	if raw in ("approved", "approve", "submitted", "1"):
 		return "approved"
 	if raw in ("pending", "pending_approval", "pending_for_approval", "awaiting_approval"):
@@ -221,6 +230,7 @@ def _school_registry_filter_clause(
 	customers=None,
 	field_officer=None,
 	doc_status=None,
+	created_by=None,
 ):
 	conditions = [_SCHOOL_CUSTOMER_BASE_CONDITION]
 	values = {}
@@ -262,7 +272,7 @@ def _school_registry_filter_clause(
 
 	field_officer = (field_officer or "").strip()
 	if field_officer:
-		# Approved SOA representative, or latest Field Visit visit_by / me / mt for this school
+		# Approved SOA / Field Visit / SOA name match / Customer created-by user
 		conditions.append(
 			"""(
 			IFNULL(soa.field_officer, '') = %(field_officer)s
@@ -278,19 +288,56 @@ def _school_registry_filter_clause(
 						TRIM(IFNULL(fv.visit_by, '')) = %(field_officer)s
 						OR TRIM(IFNULL(fv.me_visit_by, '')) = %(field_officer)s
 						OR TRIM(IFNULL(fv.mt_visit_by, '')) = %(field_officer)s
+						OR fv.owner = %(field_officer)s
+						OR EXISTS (
+							SELECT 1 FROM `tabUser` u
+							WHERE u.name = fv.owner
+								AND TRIM(IFNULL(u.full_name, '')) = %(field_officer)s
+						)
 					)
 			)
 			OR EXISTS (
 				SELECT 1 FROM `tabSchool Opening Application` app
-				WHERE TRIM(IFNULL(app.tif_representative, '')) = %(field_officer)s
+				WHERE (
+						TRIM(IFNULL(app.tif_representative, '')) = %(field_officer)s
+						OR app.owner = %(field_officer)s
+						OR EXISTS (
+							SELECT 1 FROM `tabUser` u
+							WHERE u.name = app.owner
+								AND TRIM(IFNULL(u.full_name, '')) = %(field_officer)s
+						)
+					)
 					AND (
 						app.customer = c.name
 						OR TRIM(IFNULL(app.school_name, '')) = TRIM(IFNULL(c.customer_name, ''))
 					)
 			)
+			OR c.owner = %(field_officer)s
+			OR EXISTS (
+				SELECT 1 FROM `tabUser` u
+				WHERE u.name = c.owner
+					AND TRIM(IFNULL(u.full_name, '')) = %(field_officer)s
+			)
 		)"""
 		)
 		values["field_officer"] = field_officer
+
+	created_by = (created_by or "").strip()
+	if created_by:
+		conditions.append(
+			"""(
+			c.owner = %(created_by)s
+			OR EXISTS (
+				SELECT 1 FROM `tabUser` u
+				WHERE u.name = c.owner
+					AND (
+						TRIM(IFNULL(u.full_name, '')) = %(created_by)s
+						OR u.name = %(created_by)s
+					)
+			)
+		)"""
+		)
+		values["created_by"] = created_by
 
 	city = (city or "").strip()
 	if city:
@@ -386,28 +433,15 @@ def get_school_registry_filter_options():
 		)
 	]
 
+	# Use Field Officer master only — free-text visit_by / creators caused duplicate / junk names
 	field_officers = [
 		row[0]
 		for row in frappe.db.sql(
 			"""
-			SELECT DISTINCT v FROM (
-				SELECT TRIM(tif_representative) AS v
-				FROM `tabSchool Opening Application`
-				WHERE IFNULL(TRIM(tif_representative), '') != ''
-				UNION
-				SELECT TRIM(visit_by) AS v
-				FROM `tabField Visit`
-				WHERE docstatus < 2 AND IFNULL(TRIM(visit_by), '') != ''
-				UNION
-				SELECT TRIM(me_visit_by) AS v
-				FROM `tabField Visit`
-				WHERE docstatus < 2 AND IFNULL(TRIM(me_visit_by), '') != ''
-				UNION
-				SELECT TRIM(mt_visit_by) AS v
-				FROM `tabField Visit`
-				WHERE docstatus < 2 AND IFNULL(TRIM(mt_visit_by), '') != ''
-			) officers
-			WHERE v != ''
+			SELECT DISTINCT TRIM(name1) AS v
+			FROM `tabField Officer`
+			WHERE IFNULL(status, 'Active') = 'Active'
+				AND IFNULL(TRIM(name1), '') != ''
 			ORDER BY v
 			"""
 		)
@@ -447,6 +481,7 @@ def list_school_customers(
 	address_search=None,
 	field_officer=None,
 	doc_status=None,
+	created_by=None,
 ):
 	"""Paginated school customers (or pending applications) for the registry."""
 	limit = min(max(int(limit or 50), 1), 200)
@@ -460,6 +495,7 @@ def list_school_customers(
 			city=city,
 			address_search=address_search,
 			field_officer=field_officer,
+			created_by=created_by,
 		)
 
 	where, filter_values = _school_registry_filter_clause(
@@ -472,6 +508,7 @@ def list_school_customers(
 		address_search=address_search,
 		field_officer=field_officer,
 		doc_status=doc_status,
+		created_by=created_by,
 	)
 	values = {"limit": limit, "start": start, **filter_values}
 
@@ -496,6 +533,7 @@ def list_school_customers(
 			c.custom_registration_date AS registration_date,
 			c.territory,
 			c.modified,
+			c.owner AS created_by_user,
 			IFNULL(soa.field_officer, '') AS field_officer,
 			IF(soa.customer IS NOT NULL, 1, 0) AS has_application
 		FROM `tabCustomer` c
@@ -511,13 +549,17 @@ def list_school_customers(
 	customers = [row.customer for row in rows]
 	addr_map = _addresses_for_customers(customers)
 	fo_map = _field_officers_for_customers(rows)
+	owner_names = _user_display_names([row.get("created_by_user") for row in rows])
 	for row in rows:
 		row.has_application = bool(row.pop("has_application", 0))
 		row.application = None
 		row.row_type = "customer"
+		created_by_user = cstr(row.pop("created_by_user", None) or "").strip()
+		row.created_by = owner_names.get(created_by_user) or created_by_user
 		row.field_officer = (
 			cstr(row.get("field_officer") or "").strip()
 			or fo_map.get(row.customer)
+			or row.created_by
 			or ""
 		)
 		row.doc_status = "approved" if row.has_application else "draft"
@@ -528,7 +570,13 @@ def list_school_customers(
 
 
 def _list_pending_applications(
-	search=None, limit=50, start=0, city=None, address_search=None, field_officer=None
+	search=None,
+	limit=50,
+	start=0,
+	city=None,
+	address_search=None,
+	field_officer=None,
+	created_by=None,
 ):
 	"""Draft School Opening Applications waiting for HO approval."""
 	conditions = ["docstatus = 0"]
@@ -560,8 +608,35 @@ def _list_pending_applications(
 
 	field_officer = (field_officer or "").strip()
 	if field_officer:
-		conditions.append("IFNULL(TRIM(tif_representative), '') = %(field_officer)s")
+		conditions.append(
+			"""(
+			IFNULL(TRIM(tif_representative), '') = %(field_officer)s
+			OR owner = %(field_officer)s
+			OR EXISTS (
+				SELECT 1 FROM `tabUser` u
+				WHERE u.name = `tabSchool Opening Application`.owner
+					AND TRIM(IFNULL(u.full_name, '')) = %(field_officer)s
+			)
+		)"""
+		)
 		values["field_officer"] = field_officer
+
+	created_by = (created_by or "").strip()
+	if created_by:
+		conditions.append(
+			"""(
+			owner = %(created_by)s
+			OR EXISTS (
+				SELECT 1 FROM `tabUser` u
+				WHERE u.name = `tabSchool Opening Application`.owner
+					AND (
+						TRIM(IFNULL(u.full_name, '')) = %(created_by)s
+						OR u.name = %(created_by)s
+					)
+			)
+		)"""
+		)
+		values["created_by"] = created_by
 
 	where = " AND ".join(conditions)
 	total = frappe.db.sql(
@@ -578,6 +653,7 @@ def _list_pending_applications(
 			'Pending' AS status,
 			'' AS territory,
 			modified,
+			owner AS created_by_user,
 			IFNULL(TRIM(tif_representative), '') AS field_officer,
 			IFNULL(address, '') AS address,
 			IFNULL(area, '') AS area,
@@ -593,11 +669,14 @@ def _list_pending_applications(
 		as_dict=True,
 	)
 
+	owner_names = _user_display_names([row.get("created_by_user") for row in rows])
 	for row in rows:
 		row.customer = ""
 		row.has_application = False
 		row.row_type = "pending"
-		row.field_officer = cstr(row.get("field_officer") or "").strip()
+		created_by_user = cstr(row.pop("created_by_user", None) or "").strip()
+		row.created_by = owner_names.get(created_by_user) or created_by_user
+		row.field_officer = cstr(row.get("field_officer") or "").strip() or row.created_by or ""
 		row.doc_status = "pending"
 		row.doc_status_label = _("Pending for Approval")
 		row.full_address = ", ".join(
@@ -620,6 +699,7 @@ def get_school_opening_neighbors(
 	address_search=None,
 	field_officer=None,
 	doc_status=None,
+	created_by=None,
 ):
 	"""Previous / next document keys for the print toolbar (same order as registry)."""
 	application = (application or "").strip()
@@ -632,6 +712,7 @@ def get_school_opening_neighbors(
 			city=city,
 			address_search=address_search,
 			field_officer=field_officer,
+			created_by=created_by,
 		)
 
 	if not customer:
@@ -647,6 +728,7 @@ def get_school_opening_neighbors(
 		address_search=address_search,
 		field_officer=field_officer,
 		doc_status=doc_status,
+		created_by=created_by,
 	)
 	keys = frappe.db.sql(
 		f"""
@@ -663,7 +745,9 @@ def get_school_opening_neighbors(
 	return _neighbor_payload(names, customer, key_field="customer")
 
 
-def _neighbors_pending(application=None, search=None, city=None, address_search=None, field_officer=None):
+def _neighbors_pending(
+	application=None, search=None, city=None, address_search=None, field_officer=None, created_by=None
+):
 	conditions = ["docstatus = 0"]
 	values = {}
 	search = (search or "").strip()
@@ -678,8 +762,34 @@ def _neighbors_pending(application=None, search=None, city=None, address_search=
 		values["city"] = f"%{city}%"
 	field_officer = (field_officer or "").strip()
 	if field_officer:
-		conditions.append("IFNULL(TRIM(tif_representative), '') = %(field_officer)s")
+		conditions.append(
+			"""(
+			IFNULL(TRIM(tif_representative), '') = %(field_officer)s
+			OR owner = %(field_officer)s
+			OR EXISTS (
+				SELECT 1 FROM `tabUser` u
+				WHERE u.name = `tabSchool Opening Application`.owner
+					AND TRIM(IFNULL(u.full_name, '')) = %(field_officer)s
+			)
+		)"""
+		)
 		values["field_officer"] = field_officer
+	created_by = (created_by or "").strip()
+	if created_by:
+		conditions.append(
+			"""(
+			owner = %(created_by)s
+			OR EXISTS (
+				SELECT 1 FROM `tabUser` u
+				WHERE u.name = `tabSchool Opening Application`.owner
+					AND (
+						TRIM(IFNULL(u.full_name, '')) = %(created_by)s
+						OR u.name = %(created_by)s
+					)
+			)
+		)"""
+		)
+		values["created_by"] = created_by
 	address_search = (address_search or "").strip()
 	if address_search:
 		conditions.append(
@@ -794,6 +904,217 @@ def approve_school_opening(application=None, customer=None):
 	}
 
 
+def _csv_join(value):
+	if value is None:
+		return ""
+	if isinstance(value, str):
+		return value.strip()
+	if isinstance(value, (list, tuple)):
+		return ", ".join(cstr(v).strip() for v in value if cstr(v).strip())
+	return cstr(value)
+
+
+_STUDENT_BUCKET_TO_INT = {
+	"1-10": 10,
+	"11-50": 50,
+	"51-200": 200,
+	"201-500": 500,
+	"501-1000": 1000,
+	"1000+": 1001,
+}
+
+
+def _no_of_students_as_int(value):
+	"""Map UI value (number or range bucket) to SOA Int, never 0."""
+	if value is None or value == "":
+		return None
+	raw = cstr(value).strip()
+	if raw in _STUDENT_BUCKET_TO_INT:
+		return _STUDENT_BUCKET_TO_INT[raw]
+	try:
+		n = int(float(raw))
+	except (TypeError, ValueError):
+		return None
+	return n if n > 0 else None
+
+
+def _display_no_of_students(value):
+	"""Show Customer-compatible range on the SC-1.2 form."""
+	from tif_customization.tif_customization.doctype.school.school_customer import (
+		student_count_bucket,
+	)
+
+	return student_count_bucket(value) or ""
+
+
+def _apply_school_opening_payload(doc, data):
+	"""Map SC-1.2 form JSON onto a School Opening Application doc."""
+	data = data or {}
+	school_name = (data.get("school_name") or "").strip()
+	if not school_name:
+		frappe.throw(_("Name of School is required."))
+
+	visit_type = (data.get("visit_type") or "").strip() or "Visit with enrollment"
+	if visit_type not in ("Visit without enrollment", "Visit with enrollment"):
+		frappe.throw(_("Please select Visit without enrollment or Visit with enrollment."))
+
+	doc.form_date = data.get("form_date") or doc.form_date or getdate()
+	doc.visit_type = visit_type
+	doc.school_name = school_name
+	doc.tif_representative = data.get("tif_representative")
+	doc.institution_types = _csv_join(data.get("institution_types"))
+	doc.institution_category = data.get("institution_category")
+	doc.educational_system = _csv_join(data.get("educational_system"))
+	doc.type_of_school = data.get("type_of_school")
+	doc.no_of_campuses = data.get("no_of_campuses") or None
+	# SOA stores Int; UI may send range buckets used on Customer
+	doc.no_of_students = _no_of_students_as_int(data.get("no_of_students"))
+	doc.structure = data.get("structure")
+	doc.academic_shift = data.get("academic_shift")
+	doc.teacher_training_services = _csv_join(data.get("teacher_training_services"))
+	doc.tilawat_services = _csv_join(data.get("tilawat_services"))
+	doc.quran_program_services = _csv_join(data.get("quran_program_services"))
+	doc.running_tif_services = _csv_join(data.get("running_tif_services"))
+	doc.curriculum_in_use = _csv_join(data.get("curriculum_in_use"))
+	doc.curriculum_others = data.get("curriculum_others")
+	doc.fee_structure = data.get("fee_structure")
+	doc.website = data.get("website")
+	doc.facebook = data.get("facebook")
+	doc.instagram = data.get("instagram")
+	doc.linkedin = data.get("linkedin")
+	doc.other_links = data.get("other_links")
+	doc.address = data.get("address")
+	doc.area = data.get("area")
+	doc.province = data.get("province")
+	doc.city = data.get("city")
+	doc.country = data.get("country") or "Pakistan"
+	doc.marketing_sample_provided = data.get("marketing_sample_provided")
+	doc.school_ptcl = data.get("school_ptcl")
+	doc.school_mobile = data.get("school_mobile")
+	doc.school_whatsapp = data.get("school_whatsapp")
+	doc.school_email = data.get("school_email")
+
+	doc.set("key_contacts", [])
+	contacts = data.get("key_contacts") or {}
+	for role in CONTACT_ROLES:
+		row = contacts.get(role) or {}
+		if not isinstance(row, dict):
+			row = {}
+		doc.append(
+			"key_contacts",
+			{
+				"role": role,
+				"contact_name": (row.get("name") or "").strip(),
+				"cell_no": (row.get("cell") or row.get("cell_no") or "").strip(),
+			},
+		)
+
+
+def _sync_customer_from_payload(customer, data):
+	"""Keep linked Customer basic fields in sync after HO edit."""
+	customer = resolve_customer_name(customer)
+	if not customer or not frappe.db.exists("Customer", customer):
+		return
+	cust = frappe.get_doc("Customer", customer)
+	school_name = (data.get("school_name") or "").strip()
+	if school_name:
+		cust.customer_name = school_name
+	meta = frappe.get_meta("Customer")
+	govt = ""
+	cat = (data.get("institution_category") or "").strip()
+	if cat == "Private":
+		govt = "Private"
+	elif cat == "Provincial Govt.":
+		govt = "Govt"
+	if govt and meta.has_field("custom_govt_private"):
+		cust.custom_govt_private = govt
+	if meta.has_field("custom_no_of_students"):
+		from tif_customization.tif_customization.doctype.school.school_customer import (
+			student_count_bucket,
+		)
+
+		bucket = student_count_bucket(data.get("no_of_students"))
+		if bucket:
+			cust.custom_no_of_students = bucket
+	if meta.has_field("custom_shift") and data.get("academic_shift"):
+		cust.custom_shift = data.get("academic_shift")
+	cust.flags.ignore_permissions = True
+	cust.flags.ignore_mandatory = True
+	cust.save()
+
+
+@frappe.whitelist()
+def update_school_opening(application=None, customer=None, data=None):
+	"""HO edit of SC-1.2 (Farhan / Danish / Administrator / School Approval)."""
+	if not can_edit_school_opening_form():
+		frappe.throw(_("Not permitted to edit this form."), frappe.PermissionError)
+
+	if isinstance(data, str):
+		import json
+
+		data = json.loads(data)
+	data = data or {}
+
+	application = (application or "").strip()
+	customer = resolve_customer_name(customer) if customer else ""
+
+	if not application and customer:
+		application = frappe.db.get_value(
+			"School Opening Application",
+			{"customer": customer, "docstatus": 1},
+			"name",
+			order_by="modified desc",
+		) or frappe.db.get_value(
+			"School Opening Application",
+			{"customer": customer},
+			"name",
+			order_by="modified desc",
+		)
+
+	if application:
+		if not frappe.db.exists("School Opening Application", application):
+			frappe.throw(_("School Opening Application {0} not found.").format(application))
+		doc = frappe.get_doc("School Opening Application", application)
+		_apply_school_opening_payload(doc, data)
+		doc.flags.ignore_permissions = True
+		doc.flags.ignore_validate_update_after_submit = True
+		doc.save()
+		if doc.customer:
+			_sync_customer_from_payload(doc.customer, data)
+		return {
+			"ok": True,
+			"application": doc.name,
+			"customer": doc.customer or customer or "",
+			"message": _("School Opening form saved."),
+		}
+
+	if not customer:
+		frappe.throw(_("Customer or application is required."))
+
+	# Customer-only row: create SC-1.2 linked to this Customer, then submit (already "approved" school)
+	from tif_customization.tif_customization.api.school_opening_form import (
+		create_school_opening_application,
+	)
+
+	data = dict(data)
+	data["school_name"] = (data.get("school_name") or "").strip() or frappe.db.get_value(
+		"Customer", customer, "customer_name"
+	)
+	doc = create_school_opening_application(data)
+	doc.db_set("customer", customer, update_modified=False)
+	doc.reload()
+	doc.flags.ignore_permissions = True
+	if int(doc.docstatus or 0) == 0:
+		doc.submit()
+	_sync_customer_from_payload(customer, data)
+	return {
+		"ok": True,
+		"application": doc.name,
+		"customer": customer,
+		"message": _("School Opening form saved."),
+	}
+
+
 _EXPORT_MAX_ROWS = 5000
 
 
@@ -809,6 +1130,7 @@ def export_school_registry(
 	customers=None,
 	field_officer=None,
 	doc_status=None,
+	created_by=None,
 ):
 	"""Export filtered school registry rows for Excel (CSV), including address fields."""
 	if not frappe.has_permission("Customer", "read"):
@@ -822,6 +1144,7 @@ def export_school_registry(
 			city=city,
 			address_search=address_search,
 			field_officer=field_officer,
+			created_by=created_by,
 		)
 		out = []
 		for row in pending.get("rows") or []:
@@ -833,6 +1156,7 @@ def export_school_registry(
 					"status": row.get("status") or "",
 					"territory": "",
 					"field_officer": row.get("field_officer") or "",
+					"created_by": row.get("created_by") or "",
 					"doc_status": row.get("doc_status_label") or _("Pending for Approval"),
 					"form_data": _("Pending approval"),
 					"address": row.get("address") or "",
@@ -859,6 +1183,7 @@ def export_school_registry(
 				"address_search": address_search or "",
 				"field_officer": field_officer or "",
 				"doc_status": doc_status or "",
+				"created_by": created_by or "",
 			},
 		}
 
@@ -873,6 +1198,7 @@ def export_school_registry(
 		customers=customers,
 		field_officer=field_officer,
 		doc_status=doc_status,
+		created_by=created_by,
 	)
 	values = {**filter_values}
 
@@ -886,6 +1212,7 @@ def export_school_registry(
 			c.territory,
 			c.email_id,
 			c.mobile_no,
+			c.owner AS created_by_user,
 			IFNULL(soa.field_officer, '') AS field_officer,
 			IF(soa.customer IS NOT NULL, 1, 0) AS has_application
 		FROM `tabCustomer` c
@@ -901,10 +1228,13 @@ def export_school_registry(
 	customer_names = [row.customer for row in rows]
 	addr_map = _addresses_for_customers(customer_names)
 	fo_map = _field_officers_for_customers(rows)
+	owner_names = _user_display_names([row.get("created_by_user") for row in rows])
 	out = []
 	for row in rows:
 		has_app = bool(row.pop("has_application", 0))
 		addr = addr_map.get(row.customer) or {}
+		created_by_user = cstr(row.pop("created_by_user", None) or "").strip()
+		created_by_name = owner_names.get(created_by_user) or created_by_user
 		out.append(
 			{
 				"customer": row.customer,
@@ -915,8 +1245,10 @@ def export_school_registry(
 				"field_officer": (
 					cstr(row.get("field_officer") or "").strip()
 					or fo_map.get(row.customer)
+					or created_by_name
 					or ""
 				),
+				"created_by": created_by_name,
 				"doc_status": _("Approved") if has_app else _("Draft"),
 				"form_data": _("Full SC-1.2") if has_app else _("Customer only"),
 				"address": (addr.get("address_line1") or "").strip(),
@@ -944,8 +1276,30 @@ def export_school_registry(
 			"address_search": address_search or "",
 			"field_officer": field_officer or "",
 			"doc_status": doc_status or "",
+			"created_by": created_by or "",
 		},
 	}
+
+
+SCHOOL_OPENING_EDIT_USERS = frozenset(
+	{
+		"Administrator",
+		"farhan.hussain@tif.edu.pk",
+		"danishawan@tif.edu.pk",
+	}
+)
+SCHOOL_OPENING_EDIT_ROLES = frozenset({"System Manager", "School Approval", "Administrator"})
+
+
+def can_edit_school_opening_form(user=None):
+	"""HO editors: Administrator, Farhan, Danish, System Manager / School Approval."""
+	user = user or frappe.session.user
+	if not user or user == "Guest":
+		return False
+	if user == "Administrator" or user.lower() in {u.lower() for u in SCHOOL_OPENING_EDIT_USERS}:
+		return True
+	roles = set(frappe.get_roles(user))
+	return bool(roles & SCHOOL_OPENING_EDIT_ROLES)
 
 
 @frappe.whitelist()
@@ -1005,6 +1359,7 @@ def _view_from_application(app):
 		"School Opening Application", "submit", app.name
 	)
 	is_approved = int(app.docstatus or 0) == 1 and bool(app.customer)
+	can_edit = can_edit_school_opening_form()
 	return {
 		"source": "application",
 		"application": app.name,
@@ -1012,6 +1367,7 @@ def _view_from_application(app):
 		"approved_by": app.approved_by or "",
 		"approved_on": cstr(app.approved_on or ""),
 		"can_approve": bool(can_approve),
+		"can_edit": bool(can_edit),
 		"is_approved": bool(is_approved),
 		"customer": app.customer,
 		"erp_school_code": app.erp_school_code or app.customer,
@@ -1026,7 +1382,7 @@ def _view_from_application(app):
 		"educational_system": _csv_to_list(app.educational_system),
 		"type_of_school": app.type_of_school or "",
 		"no_of_campuses": app.no_of_campuses,
-		"no_of_students": app.no_of_students,
+		"no_of_students": _display_no_of_students(app.no_of_students),
 		"structure": app.structure or "",
 		"academic_shift": app.academic_shift or "",
 		"teacher_training_services": _csv_to_list(app.teacher_training_services),
@@ -1079,6 +1435,7 @@ def _view_from_customer(cust):
 		"approved_by": "",
 		"approved_on": "",
 		"can_approve": False,
+		"can_edit": bool(can_edit_school_opening_form()),
 		"is_approved": True,
 		"customer": cust.name,
 		"erp_school_code": cust.name,
@@ -1093,7 +1450,7 @@ def _view_from_customer(cust):
 		"educational_system": [],
 		"type_of_school": category,
 		"no_of_campuses": None,
-		"no_of_students": cust.get("custom_no_of_students") or "",
+		"no_of_students": _display_no_of_students(cust.get("custom_no_of_students")),
 		"structure": structure,
 		"academic_shift": cust.get("custom_shift") or "",
 		"teacher_training_services": _csv_to_list(cust.get("custom_books")),
@@ -1125,6 +1482,23 @@ def _view_from_customer(cust):
 		"contact_roles": CONTACT_ROLES,
 		"remarks_html": cust.get("custom_remarks") or "",
 	}
+
+
+def _user_display_names(user_ids):
+	"""Map User.name → full_name (fallback to email/id)."""
+	ids = [cstr(u).strip() for u in (user_ids or []) if cstr(u).strip()]
+	if not ids:
+		return {}
+	out = {}
+	for row in frappe.get_all(
+		"User",
+		filters={"name": ("in", list(set(ids)))},
+		fields=["name", "full_name"],
+	):
+		out[row.name] = cstr(row.full_name or row.name).strip() or row.name
+	for uid in ids:
+		out.setdefault(uid, uid)
+	return out
 
 
 def _field_officers_for_customers(rows):

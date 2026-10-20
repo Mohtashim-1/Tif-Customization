@@ -32,12 +32,27 @@ STATUS_MAP = {
 }
 
 
+STUDENT_COUNT_BUCKETS = (
+	"1-10",
+	"11-50",
+	"51-200",
+	"201-500",
+	"501-1000",
+	"1000+",
+)
+
+
 def student_count_bucket(count):
 	if count is None or count == "":
 		return None
+	raw = str(count).strip()
+	if raw in STUDENT_COUNT_BUCKETS:
+		return raw
 	try:
-		n = int(count)
+		n = int(float(raw))
 	except (TypeError, ValueError):
+		return None
+	if n <= 0:
 		return None
 	if n <= 10:
 		return "1-10"
