@@ -1533,7 +1533,7 @@ def submit_smes_activity(data):
 		or cstr(data.get("travel_remarks") or "").strip()
 	)
 	if not remarks_text:
-		frappe.throw(_("Remarks are required for every activity. Please enter remarks before submitting."))
+		frappe.throw(_("Visit Summary is required for every activity. Please enter visit summary before submitting."))
 
 	activity_label = data.get("activity_type")
 	doc_type = ACTIVITY_TYPE_MAP.get(activity_label, activity_label)
@@ -2086,7 +2086,7 @@ def get_field_visit_easy_view(name=None):
 					row(_("Address"), getattr(vol, "address", None)),
 					row(_("School"), _child_school_label(getattr(vol, "school", None))),
 					row(_("Form Submitted"), getattr(vol, "volunteer_form_submitted", None)),
-					row(_("Remarks"), getattr(vol, "remarks", None)),
+					row(_("Visit Summary"), getattr(vol, "remarks", None)),
 				],
 			)
 
@@ -2119,7 +2119,7 @@ def get_field_visit_easy_view(name=None):
 					row(_("Address"), getattr(amb, "address", None)),
 					row(_("School"), _child_school_label(getattr(amb, "school", None))),
 					row(_("Form Submitted"), getattr(amb, "ambassador_form_submitted", None)),
-					row(_("Remarks"), getattr(amb, "remarks", None)),
+					row(_("Visit Summary"), getattr(amb, "remarks", None)),
 				],
 			)
 
@@ -2131,7 +2131,7 @@ def get_field_visit_easy_view(name=None):
 				_("Distance (km)"),
 				getattr(doc, "travel_distance_km", None) or getattr(doc, "distance_km", None),
 			),
-			row(_("Remarks"), getattr(doc, "travel_remarks", None)),
+			row(_("Travel Visit Summary"), getattr(doc, "travel_remarks", None)),
 		],
 	)
 	visit_summary_notes = []

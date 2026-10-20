@@ -1442,7 +1442,7 @@ function activityRemarksText() {
 function assertRemarksFilled() {
 	if (!selected.value || selected.value.group === "report") return true;
 	if (activityRemarksText()) return true;
-	error.value = "Remarks are required. Please enter remarks before continuing.";
+	error.value = "Visit Summary is required. Please enter visit summary before continuing.";
 	return false;
 }
 
@@ -1942,7 +1942,7 @@ const steps = [
 							/>
 							<FieldSelect :mode="lang" label-en="School Type" label-ur="اسکول کی قسم" :options="schoolTypeOptions" placeholder-en="Select" placeholder-ur="منتخب کریں" v-model="visit.schoolType" />
 							<FieldTextarea :mode="lang" label-en="School Address" label-ur="اسکول کا پتہ" v-model="visit.schoolAddress" />
-							<FieldTextarea :mode="lang" label-en="Any Additional Remarks regarding School" label-ur="اسکول کے بارے میں اضافی ریمارکس" required v-model="visit.schoolAdditionalRemarks" />
+							<FieldTextarea :mode="lang" label-en="Visit Summary regarding School" label-ur="اسکول کے بارے میں دورے کا خلاصہ" required v-model="visit.schoolAdditionalRemarks" />
 							<FieldInput :mode="lang" label-en="Reference" label-ur="حوالہ" v-model="visit.reference" />
 							<label class="check-row" style="margin-top: 0">
 								<input type="checkbox" v-model="visit.marketingMaterial" />
@@ -2225,13 +2225,13 @@ const steps = [
 							<FieldSelect :mode="lang" label-en="Registered with TIF as a Volunteer" label-ur="کیا TIF کے ساتھ والینٹیئر رجسٹرڈ ہے؟" :options="['Yes', 'No']" required v-model="me.volunteer" />
 						</div>
 
-						<div class="block-title">Remarks / ریمارکس</div>
+						<div class="block-title">Visit Summary / دورے کا خلاصہ</div>
 						<div class="academic-work">
 							<FieldTextarea
 								:mode="lang"
-								label-en="Remarks"
-								label-ur="ریمارکس"
-								placeholder="Any additional remarks regarding this monitoring visit"
+								label-en="Visit Summary"
+								label-ur="دورے کا خلاصہ"
+								placeholder="Any additional visit summary regarding this monitoring visit"
 								required
 								v-model="visit.schoolAdditionalRemarks"
 							/>
@@ -2262,7 +2262,7 @@ const steps = [
 						<div style="margin-top: 16px">
 							<FieldTextarea :mode="lang" label-en="Agenda" label-ur="ایجنڈا" v-model="meeting.agenda" />
 							<FieldTextarea :mode="lang" label-en="Resolution" label-ur="قرارداد" v-model="meeting.resolution" />
-							<FieldTextarea :mode="lang" label-en="Remarks" label-ur="ریمارکس" required v-model="meeting.remarks" />
+							<FieldTextarea :mode="lang" label-en="Visit Summary" label-ur="دورے کا خلاصہ" required v-model="meeting.remarks" />
 						</div>
 					</div>
 
@@ -2334,7 +2334,7 @@ const steps = [
 						/>
 						<div class="grid-2" style="margin-top: 24px">
 							<FieldTextarea :mode="lang" label-en="Agenda" label-ur="ایجنڈا" placeholder="Purpose of meeting / ملاقات کا مقصد" v-model="meeting.agenda" />
-							<FieldTextarea :mode="lang" label-en="Remarks" label-ur="ریمارکس / اگلا قدم" placeholder="Next follow-up?" required v-model="meeting.remarks" />
+							<FieldTextarea :mode="lang" label-en="Visit Summary" label-ur="دورے کا خلاصہ / اگلا قدم" placeholder="Next follow-up?" required v-model="meeting.remarks" />
 						</div>
 						<label class="check-row">
 							<input type="checkbox" v-model="meeting.mutalaeSample" />
@@ -2411,9 +2411,9 @@ const steps = [
 						<div v-if="selected.group === 'training'" style="margin-top: 16px">
 							<FieldTextarea
 								:mode="lang"
-								label-en="Remarks"
-								label-ur="ریمارکس"
-								placeholder="Remarks about this training / workshop"
+								label-en="Visit Summary"
+								label-ur="دورے کا خلاصہ"
+								placeholder="Visit summary about this training / workshop"
 								required
 								v-model="meeting.remarks"
 							/>
@@ -2625,8 +2625,8 @@ const steps = [
 							<div style="grid-column: 1 / -1">
 								<FieldTextarea
 									:mode="lang"
-									label-en="Visit / batch remarks"
-									label-ur="دورہ / بیچ نوٹس"
+									label-en="Visit Summary"
+									label-ur="دورے کا خلاصہ"
 									required
 									v-model="volunteerVisit.remarks"
 								/>
@@ -2738,8 +2738,8 @@ const steps = [
 							<div style="grid-column: 1 / -1">
 								<FieldTextarea
 									:mode="lang"
-									label-en="Visit / batch remarks"
-									label-ur="دورہ / بیچ نوٹس"
+									label-en="Visit Summary"
+									label-ur="دورے کا خلاصہ"
 									required
 									v-model="ambassadorVisit.remarks"
 								/>
@@ -2847,9 +2847,9 @@ const steps = [
 							</div>
 							<FieldTextarea
 								:mode="lang"
-								label-en="Remarks"
-								label-ur="ریمارکس"
-								placeholder="Remarks about this enrolment"
+								label-en="Visit Summary"
+								label-ur="دورے کا خلاصہ"
+								placeholder="Visit summary about this enrolment"
 								required
 								v-model="meeting.remarks"
 							/>
@@ -2905,7 +2905,7 @@ const steps = [
 							<FieldInput :mode="lang" label-en="Contact Person" label-ur="رابطہ شخص" v-model="visit.meetingWith" />
 							<FieldInput :mode="lang" label-en="Contact No." label-ur="رابطہ نمبر" placeholder="03XX-XXXXXXX" v-model="visit.contactNumber" />
 							<FieldTextarea :mode="lang" label-en="School / Madrasa Address" label-ur="اسکول / مدرسہ کا پتہ" v-model="visit.schoolAddress" />
-							<FieldTextarea :mode="lang" label-en="Remarks" label-ur="ریمارکس" required v-model="visit.schoolAdditionalRemarks" />
+							<FieldTextarea :mode="lang" label-en="Visit Summary" label-ur="دورے کا خلاصہ" required v-model="visit.schoolAdditionalRemarks" />
 						</div>
 
 						<SchoolOpeningPanel
@@ -2999,7 +2999,7 @@ const steps = [
 								:helper-ur="travel.autoCost ? `${travel.distance || 0} کلومیٹر × ${travel.perKm || 18} روپے` : 'صرف حقیقی سفر کا خرچ لکھیں'"
 							/>
 							<div style="grid-column: 1 / -1">
-								<FieldTextarea :mode="lang" label-en="Travel Remarks" label-ur="سفر کے ریمارکس" v-model="travel.remarks" />
+								<FieldTextarea :mode="lang" label-en="Travel Visit Summary" label-ur="سفر کا خلاصہ" v-model="travel.remarks" />
 							</div>
 						</div>
 						<div v-else class="empty">
@@ -3230,7 +3230,7 @@ const steps = [
 							/>
 						</div>
 						<div style="grid-column: 1 / -1">
-							<FieldTextarea :mode="lang" label-en="Other / Remarks" label-ur="دیگر / نوٹس" v-model="volunteerForm.remarks" />
+							<FieldTextarea :mode="lang" label-en="Other / Visit Summary" label-ur="دیگر / دورے کا خلاصہ" v-model="volunteerForm.remarks" />
 						</div>
 					</div>
 				</div>
@@ -3324,7 +3324,7 @@ const steps = [
 							/>
 						</div>
 						<div style="grid-column: 1 / -1">
-							<FieldTextarea :mode="lang" label-en="Other / Remarks" label-ur="دیگر / نوٹس" v-model="ambassadorForm.remarks" />
+							<FieldTextarea :mode="lang" label-en="Other / Visit Summary" label-ur="دیگر / دورے کا خلاصہ" v-model="ambassadorForm.remarks" />
 						</div>
 					</div>
 				</div>
