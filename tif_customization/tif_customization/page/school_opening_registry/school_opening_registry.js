@@ -1,4 +1,4 @@
-/* School Opening Registry v20261020d */
+/* School Opening Registry v20261020f */
 frappe.pages["school-opening-registry"].on_page_load = function (wrapper) {
 	frappe.tif_customization.SchoolOpeningRegistry.clear_stuck_freeze();
 	const page = frappe.ui.make_app_page({
@@ -185,6 +185,7 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 	}
 
 	get_filter_args() {
+		const fo = (this.filter_fields.field_officer?.get_value() || "").trim();
 		return {
 			search: this.search_field?.get_value() || "",
 			govt_private: this.filter_fields.govt_private?.get_value() || "",
@@ -193,7 +194,7 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 			form_data: this._form_data_arg(),
 			city: this.filter_fields.city?.get_value() || "",
 			address_search: this.filter_fields.address_search?.get_value() || "",
-			field_officer: this.filter_fields.field_officer?.get_value() || "",
+			field_officer: fo.includes(":") ? fo.split(":")[0].trim() : fo,
 			doc_status: this._doc_status_arg(),
 		};
 	}
@@ -587,14 +588,14 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 				}
 				const docStatus = (row.doc_status || "").toLowerCase();
 				let docBadge;
-				if (docStatus === "pending" || isPending) {
+				if (docStatus === "draft" || docStatus === "pending" || isPending) {
 					docBadge = `<span class="indicator-pill yellow">${__(
-						row.doc_status_label || "Pending for Approval"
+						row.doc_status_label || "Draft"
 					)}</span>`;
 				} else if (docStatus === "approved" || row.has_application) {
 					docBadge = `<span class="indicator-pill green">${__(row.doc_status_label || "Approved")}</span>`;
 				} else {
-					docBadge = `<span class="indicator-pill gray">${__(row.doc_status_label || "Draft")}</span>`;
+					docBadge = `<span class="text-muted">—</span>`;
 				}
 				const officer = (row.field_officer || "").trim();
 				const officerCell = officer

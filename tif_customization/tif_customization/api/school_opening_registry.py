@@ -197,11 +197,59 @@ LEFT JOIN (
 ) soa ON soa.customer = c.name
 """
 
+_FIELD_VISIT_FO_SUBQUERY = """
+	SELECT
+		TRIM(school_name) AS school_key,
+		SUBSTRING_INDEX(
+			GROUP_CONCAT(
+				TRIM(COALESCE(
+					NULLIF(TRIM(visit_by), ''),
+					NULLIF(TRIM(me_visit_by), ''),
+					NULLIF(TRIM(mt_visit_by), '')
+				))
+				ORDER BY modified DESC
+				SEPARATOR '\\n'
+			),
+			'\\n',
+			1
+		) AS field_officer
+	FROM `tabField Visit`
+	WHERE docstatus < 2
+		AND IFNULL(TRIM(school_name), '') != ''
+		AND TRIM(COALESCE(
+			NULLIF(TRIM(visit_by), ''),
+			NULLIF(TRIM(me_visit_by), ''),
+			NULLIF(TRIM(mt_visit_by), '')
+		)) != ''
+	GROUP BY TRIM(school_name)
+"""
+
+_SCHOOL_REGISTRY_FO_JOINS = f"""
+{_SCHOOL_OPENING_APP_JOIN}
+LEFT JOIN (
+{_FIELD_VISIT_FO_SUBQUERY}
+) fv_fo_id ON fv_fo_id.school_key = TRIM(c.name)
+LEFT JOIN (
+{_FIELD_VISIT_FO_SUBQUERY}
+) fv_fo_nm ON fv_fo_nm.school_key = TRIM(IFNULL(c.customer_name, ''))
+LEFT JOIN `tabUser` owner_u ON owner_u.name = c.owner
+"""
+
+_RESOLVED_FIELD_OFFICER_SQL = """
+TRIM(COALESCE(
+	NULLIF(IFNULL(soa.field_officer, ''), ''),
+	NULLIF(IFNULL(fv_fo_id.field_officer, ''), ''),
+	NULLIF(IFNULL(fv_fo_nm.field_officer, ''), ''),
+	NULLIF(TRIM(IFNULL(owner_u.full_name, owner_u.name)), '')
+))
+"""
+
 
 def _normalize_doc_status(value):
 	"""Map UI filter values to draft | pending | approved.
 
-	Accepts plain values (approved) or Select value:label strings (approved:Approved).
+	Draft / Pending for Approval = School Opening Application docstatus 0.
+	Approved = customers with submitted SC-1.2.
 	"""
 	raw = cstr(value or "").strip()
 	if not raw:
@@ -212,11 +260,46 @@ def _normalize_doc_status(value):
 	raw = raw.lower().replace("-", "_").replace(" ", "_")
 	if raw in ("approved", "approve", "submitted", "1"):
 		return "approved"
-	if raw in ("pending", "pending_approval", "pending_for_approval", "awaiting_approval"):
-		return "pending"
-	if raw in ("draft", "customer_only", "customer-only", "customer", "0"):
+	# Draft and pending approval are the same SOA queue (docstatus 0)
+	if raw in (
+		"draft",
+		"0",
+		"pending",
+		"pending_approval",
+		"pending_for_approval",
+		"awaiting_approval",
+	):
 		return "draft"
 	return ""
+
+
+def _officer_aliases(label):
+	"""Name / email tokens that identify one Field Officer (for exact filter match)."""
+	label = cstr(label or "").strip()
+	if not label:
+		return []
+	aliases = {label}
+	rows = frappe.db.sql(
+		"""
+		SELECT
+			TRIM(IFNULL(fo.name1, '')) AS name1,
+			TRIM(IFNULL(fo.user, '')) AS user_id,
+			TRIM(IFNULL(u.full_name, '')) AS full_name
+		FROM `tabField Officer` fo
+		LEFT JOIN `tabUser` u ON u.name = fo.user
+		WHERE TRIM(IFNULL(fo.name1, '')) = %(label)s
+			OR TRIM(IFNULL(fo.user, '')) = %(label)s
+			OR TRIM(IFNULL(u.full_name, '')) = %(label)s
+		""",
+		{"label": label},
+		as_dict=True,
+	)
+	for row in rows:
+		for key in ("name1", "user_id", "full_name"):
+			val = cstr(row.get(key) or "").strip()
+			if val:
+				aliases.add(val)
+	return list(aliases)
 
 
 def _school_registry_filter_clause(
@@ -267,60 +350,15 @@ def _school_registry_filter_clause(
 	form_data = (form_data or "").strip().lower()
 	if doc_status_norm == "approved" or form_data == "full":
 		conditions.append("soa.customer IS NOT NULL")
-	elif doc_status_norm == "draft" or form_data in ("customer_only", "customer-only", "customer"):
+	elif form_data in ("customer_only", "customer-only", "customer"):
 		conditions.append("soa.customer IS NULL")
 
 	field_officer = (field_officer or "").strip()
 	if field_officer:
-		# Approved SOA / Field Visit / SOA name match / Customer created-by user
-		conditions.append(
-			"""(
-			IFNULL(soa.field_officer, '') = %(field_officer)s
-			OR EXISTS (
-				SELECT 1 FROM `tabField Visit` fv
-				WHERE fv.docstatus < 2
-					AND (
-						fv.school_name = c.name
-						OR TRIM(IFNULL(fv.school_name, '')) = TRIM(IFNULL(c.customer_name, ''))
-						OR TRIM(IFNULL(fv.school_name, '')) = TRIM(IFNULL(c.name, ''))
-					)
-					AND (
-						TRIM(IFNULL(fv.visit_by, '')) = %(field_officer)s
-						OR TRIM(IFNULL(fv.me_visit_by, '')) = %(field_officer)s
-						OR TRIM(IFNULL(fv.mt_visit_by, '')) = %(field_officer)s
-						OR fv.owner = %(field_officer)s
-						OR EXISTS (
-							SELECT 1 FROM `tabUser` u
-							WHERE u.name = fv.owner
-								AND TRIM(IFNULL(u.full_name, '')) = %(field_officer)s
-						)
-					)
-			)
-			OR EXISTS (
-				SELECT 1 FROM `tabSchool Opening Application` app
-				WHERE (
-						TRIM(IFNULL(app.tif_representative, '')) = %(field_officer)s
-						OR app.owner = %(field_officer)s
-						OR EXISTS (
-							SELECT 1 FROM `tabUser` u
-							WHERE u.name = app.owner
-								AND TRIM(IFNULL(u.full_name, '')) = %(field_officer)s
-						)
-					)
-					AND (
-						app.customer = c.name
-						OR TRIM(IFNULL(app.school_name, '')) = TRIM(IFNULL(c.customer_name, ''))
-					)
-			)
-			OR c.owner = %(field_officer)s
-			OR EXISTS (
-				SELECT 1 FROM `tabUser` u
-				WHERE u.name = c.owner
-					AND TRIM(IFNULL(u.full_name, '')) = %(field_officer)s
-			)
-		)"""
-		)
-		values["field_officer"] = field_officer
+		# Same expression as the Field Officer column
+		aliases = _officer_aliases(field_officer) or [field_officer]
+		values["fo_aliases"] = tuple(aliases)
+		conditions.append(f"({_RESOLVED_FIELD_OFFICER_SQL}) IN %(fo_aliases)s")
 
 	created_by = (created_by or "").strip()
 	if created_by:
@@ -461,11 +499,12 @@ def get_school_registry_filter_options():
 
 
 def _wants_pending_list(form_data=None, doc_status=None):
+	"""Draft / Pending for Approval → School Opening Application drafts (docstatus 0)."""
 	doc_status_norm = _normalize_doc_status(doc_status)
-	if doc_status_norm == "pending":
+	if doc_status_norm in ("draft", "pending"):
 		return True
 	form_data_norm = (form_data or "").strip().lower()
-	return form_data_norm in ("pending", "pending_approval")
+	return form_data_norm in ("pending", "pending_approval", "draft")
 
 
 @frappe.whitelist()
@@ -516,7 +555,7 @@ def list_school_customers(
 		f"""
 		SELECT COUNT(*)
 		FROM `tabCustomer` c
-		{_SCHOOL_OPENING_APP_JOIN}
+		{_SCHOOL_REGISTRY_FO_JOINS}
 		WHERE {where}
 		""",
 		values,
@@ -534,10 +573,10 @@ def list_school_customers(
 			c.territory,
 			c.modified,
 			c.owner AS created_by_user,
-			IFNULL(soa.field_officer, '') AS field_officer,
+			{_RESOLVED_FIELD_OFFICER_SQL} AS field_officer,
 			IF(soa.customer IS NOT NULL, 1, 0) AS has_application
 		FROM `tabCustomer` c
-		{_SCHOOL_OPENING_APP_JOIN}
+		{_SCHOOL_REGISTRY_FO_JOINS}
 		WHERE {where}
 		ORDER BY c.customer_name
 		LIMIT %(limit)s OFFSET %(start)s
@@ -548,7 +587,6 @@ def list_school_customers(
 
 	customers = [row.customer for row in rows]
 	addr_map = _addresses_for_customers(customers)
-	fo_map = _field_officers_for_customers(rows)
 	owner_names = _user_display_names([row.get("created_by_user") for row in rows])
 	for row in rows:
 		row.has_application = bool(row.pop("has_application", 0))
@@ -556,14 +594,9 @@ def list_school_customers(
 		row.row_type = "customer"
 		created_by_user = cstr(row.pop("created_by_user", None) or "").strip()
 		row.created_by = owner_names.get(created_by_user) or created_by_user
-		row.field_officer = (
-			cstr(row.get("field_officer") or "").strip()
-			or fo_map.get(row.customer)
-			or row.created_by
-			or ""
-		)
-		row.doc_status = "approved" if row.has_application else "draft"
-		row.doc_status_label = _("Approved") if row.has_application else _("Draft")
+		row.field_officer = cstr(row.get("field_officer") or "").strip()
+		row.doc_status = "approved" if row.has_application else "customer_only"
+		row.doc_status_label = _("Approved") if row.has_application else ""
 		_apply_registry_location(row, addr_map.get(row.customer))
 
 	return {"rows": rows, "total": total, "start": start, "page_length": limit, "mode": "customer"}
@@ -608,18 +641,28 @@ def _list_pending_applications(
 
 	field_officer = (field_officer or "").strip()
 	if field_officer:
+		fo_aliases = _officer_aliases(field_officer) or [field_officer]
+		values["fo_aliases"] = tuple(fo_aliases)
+		# Match displayed FO only: TIF Representative, or creator when representative is blank
 		conditions.append(
 			"""(
-			IFNULL(TRIM(tif_representative), '') = %(field_officer)s
-			OR owner = %(field_officer)s
-			OR EXISTS (
-				SELECT 1 FROM `tabUser` u
-				WHERE u.name = `tabSchool Opening Application`.owner
-					AND TRIM(IFNULL(u.full_name, '')) = %(field_officer)s
+			IFNULL(TRIM(tif_representative), '') IN %(fo_aliases)s
+			OR (
+				IFNULL(TRIM(tif_representative), '') = ''
+				AND (
+					owner IN %(fo_aliases)s
+					OR EXISTS (
+						SELECT 1 FROM `tabUser` u
+						WHERE u.name = `tabSchool Opening Application`.owner
+							AND (
+								u.name IN %(fo_aliases)s
+								OR TRIM(IFNULL(u.full_name, '')) IN %(fo_aliases)s
+							)
+					)
+				)
 			)
 		)"""
 		)
-		values["field_officer"] = field_officer
 
 	created_by = (created_by or "").strip()
 	if created_by:
@@ -677,8 +720,8 @@ def _list_pending_applications(
 		created_by_user = cstr(row.pop("created_by_user", None) or "").strip()
 		row.created_by = owner_names.get(created_by_user) or created_by_user
 		row.field_officer = cstr(row.get("field_officer") or "").strip() or row.created_by or ""
-		row.doc_status = "pending"
-		row.doc_status_label = _("Pending for Approval")
+		row.doc_status = "draft"
+		row.doc_status_label = _("Draft")
 		row.full_address = ", ".join(
 			p for p in [row.address, row.area, row.city, row.province, row.country] if p
 		)
@@ -734,7 +777,7 @@ def get_school_opening_neighbors(
 		f"""
 		SELECT c.name
 		FROM `tabCustomer` c
-		{_SCHOOL_OPENING_APP_JOIN}
+		{_SCHOOL_REGISTRY_FO_JOINS}
 		WHERE {where}
 		ORDER BY c.customer_name
 		""",
@@ -1213,10 +1256,10 @@ def export_school_registry(
 			c.email_id,
 			c.mobile_no,
 			c.owner AS created_by_user,
-			IFNULL(soa.field_officer, '') AS field_officer,
+			{_RESOLVED_FIELD_OFFICER_SQL} AS field_officer,
 			IF(soa.customer IS NOT NULL, 1, 0) AS has_application
 		FROM `tabCustomer` c
-		{_SCHOOL_OPENING_APP_JOIN}
+		{_SCHOOL_REGISTRY_FO_JOINS}
 		WHERE {where}
 		ORDER BY c.customer_name
 		LIMIT {_EXPORT_MAX_ROWS}
@@ -1227,7 +1270,6 @@ def export_school_registry(
 
 	customer_names = [row.customer for row in rows]
 	addr_map = _addresses_for_customers(customer_names)
-	fo_map = _field_officers_for_customers(rows)
 	owner_names = _user_display_names([row.get("created_by_user") for row in rows])
 	out = []
 	for row in rows:
@@ -1242,12 +1284,7 @@ def export_school_registry(
 				"govt_private": row.govt_private or "",
 				"status": row.status or "",
 				"territory": row.territory or "",
-				"field_officer": (
-					cstr(row.get("field_officer") or "").strip()
-					or fo_map.get(row.customer)
-					or created_by_name
-					or ""
-				),
+				"field_officer": cstr(row.get("field_officer") or "").strip(),
 				"created_by": created_by_name,
 				"doc_status": _("Approved") if has_app else _("Draft"),
 				"form_data": _("Full SC-1.2") if has_app else _("Customer only"),
