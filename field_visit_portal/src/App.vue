@@ -271,6 +271,27 @@ const training = reactive({
 	fieldOfficer: "",
 });
 
+const EVENT_ACTIVITY_OPTIONS = {
+	stall: [
+		"Introduce TIF in Exhibition",
+		"Introduce TIF in School Functions",
+		"Conduct / Arrange Demo Class",
+	],
+	quiz: ["Arrange Quiz in School", "Inter School Quiz Competition"],
+};
+
+const eventForm = reactive({
+	date: todayISO(),
+	province: "Punjab",
+	city: "",
+	activity: "",
+	venue: "",
+	noOfSchools: "1",
+	noOfParticipants: "",
+	participantCategory: "",
+	remarks: "",
+});
+
 const participants = ref([]);
 const participantForm = reactive({
 	name: "",
@@ -368,8 +389,12 @@ const summaryLocation = computed(() => {
 	if (group === "meeting") return meeting;
 	if (group === "volunteer") return volunteerVisit;
 	if (group === "ambassador") return ambassadorVisit;
+	if (group === "event") return eventForm;
 	return training;
 });
+const eventActivityOptions = computed(
+	() => EVENT_ACTIVITY_OPTIONS[selected.value?.id] || EVENT_ACTIVITY_OPTIONS.stall
+);
 const summaryCity = computed(() => summaryLocation.value.city || "-");
 const summaryProvince = computed(() => summaryLocation.value.province || "-");
 const visibleCards = computed(() => cardsForUser(meta.value.activity_types || []));
@@ -681,6 +706,13 @@ function pickCard(card) {
 	selectedId.value = card.id;
 	error.value = "";
 	cancelCreateSchool();
+	if (card.id === "workshop_arranged" || card.id === "workshop_conducted") {
+		training.trainingCategory = "Half Day Workshop";
+	}
+	if (card.group === "event") {
+		const options = EVENT_ACTIVITY_OPTIONS[card.id] || [];
+		eventForm.activity = options[0] || "";
+	}
 	setTimeout(() => {
 		if (selectedId.value === card.id && step.value === 1) step.value = 2;
 	}, 500);
@@ -847,6 +879,7 @@ function bindLocationCascade(target) {
 bindLocationCascade(visit);
 bindLocationCascade(meeting);
 bindLocationCascade(training);
+bindLocationCascade(eventForm);
 bindLocationCascade(volunteerVisit);
 bindLocationCascade(ambassadorVisit);
 bindLocationCascade(volunteerForm);
@@ -1044,20 +1077,25 @@ function buildPayload(submitDoc) {
 	const schoolForm = card?.group === "visits" || card?.group === "books" || card?.group === "me";
 	const volunteerFormGroup = card?.group === "volunteer";
 	const ambassadorFormGroup = card?.group === "ambassador";
+	const eventFormGroup = card?.group === "event";
 	const visitDate = schoolForm
 		? visit.visitDate
 		: volunteerFormGroup
 			? volunteerVisit.date
 			: ambassadorFormGroup
 				? ambassadorVisit.date
-				: meeting.meetingDate || training.date || todayISO();
+				: eventFormGroup
+					? eventForm.date
+					: meeting.meetingDate || training.date || todayISO();
 	const city = schoolForm
 		? visit.city
 		: volunteerFormGroup
 			? volunteerVisit.city
 			: ambassadorFormGroup
 				? ambassadorVisit.city
-				: meeting.city || training.city;
+				: eventFormGroup
+					? eventForm.city
+					: meeting.city || training.city;
 	const payload = {
 		activity_type: activityType,
 		visit_by: staffName.value,
@@ -1081,21 +1119,29 @@ function buildPayload(submitDoc) {
 				? volunteerVisit.province
 				: ambassadorFormGroup
 					? ambassadorVisit.province
-					: card?.group === "meeting"
-						? meeting.province
-						: training.province,
+					: eventFormGroup
+						? eventForm.province
+						: card?.group === "meeting"
+							? meeting.province
+							: training.province,
 		school_name: schoolForm
 			? visit.schoolName
 			: volunteerFormGroup
 				? volunteers.value.find((v) => v.school)?.school || ""
 				: ambassadorFormGroup
 					? ambassadors.value.find((v) => v.school)?.school || ""
-					: meeting.institute || training.venueName,
+					: eventFormGroup
+						? eventForm.venue
+						: meeting.institute || training.venueName,
 		contact_person_name: schoolForm ? visit.meetingWith : meeting.meetingWith,
 		contact_number: schoolForm ? visit.contactNumber : meeting.contactNo,
 		designation: schoolForm ? visit.designation : "",
 		designation_other: card?.group === "visits" ? visit.designationOther : "",
-		school_additional_remarks: schoolForm ? visit.schoolAdditionalRemarks : meeting.remarks,
+		school_additional_remarks: schoolForm
+			? visit.schoolAdditionalRemarks
+			: eventFormGroup
+				? eventForm.remarks
+				: meeting.remarks,
 		// Frequency field removed from Easy Form — mirror Marketing Visit Category for desk/reports.
 		frequency_of_visits:
 			card?.group === "visits" ? visit.marketingVisitCategory || "" : meeting.frequency || "",
@@ -1213,6 +1259,21 @@ function buildPayload(submitDoc) {
 		payload.province = training.province;
 		payload.visit_date = training.date || visitDate;
 		payload.school_name = training.venueName;
+	}
+
+	if (card?.group === "event") {
+		payload.visit_date = eventForm.date || visitDate;
+		payload.city = eventForm.city || city;
+		payload.province = eventForm.province;
+		payload.cc_activity = eventForm.activity;
+		payload.cc_venue = eventForm.venue;
+		payload.cc_no_of_schools = eventForm.noOfSchools;
+		payload.cc_no_of_participants = eventForm.noOfParticipants;
+		payload.cc_participants_category = eventForm.participantCategory
+			? [eventForm.participantCategory]
+			: [];
+		payload.school_additional_remarks = eventForm.remarks;
+		payload.school_name = eventForm.venue;
 	}
 
 	if (card?.group === "academic") {
@@ -1427,6 +1488,9 @@ function activityRemarksText() {
 	if (g === "training") {
 		return (meeting.remarks || training.academicWorkDetail || "").trim();
 	}
+	if (g === "event") {
+		return (eventForm.remarks || "").trim();
+	}
 	if (g === "academic") {
 		return (training.academicWorkDetail || "").trim();
 	}
@@ -1512,6 +1576,24 @@ async function saveVisit(submitDoc) {
 		}
 		if (!ambassadorVisit.city) {
 			error.value = "City is required.";
+			return;
+		}
+	}
+	if (selected.value.group === "event") {
+		if (!eventForm.date) {
+			error.value = "Date is required.";
+			return;
+		}
+		if (!eventForm.city) {
+			error.value = "City is required.";
+			return;
+		}
+		if (!(eventForm.venue || "").trim()) {
+			error.value = "Venue is required.";
+			return;
+		}
+		if (!(eventForm.activity || "").trim()) {
+			error.value = "Select activity type.";
 			return;
 		}
 	}
@@ -1621,6 +1703,17 @@ function resetForm() {
 		remarks: "",
 	});
 	Object.assign(ambassadorForm, emptyAmbassadorForm());
+	Object.assign(eventForm, {
+		date: todayISO(),
+		province: "Punjab",
+		city: "",
+		activity: "",
+		venue: "",
+		noOfSchools: "1",
+		noOfParticipants: "",
+		participantCategory: "",
+		remarks: "",
+	});
 	books.value = [];
 	attachments.card = null;
 	attachments.meeting = null;
@@ -2355,8 +2448,8 @@ const steps = [
 					<div class="panel-body" v-else-if="selected.group === 'training' || selected.group === 'academic'">
 						<SectionTitle
 							:mode="lang"
-							:title-en="selected.id === 'workshop' || selected.id === 'workshop_conducted' ? 'Workshop Details' : selected.group === 'academic' ? 'Official Task Details' : 'Training / Visit Details'"
-							:title-ur="selected.id === 'workshop' || selected.id === 'workshop_conducted' ? 'ورکشاپ کی تفصیلات' : selected.group === 'academic' ? 'آفیشل ٹاسک کی تفصیلات' : 'تربیت / دورہ کی تفصیلات'"
+							:title-en="selected.id === 'workshop' || selected.id === 'workshop_conducted' || selected.id === 'workshop_arranged' ? 'Workshop Details' : selected.group === 'academic' ? 'Official Task Details' : 'Training / Visit Details'"
+							:title-ur="selected.id === 'workshop' || selected.id === 'workshop_conducted' || selected.id === 'workshop_arranged' ? 'ورکشاپ کی تفصیلات' : selected.group === 'academic' ? 'آفیشل ٹاسک کی تفصیلات' : 'تربیت / دورہ کی تفصیلات'"
 							:sub-en="`${clock} • Asia/Karachi auto`"
 							:sub-ur="`${clock} • خودکار وقت`"
 						/>
@@ -2853,6 +2946,65 @@ const steps = [
 								required
 								v-model="meeting.remarks"
 							/>
+						</div>
+					</div>
+
+					<div class="panel-body" v-else-if="selected.group === 'event'">
+						<SectionTitle
+							:mode="lang"
+							:title-en="selected.id === 'quiz' ? 'Quiz Details' : 'Stall / Exhibition Details'"
+							:title-ur="selected.id === 'quiz' ? 'کوئز کی تفصیلات' : 'سٹال / نمائش کی تفصیلات'"
+							sub-en="Basic details for this activity"
+							sub-ur="اس سرگرمی کی بنیادی تفصیلات"
+						/>
+						<div class="grid-3">
+							<FieldDate :mode="lang" label-en="Date" label-ur="تاریخ" required v-model="eventForm.date" />
+							<FieldSelect :mode="lang" label-en="Province" label-ur="صوبہ" :options="provinceOptions" required v-model="eventForm.province" />
+							<FieldLink
+								:mode="lang"
+								label-en="City"
+								label-ur="شہر"
+								placeholder="Type to search city"
+								empty-text="No cities for this province"
+								:options="cityOptionsFor(eventForm)"
+								:search="searchCitiesFor(eventForm)"
+								required
+								v-model="eventForm.city"
+							/>
+							<FieldSelect
+								:mode="lang"
+								:label-en="selected.id === 'quiz' ? 'Quiz Type' : 'Activity Type'"
+								:label-ur="selected.id === 'quiz' ? 'کوئز کی قسم' : 'سرگرمی کی قسم'"
+								:options="eventActivityOptions"
+								required
+								v-model="eventForm.activity"
+							/>
+							<FieldInput :mode="lang" label-en="Venue" label-ur="مقام" required v-model="eventForm.venue" />
+							<FieldInput :mode="lang" label-en="No. of Schools" label-ur="اسکولوں کی تعداد" v-model="eventForm.noOfSchools" />
+							<FieldInput :mode="lang" label-en="No. of Participants" label-ur="شرکاء کی تعداد" v-model="eventForm.noOfParticipants" />
+							<FieldInput
+								:mode="lang"
+								label-en="Participants Category"
+								label-ur="شرکاء کی کیٹیگری"
+								placeholder="Students / Teachers / Parents"
+								v-model="eventForm.participantCategory"
+							/>
+						</div>
+						<div style="margin-top: 16px">
+							<FieldTextarea
+								:mode="lang"
+								label-en="Visit Summary"
+								label-ur="دورے کا خلاصہ"
+								placeholder="Brief summary of this activity"
+								required
+								v-model="eventForm.remarks"
+							/>
+						</div>
+						<div style="margin-top: 24px">
+							<div style="font-size: 13px; font-weight: 600">Attachments / منسلکات</div>
+							<div class="attach-grid">
+								<AttachDrop :mode="lang" label-en="Pictures" label-ur="تصاویر" :file="attachments.meeting" @pick="attachments.meeting = $event" />
+							</div>
 						</div>
 					</div>
 
