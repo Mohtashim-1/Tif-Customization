@@ -180,11 +180,34 @@ _SCHOOL_CUSTOMER_BASE_CONDITION = "IFNULL(c.disabled, 0) = 0"
 
 _SCHOOL_OPENING_APP_JOIN = """
 LEFT JOIN (
-	SELECT DISTINCT customer
+	SELECT
+		customer,
+		SUBSTRING_INDEX(
+			GROUP_CONCAT(
+				NULLIF(TRIM(tif_representative), '')
+				ORDER BY modified DESC
+				SEPARATOR '\\n'
+			),
+			'\\n',
+			1
+		) AS field_officer
 	FROM `tabSchool Opening Application`
 	WHERE docstatus = 1 AND IFNULL(customer, '') != ''
+	GROUP BY customer
 ) soa ON soa.customer = c.name
 """
+
+
+def _normalize_doc_status(value):
+	"""Map UI filter values to draft | pending | approved."""
+	raw = (value or "").strip().lower().replace("-", "_").replace(" ", "_")
+	if raw in ("approved", "approve", "submitted", "1"):
+		return "approved"
+	if raw in ("pending", "pending_approval", "pending_for_approval", "awaiting_approval"):
+		return "pending"
+	if raw in ("draft", "customer_only", "customer-only", "customer", "0"):
+		return "draft"
+	return ""
 
 
 def _school_registry_filter_clause(
@@ -196,6 +219,8 @@ def _school_registry_filter_clause(
 	city=None,
 	address_search=None,
 	customers=None,
+	field_officer=None,
+	doc_status=None,
 ):
 	conditions = [_SCHOOL_CUSTOMER_BASE_CONDITION]
 	values = {}
@@ -228,11 +253,44 @@ def _school_registry_filter_clause(
 		conditions.append("IFNULL(c.territory, '') = %(territory)s")
 		values["territory"] = territory
 
+	doc_status_norm = _normalize_doc_status(doc_status)
 	form_data = (form_data or "").strip().lower()
-	if form_data == "full":
+	if doc_status_norm == "approved" or form_data == "full":
 		conditions.append("soa.customer IS NOT NULL")
-	elif form_data in ("customer_only", "customer-only", "customer"):
+	elif doc_status_norm == "draft" or form_data in ("customer_only", "customer-only", "customer"):
 		conditions.append("soa.customer IS NULL")
+
+	field_officer = (field_officer or "").strip()
+	if field_officer:
+		# Approved SOA representative, or latest Field Visit visit_by / me / mt for this school
+		conditions.append(
+			"""(
+			IFNULL(soa.field_officer, '') = %(field_officer)s
+			OR EXISTS (
+				SELECT 1 FROM `tabField Visit` fv
+				WHERE fv.docstatus < 2
+					AND (
+						fv.school_name = c.name
+						OR TRIM(IFNULL(fv.school_name, '')) = TRIM(IFNULL(c.customer_name, ''))
+						OR TRIM(IFNULL(fv.school_name, '')) = TRIM(IFNULL(c.name, ''))
+					)
+					AND (
+						TRIM(IFNULL(fv.visit_by, '')) = %(field_officer)s
+						OR TRIM(IFNULL(fv.me_visit_by, '')) = %(field_officer)s
+						OR TRIM(IFNULL(fv.mt_visit_by, '')) = %(field_officer)s
+					)
+			)
+			OR EXISTS (
+				SELECT 1 FROM `tabSchool Opening Application` app
+				WHERE TRIM(IFNULL(app.tif_representative, '')) = %(field_officer)s
+					AND (
+						app.customer = c.name
+						OR TRIM(IFNULL(app.school_name, '')) = TRIM(IFNULL(c.customer_name, ''))
+					)
+			)
+		)"""
+		)
+		values["field_officer"] = field_officer
 
 	city = (city or "").strip()
 	if city:
@@ -328,11 +386,52 @@ def get_school_registry_filter_options():
 		)
 	]
 
+	field_officers = [
+		row[0]
+		for row in frappe.db.sql(
+			"""
+			SELECT DISTINCT v FROM (
+				SELECT TRIM(tif_representative) AS v
+				FROM `tabSchool Opening Application`
+				WHERE IFNULL(TRIM(tif_representative), '') != ''
+				UNION
+				SELECT TRIM(visit_by) AS v
+				FROM `tabField Visit`
+				WHERE docstatus < 2 AND IFNULL(TRIM(visit_by), '') != ''
+				UNION
+				SELECT TRIM(me_visit_by) AS v
+				FROM `tabField Visit`
+				WHERE docstatus < 2 AND IFNULL(TRIM(me_visit_by), '') != ''
+				UNION
+				SELECT TRIM(mt_visit_by) AS v
+				FROM `tabField Visit`
+				WHERE docstatus < 2 AND IFNULL(TRIM(mt_visit_by), '') != ''
+			) officers
+			WHERE v != ''
+			ORDER BY v
+			"""
+		)
+	]
+
 	return {
 		"govt_private": distinct("custom_govt_private"),
 		"status": distinct("custom_status"),
 		"cities": cities,
+		"field_officers": field_officers,
+		"doc_status": [
+			{"value": "draft", "label": _("Draft")},
+			{"value": "pending", "label": _("Pending for Approval")},
+			{"value": "approved", "label": _("Approved")},
+		],
 	}
+
+
+def _wants_pending_list(form_data=None, doc_status=None):
+	doc_status_norm = _normalize_doc_status(doc_status)
+	if doc_status_norm == "pending":
+		return True
+	form_data_norm = (form_data or "").strip().lower()
+	return form_data_norm in ("pending", "pending_approval")
 
 
 @frappe.whitelist()
@@ -346,19 +445,21 @@ def list_school_customers(
 	form_data=None,
 	city=None,
 	address_search=None,
+	field_officer=None,
+	doc_status=None,
 ):
 	"""Paginated school customers (or pending applications) for the registry."""
 	limit = min(max(int(limit or 50), 1), 200)
 	start = max(int(start or 0), 0)
 
-	form_data_norm = (form_data or "").strip().lower()
-	if form_data_norm in ("pending", "pending_approval", "draft"):
+	if _wants_pending_list(form_data=form_data, doc_status=doc_status):
 		return _list_pending_applications(
 			search=search,
 			limit=limit,
 			start=start,
 			city=city,
 			address_search=address_search,
+			field_officer=field_officer,
 		)
 
 	where, filter_values = _school_registry_filter_clause(
@@ -369,6 +470,8 @@ def list_school_customers(
 		form_data=form_data,
 		city=city,
 		address_search=address_search,
+		field_officer=field_officer,
+		doc_status=doc_status,
 	)
 	values = {"limit": limit, "start": start, **filter_values}
 
@@ -393,6 +496,7 @@ def list_school_customers(
 			c.custom_registration_date AS registration_date,
 			c.territory,
 			c.modified,
+			IFNULL(soa.field_officer, '') AS field_officer,
 			IF(soa.customer IS NOT NULL, 1, 0) AS has_application
 		FROM `tabCustomer` c
 		{_SCHOOL_OPENING_APP_JOIN}
@@ -406,16 +510,26 @@ def list_school_customers(
 
 	customers = [row.customer for row in rows]
 	addr_map = _addresses_for_customers(customers)
+	fo_map = _field_officers_for_customers(rows)
 	for row in rows:
 		row.has_application = bool(row.pop("has_application", 0))
 		row.application = None
 		row.row_type = "customer"
+		row.field_officer = (
+			cstr(row.get("field_officer") or "").strip()
+			or fo_map.get(row.customer)
+			or ""
+		)
+		row.doc_status = "approved" if row.has_application else "draft"
+		row.doc_status_label = _("Approved") if row.has_application else _("Draft")
 		_apply_registry_location(row, addr_map.get(row.customer))
 
 	return {"rows": rows, "total": total, "start": start, "page_length": limit, "mode": "customer"}
 
 
-def _list_pending_applications(search=None, limit=50, start=0, city=None, address_search=None):
+def _list_pending_applications(
+	search=None, limit=50, start=0, city=None, address_search=None, field_officer=None
+):
 	"""Draft School Opening Applications waiting for HO approval."""
 	conditions = ["docstatus = 0"]
 	values = {"limit": limit, "start": start}
@@ -444,6 +558,11 @@ def _list_pending_applications(search=None, limit=50, start=0, city=None, addres
 		)
 		values["addr_pat"] = f"%{address_search}%"
 
+	field_officer = (field_officer or "").strip()
+	if field_officer:
+		conditions.append("IFNULL(TRIM(tif_representative), '') = %(field_officer)s")
+		values["field_officer"] = field_officer
+
 	where = " AND ".join(conditions)
 	total = frappe.db.sql(
 		f"SELECT COUNT(*) FROM `tabSchool Opening Application` WHERE {where}",
@@ -459,6 +578,7 @@ def _list_pending_applications(search=None, limit=50, start=0, city=None, addres
 			'Pending' AS status,
 			'' AS territory,
 			modified,
+			IFNULL(TRIM(tif_representative), '') AS field_officer,
 			IFNULL(address, '') AS address,
 			IFNULL(area, '') AS area,
 			IFNULL(city, '') AS city,
@@ -477,6 +597,9 @@ def _list_pending_applications(search=None, limit=50, start=0, city=None, addres
 		row.customer = ""
 		row.has_application = False
 		row.row_type = "pending"
+		row.field_officer = cstr(row.get("field_officer") or "").strip()
+		row.doc_status = "pending"
+		row.doc_status_label = _("Pending for Approval")
 		row.full_address = ", ".join(
 			p for p in [row.address, row.area, row.city, row.province, row.country] if p
 		)
@@ -495,18 +618,20 @@ def get_school_opening_neighbors(
 	form_data=None,
 	city=None,
 	address_search=None,
+	field_officer=None,
+	doc_status=None,
 ):
 	"""Previous / next document keys for the print toolbar (same order as registry)."""
 	application = (application or "").strip()
 	customer = resolve_customer_name(customer) if customer else ""
-	form_data_norm = (form_data or "").strip().lower()
 
-	if application or form_data_norm in ("pending", "pending_approval", "draft"):
+	if application or _wants_pending_list(form_data=form_data, doc_status=doc_status):
 		return _neighbors_pending(
 			application=application,
 			search=search,
 			city=city,
 			address_search=address_search,
+			field_officer=field_officer,
 		)
 
 	if not customer:
@@ -520,6 +645,8 @@ def get_school_opening_neighbors(
 		form_data=form_data,
 		city=city,
 		address_search=address_search,
+		field_officer=field_officer,
+		doc_status=doc_status,
 	)
 	keys = frappe.db.sql(
 		f"""
@@ -536,7 +663,7 @@ def get_school_opening_neighbors(
 	return _neighbor_payload(names, customer, key_field="customer")
 
 
-def _neighbors_pending(application=None, search=None, city=None, address_search=None):
+def _neighbors_pending(application=None, search=None, city=None, address_search=None, field_officer=None):
 	conditions = ["docstatus = 0"]
 	values = {}
 	search = (search or "").strip()
@@ -549,6 +676,10 @@ def _neighbors_pending(application=None, search=None, city=None, address_search=
 	if city:
 		conditions.append("IFNULL(city, '') LIKE %(city)s")
 		values["city"] = f"%{city}%"
+	field_officer = (field_officer or "").strip()
+	if field_officer:
+		conditions.append("IFNULL(TRIM(tif_representative), '') = %(field_officer)s")
+		values["field_officer"] = field_officer
 	address_search = (address_search or "").strip()
 	if address_search:
 		conditions.append(
@@ -676,10 +807,60 @@ def export_school_registry(
 	city=None,
 	address_search=None,
 	customers=None,
+	field_officer=None,
+	doc_status=None,
 ):
 	"""Export filtered school registry rows for Excel (CSV), including address fields."""
 	if not frappe.has_permission("Customer", "read"):
 		frappe.throw(_("Not permitted to export customers."), frappe.PermissionError)
+
+	if _wants_pending_list(form_data=form_data, doc_status=doc_status):
+		pending = _list_pending_applications(
+			search=search,
+			limit=_EXPORT_MAX_ROWS,
+			start=0,
+			city=city,
+			address_search=address_search,
+			field_officer=field_officer,
+		)
+		out = []
+		for row in pending.get("rows") or []:
+			out.append(
+				{
+					"customer": row.get("application") or "",
+					"school_name": row.get("customer_name") or "",
+					"govt_private": row.get("govt_private") or "",
+					"status": row.get("status") or "",
+					"territory": "",
+					"field_officer": row.get("field_officer") or "",
+					"doc_status": row.get("doc_status_label") or _("Pending for Approval"),
+					"form_data": _("Pending approval"),
+					"address": row.get("address") or "",
+					"area": row.get("area") or "",
+					"city": row.get("city") or "",
+					"province": row.get("province") or "",
+					"country": row.get("country") or "",
+					"phone": "",
+					"email": "",
+					"full_address": row.get("full_address") or "",
+				}
+			)
+		return {
+			"rows": out,
+			"count": len(out),
+			"truncated": len(out) >= _EXPORT_MAX_ROWS,
+			"filters": {
+				"search": search or "",
+				"govt_private": govt_private or "",
+				"status": status or "",
+				"territory": territory or "",
+				"form_data": form_data or "",
+				"city": city or "",
+				"address_search": address_search or "",
+				"field_officer": field_officer or "",
+				"doc_status": doc_status or "",
+			},
+		}
 
 	where, filter_values = _school_registry_filter_clause(
 		search=search,
@@ -690,6 +871,8 @@ def export_school_registry(
 		city=city,
 		address_search=address_search,
 		customers=customers,
+		field_officer=field_officer,
+		doc_status=doc_status,
 	)
 	values = {**filter_values}
 
@@ -703,6 +886,7 @@ def export_school_registry(
 			c.territory,
 			c.email_id,
 			c.mobile_no,
+			IFNULL(soa.field_officer, '') AS field_officer,
 			IF(soa.customer IS NOT NULL, 1, 0) AS has_application
 		FROM `tabCustomer` c
 		{_SCHOOL_OPENING_APP_JOIN}
@@ -716,6 +900,7 @@ def export_school_registry(
 
 	customer_names = [row.customer for row in rows]
 	addr_map = _addresses_for_customers(customer_names)
+	fo_map = _field_officers_for_customers(rows)
 	out = []
 	for row in rows:
 		has_app = bool(row.pop("has_application", 0))
@@ -727,6 +912,12 @@ def export_school_registry(
 				"govt_private": row.govt_private or "",
 				"status": row.status or "",
 				"territory": row.territory or "",
+				"field_officer": (
+					cstr(row.get("field_officer") or "").strip()
+					or fo_map.get(row.customer)
+					or ""
+				),
+				"doc_status": _("Approved") if has_app else _("Draft"),
 				"form_data": _("Full SC-1.2") if has_app else _("Customer only"),
 				"address": (addr.get("address_line1") or "").strip(),
 				"area": (addr.get("address_line2") or "").strip(),
@@ -751,6 +942,8 @@ def export_school_registry(
 			"form_data": form_data or "",
 			"city": city or "",
 			"address_search": address_search or "",
+			"field_officer": field_officer or "",
+			"doc_status": doc_status or "",
 		},
 	}
 
@@ -932,6 +1125,117 @@ def _view_from_customer(cust):
 		"contact_roles": CONTACT_ROLES,
 		"remarks_html": cust.get("custom_remarks") or "",
 	}
+
+
+def _field_officers_for_customers(rows):
+	"""Resolve Field Officer for registry customer rows (SOA + Field Visit fallback)."""
+	rows = [r for r in (rows or []) if r.get("customer")]
+	if not rows:
+		return {}
+
+	# Prefer already-joined approved SOA representative
+	out = {}
+	need = []
+	for row in rows:
+		cust = row.get("customer")
+		existing = cstr(row.get("field_officer") or "").strip()
+		if existing:
+			out[cust] = existing
+		else:
+			need.append(row)
+
+	if not need:
+		return out
+
+	keys = set()
+	for row in need:
+		for key in (row.get("customer"), row.get("customer_name")):
+			trimmed = cstr(key or "").strip()
+			if trimmed:
+				keys.add(trimmed)
+	if not keys:
+		return out
+
+	key_tuple = tuple(keys)
+
+	# Any SOA (approved or draft) matched by customer link or school name
+	soa_rows = frappe.db.sql(
+		"""
+		SELECT
+			IFNULL(customer, '') AS customer,
+			TRIM(IFNULL(school_name, '')) AS school_name,
+			TRIM(IFNULL(tif_representative, '')) AS field_officer,
+			modified
+		FROM `tabSchool Opening Application`
+		WHERE IFNULL(TRIM(tif_representative), '') != ''
+			AND (
+				customer IN %(keys)s
+				OR TRIM(IFNULL(school_name, '')) IN %(keys)s
+			)
+		ORDER BY modified DESC
+		""",
+		{"keys": key_tuple},
+		as_dict=True,
+	)
+
+	# Latest Field Visit officer for school
+	fv_rows = frappe.db.sql(
+		"""
+		SELECT
+			TRIM(IFNULL(school_name, '')) AS school_name,
+			TRIM(COALESCE(
+				NULLIF(TRIM(visit_by), ''),
+				NULLIF(TRIM(me_visit_by), ''),
+				NULLIF(TRIM(mt_visit_by), '')
+			)) AS field_officer,
+			modified
+		FROM `tabField Visit`
+		WHERE docstatus < 2
+			AND TRIM(IFNULL(school_name, '')) IN %(keys)s
+			AND (
+				IFNULL(TRIM(visit_by), '') != ''
+				OR IFNULL(TRIM(me_visit_by), '') != ''
+				OR IFNULL(TRIM(mt_visit_by), '') != ''
+			)
+		ORDER BY modified DESC
+		""",
+		{"keys": key_tuple},
+		as_dict=True,
+	)
+
+	soa_by_key = {}
+	for r in soa_rows:
+		fo = cstr(r.field_officer or "").strip()
+		if not fo:
+			continue
+		for key in (cstr(r.customer or "").strip(), cstr(r.school_name or "").strip()):
+			if key and key not in soa_by_key:
+				soa_by_key[key] = fo
+
+	fv_by_key = {}
+	for r in fv_rows:
+		fo = cstr(r.field_officer or "").strip()
+		key = cstr(r.school_name or "").strip()
+		if fo and key and key not in fv_by_key:
+			fv_by_key[key] = fo
+
+	for row in need:
+		cust = row.get("customer")
+		name = cstr(row.get("customer_name") or "").strip()
+		cust_trim = cstr(cust or "").strip()
+		fo = (
+			soa_by_key.get(cust)
+			or soa_by_key.get(cust_trim)
+			or soa_by_key.get(name)
+			or fv_by_key.get(cust)
+			or fv_by_key.get(cust_trim)
+			or fv_by_key.get(name)
+			or ""
+		)
+		if fo:
+			out[cust] = fo
+
+	return out
 
 
 def _addresses_for_customers(customers):

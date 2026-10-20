@@ -1,4 +1,4 @@
-/* School Opening Registry v20261013 */
+/* School Opening Registry v20261020 */
 frappe.pages["school-opening-registry"].on_page_load = function (wrapper) {
 	frappe.tif_customization.SchoolOpeningRegistry.clear_stuck_freeze();
 	const page = frappe.ui.make_app_page({
@@ -15,7 +15,7 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 	static PAGE_LENGTH_OPTIONS = [20, 50, 100, 200];
 	static PAGE_LENGTH_STORAGE_KEY = "soa_registry_page_length";
 	static FILTER_STORAGE_KEY = "soa_registry_print_filters";
-	static TABLE_COLS = 10;
+	static TABLE_COLS = 12;
 
 	static clear_stuck_freeze() {
 		while (frappe.dom.freeze_count > 0) {
@@ -118,6 +118,25 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 			placeholder: __("Street, area, or city"),
 		});
 
+		this.filter_fields.field_officer = this.make_filter({
+			label: __("Field Officer"),
+			fieldtype: "Select",
+			fieldname: "field_officer",
+			options: "\n",
+		});
+
+		this.filter_fields.doc_status = this.make_filter({
+			label: __("Doc Status"),
+			fieldtype: "Select",
+			fieldname: "doc_status",
+			options: [
+				"",
+				"draft:Draft",
+				"pending:Pending for Approval",
+				"approved:Approved",
+			].join("\n"),
+		});
+
 		frappe.call({
 			method: "tif_customization.tif_customization.api.school_opening_registry.get_school_registry_filter_options",
 			freeze: false,
@@ -126,6 +145,7 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 				this._set_select_options(this.filter_fields.govt_private, opts.govt_private || []);
 				this._set_select_options(this.filter_fields.status, opts.status || []);
 				this._set_select_options(this.filter_fields.city, opts.cities || []);
+				this._set_select_options(this.filter_fields.field_officer, opts.field_officers || []);
 			},
 		});
 	}
@@ -152,6 +172,8 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 			form_data: this.filter_fields.form_data?.get_value() || "",
 			city: this.filter_fields.city?.get_value() || "",
 			address_search: this.filter_fields.address_search?.get_value() || "",
+			field_officer: this.filter_fields.field_officer?.get_value() || "",
+			doc_status: this.filter_fields.doc_status?.get_value() || "",
 		};
 	}
 
@@ -163,6 +185,8 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 		this.filter_fields.form_data?.set_value("");
 		this.filter_fields.city?.set_value("");
 		this.filter_fields.address_search?.set_value("");
+		this.filter_fields.field_officer?.set_value("");
+		this.filter_fields.doc_status?.set_value("");
 		this.selectedCustomers.clear();
 		this.load_data(0);
 	}
@@ -199,6 +223,8 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 								<th>${__("Govt / Private")}</th>
 								<th>${__("Status")}</th>
 								<th>${__("Territory")}</th>
+								<th>${__("Field Officer")}</th>
+								<th>${__("Doc Status")}</th>
 								<th>${__("Form Data")}</th>
 								<th style="width:220px">${__("Actions")}</th>
 							</tr>
@@ -326,7 +352,7 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 			return Promise.resolve();
 		}
 		return new Promise((resolve) => {
-			frappe.require("/assets/tif_customization/js/school_opening_pdf_download.js?v=20261013a", resolve);
+			frappe.require("/assets/tif_customization/js/school_opening_pdf_download.js?v=20261020a", resolve);
 		});
 	}
 
@@ -441,6 +467,8 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 					"Govt / Private",
 					"Status",
 					"Territory",
+					"Field Officer",
+					"Doc Status",
 					"Form Data",
 					"Address",
 					"Area",
@@ -457,6 +485,8 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 					"govt_private",
 					"status",
 					"territory",
+					"field_officer",
+					"doc_status",
 					"form_data",
 					"address",
 					"area",
@@ -534,6 +564,21 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 				} else {
 					formBadge = `<span class="indicator-pill orange">${__("Customer only")}</span>`;
 				}
+				const docStatus = (row.doc_status || "").toLowerCase();
+				let docBadge;
+				if (docStatus === "pending" || isPending) {
+					docBadge = `<span class="indicator-pill yellow">${__(
+						row.doc_status_label || "Pending for Approval"
+					)}</span>`;
+				} else if (docStatus === "approved" || row.has_application) {
+					docBadge = `<span class="indicator-pill green">${__(row.doc_status_label || "Approved")}</span>`;
+				} else {
+					docBadge = `<span class="indicator-pill gray">${__(row.doc_status_label || "Draft")}</span>`;
+				}
+				const officer = (row.field_officer || "").trim();
+				const officerCell = officer
+					? frappe.utils.escape_html(officer)
+					: `<span class="text-muted">—</span>`;
 				const checked =
 					!isPending && row.customer && this.selectedCustomers.has(row.customer) ? "checked" : "";
 				const idCell = isPending
@@ -556,6 +601,8 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 					<td>${frappe.utils.escape_html(row.govt_private || "")}</td>
 					<td>${frappe.utils.escape_html(row.status || "")}</td>
 					<td>${frappe.utils.escape_html(row.territory || "")}</td>
+					<td class="small">${officerCell}</td>
+					<td>${docBadge}</td>
 					<td>${formBadge}</td>
 					<td>
 						<button type="button" class="btn btn-xs btn-primary soa-open-view" data-url="${printUrl}">${__("Open Form")}</button>
