@@ -1733,7 +1733,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 							<th>${__("Province")}</th>
 							<th>${__("Area")}</th>
 							<th class="text-right">${__("Visits")}</th>
-							<th>${__("Visit Detail")}</th>
+							<th>${__("Visit Summary")}</th>
 						</tr>
 					</thead>
 					<tbody>${body}</tbody>
