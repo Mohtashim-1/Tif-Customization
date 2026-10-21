@@ -313,7 +313,7 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 	]);
 	const hideSchool = noSchoolMetrics.has(data.metric);
 	const hideType = false;
-	const colCount = (hideSchool ? 6 : 7) - (hideType ? 1 : 0) + (showRemarks ? 1 : 0);
+	const colCount = (hideSchool ? 5 : 6) - (hideType ? 1 : 0) + (showRemarks ? 1 : 0);
 	const schoolCell = (row) => {
 		const school = frappe.utils.escape_html(row.school || "—");
 		let badge = "";
@@ -339,7 +339,6 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 				${hideType ? "" : `<td>${frappe.utils.escape_html(row.type || "")}</td>`}
 				${hideSchool ? "" : `<td>${schoolCell(row)}</td>`}
 				<td>${frappe.utils.escape_html(row.officer || "")}</td>
-				<td>${frappe.utils.escape_html(row.status || "")}</td>
 				<td>${frappe.utils.escape_html(row.category || "")}</td>
 				${
 					showRemarks
@@ -377,7 +376,6 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 						${hideType ? "" : `<th>${__("Type / Task")}</th>`}
 						${hideSchool ? "" : `<th>${__("School / Venue")}</th>`}
 						<th>${__("Officer")}</th>
-						<th>${__("Status")}</th>
 						<th>${__("Category")}</th>
 						${showRemarks ? `<th>${__("Visit Summary")}</th>` : ""}
 					</tr>

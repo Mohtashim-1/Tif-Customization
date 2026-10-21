@@ -163,6 +163,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					.sme-sum-kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,160px));gap:10px;justify-content:start}
 					.sme-sum-kpis + .sme-sum-kpis{margin-top:10px}
 					.sme-sum-kpi{border:1px solid var(--border-color,#e5e7eb);border-top:4px solid #64748b;border-radius:10px;background:#fff;padding:12px 12px;box-shadow:0 2px 8px rgba(15,23,42,.05);max-width:160px;min-width:140px;overflow:hidden;box-sizing:border-box}
+					.sme-sum-kpi--spacer{visibility:hidden;pointer-events:none;border:0;background:transparent;box-shadow:none;min-height:1px}
 					.sme-sum-kpi[data-visit-metric],.sme-sum-kpi[data-points-kind],.sme-sum-kpi[data-card-kind]{cursor:pointer}
 					.sme-sum-kpi[data-visit-metric]:hover,.sme-sum-kpi[data-points-kind]:hover,.sme-sum-kpi[data-card-kind]:hover{box-shadow:0 4px 14px rgba(15,23,42,.12)}
 					.sme-sum-kpi__label{color:#64748b;font-size:11px;margin-bottom:6px;line-height:1.25;overflow-wrap:anywhere;word-break:break-word}
@@ -830,18 +831,28 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 							),
 						},
 						{
+							label: __("Model 0 (No Program Selected)"),
+							value: this.fmt(((data.outcome_fy || {}).model_school_0 || {}).actual),
+							style: "model-c",
+							metric: "model_school_0",
+							outcomeFy: true,
+							hint: __("Schools with no TIF program running."),
+						},
+						{
 							label: __("Total Schools"),
 							value: this.fmt(
-								cint(((data.outcome_fy || {}).new_schools || {}).actual) +
-									cint(((data.outcome_fy || {}).active_schools || {}).actual) +
-									cint(((data.outcome_fy || {}).inactive_schools || {}).actual)
+								cint(((data.outcome_fy || {}).active_schools || {}).actual) +
+									cint(((data.outcome_fy || {}).model_school_0 || {}).actual)
 							),
 							style: "grand",
 							outcomeFy: true,
-							hint: __(
-								"New Registered + Active + Inactive (sum of the three cards)."
-							),
+							hint: __("Active Schools + Model 0 (No Program Selected)."),
 						},
+						// 4 empty card slots after Total Schools
+						{ spacer: true },
+						{ spacer: true },
+						{ spacer: true },
+						{ spacer: true },
 						{
 							label: __("New Registered School"),
 							value: this.fmt(((data.outcome_fy || {}).new_schools || {}).actual),
@@ -886,14 +897,6 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 							outcomeFy: true,
 							hint: __("Other registered schools. Model A + B + C = Active Schools."),
 						},
-						{
-							label: __("Model 0 (No Program Selected)"),
-							value: this.fmt(((data.outcome_fy || {}).model_school_0 || {}).actual),
-							style: "model-c",
-							metric: "model_school_0",
-							outcomeFy: true,
-							hint: __("Schools with no TIF program running."),
-						},
 					],
 				],
 			},
@@ -901,6 +904,9 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 	}
 
 	render_kpi_card(card) {
+		if (card && card.spacer) {
+			return `<div class="sme-sum-kpi sme-sum-kpi--spacer" aria-hidden="true"></div>`;
+		}
 		const attrs = [];
 		if (card.metric) attrs.push(`data-visit-metric="${frappe.utils.escape_html(card.metric)}"`);
 		if (card.useYtd) attrs.push(`data-use-ytd="1"`);

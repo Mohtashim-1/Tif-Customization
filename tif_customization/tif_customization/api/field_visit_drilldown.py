@@ -1335,13 +1335,15 @@ def get_visit_drilldown(filters=None, metric=None, staff=None):
 			owner_names.get(r.owner) or r.owner,
 		)
 		if vtype == "M&E":
-			category, why = _me_status_note(r)
-			if why and category == "In-Active":
-				category = f"In-Active — {why}"
+			# Drilldown Category column: Active / Inactive only (no reason text)
+			category, _why = _me_status_note(r)
+			if category == "In-Active":
+				category = "Inactive"
+			elif category != "Active":
+				category = _visit_active_inactive_label(r, vtype) or category or ""
 		else:
-			category = _with_active_inactive_bracket(
-				r.marketing_visit_category or r.me_activity_status or "", r, vtype
-			)
+			# e.g. "1st Follow up visit (Active)" → "Active" / "Inactive" only
+			category = _visit_active_inactive_label(r, vtype) or ""
 		remarks = _visit_remarks(r)
 		school = (r.school or "").strip() or child_schools.get(r.name, "")
 		# Volunteer / ambassador / participant enrolment: school is optional on the visit.
