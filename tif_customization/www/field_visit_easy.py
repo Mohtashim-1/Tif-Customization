@@ -14,7 +14,7 @@ def get_context(context):
 		raise frappe.Redirect
 
 	js_url, css_url = _portal_asset_urls()
-	context.title = _("Field Visit — Easy Form")
+	context.title = _("Field Visit Portal")
 	context.portal_js = js_url
 	context.portal_css = css_url
 	context.boot = {

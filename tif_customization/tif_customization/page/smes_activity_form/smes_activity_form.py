@@ -267,12 +267,83 @@ FIELD_OFFICER_ROLES = (
 )
 
 
+def _norm_person_name(value):
+	"""Collapse whitespace and lowercase for person-name matching."""
+	return " ".join(cstr(value or "").lower().split())
+
+
+def _name_tokens(value):
+	return [t for t in _norm_person_name(value).split() if len(t) > 1]
+
+
+def _employee_name_matches(candidate_name, query_name):
+	"""True when query tokens are a subset of candidate name tokens (word-level)."""
+	q_tokens = _name_tokens(query_name)
+	if not q_tokens:
+		return False
+	c_tokens = set(_name_tokens(candidate_name))
+	if not c_tokens:
+		return False
+	if _norm_person_name(candidate_name) == _norm_person_name(query_name):
+		return True
+	return set(q_tokens).issubset(c_tokens)
+
+
+def _find_active_employee_by_name(full_name):
+	"""Best Active Employee whose name matches the given person name."""
+	target = _norm_person_name(full_name)
+	if not target:
+		return None
+	employees = frappe.get_all(
+		"Employee",
+		filters={"status": "Active"},
+		fields=["name", "employee_name", "user_id", "status"],
+		limit_page_length=5000,
+	)
+	exact = None
+	partial = None
+	for emp in employees:
+		ename = cstr(emp.employee_name or "").strip()
+		if not ename:
+			continue
+		if _norm_person_name(ename) == target:
+			exact = emp
+			break
+		if _employee_name_matches(ename, full_name) and partial is None:
+			partial = emp
+	return exact or partial
+
+
+def _employee_for_user(user=None):
+	"""Active Employee linked to user_id, or name-matched when user_id is missing."""
+	user = user or frappe.session.user
+	if not user or user == "Guest":
+		return None
+	emp = frappe.db.get_value(
+		"Employee",
+		{"user_id": user, "status": "Active"},
+		["name", "employee_name", "user_id", "status"],
+		as_dict=True,
+	)
+	if emp:
+		return emp
+	full_name = cstr(frappe.db.get_value("User", user, "full_name") or "").strip()
+	if not full_name:
+		return None
+	return _find_active_employee_by_name(full_name)
+
+
+def _user_has_field_officer_roles(user=None):
+	user = user or frappe.session.user
+	return bool(set(frappe.get_roles(user)) & set(FIELD_OFFICER_ROLES))
+
+
 def get_active_field_officer_staff():
 	"""
 	Active employees who are Field Officers:
 	- Field Officer DocType (status Active) + Employee Active + User enabled
 	- OR user has Field Staff / Field Staff Manager / Supervisor Field Staff role,
-	  user enabled, and linked Employee is Active.
+	  user enabled, and linked (or name-matched) Employee is Active.
 	"""
 	by_employee = {}
 
@@ -325,6 +396,9 @@ def get_active_field_officer_staff():
 			as_dict=True,
 		)
 		if not emp_row:
+			# Employee.user_id often unset; match User.full_name → Employee name
+			emp_row = _employee_for_user(user)
+		if not emp_row:
 			continue
 		by_employee[emp_row.name] = {
 			"employee": emp_row.name,
@@ -334,6 +408,49 @@ def get_active_field_officer_staff():
 
 	staff = sorted(by_employee.values(), key=lambda r: (r["employee_name"] or "").lower())
 	return staff
+
+
+def _resolve_visit_staff(data):
+	"""
+	Resolve Name of Staff / staff_employee to an allowed FO staff row.
+	Accepts exact name, employee id, normalized / partial name, or session FO employee.
+	"""
+	staff_list = get_active_field_officer_staff()
+	by_name = {s["employee_name"]: s for s in staff_list}
+	by_norm = {_norm_person_name(s["employee_name"]): s for s in staff_list}
+	by_emp = {s["employee"]: s for s in staff_list}
+
+	staff_emp = cstr(data.get("staff_employee") or data.get("field_officer") or "").strip()
+	visit_by = cstr(data.get("visit_by") or "").strip()
+
+	if staff_emp and staff_emp in by_emp:
+		return by_emp[staff_emp]
+	if visit_by and visit_by in by_name:
+		return by_name[visit_by]
+	norm = _norm_person_name(visit_by)
+	if norm and norm in by_norm:
+		return by_norm[norm]
+	if visit_by:
+		for row in staff_list:
+			if _employee_name_matches(row.get("employee_name"), visit_by) or _employee_name_matches(
+				visit_by, row.get("employee_name")
+			):
+				return row
+
+	# Session user → their employee if already in FO list
+	session_emp = _employee_for_user(frappe.session.user)
+	if session_emp and session_emp.name in by_emp:
+		return by_emp[session_emp.name]
+
+	# FO-role user whose employee was missing from the list (e.g. unlinked user_id)
+	if session_emp and _user_has_field_officer_roles(frappe.session.user):
+		return {
+			"employee": session_emp.name,
+			"employee_name": session_emp.employee_name or session_emp.name,
+			"user": frappe.session.user,
+		}
+
+	return None
 
 
 @frappe.whitelist()
@@ -352,22 +469,21 @@ def get_form_meta():
 	areas = _area_link_options(limit=5000)
 	staff_list = get_active_field_officer_staff()
 	staff_names = [s["employee_name"] for s in staff_list]
+	staff_by_emp = {s["employee"]: s for s in staff_list}
 
-	current_emp = frappe.db.get_value(
-		"Employee",
-		{"user_id": frappe.session.user, "status": "Active"},
-		["name", "employee_name"],
-		as_dict=True,
-	)
+	current_emp = _employee_for_user(frappe.session.user)
 	staff_name = ""
 	staff_employee = ""
-	if current_emp and current_emp.employee_name in staff_names:
+	if current_emp and current_emp.name in staff_by_emp:
+		staff_name = staff_by_emp[current_emp.name]["employee_name"]
+		staff_employee = current_emp.name
+	elif current_emp and current_emp.employee_name in staff_names:
 		staff_name = current_emp.employee_name
 		staff_employee = current_emp.name
-	elif current_emp:
-		# Logged-in employee not in FO list — still prefer name if matches list later
-		staff_name = current_emp.employee_name if current_emp.employee_name in staff_names else ""
-		staff_employee = current_emp.name if staff_name else ""
+	elif current_emp and _user_has_field_officer_roles(frappe.session.user):
+		# FO-role user matched by name but not yet in compiled list
+		staff_name = current_emp.employee_name
+		staff_employee = current_emp.name
 
 	return {
 		"customers": _customer_link_options(limit=5000),
@@ -1539,16 +1655,16 @@ def submit_smes_activity(data):
 	doc_type = ACTIVITY_TYPE_MAP.get(activity_label, activity_label)
 	for_officer = _officer_for_academic_card(doc_type, data)
 
-	if not data.get("visit_by"):
+	if not data.get("visit_by") and not data.get("staff_employee"):
 		frappe.throw(_("Name of Staff is required."))
 
-	allowed_staff = {s["employee_name"]: s for s in get_active_field_officer_staff()}
-	if data.get("visit_by") not in allowed_staff:
+	staff_meta = _resolve_visit_staff(data)
+	if not staff_meta:
 		frappe.throw(
 			_("Name of Staff must be an Active employee with Field Officer / Field Staff rights.")
 		)
-	staff_meta = allowed_staff[data.get("visit_by")]
-	data["staff_employee"] = data.get("staff_employee") or staff_meta.get("employee")
+	data["visit_by"] = staff_meta.get("employee_name") or data.get("visit_by")
+	data["staff_employee"] = staff_meta.get("employee") or data.get("staff_employee")
 
 	province = PROVINCE_MAP.get(data.get("province") or "", data.get("province"))
 
@@ -1878,15 +1994,23 @@ def submit_smes_activity(data):
 @frappe.whitelist()
 def submit_field_visit_doc(name):
 	"""Submit a Field Visit created from the easy portal after attachments are uploaded."""
+	name = cstr(name or "").strip()
 	if not name:
 		frappe.throw(_("Field Visit name is required."))
+	if not frappe.db.exists("Field Visit", name):
+		frappe.throw(_("Field Visit {0} not found.").format(name))
 	doc = frappe.get_doc("Field Visit", name)
-	if doc.docstatus == 0:
+	if not frappe.has_permission("Field Visit", "submit", doc):
+		frappe.throw(_("Not permitted to submit this Field Visit."), frappe.PermissionError)
+	if cint(doc.docstatus) == 2:
+		frappe.throw(_("Cancelled visits cannot be submitted."))
+	if cint(doc.docstatus) == 0:
 		doc.submit()
 		frappe.db.commit()
 	return {
 		"name": doc.name,
 		"submitted": True,
+		"docstatus": cint(doc.docstatus),
 		"url": get_url(f"/field-visit-easy?name={doc.name}"),
 		"desk_url": get_url(f"/app/field-visit/{doc.name}"),
 		"message": _("Visit submitted as {0}").format(doc.name),
@@ -1897,6 +2021,322 @@ def field_visit_easy_path(name):
 	from urllib.parse import quote
 
 	return f"/field-visit-easy?name={quote(cstr(name), safe='')}"
+
+
+def _portal_school_expr(alias="fv"):
+	a = alias
+	return f"""COALESCE(
+		NULLIF(TRIM({a}.school_name), ''),
+		NULLIF(TRIM({a}.pending_school_name), ''),
+		NULLIF(TRIM({a}.me_school_name), ''),
+		NULLIF(TRIM({a}.mt_institute_or_organization_name), ''),
+		NULLIF(TRIM({a}.training_venue_name), '')
+	)"""
+
+
+def _portal_officer_expr(alias="fv"):
+	a = alias
+	return f"""COALESCE(
+		NULLIF(TRIM({a}.visit_by), ''),
+		NULLIF(TRIM({a}.me_visit_by), ''),
+		NULLIF(TRIM({a}.mt_visit_by), ''),
+		NULLIF(TRIM({a}.training_entry_filled_by), ''),
+		NULLIF(TRIM({a}.training_trainer_name), '')
+	)"""
+
+
+def _portal_city_expr(alias="fv"):
+	a = alias
+	return f"""COALESCE(
+		NULLIF(TRIM({a}.city), ''),
+		NULLIF(TRIM({a}.me_city), ''),
+		NULLIF(TRIM({a}.mt_city), '')
+	)"""
+
+
+def _resolve_customer_label(value):
+	name = cstr(value or "").strip()
+	if not name:
+		return ""
+	if frappe.db.exists("Customer", name):
+		return cstr(frappe.db.get_value("Customer", name, "customer_name") or name).strip()
+	return name
+
+
+def _portal_status_label(docstatus):
+	return {0: _("Draft"), 1: _("Submitted"), 2: _("Cancelled")}.get(cint(docstatus), cstr(docstatus))
+
+
+@frappe.whitelist()
+def get_portal_dashboard(from_date=None, to_date=None):
+	"""Field employee portal home: counts, type breakdown, recent visits."""
+	from frappe.utils import add_days, get_first_day, get_last_day
+
+	from tif_customization.tif_customization.field_visit_permissions import (
+		apply_team_scope_to_conditions,
+		visit_day_sql,
+	)
+
+	if frappe.session.user == "Guest":
+		frappe.throw(_("Please log in"), frappe.AuthenticationError)
+
+	today_s = today()
+	month_start = str(get_first_day(today_s))
+	month_end = str(get_last_day(today_s))
+	week_start = str(add_days(getdate(today_s), -getdate(today_s).weekday()))
+	from_date = cstr(from_date or month_start).strip() or month_start
+	to_date = cstr(to_date or today_s).strip() or today_s
+
+	params = {
+		"from_date": from_date,
+		"to_date": to_date,
+		"today": today_s,
+		"week_start": week_start,
+		"month_start": month_start,
+		"month_end": month_end,
+	}
+	scope = []
+	apply_team_scope_to_conditions(scope, params, alias="fv")
+	scope_sql = (" AND " + " AND ".join(scope)) if scope else ""
+	day_sql = visit_day_sql("fv")
+
+	def _count(extra=""):
+		return cint(
+			frappe.db.sql(
+				f"""
+				SELECT COUNT(*)
+				FROM `tabField Visit` fv
+				WHERE IFNULL(fv.docstatus, 0) < 2
+				{scope_sql}
+				{extra}
+				""",
+				params,
+			)[0][0]
+		)
+
+	total_period = _count(f" AND ({day_sql}) BETWEEN %(from_date)s AND %(to_date)s")
+	today_count = _count(f" AND ({day_sql}) = %(today)s")
+	week_count = _count(f" AND ({day_sql}) BETWEEN %(week_start)s AND %(today)s")
+	month_count = _count(f" AND ({day_sql}) BETWEEN %(month_start)s AND %(month_end)s")
+	draft_count = _count(
+		f" AND IFNULL(fv.docstatus, 0) = 0 AND ({day_sql}) BETWEEN %(from_date)s AND %(to_date)s"
+	)
+
+	by_type = frappe.db.sql(
+		f"""
+		SELECT IFNULL(NULLIF(TRIM(fv.type), ''), 'Other') AS activity_type, COUNT(*) AS total
+		FROM `tabField Visit` fv
+		WHERE IFNULL(fv.docstatus, 0) < 2
+			AND ({day_sql}) BETWEEN %(from_date)s AND %(to_date)s
+			{scope_sql}
+		GROUP BY 1
+		ORDER BY total DESC
+		LIMIT 8
+		""",
+		params,
+		as_dict=True,
+	)
+
+	recent = frappe.db.sql(
+		f"""
+		SELECT
+			fv.name,
+			fv.type,
+			fv.docstatus,
+			fv.status,
+			({day_sql}) AS visit_date,
+			{_portal_school_expr("fv")} AS school,
+			{_portal_officer_expr("fv")} AS officer,
+			{_portal_city_expr("fv")} AS city,
+			fv.modified
+		FROM `tabField Visit` fv
+		WHERE IFNULL(fv.docstatus, 0) < 2
+			{scope_sql}
+		ORDER BY fv.modified DESC
+		LIMIT 8
+		""",
+		params,
+		as_dict=True,
+	)
+	for row in recent:
+		row["school"] = _resolve_customer_label(row.get("school"))
+		row["docstatus_label"] = _portal_status_label(row.get("docstatus"))
+		row["url"] = field_visit_easy_path(row.get("name"))
+		if row.get("visit_date"):
+			row["visit_date"] = str(getdate(row["visit_date"]))
+
+	emp = None
+	try:
+		from tif_customization.tif_customization.field_visit_permissions import get_employee_for_user
+
+		emp = get_employee_for_user()
+	except Exception:
+		emp = None
+	if not emp:
+		emp = _employee_for_user(frappe.session.user)
+
+	full_name = (
+		(emp.employee_name if emp else None)
+		or frappe.db.get_value("User", frappe.session.user, "full_name")
+		or frappe.session.user
+	)
+
+	return {
+		"user": frappe.session.user,
+		"full_name": full_name,
+		"employee": emp.name if emp else "",
+		"from_date": from_date,
+		"to_date": to_date,
+		"stats": {
+			"today": today_count,
+			"this_week": week_count,
+			"this_month": month_count,
+			"period_total": total_period,
+			"drafts": draft_count,
+		},
+		"by_type": by_type,
+		"recent": recent,
+	}
+
+
+@frappe.whitelist()
+def get_portal_visit_list(
+	page=1,
+	page_length=20,
+	search=None,
+	activity_type=None,
+	from_date=None,
+	to_date=None,
+	docstatus=None,
+):
+	"""Paginated Field Visit list for the field employee portal."""
+	from tif_customization.tif_customization.field_visit_permissions import (
+		apply_team_scope_to_conditions,
+		visit_day_sql,
+	)
+
+	if frappe.session.user == "Guest":
+		frappe.throw(_("Please log in"), frappe.AuthenticationError)
+
+	page = max(cint(page) or 1, 1)
+	page_length = min(max(cint(page_length) or 20, 1), 100)
+	search = cstr(search or "").strip()
+	activity_type = cstr(activity_type or "").strip()
+	from_date = cstr(from_date or "").strip()
+	to_date = cstr(to_date or "").strip()
+	docstatus_filter = cstr(docstatus if docstatus is not None else "").strip()
+
+	params = {}
+	conditions = []
+	apply_team_scope_to_conditions(conditions, params, alias="fv")
+	day_sql = visit_day_sql("fv")
+
+	if docstatus_filter in ("0", "1", "2"):
+		conditions.append("IFNULL(fv.docstatus, 0) = %(docstatus)s")
+		params["docstatus"] = cint(docstatus_filter)
+	else:
+		conditions.append("IFNULL(fv.docstatus, 0) < 2")
+
+	if activity_type:
+		conditions.append("fv.type = %(activity_type)s")
+		params["activity_type"] = activity_type
+
+	if from_date:
+		conditions.append(f"({day_sql}) >= %(from_date)s")
+		params["from_date"] = from_date
+	if to_date:
+		conditions.append(f"({day_sql}) <= %(to_date)s")
+		params["to_date"] = to_date
+
+	if search:
+		params["search"] = f"%{search}%"
+		conditions.append(
+			f"""(
+				fv.name LIKE %(search)s
+				OR {_portal_school_expr("fv")} LIKE %(search)s
+				OR {_portal_officer_expr("fv")} LIKE %(search)s
+				OR {_portal_city_expr("fv")} LIKE %(search)s
+				OR IFNULL(fv.type, '') LIKE %(search)s
+			)"""
+		)
+
+	where_sql = (" WHERE " + " AND ".join(conditions)) if conditions else ""
+	total = cint(
+		frappe.db.sql(
+			f"SELECT COUNT(*) FROM `tabField Visit` fv{where_sql}",
+			params,
+		)[0][0]
+	)
+
+	params["limit"] = page_length
+	params["offset"] = (page - 1) * page_length
+	rows = frappe.db.sql(
+		f"""
+		SELECT
+			fv.name,
+			fv.type,
+			fv.docstatus,
+			fv.status,
+			fv.month,
+			fv.quarter,
+			fv.province,
+			({day_sql}) AS visit_date,
+			{_portal_school_expr("fv")} AS school,
+			{_portal_officer_expr("fv")} AS officer,
+			{_portal_city_expr("fv")} AS city,
+			fv.modified,
+			fv.creation,
+			fv.owner
+		FROM `tabField Visit` fv
+		{where_sql}
+		ORDER BY ({day_sql}) DESC, fv.modified DESC
+		LIMIT %(limit)s OFFSET %(offset)s
+		""",
+		params,
+		as_dict=True,
+	)
+
+	for row in rows:
+		row["school"] = _resolve_customer_label(row.get("school"))
+		row["docstatus_label"] = _portal_status_label(row.get("docstatus"))
+		row["url"] = field_visit_easy_path(row.get("name"))
+		if row.get("visit_date"):
+			row["visit_date"] = str(getdate(row["visit_date"]))
+
+	# Distinct types for filter (scoped; ignore search/date so dropdown stays useful)
+	type_params = {}
+	type_conds = []
+	apply_team_scope_to_conditions(type_conds, type_params, alias="fv")
+	type_conds.append("IFNULL(fv.docstatus, 0) < 2")
+	type_conds.append("IFNULL(TRIM(fv.type), '') != ''")
+	type_where = " WHERE " + " AND ".join(type_conds)
+	type_rows = frappe.db.sql(
+		f"""
+		SELECT DISTINCT fv.type AS value
+		FROM `tabField Visit` fv
+		{type_where}
+		ORDER BY fv.type
+		LIMIT 100
+		""",
+		type_params,
+		as_dict=True,
+	)
+
+	return {
+		"page": page,
+		"page_length": page_length,
+		"total": total,
+		"pages": max(1, (total + page_length - 1) // page_length) if total else 1,
+		"rows": rows,
+		"activity_types": [r.value for r in type_rows if r.get("value")],
+		"filters": {
+			"search": search,
+			"activity_type": activity_type,
+			"from_date": from_date,
+			"to_date": to_date,
+			"docstatus": docstatus_filter,
+		},
+	}
 
 
 @frappe.whitelist()
@@ -2159,10 +2599,17 @@ def get_field_visit_easy_view(name=None):
 		if path:
 			images.append({"label": label, "url": path})
 
+	docstatus = cint(doc.docstatus)
+	# Portal always uses English status keys so the UI can detect Draft reliably
+	status_en = {0: "Draft", 1: "Submitted", 2: "Cancelled"}.get(docstatus, str(docstatus))
+	can_submit = docstatus == 0 and bool(frappe.has_permission("Field Visit", "submit", doc))
 	return {
 		"name": doc.name,
 		"type": doc.type or "",
-		"status": status_map.get(doc.docstatus, str(doc.docstatus)),
+		"status": status_en,
+		"status_label": status_map.get(docstatus, status_en),
+		"docstatus": docstatus,
+		"can_submit": can_submit,
 		"visit_date": visit_date,
 		"school": school,
 		"officer": officer,

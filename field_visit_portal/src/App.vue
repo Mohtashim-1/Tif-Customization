@@ -10,6 +10,9 @@ import FieldTime from "./components/FieldTime.vue";
 import SectionTitle from "./components/SectionTitle.vue";
 import AttachDrop from "./components/AttachDrop.vue";
 import SchoolOpeningPanel from "./components/SchoolOpeningPanel.vue";
+import PortalNav from "./components/PortalNav.vue";
+import PortalDashboard from "./components/PortalDashboard.vue";
+import PortalVisitList from "./components/PortalVisitList.vue";
 import { apiGet, apiPost, uploadFile, METHOD, TRAVEL_METHOD } from "./lib/api";
 import { fileWithCaptureTime } from "./lib/captureTime";
 import {
@@ -39,6 +42,8 @@ const showAmbassador = ref(false);
 const selectedId = ref("");
 const viewMode = ref(false);
 const viewDoc = ref(null);
+/** Portal sections: dashboard | list | new */
+const portalPage = ref("new");
 const meta = ref({
 	staff_name: "",
 	staff_employee: "",
@@ -659,6 +664,92 @@ function visitNameFromUrl() {
 	return "";
 }
 
+function portalPageFromUrl() {
+	try {
+		const params = new URLSearchParams(window.location.search || "");
+		const p = (params.get("page") || "").trim().toLowerCase();
+		if (p === "dashboard" || p === "home") return "dashboard";
+		if (p === "list" || p === "visits" || p === "records") return "list";
+		if (p === "new" || p === "form") return "new";
+	} catch {
+		/* ignore */
+	}
+	return "dashboard";
+}
+
+function setPortalUrl(page, { replace = true } = {}) {
+	try {
+		const url = new URL(window.location.href);
+		url.searchParams.delete("name");
+		url.searchParams.delete("visit");
+		if (page === "dashboard") url.searchParams.set("page", "dashboard");
+		else if (page === "list") url.searchParams.set("page", "list");
+		else url.searchParams.set("page", "new");
+		const next = url.pathname + url.search + url.hash;
+		if (replace) window.history.replaceState({}, "", next);
+		else window.history.pushState({}, "", next);
+	} catch {
+		/* ignore */
+	}
+}
+
+function navigatePortal(page) {
+	error.value = "";
+	viewMode.value = false;
+	viewDoc.value = null;
+	portalPage.value = page;
+	setPortalUrl(page, { replace: false });
+	if (page === "new" && !meta.value.staff_name && !loading.value) {
+		ensureFormMeta();
+	}
+}
+
+function openVisit(name) {
+	if (!name) return;
+	window.location.assign(`/field-visit-easy?name=${encodeURIComponent(name)}`);
+}
+
+const submittingView = ref(false);
+const viewNotice = ref("");
+
+const viewIsDraft = computed(() => {
+	const d = viewDoc.value;
+	if (!d) return false;
+	if (Number(d.docstatus) === 0) return true;
+	if (d.can_submit) return true;
+	const s = String(d.status || "").toLowerCase();
+	return s === "draft" || s.includes("draft");
+});
+
+async function submitViewedVisit() {
+	if (!viewDoc.value?.name || !viewIsDraft.value || submittingView.value) return;
+	if (!window.confirm(`Submit ${viewDoc.value.name}? / کیا آپ یہ وزٹ جمع کرنا چاہتے ہیں؟`)) return;
+	submittingView.value = true;
+	error.value = "";
+	viewNotice.value = "";
+	try {
+		const res = await apiPost(`${METHOD}.submit_field_visit_doc`, { name: viewDoc.value.name });
+		viewDoc.value = await apiGet(`${METHOD}.get_field_visit_easy_view`, { name: viewDoc.value.name });
+		viewNotice.value = res.message || `Submitted ${viewDoc.value.name}`;
+	} catch (e) {
+		error.value = e.message || "Could not submit visit.";
+	} finally {
+		submittingView.value = false;
+	}
+}
+
+async function ensureFormMeta() {
+	try {
+		meta.value = { ...meta.value, ...(await apiGet(`${METHOD}.get_form_meta`)) };
+		training.entryFilledBy = meta.value.staff_name || training.entryFilledBy;
+		training.trainerName = meta.value.staff_name || training.trainerName;
+		visit.visitBy = visit.visitBy || meta.value.staff_name || "";
+		if (!participantForm.course && courseOptions.value[0]) participantForm.course = courseOptions.value[0];
+	} catch (e) {
+		error.value = e.message || "Could not load form.";
+	}
+}
+
 function isImageUrl(url) {
 	return /\.(png|jpe?g|gif|webp)(\?|$)/i.test(String(url || ""));
 }
@@ -670,23 +761,39 @@ onMounted(async () => {
 	try {
 		if (viewName) {
 			viewMode.value = true;
+			portalPage.value = "list";
 			viewDoc.value = await apiGet(`${METHOD}.get_field_visit_easy_view`, { name: viewName });
 		} else {
-			meta.value = { ...meta.value, ...(await apiGet(`${METHOD}.get_form_meta`)) };
-			training.entryFilledBy = meta.value.staff_name || training.entryFilledBy;
-			training.trainerName = meta.value.staff_name || training.trainerName;
-			visit.visitBy = visit.visitBy || meta.value.staff_name || "";
-			if (!participantForm.course && courseOptions.value[0]) participantForm.course = courseOptions.value[0];
+			portalPage.value = portalPageFromUrl();
+			setPortalUrl(portalPage.value, { replace: true });
+			if (portalPage.value === "new") {
+				await ensureFormMeta();
+			}
 		}
 	} catch (e) {
 		error.value = e.message || "Could not load form.";
 	} finally {
 		loading.value = false;
 	}
+	window.addEventListener("popstate", onPopState);
 });
+
+function onPopState() {
+	const viewName = visitNameFromUrl();
+	if (viewName) {
+		window.location.reload();
+		return;
+	}
+	portalPage.value = portalPageFromUrl();
+	viewMode.value = false;
+	if (portalPage.value === "new") {
+		ensureFormMeta();
+	}
+}
 
 onUnmounted(() => {
 	if (clockTimer) clearInterval(clockTimer);
+	window.removeEventListener("popstate", onPopState);
 });
 
 function tickClock() {
@@ -1769,16 +1876,16 @@ const steps = [
 	<div>
 		<header class="header">
 			<div class="wrap header-row">
-				<div class="brand">
+				<button type="button" class="brand brand-btn" @click="navigatePortal('dashboard')">
 					<div class="logo">ILM</div>
 					<div>
 						<div class="brand-title">The ILM Foundation</div>
 						<div class="brand-sub">
-							<span>FIELD VISIT - EASY FORM</span>
-							<span class="urdu" style="font-size: 12px">/ آسان فارم</span>
+							<span>FIELD VISIT PORTAL</span>
+							<span class="urdu" style="font-size: 12px">/ فیلڈ پورٹل</span>
 						</div>
 					</div>
-				</div>
+				</button>
 				<div style="display: flex; align-items: center; gap: 12px">
 					<div class="lang-desk">
 						<button class="lang-btn" :class="{ on: lang === 'both' }" @click="lang = 'both'">Both / دونوں</button>
@@ -1796,14 +1903,19 @@ const steps = [
 					</div>
 				</div>
 			</div>
+			<div v-if="!viewMode" class="portal-nav-bar">
+				<div class="wrap">
+					<PortalNav :page="portalPage" :lang="lang" @navigate="navigatePortal" />
+				</div>
+			</div>
 			<div class="banner">
 				<div class="wrap">
-					آسان فارم - Easy Form - براہ کرم تمام معلومات اردو اور انگریزی میں سمجھیں • Default: English + Urdu
+					Field Visit Portal — Dashboard · My Visits · Easy Form • اردو / English
 				</div>
 			</div>
 		</header>
 
-		<div v-if="!viewMode" class="wrap">
+		<div v-if="!viewMode && portalPage === 'new'" class="wrap">
 			<div class="stepper">
 				<template v-for="(s, i) in steps" :key="s.n">
 					<div class="step">
@@ -1828,8 +1940,9 @@ const steps = [
 
 			<section v-else-if="viewMode" class="fade">
 				<div class="view-toolbar">
-					<a class="btn btn-ghost" href="/app/sme-summary-report-copy">← Back to report</a>
-					<a class="btn btn-ghost" href="/field-visit-easy">New visit</a>
+					<button type="button" class="btn btn-ghost" @click="navigatePortal('list')">← My Visits</button>
+					<button type="button" class="btn btn-ghost" @click="navigatePortal('dashboard')">Dashboard</button>
+					<button type="button" class="btn btn-ghost" @click="navigatePortal('new')">New visit</button>
 					<a
 						v-if="viewDoc?.desk_url"
 						class="btn btn-ghost"
@@ -1837,20 +1950,51 @@ const steps = [
 						target="_blank"
 						rel="noopener"
 					>Desk form</a>
+					<button
+						v-if="viewIsDraft"
+						type="button"
+						class="btn btn-green"
+						:disabled="submittingView"
+						@click="submitViewedVisit"
+					>
+						{{ submittingView ? "Submitting…" : "Submit Visit / جمع کرائیں" }}
+					</button>
 				</div>
+				<div v-if="viewNotice" class="success-banner">{{ viewNotice }}</div>
 				<div v-if="viewDoc" class="view-sheet">
 					<div class="view-head">
 						<div class="view-kicker">Field Visit — Easy view</div>
-						<h1 class="view-title">{{ viewDoc.name }}</h1>
+						<h1 class="view-title">
+							{{ viewDoc.name }}
+							<span
+								v-if="viewDoc.status"
+								class="portal-badge"
+								:class="'ds-' + Number(viewDoc.docstatus || 0)"
+								style="margin-left: 10px; vertical-align: middle"
+							>{{ viewDoc.status }}</span>
+						</h1>
 						<p class="view-sub">
 							<span v-if="viewDoc.type">{{ viewDoc.type }}</span>
-							<span v-if="viewDoc.status"> · {{ viewDoc.status }}</span>
 							<span v-if="viewDoc.visit_date"> · {{ viewDoc.visit_date }}</span>
 						</p>
 						<p v-if="viewDoc.school || viewDoc.officer" class="view-sub">
 							<span v-if="viewDoc.school"><strong>School:</strong> {{ viewDoc.school }}</span>
 							<span v-if="viewDoc.officer"><strong> · Officer:</strong> {{ viewDoc.officer }}</span>
 						</p>
+						<p v-if="viewIsDraft" class="view-sub" style="color: #92400e">
+							This visit is still a draft — submit it to finalize. /
+							<span class="urdu"> یہ وزٹ ابھی ڈرافٹ ہے — جمع کر کے حتمی بنائیں۔</span>
+						</p>
+						<div v-if="viewIsDraft" style="margin-top: 14px">
+							<button
+								type="button"
+								class="btn btn-green"
+								:disabled="submittingView"
+								@click="submitViewedVisit"
+							>
+								{{ submittingView ? "Submitting…" : "Submit Visit / جمع کرائیں ✓" }}
+							</button>
+						</div>
 					</div>
 					<div v-for="section in viewDoc.sections || []" :key="section.title" class="view-section">
 						<div class="view-section-title">{{ section.title }}</div>
@@ -1879,6 +2023,20 @@ const steps = [
 					</div>
 				</div>
 			</section>
+
+			<PortalDashboard
+				v-else-if="portalPage === 'dashboard'"
+				:lang="lang"
+				@navigate="navigatePortal"
+				@open-visit="openVisit"
+			/>
+
+			<PortalVisitList
+				v-else-if="portalPage === 'list'"
+				:lang="lang"
+				@navigate="navigatePortal"
+				@open-visit="openVisit"
+			/>
 
 			<section v-else-if="step === 1" class="fade">
 				<h1 class="hero">
@@ -3246,7 +3404,23 @@ const steps = [
 			</section>
 		</main>
 
-		<div class="dock">
+		<div v-if="viewMode && viewIsDraft" class="dock">
+			<div class="dock-inner">
+				<div style="display: flex; gap: 8px; margin-left: auto; align-items: center">
+					<span style="font-size: 13px; color: #92400e; font-weight: 600">Draft — not submitted yet</span>
+					<button
+						type="button"
+						class="btn btn-green"
+						:disabled="submittingView"
+						@click="submitViewedVisit"
+					>
+						{{ submittingView ? "Submitting…" : "Submit Visit / جمع کرائیں ✓" }}
+					</button>
+				</div>
+			</div>
+		</div>
+
+		<div v-else-if="!viewMode && portalPage === 'new'" class="dock">
 			<div class="dock-inner">
 				<div style="display: flex; gap: 8px; margin-left: auto">
 					<button v-if="step > 1" class="btn" type="button" @click="step -= 1">
