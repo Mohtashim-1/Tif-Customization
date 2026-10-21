@@ -956,6 +956,14 @@ h1.hero {
 	box-shadow: 0 8px 20px -8px rgba(15, 122, 60, 0.6);
 }
 
+.btn-green .urdu,
+.btn-green .muted,
+.btn-dark .urdu,
+.btn-dark .muted {
+	color: #fff !important;
+	opacity: 0.95;
+}
+
 .btn-green:disabled {
 	opacity: 0.4;
 	cursor: not-allowed;

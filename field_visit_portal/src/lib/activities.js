@@ -61,6 +61,7 @@ export const ACTIVITY_CARDS = [
 		subEn: "Workshop / Training conducted",
 		subUr: "ورکشاپ / تربیت کا انعقاد",
 	},
+	// Enrolment / Stall / Quiz: open to every field officer (see FIELD_OFFICER_OPEN_ACTIVITY_TYPES)
 	{
 		id: "workshop_arranged",
 		type: "Workshop Arranged",
@@ -116,7 +117,6 @@ export const ACTIVITY_CARDS = [
 		id: "enrolment",
 		type: "Enrolment of Participants",
 		group: "enrolment",
-		farhanOnly: true,
 		emoji: "👤",
 		titleEn: "Enrolment of Participants",
 		titleUr: "شرکاء کا اندراج",
@@ -188,10 +188,18 @@ export const QUARTER_OPTIONS = [
 	{ value: "Q4", label: "Q4 - Oct-Dec" },
 ];
 
+/** Always show these to field officers even if meta.activity_types is stale */
+const OPEN_FIELD_OFFICER_CARD_TYPES = new Set([
+	"Enrolment of Participants",
+	"Quiz Arranged",
+	"Co-curricular Activity",
+]);
+
 export function cardsForUser(activityTypes = []) {
 	const allowed = new Set(activityTypes);
 	return ACTIVITY_CARDS.filter((card) => {
 		if (card.alwaysShow) return true;
+		if (OPEN_FIELD_OFFICER_CARD_TYPES.has(card.type)) return true;
 		if (allowed.has(card.type)) return true;
 		return (card.altTypes || []).some((t) => allowed.has(t));
 	});

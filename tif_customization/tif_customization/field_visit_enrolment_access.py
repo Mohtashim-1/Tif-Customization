@@ -10,11 +10,11 @@ from frappe import _
 ENROLMENT_PARTICIPANTS_TYPE = "Enrolment of Participants"
 WORKSHOP_ATTENDANCE_TYPE = "Attendance / Registration in One Day / Half day Workshop"
 
+# Enrolment of Participants / Quiz / Stall are open to all field officers.
+# These remain Farhan / Anwar (and admins) only:
 FARHAN_ONLY_FIELD_VISIT_TYPES = frozenset(
 	{
-		ENROLMENT_PARTICIPANTS_TYPE,
 		WORKSHOP_ATTENDANCE_TYPE,
-		"Enrolment of Participant in ELP/ TECC/ TTC/ Online Tajweed",
 		"Registration of Participant in Workshops",
 		"Workshop Conducted",
 		"Workshop",

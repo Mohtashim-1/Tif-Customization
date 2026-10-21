@@ -533,7 +533,11 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			},
 			{ key: "outcome_workshop_registration", label: __("Onsite Workshop Participants through SME"), short_label: __("Onsite Workshop Participants through SME"), metric: "workshop_registration" },
 			onlineCol,
-			{ key: "outcome_volunteers", label: __("Volunteers enrolled through SME"), short_label: __("Volunteers enrolled through SME"), metric: "volunteers" },
+			{ key: "outcome_volunteers", 
+				label: __("Volunteers enrolled through SME"), 
+				short_label: __("Volunteers enrolled through SME"), 
+				inProgress: true,
+				metric: "volunteers" },
 		];
 		const cols = [...((data && data.outcome_columns) || fallback)];
 		// Always keep Online column right after Workshop Participants.
@@ -683,8 +687,6 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					value: this.fmt(k[col.key]),
 					style: (col.key || "activity").replace(/_/g, "-"),
 					metric,
-					inProgress: ["workshop", "teachers_training_meeting"].includes(col.key) ||
-						["workshop", "workshop_conducted", "teachers_training_meeting"].includes(metric),
 					hint:
 						col.key === "workshop"
 							? __("Field Visit type = Workshop Conducted or Workshop")
@@ -709,6 +711,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					"co_curricular",
 					"online_participants",
 					"workshop_registration",
+					"volunteers",
 				]);
 				const card = {
 					label: col.label,
@@ -748,11 +751,12 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					const ws = (data.outcome_fy || {}).workshop_conducted || {};
 					return [
 						{
-							label: __("Workshop Conducted"),
+							label: __("Workshop Conducted (Onsite)"),
 							value: this.fmt(ws.actual),
 							style: "workshop",
 							metric: "workshop_conducted",
 							outcomeFy: true,
+							inProgress: true,
 							hint: data.outcome_fy_label
 								? __("Workshop Conducted / Workshop · {0}", [data.outcome_fy_label])
 								: __("Workshop Conducted / Workshop · 1 July to date"),
@@ -845,8 +849,11 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 									cint(((data.outcome_fy || {}).model_school_0 || {}).actual)
 							),
 							style: "grand",
+							cardKind: "total_schools_by_province",
 							outcomeFy: true,
-							hint: __("Active Schools + Model 0 (No Program Selected)."),
+							hint: __(
+								"Active Schools + Model 0. Click for province-wise school counts."
+							),
 						},
 						// 4 empty card slots after Total Schools
 						{ spacer: true },
@@ -1190,12 +1197,92 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			else if (kind === "school_visit_officers") me.show_school_visits_by_officer();
 			else if (kind === "active_school_models") me.show_active_school_models();
 			else if (kind === "active_school_by_staff") me.show_active_schools_by_staff();
+			else if (kind === "total_schools_by_province") me.show_total_schools_by_province();
 		});
 
 		$root.on("click.smeSumExpense", "[data-expense-detail]", function (e) {
 			e.preventDefault();
 			e.stopPropagation();
 			me.show_expense_detail($(this).attr("data-expense-staff") || "");
+		});
+	}
+
+	show_total_schools_by_province() {
+		const data = this.data || {};
+		const f = this.get_filters();
+		const from_date = data.outcome_fy_from || f.from_date;
+		const to_date = data.outcome_fy_to || f.to_date;
+		if (!from_date || !to_date) {
+			frappe.msgprint(__("Please select Visit From Date and Visit To Date."));
+			return;
+		}
+		frappe.call({
+			method: "tif_customization.tif_customization.api.visit_drilldown_report.get_total_schools_by_province",
+			args: {
+				filters: {
+					from_date,
+					to_date,
+					province: f.province || "",
+					city: f.city || "",
+					supervisor: f.supervisor || data.supervisor || "",
+					submitted_only: f.submitted_only || 1,
+				},
+			},
+			freeze: true,
+			freeze_message: __("Loading province counts..."),
+			callback: (r) => {
+				const res = r.message || {};
+				const rows = res.rows || [];
+				const totals = res.totals || {};
+				const body = rows.length
+					? rows
+							.map(
+								(row) => `<tr>
+					<td>${frappe.utils.escape_html(row.province || "—")}</td>
+					<td class="text-right">${this.fmt(row.active)}</td>
+					<td class="text-right">${this.fmt(row.model_0)}</td>
+					<td class="text-right"><strong>${this.fmt(row.total)}</strong></td>
+				</tr>`
+							)
+							.join("")
+					: `<tr><td colspan="4" class="text-muted text-center">${__(
+							"No schools found"
+						)}</td></tr>`;
+				const d = new frappe.ui.Dialog({
+					title: res.title || __("Total Schools by Province"),
+					size: "large",
+					fields: [{ fieldtype: "HTML", fieldname: "html" }],
+					primary_action_label: __("Close"),
+					primary_action: () => d.hide(),
+				});
+				d.$wrapper.find(".modal-dialog").css({ "max-width": "640px" });
+				d.fields_dict.html.$wrapper.html(`
+					<div class="table-responsive" style="max-height:420px;overflow:auto;">
+						<table class="table table-bordered table-hover" style="font-size:12px;margin:0;">
+							<thead>
+								<tr>
+									<th>${__("Province")}</th>
+									<th class="text-right">${__("Active Schools")}</th>
+									<th class="text-right">${__("Model 0")}</th>
+									<th class="text-right">${__("Total Schools")}</th>
+								</tr>
+							</thead>
+							<tbody>${body}</tbody>
+							${
+								rows.length
+									? `<tfoot><tr>
+								<th>${__("All provinces")}</th>
+								<th class="text-right">${this.fmt(totals.active)}</th>
+								<th class="text-right">${this.fmt(totals.model_0)}</th>
+								<th class="text-right">${this.fmt(totals.total)}</th>
+							</tr></tfoot>`
+									: ""
+							}
+						</table>
+					</div>
+				`);
+				d.show();
+			},
 		});
 	}
 

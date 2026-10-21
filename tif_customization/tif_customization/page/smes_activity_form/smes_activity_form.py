@@ -127,12 +127,26 @@ def _normalize_designation(value, other=""):
 	return "Other", other or value
 
 
+# Always offered on the easy portal to every field officer
+FIELD_OFFICER_OPEN_ACTIVITY_TYPES = frozenset(
+	{
+		"Enrolment of Participants",
+		"Enrolment of Participant in ELP/ TECC/ TTC/ Online Tajweed",
+		"Quiz Arranged",
+		"Co-curricular Activity",
+	}
+)
+
+
 def _activity_type_labels_for_user():
 	can_farhan = can_manage_farhan_only_field_visit()
 	can_supervisor = can_manage_supervisor_only_field_visits()
 	labels = []
 	for label in SHEET_ACTIVITY_TYPES:
 		mapped = ACTIVITY_TYPE_MAP.get(label, label)
+		if mapped in FIELD_OFFICER_OPEN_ACTIVITY_TYPES:
+			labels.append(label)
+			continue
 		if mapped in FARHAN_ONLY_FIELD_VISIT_TYPES and not can_farhan:
 			continue
 		if mapped in SUPERVISOR_ONLY_ACTIVITY_TYPES and not can_supervisor:

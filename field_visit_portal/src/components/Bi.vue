@@ -25,7 +25,9 @@ defineProps({
 }
 .muted {
 	font-size: 11px;
-	color: #71717a;
 	font-weight: 400;
+	/* Inherit parent color so Urdu stays readable on green/dark buttons */
+	color: inherit;
+	opacity: 0.88;
 }
 </style>

@@ -66,6 +66,7 @@ METRIC_LABELS = {
 	"model_school_0": _("Model 0 (No Program Selected)"),
 	"model_0": _("Model 0 (No Program Selected)"),
 	"inactive_schools": _("Inactive Schools / Model 0"),
+	"total_schools": _("Total Schools"),
 	"model_a": _("Model A (3 departments)"),
 	"model_b": _("Model B (2 departments)"),
 	"model_c": _("Model C (1 department or not affiliated)"),
@@ -268,6 +269,15 @@ def _metric_condition(metric: str, alias: str = "fv") -> str:
 			f"NOT ({registered_school_sql(a)}) AND ({named})"
 			f" AND ({school_field_visit_type_sql(a)})"
 		)
+	if m == "total_schools":
+		# Active Schools + Model 0 (named school field visits).
+		return f"""({named}) AND (
+			({registered_school_sql(a)})
+			OR (
+				NOT ({registered_school_sql(a)})
+				AND ({school_field_visit_type_sql(a)})
+			)
+		)"""
 	if m == "online_workshop":
 		return f"""{a}.type IN ('Workshop Conducted', 'Workshop', 'Workshop Arranged', 'Training')
 			AND LOWER(IFNULL({a}.training_mode, '')) LIKE '%%online%%'"""
@@ -1414,4 +1424,107 @@ def get_visit_drilldown(filters=None, metric=None, staff=None):
 		"staff": staff,
 		"rows": out,
 		"participants": participants,
+	}
+
+
+@frappe.whitelist()
+def get_total_schools_by_province(filters=None):
+	"""Distinct Total Schools (Active + Model 0) counted by province."""
+	if not frappe.has_permission("Field Visit", "read"):
+		frappe.throw(_("You are not permitted to view Field Visit data."), frappe.PermissionError)
+
+	filters = _parse(filters)
+	from_date = getdate(filters.get("from_date"))
+	to_date = getdate(filters.get("to_date"))
+	if not from_date or not to_date:
+		frappe.throw(_("From Date and To Date are required."))
+	if from_date > to_date:
+		frappe.throw(_("From Date cannot be after To Date."))
+
+	visit_day = visit_day_sql("fv")
+	submitted_only = cint(filters.get("submitted_only") or filters.get("submitted") or 0)
+	docstatus_sql = "fv.docstatus = 1" if submitted_only else "fv.docstatus < 2"
+	school_expr = _school_sql("fv")
+	province_expr = """COALESCE(
+		NULLIF(TRIM(fv.province), ''),
+		NULLIF(TRIM(fv.me_province), ''),
+		NULLIF(TRIM(fv.training_province), ''),
+		'—'
+	)"""
+	active_sql = registered_school_sql("fv")
+	model0_sql = (
+		f"NOT ({registered_school_sql('fv')}) AND ({school_field_visit_type_sql('fv')})"
+	)
+	named = _has_named_school_sql("fv")
+	total_cond = f"""({named}) AND (
+		({active_sql}) OR ({model0_sql})
+	)"""
+
+	conditions = [
+		docstatus_sql,
+		f"{visit_day} BETWEEN %(from_date)s AND %(to_date)s",
+		total_cond,
+	]
+	params = {"from_date": from_date, "to_date": to_date}
+	apply_team_scope_to_conditions(conditions, params, alias="fv")
+
+	staff = (filters.get("staff") or filters.get("user") or "").strip()
+	supervisor = (filters.get("supervisor") or "").strip()
+	if staff:
+		tokens = expand_staff_tokens(staff)
+		params["staff_tokens"] = tuple(t.lower() for t in tokens) or ("__none__",)
+		conditions.append(staff_match_sql("fv", "staff_tokens"))
+	elif supervisor:
+		team_tokens = _supervisor_team_tokens(supervisor)
+		params["staff_tokens"] = tuple(t.lower() for t in team_tokens) or ("__none__",)
+		conditions.append(staff_match_sql("fv", "staff_tokens"))
+
+	where_sql = " AND ".join(conditions)
+	rows = frappe.db.sql(
+		f"""
+		SELECT
+			province,
+			SUM(is_active) AS active,
+			SUM(1 - is_active) AS model_0,
+			COUNT(*) AS total
+		FROM (
+			SELECT
+				LOWER(TRIM({school_expr})) AS school_key,
+				MAX({province_expr}) AS province,
+				MAX(CASE WHEN ({active_sql}) THEN 1 ELSE 0 END) AS is_active
+			FROM `tabField Visit` fv
+			WHERE {where_sql}
+			GROUP BY LOWER(TRIM({school_expr}))
+		) school_rows
+		GROUP BY province
+		ORDER BY total DESC, province ASC
+		""",
+		params,
+		as_dict=True,
+	)
+
+	out = []
+	sum_active = sum_model0 = sum_total = 0
+	for r in rows:
+		active = cint(r.active)
+		model0 = cint(r.model_0)
+		total = cint(r.total)
+		sum_active += active
+		sum_model0 += model0
+		sum_total += total
+		out.append(
+			{
+				"province": cstr(r.province or "—").strip() or "—",
+				"active": active,
+				"model_0": model0,
+				"total": total,
+			}
+		)
+
+	return {
+		"from_date": str(from_date),
+		"to_date": str(to_date),
+		"rows": out,
+		"totals": {"active": sum_active, "model_0": sum_model0, "total": sum_total},
+		"title": _("Total Schools by Province"),
 	}
