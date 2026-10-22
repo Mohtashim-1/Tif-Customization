@@ -864,7 +864,7 @@ def _neighbors_pending(
 	return _neighbor_payload(names, current, key_field="application")
 
 
-def _neighbor_payload(names, cur firent, key_field="customer"):
+def _neighbor_payload(names, current, key_field="customer"):
 	total = len(names)
 	if not current or current not in names:
 		return {

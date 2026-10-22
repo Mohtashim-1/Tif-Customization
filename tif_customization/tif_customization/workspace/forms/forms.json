@@ -355,8 +355,146 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "Late Coming Report",
+   "link_count": 0,
+   "link_to": "late-coming-report",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Supply Chain",
+   "link_count": 12,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Customer",
+   "link_count": 0,
+   "link_to": "Customer",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Sales Order",
+   "link_count": 0,
+   "link_to": "Sales Order",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Delivery Note",
+   "link_count": 0,
+   "link_to": "Delivery Note",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Stock Reconciliation",
+   "link_count": 0,
+   "link_to": "Stock Reconciliation",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Item",
+   "link_count": 0,
+   "link_to": "Item",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Courier",
+   "link_count": 0,
+   "link_to": "Courier",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Courier City",
+   "link_count": 0,
+   "link_to": "Courier City",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Courier Rate",
+   "link_count": 0,
+   "link_to": "Courier Rate",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Courier Service",
+   "link_count": 0,
+   "link_to": "Courier Service",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Stock Balance",
+   "link_count": 0,
+   "link_to": "Stock Balance",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Stock Ledger",
+   "link_count": 0,
+   "link_to": "Stock Ledger",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Stock Entry",
+   "link_count": 0,
+   "link_to": "Stock Entry",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "HR",
-   "link_count": 20,
+   "link_count": 22,
    "onboard": 0,
    "type": "Card Break"
   },
@@ -573,133 +711,15 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Supply Chain",
-   "link_count": 12,
-   "onboard": 0,
-   "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Customer",
+   "label": "Staff Appraisal",
    "link_count": 0,
-   "link_to": "Customer",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Sales Order",
-   "link_count": 0,
-   "link_to": "Sales Order",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Delivery Note",
-   "link_count": 0,
-   "link_to": "Delivery Note",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Stock Reconciliation",
-   "link_count": 0,
-   "link_to": "Stock Reconciliation",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Item",
-   "link_count": 0,
-   "link_to": "Item",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Courier",
-   "link_count": 0,
-   "link_to": "Courier",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Courier City",
-   "link_count": 0,
-   "link_to": "Courier City",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Courier Rate",
-   "link_count": 0,
-   "link_to": "Courier Rate",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Courier Service",
-   "link_count": 0,
-   "link_to": "Courier Service",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Stock Balance",
-   "link_count": 0,
-   "link_to": "Stock Balance",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Stock Ledger",
-   "link_count": 0,
-   "link_to": "Stock Ledger",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Stock Entry",
-   "link_count": 0,
-   "link_to": "Stock Entry",
-   "link_type": "DocType",
+   "link_to": "staff-appraisal",
+   "link_type": "Page",
    "onboard": 0,
    "type": "Link"
   }
  ],
- "modified": "2026-10-05 04:13:32.120028",
+ "modified": "2026-10-21 20:41:43.634238",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Forms",
