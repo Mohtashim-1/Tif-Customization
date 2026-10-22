@@ -1099,28 +1099,39 @@ def create_area(area=None, city=None, province=None):
 	if not _user_can_create_area():
 		frappe.throw(_("You are not allowed to add an Area"), frappe.PermissionError)
 	area_name = cstr(area or "").strip()
-	city = cstr(city or "").strip()
-	province = cstr(province or "").strip()
+	city_raw = cstr(city or "").strip()
+	province = _map_province_name(province) or cstr(province or "").strip()
 	if len(area_name) < 2:
 		frappe.throw(_("Enter an area name"))
-	if not city or not frappe.db.exists("City", city):
+
+	# Resolve City link (never treat province codes like KPK as a city)
+	city = _resolve_school_city(city_raw)
+	if not city:
 		frappe.throw(_("Select a city before adding an area"))
+
 	city_province = ""
 	if frappe.db.has_column("City", "province"):
 		city_province = cstr(frappe.db.get_value("City", city, "province") or "").strip()
 	if province and city_province and province != city_province:
-		frappe.throw(_("City {0} belongs to {1}").format(city, city_province))
-	province = province or city_province
-	existing = frappe.db.exists("Area", area_name)
-	if existing:
+		# Prefer City master province — form may still send a mapped label that matches
+		if _map_province_name(province) != city_province and province != city_province:
+			frappe.throw(_("City {0} belongs to {1}").format(city, city_province))
+	province = city_province or province
+
+	# Reuse existing Area (case-insensitive / label match) under this city
+	existing_row = _find_area_in_city(area_name, city)
+	if existing_row:
+		return _area_payload(existing_row)
+
+	# Unique area name taken by another city
+	if frappe.db.exists("Area", area_name):
 		row = frappe.db.get_value("Area", area_name, ["name", "area", "city", "province"], as_dict=True) or {}
-		if cstr(row.get("city") or "").strip() == city:
-			return _area_payload(row)
 		frappe.throw(
 			_("Area '{0}' already exists under {1}. Choose it from the list or use a different name.").format(
 				area_name, row.get("city") or _("another city")
 			)
 		)
+
 	doc = frappe.get_doc(
 		{
 			"doctype": "Area",
@@ -1131,6 +1142,52 @@ def create_area(area=None, city=None, province=None):
 	)
 	doc.insert(ignore_permissions=True)
 	return _area_payload(doc)
+
+
+def _find_area_in_city(area_name, city):
+	"""Find Area by name/label under a City (exact, then case-insensitive)."""
+	area_name = cstr(area_name or "").strip()
+	city = cstr(city or "").strip()
+	if not area_name or not city or not frappe.db.exists("DocType", "Area"):
+		return None
+	has_area = frappe.db.has_column("Area", "area")
+	has_city = frappe.db.has_column("Area", "city")
+	if not has_city:
+		return None
+	fields = ["name", "city"]
+	if has_area:
+		fields.append("area")
+	if frappe.db.has_column("Area", "province"):
+		fields.append("province")
+
+	# Exact name
+	if frappe.db.exists("Area", area_name):
+		row = frappe.db.get_value("Area", area_name, fields, as_dict=True) or {}
+		if cstr(row.get("city") or "").strip() == city:
+			return row
+
+	# Match label / case-insensitive under city
+	params = {"city": city, "val": area_name, "val_lower": area_name.lower()}
+	conds = ["name = %(val)s", "LOWER(name) = %(val_lower)s"]
+	if has_area:
+		conds.extend(
+			[
+				"IFNULL(area, '') = %(val)s",
+				"LOWER(IFNULL(area, '')) = %(val_lower)s",
+			]
+		)
+	rows = frappe.db.sql(
+		f"""
+		SELECT {", ".join(fields)}
+		FROM `tabArea`
+		WHERE city = %(city)s AND ({" OR ".join(conds)})
+		ORDER BY name ASC
+		LIMIT 1
+		""",
+		params,
+		as_dict=True,
+	)
+	return rows[0] if rows else None
 
 
 def _area_payload(row):
@@ -1247,29 +1304,28 @@ def get_school_customer(name=None):
 	cust = frappe.db.get_value("Customer", name, cust_fields, as_dict=True) or {}
 	addr = _customer_address_row(name, cust.get("customer_primary_address"))
 	address = _format_address_row(addr) if addr else ""
-	city = (
-		cstr(cust.get("territory") or "").strip()
-		or cstr((addr or {}).get("city") or "").strip()
+
+	# Prefer Address.city over Customer.territory — territory is often a province
+	# code like "KPK", which is not a City (was wiping Area and failing Link validation).
+	city = _resolve_school_city(
+		cstr((addr or {}).get("city") or "").strip(),
+		cstr(cust.get("territory") or "").strip(),
 	)
-	# Prefer City master name when address city matches a City doc.
-	if city and frappe.db.exists("DocType", "City") and not frappe.db.exists("City", city):
-		alt = frappe.db.get_value("City", {"city": city}, "name")
-		if alt:
-			city = alt
 	province = ""
 	if city and frappe.db.exists("DocType", "City") and frappe.db.has_column("City", "province"):
 		province = cstr(frappe.db.get_value("City", city, "province") or "").strip()
 	if not province:
 		raw_state = cstr((addr or {}).get("state") or "").strip()
-		if raw_state:
-			province = PROVINCE_MAP.get(raw_state) or PROVINCE_MAP.get(raw_state.title()) or ""
-			if not province:
-				for key, full in PROVINCE_MAP.items():
-					if raw_state.lower() == key.lower() or raw_state.lower() == full.lower():
-						province = full
-						break
-			if not province:
-				province = raw_state
+		territory = cstr(cust.get("territory") or "").strip()
+		for raw in (raw_state, territory):
+			if not raw:
+				continue
+			mapped = _map_province_name(raw)
+			if mapped:
+				province = mapped
+				break
+			province = raw
+			break
 	school_type = _school_type_from_customer(
 		cust.get("custom_category"),
 		cust.get("customer_type"),
@@ -1283,6 +1339,65 @@ def get_school_customer(name=None):
 		"school_type": school_type,
 		"address": address,
 	}
+
+
+def _map_province_name(raw):
+	"""Map abbreviations like KPK → full province name used on the form."""
+	raw = cstr(raw or "").strip()
+	if not raw:
+		return ""
+	if raw in PROVINCE_MAP:
+		return PROVINCE_MAP[raw]
+	title = raw.title()
+	if title in PROVINCE_MAP:
+		return PROVINCE_MAP[title]
+	lower = raw.lower()
+	for key, full in PROVINCE_MAP.items():
+		if lower == key.lower() or lower == full.lower():
+			return full
+	# Already a full province label
+	for full in PROVINCE_MAP.values():
+		if lower == full.lower():
+			return full
+	return ""
+
+
+def _is_province_label(value):
+	"""True if value looks like a province / territory code, not a city."""
+	raw = cstr(value or "").strip()
+	if not raw:
+		return False
+	return bool(_map_province_name(raw)) or raw.upper() in {
+		"KPK",
+		"KP",
+		"AJK",
+		"GB",
+		"ICT",
+		"FATA",
+	}
+
+
+def _resolve_school_city(*candidates):
+	"""Pick the first candidate that is a real City (never a province code like KPK)."""
+	if not frappe.db.exists("DocType", "City"):
+		for c in candidates:
+			c = cstr(c or "").strip()
+			if c and not _is_province_label(c):
+				return c
+		return ""
+
+	has_city_field = frappe.db.has_column("City", "city")
+	for raw in candidates:
+		raw = cstr(raw or "").strip()
+		if not raw or _is_province_label(raw):
+			continue
+		if frappe.db.exists("City", raw):
+			return raw
+		if has_city_field:
+			alt = frappe.db.get_value("City", {"city": raw}, "name")
+			if alt:
+				return alt
+	return ""
 
 
 def _school_type_from_customer(category=None, customer_type=None, type_of_customer=None):

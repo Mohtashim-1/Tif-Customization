@@ -132,21 +132,49 @@ function hasExactMatch() {
 	return items.value.some((o) => o.label.toLowerCase() === q || o.value.toLowerCase() === q);
 }
 
+function findExactItem(q) {
+	const needle = (q || "").trim().toLowerCase();
+	if (!needle) return null;
+	return (
+		items.value.find(
+			(o) => o.label.toLowerCase() === needle || o.value.toLowerCase() === needle
+		) || null
+	);
+}
+
 function emitCreate() {
 	const q = query.value.trim();
 	if (!q) return;
+	// If the area/city already exists in the list, select it instead of creating
+	const existing = findExactItem(q);
+	if (existing) {
+		pick(existing);
+		return;
+	}
 	emit("create", q);
 	open.value = false;
 }
 
 function onFilterKey(e) {
-	if (e.key === "Enter" && props.allowCustom && query.value.trim()) {
-		e.preventDefault();
+	if (e.key !== "Enter" || !query.value.trim()) return;
+	e.preventDefault();
+	const existing = findExactItem(query.value);
+	if (existing) {
+		pick(existing);
+		return;
+	}
+	if (props.allowCreate) {
+		emitCreate();
+		return;
+	}
+	if (props.allowCustom) {
 		if (items.value[0] && matchesQuery(items.value[0], query.value)) {
 			pick(items.value[0]);
 			return;
 		}
 		useCustom();
+	} else if (items.value[0] && matchesQuery(items.value[0], query.value)) {
+		pick(items.value[0]);
 	}
 }
 

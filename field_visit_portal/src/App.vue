@@ -910,11 +910,43 @@ async function addArea(name, target) {
 	}
 	error.value = "";
 	try {
-		const row = await apiPost(`${METHOD}.create_area`, { area, city, province });
+		// Prefer an existing area under this city (avoids create race / unique-name clashes).
+		const existing = await apiGet(`${METHOD}.search_areas`, {
+			txt: area,
+			city,
+			province,
+			limit: 20,
+		});
+		const match = (Array.isArray(existing) ? existing : []).find((a) => {
+			const v = String(a.value || a.name || "").trim().toLowerCase();
+			const l = String(a.label || a.area || "").trim().toLowerCase();
+			const q = area.toLowerCase();
+			return v === q || l === q;
+		});
+		const row =
+			match ||
+			(await apiPost(`${METHOD}.create_area`, { area, city, province }));
 		if (!row?.value) return;
 		if (!Array.isArray(meta.value.areas)) meta.value.areas = [];
-		meta.value.areas = [...meta.value.areas.filter((a) => (a.value || a.name) !== row.value), row];
-		target.area = row.value;
+		meta.value.areas = [
+			...meta.value.areas.filter((a) => (a.value || a.name) !== row.value),
+			{
+				value: row.value,
+				label: row.label || row.value,
+				name: row.value,
+				city: row.city || city,
+				province: row.province || province,
+				description: row.description || "",
+			},
+		];
+		// Keep cascade from wiping the value we just set
+		skipLocationReset = true;
+		try {
+			target.area = row.value;
+		} finally {
+			skipLocationReset = false;
+		}
+		error.value = "";
 	} catch (e) {
 		error.value = e.message || "Could not add this area.";
 	}
@@ -936,9 +968,22 @@ watch(
 			skipLocationReset = true;
 			try {
 				if (row.province) visit.province = row.province;
-				if (row.city) {
-					if (visit.city && visit.city !== row.city) visit.area = "";
-					visit.city = row.city;
+				// Only apply city when it is a real City (API already filters province codes like KPK).
+				// Keep existing Area when city does not change.
+				const schoolCity = (row.city || "").trim();
+				const prevCity = (visit.city || "").trim();
+				const prevArea = (visit.area || "").trim();
+				if (schoolCity) {
+					visit.city = schoolCity;
+					if (prevCity && prevCity !== schoolCity) {
+						visit.area = "";
+					} else if (prevArea) {
+						visit.area = prevArea;
+					}
+				}
+				// If still no area, try matching school address to an Area under this city
+				if (!(visit.area || "").trim() && schoolCity) {
+					await suggestAreaFromSchoolAddress(visit, row.address || visit.schoolAddress || "");
 				}
 			} finally {
 				skipLocationReset = false;
@@ -964,6 +1009,36 @@ watch(
 	},
 );
 
+async function suggestAreaFromSchoolAddress(target, address) {
+	const city = (target?.city || "").trim();
+	const text = String(address || "").trim();
+	if (!city || !text) return;
+	// Prefer longer area names found in the address (e.g. "GT Road Baldher" before "Baldher")
+	try {
+		const rows = await apiGet(`${METHOD}.search_areas`, {
+			txt: "",
+			city,
+			province: target?.province || "",
+			limit: 80,
+		});
+		const list = (Array.isArray(rows) ? rows : [])
+			.map((a) => ({
+				value: String(a.value || a.name || "").trim(),
+				label: String(a.label || a.area || a.value || "").trim(),
+			}))
+			.filter((a) => a.value);
+		const addrLower = text.toLowerCase();
+		list.sort((a, b) => (b.label || b.value).length - (a.label || a.value).length);
+		const hit = list.find((a) => {
+			const label = (a.label || a.value).toLowerCase();
+			return label.length >= 3 && addrLower.includes(label);
+		});
+		if (hit) target.area = hit.value;
+	} catch {
+		/* ignore */
+	}
+}
+
 function bindLocationCascade(target) {
 	watch(
 		() => target.province,
@@ -979,6 +1054,7 @@ function bindLocationCascade(target) {
 		() => target.city,
 		(city, prev) => {
 			if (skipLocationReset || !prev || city === prev) return;
+			// Only clear area when city actually changes to a different value
 			target.area = "";
 		},
 	);
