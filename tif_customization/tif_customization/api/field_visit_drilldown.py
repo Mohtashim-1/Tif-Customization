@@ -1429,7 +1429,7 @@ def get_visit_drilldown(filters=None, metric=None, staff=None):
 
 @frappe.whitelist()
 def get_total_schools_by_province(filters=None):
-	"""Distinct Total Schools (Active + Model 0) counted by province."""
+	"""Distinct Total Schools (Active + Model 0) by province, plus New / Active New."""
 	if not frappe.has_permission("Field Visit", "read"):
 		frappe.throw(_("You are not permitted to view Field Visit data."), frappe.PermissionError)
 
@@ -1455,9 +1455,11 @@ def get_total_schools_by_province(filters=None):
 	model0_sql = (
 		f"NOT ({registered_school_sql('fv')}) AND ({school_field_visit_type_sql('fv')})"
 	)
+	new_sql = _metric_condition("new_schools", "fv")
 	named = _has_named_school_sql("fv")
+	# Include Active, Model 0, and New Registered so new schools are not dropped.
 	total_cond = f"""({named}) AND (
-		({active_sql}) OR ({model0_sql})
+		({active_sql}) OR ({model0_sql}) OR ({new_sql})
 	)"""
 
 	conditions = [
@@ -1485,13 +1487,17 @@ def get_total_schools_by_province(filters=None):
 		SELECT
 			province,
 			SUM(is_active) AS active,
-			SUM(1 - is_active) AS model_0,
-			COUNT(*) AS total
+			SUM(is_new) AS new_schools,
+			SUM(CASE WHEN is_active = 1 AND is_new = 1 THEN 1 ELSE 0 END) AS active_new_merge,
+			SUM(is_model0) AS model_0,
+			SUM(CASE WHEN is_active = 1 OR is_model0 = 1 THEN 1 ELSE 0 END) AS total
 		FROM (
 			SELECT
 				LOWER(TRIM({school_expr})) AS school_key,
 				MAX({province_expr}) AS province,
-				MAX(CASE WHEN ({active_sql}) THEN 1 ELSE 0 END) AS is_active
+				MAX(CASE WHEN ({active_sql}) THEN 1 ELSE 0 END) AS is_active,
+				MAX(CASE WHEN ({new_sql}) THEN 1 ELSE 0 END) AS is_new,
+				MAX(CASE WHEN ({model0_sql}) THEN 1 ELSE 0 END) AS is_model0
 			FROM `tabField Visit` fv
 			WHERE {where_sql}
 			GROUP BY LOWER(TRIM({school_expr}))
@@ -1504,18 +1510,27 @@ def get_total_schools_by_province(filters=None):
 	)
 
 	out = []
-	sum_active = sum_model0 = sum_total = 0
+	sum_active = sum_new = sum_active_new = sum_model0 = sum_total = 0
 	for r in rows:
 		active = cint(r.active)
+		new_schools = cint(r.new_schools)
+		# Active New = Active + New schools that are merging into Active (intersection).
+		# Display value = Active + New (new schools count added alongside active).
+		active_new = active + new_schools
 		model0 = cint(r.model_0)
 		total = cint(r.total)
 		sum_active += active
+		sum_new += new_schools
+		sum_active_new += active_new
 		sum_model0 += model0
 		sum_total += total
 		out.append(
 			{
 				"province": cstr(r.province or "—").strip() or "—",
 				"active": active,
+				"new_schools": new_schools,
+				"active_new": active_new,
+				"active_new_merge": cint(r.active_new_merge),
 				"model_0": model0,
 				"total": total,
 			}
@@ -1525,6 +1540,12 @@ def get_total_schools_by_province(filters=None):
 		"from_date": str(from_date),
 		"to_date": str(to_date),
 		"rows": out,
-		"totals": {"active": sum_active, "model_0": sum_model0, "total": sum_total},
+		"totals": {
+			"active": sum_active,
+			"new_schools": sum_new,
+			"active_new": sum_active_new,
+			"model_0": sum_model0,
+			"total": sum_total,
+		},
 		"title": _("Total Schools by Province"),
 	}

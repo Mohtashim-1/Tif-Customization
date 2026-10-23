@@ -1,5 +1,57 @@
 frappe.tif_customization = frappe.tif_customization || {};
 
+/** Download rows as CSV (opens cleanly in Excel). */
+frappe.tif_customization.export_rows_excel = function (filename, headers, rows) {
+	const esc = (v) => {
+		const s = v == null ? "" : String(v);
+		if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+		return s;
+	};
+	const lines = [headers.map(esc).join(",")];
+	(rows || []).forEach((row) => {
+		lines.push(headers.map((_, i) => esc(Array.isArray(row) ? row[i] : row[headers[i]])).join(","));
+	});
+	const bom = "\ufeff";
+	const blob = new Blob([bom + lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+	const a = document.createElement("a");
+	const safe = String(filename || "export")
+		.replace(/[^\w\-]+/g, "_")
+		.replace(/_+/g, "_")
+		.slice(0, 80);
+	a.href = URL.createObjectURL(blob);
+	a.download = `${safe}.csv`;
+	document.body.appendChild(a);
+	a.click();
+	document.body.removeChild(a);
+	URL.revokeObjectURL(a.href);
+	frappe.show_alert({ message: __("Excel file downloaded"), indicator: "green" });
+};
+
+/** Standard drill-down header: "Card Name: 401" */
+frappe.tif_customization.drilldown_title = function (label, count) {
+	const name = String(label || __("Details")).trim() || __("Details");
+	const n = count == null || count === "" ? 0 : cint(count);
+	return __("{0}: {1}", [name, n.toLocaleString()]);
+};
+
+/** Prefer API title, else build Label: Count from label/count/rows. */
+frappe.tif_customization.resolve_drilldown_title = function (data, fallbackLabel) {
+	data = data || {};
+	if (data.title && String(data.title).includes(":")) {
+		return data.title;
+	}
+	const label = data.label || fallbackLabel || __("Details");
+	const count =
+		data.count != null
+			? data.count
+			: Array.isArray(data.rows)
+				? data.rows.length
+				: Array.isArray(data.participants)
+					? data.participants.length
+					: 0;
+	return frappe.tif_customization.drilldown_title(label, count);
+};
+
 frappe.tif_customization.field_visit_easy_url = function (name) {
 	const n = String(name || "").trim();
 	if (!n) return "";
@@ -82,6 +134,17 @@ frappe.tif_customization.open_visit_drilldown = function (opts) {
 		freeze_message: __("Loading documents..."),
 		callback: (r) => {
 			const data = r.message || {};
+			// Prefer the KPI card label so header matches what the user clicked
+			if (opts.cardLabel) {
+				data.label = opts.cardLabel;
+				const count =
+					opts.cardCount != null && opts.cardCount !== ""
+						? opts.cardCount
+						: data.count;
+				data.title = frappe.tif_customization.drilldown_title(opts.cardLabel, count);
+			} else if (!data.title || !String(data.title).includes(":")) {
+				data.title = frappe.tif_customization.resolve_drilldown_title(data);
+			}
 			frappe.tif_customization.show_visit_drilldown_dialog(data, opts);
 		},
 	});
@@ -113,16 +176,72 @@ frappe.tif_customization.show_school_metric_drilldown_dialog = function (data, o
 	const schoolRows = Object.values(schoolMap).sort(
 		(a, b) => b.visits - a.visits || String(a.school).localeCompare(String(b.school))
 	);
-	const label = data.label || data.title || __("Schools");
+	const label = data.label || __("Schools");
+	const exportSchoolList = () => {
+		const headers = [
+			__("School Name"),
+			__("Province"),
+			__("Area"),
+			__("Visits"),
+			__("Latest Document"),
+			__("Visit Date"),
+			__("Officer"),
+		];
+		const exportRows = schoolRows.map((s) => {
+			const latest = s.docs[0] || {};
+			return [
+				s.school || "",
+				s.province || "",
+				s.area || "",
+				s.visits || 0,
+				latest.name || "",
+				latest.visit_date || "",
+				latest.officer || "",
+			];
+		});
+		const fname = `${label}-${data.from_date || ""}-${data.to_date || ""}`.replace(/\s+/g, "-");
+		frappe.tif_customization.export_rows_excel(fname, headers, exportRows);
+	};
+	const exportVisitRows = (docs, schoolName) => {
+		const headers = [
+			__("Document No"),
+			__("Visit Date"),
+			__("Type"),
+			__("School"),
+			__("Province"),
+			__("Area"),
+			__("Officer"),
+			__("Status"),
+			__("Category"),
+			__("Visit Summary"),
+		];
+		const exportRows = (docs || []).map((row) => [
+			row.name || "",
+			row.visit_date || "",
+			row.type || "",
+			row.school || "",
+			row.province || "",
+			row.area || "",
+			row.officer || "",
+			row.status || "",
+			row.category || "",
+			(row.remarks || "").replace(/\s+/g, " ").trim(),
+		]);
+		const fname = `${schoolName || label}-visits-${data.from_date || ""}`.replace(/\s+/g, "-");
+		frappe.tif_customization.export_rows_excel(fname, headers, exportRows);
+	};
 	const d = new frappe.ui.Dialog({
-		title: __("{0}: {1} schools", [label, schoolRows.length]),
+		title: frappe.tif_customization.drilldown_title(label, schoolRows.length),
 		size: "extra-large",
 		fields: [{ fieldtype: "HTML", fieldname: "html" }],
 		primary_action_label: __("Close"),
 		primary_action: () => d.hide(),
+		secondary_action_label: __("Export Excel"),
+		secondary_action: () => exportSchoolList(),
 	});
 
 	const renderSchools = () => {
+		d.get_secondary_btn().show().text(__("Export Excel")).off("click").on("click", () => exportSchoolList());
 		const body = schoolRows.length
 			? schoolRows
 					.map((s) => {
@@ -143,7 +262,7 @@ frappe.tif_customization.show_school_metric_drilldown_dialog = function (data, o
 					})
 					.join("")
 			: `<tr><td colspan="7" class="text-muted text-center">${__("No schools found")}</td></tr>`;
-		d.set_title(__("{0}: {1} schools", [label, schoolRows.length]));
+		d.set_title(frappe.tif_customization.drilldown_title(label, schoolRows.length));
 		d.fields_dict.html.$wrapper.html(`
 			<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px;">
 				<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;">
@@ -203,7 +322,14 @@ frappe.tif_customization.show_school_metric_drilldown_dialog = function (data, o
 			</tr>`;
 			})
 			.join("");
-		d.set_title(__("{0} — {1}", [bucket.school, __("{0} visits", [bucket.visits])]));
+		d.set_title(
+			frappe.tif_customization.drilldown_title(bucket.school || __("School"), bucket.visits)
+		);
+		d.get_secondary_btn()
+			.show()
+			.text(__("Export Excel"))
+			.off("click")
+			.on("click", () => exportVisitRows(bucket.docs, bucket.school));
 		d.fields_dict.html.$wrapper.html(`
 			<p style="margin-bottom:10px;">
 				<a href="#" class="tif-school-back">${__("← All schools")}</a>
@@ -352,12 +478,37 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 				.join("")
 		: `<tr><td colspan="${colCount}" class="text-muted text-center">${__("No Field Visits for this number.")}</td></tr>`;
 
+	const visitTitle = frappe.tif_customization.resolve_drilldown_title(
+		data,
+		__("Visit details")
+	);
+	const exportVisitList = () => {
+		const headers = [__("Document No"), __("Visit Date")];
+		if (!hideType) headers.push(__("Type / Task"));
+		if (!hideSchool) headers.push(__("School / Venue"));
+		headers.push(__("Officer"), __("Category"));
+		if (showRemarks) headers.push(__("Visit Summary"));
+		const exportRows = rows.map((row) => {
+			const r = [row.name || "", row.visit_date || ""];
+			if (!hideType) r.push(row.type || "");
+			if (!hideSchool) r.push(row.school || "");
+			r.push(row.officer || "", row.category || "");
+			if (showRemarks) r.push((row.remarks || "").replace(/\s+/g, " ").trim());
+			return r;
+		});
+		const fname = `${data.label || data.metric || "visits"}-${data.from_date || ""}-${
+			data.to_date || ""
+		}`.replace(/\s+/g, "-");
+		frappe.tif_customization.export_rows_excel(fname, headers, exportRows);
+	};
 	const d = new frappe.ui.Dialog({
-		title: data.title || __("Visit details"),
+		title: visitTitle,
 		size: "extra-large",
 		fields: [{ fieldtype: "HTML", fieldname: "html" }],
 		primary_action_label: __("Close"),
 		primary_action: () => d.hide(),
+		secondary_action_label: __("Export Excel"),
+		secondary_action: () => exportVisitList(),
 	});
 	d.fields_dict.html.$wrapper.html(`
 		${
@@ -409,8 +560,12 @@ frappe.tif_customization.show_workshop_participant_dialog = function (data, opts
 		visitByName[row.name] = row;
 	});
 	const headcount = visits.reduce((sum, row) => sum + cint(row.participants), 0);
+	const wsTitle = frappe.tif_customization.drilldown_title(
+		data.label || __("Workshop Participants"),
+		data.count != null ? data.count : headcount
+	);
 	const d = new frappe.ui.Dialog({
-		title: data.title || __("Workshop Participants"),
+		title: wsTitle,
 		size: "extra-large",
 		fields: [{ fieldtype: "HTML", fieldname: "html" }],
 		primary_action_label: __("Open Field Staff Report"),
@@ -435,7 +590,7 @@ frappe.tif_customization.show_workshop_participant_dialog = function (data, opts
 		return `${school}${badge}`;
 	};
 	const showVisits = () => {
-		d.set_title(data.title || __("Workshop Participants: {0}", [headcount]));
+		d.set_title(wsTitle);
 		const body = visits.length
 			? visits
 					.map((row) => {
@@ -487,7 +642,12 @@ frappe.tif_customization.show_workshop_participant_dialog = function (data, opts
 		const visit = visitByName[visitName] || {};
 		const rows = byVisit[visitName] || [];
 		const recorded = cint(visit.participants);
-		d.set_title(__("{0} — Participants", [visit.school || visitName || __("Participants")]));
+		d.set_title(
+			frappe.tif_customization.drilldown_title(
+				visit.school || visitName || __("Participants"),
+				rows.length || recorded
+			)
+		);
 		const table = rows.length
 			? rows
 					.map(
@@ -560,8 +720,12 @@ frappe.tif_customization.show_volunteer_enrolment_dialog = function (data) {
 		(a, b) => b.rows.length - a.rows.length || a.officer.localeCompare(b.officer)
 	);
 	const total = people.length;
+	const volTitle = frappe.tif_customization.drilldown_title(
+		data.label || __("Volunteers enrolled through SME"),
+		data.count != null ? data.count : total
+	);
 	const d = new frappe.ui.Dialog({
-		title: data.title || __("Volunteers enrolled through SME"),
+		title: volTitle,
 		size: "extra-large",
 		fields: [{ fieldtype: "HTML", fieldname: "html" }],
 		primary_action_label: __("Close"),
@@ -590,7 +754,7 @@ frappe.tif_customization.show_volunteer_enrolment_dialog = function (data) {
 			.join("");
 	};
 	const showOfficers = () => {
-		d.set_title(data.title || __("Volunteers enrolled through SME"));
+		d.set_title(volTitle);
 		const body = officers.length
 			? officers
 					.map(
@@ -630,7 +794,9 @@ frappe.tif_customization.show_volunteer_enrolment_dialog = function (data) {
 	const showPeople = (officer) => {
 		const bucket = byOfficer[officer];
 		const rows = bucket ? bucket.rows : people;
-		d.set_title(__("{0} — Volunteers", [officer || __("Volunteers")]));
+		d.set_title(
+			frappe.tif_customization.drilldown_title(officer || __("Volunteers"), (bucket && bucket.rows) ? bucket.rows.length : 0)
+		);
 		d.fields_dict.html.$wrapper.html(`
 			<p style="margin-bottom:10px;">
 				${data.staff ? "" : `<a href="#" class="vol-officer-back">${__("← Field officers")}</a> &nbsp;·&nbsp;`}
@@ -687,8 +853,12 @@ frappe.tif_customization.show_enrolment_officer_dialog = function (data) {
 		(a, b) => b.rows.length - a.rows.length || a.officer.localeCompare(b.officer)
 	);
 	const total = people.length;
+	const enrolTitle = frappe.tif_customization.drilldown_title(
+		data.label || __("Enrollment of Participants"),
+		data.count != null ? data.count : total
+	);
 	const d = new frappe.ui.Dialog({
-		title: data.title || __("Enrollment of Participants"),
+		title: enrolTitle,
 		size: "extra-large",
 		fields: [{ fieldtype: "HTML", fieldname: "html" }],
 		primary_action_label: __("Close"),
@@ -713,7 +883,7 @@ frappe.tif_customization.show_enrolment_officer_dialog = function (data) {
 			.join("");
 	};
 	const showOfficers = () => {
-		d.set_title(data.title || __("Enrollment of Participants"));
+		d.set_title(enrolTitle);
 		const body = officers.length
 			? officers
 					.map(
@@ -753,7 +923,9 @@ frappe.tif_customization.show_enrolment_officer_dialog = function (data) {
 	const showPeople = (officer) => {
 		const bucket = byOfficer[officer];
 		const rows = bucket ? bucket.rows : people;
-		d.set_title(__("{0} — Participants", [officer || __("Participants")]));
+		d.set_title(
+			frappe.tif_customization.drilldown_title(officer || __("Participants"), rows.length)
+		);
 		d.fields_dict.html.$wrapper.html(`
 			<p style="margin-bottom:10px;">
 				${data.staff ? "" : `<a href="#" class="enrol-officer-back">${__("← Field officers")}</a> &nbsp;·&nbsp;`}
@@ -952,8 +1124,12 @@ frappe.tif_customization.show_monitoring_officer_dialog = function (data, rows, 
 				.join("")
 		: `<tr><td colspan="4" class="text-muted text-center">${__("No Monitoring visits in this period.")}</td></tr>`;
 
+	const meTitle = frappe.tif_customization.resolve_drilldown_title(
+		data,
+		__("Monitoring (M&E) Visits")
+	);
 	const d = new frappe.ui.Dialog({
-		title: data.title || __("Monitoring (M&E) Visits"),
+		title: meTitle,
 		size: "extra-large",
 		fields: [{ fieldtype: "HTML", fieldname: "html" }],
 		primary_action_label: __("Close"),
@@ -961,7 +1137,7 @@ frappe.tif_customization.show_monitoring_officer_dialog = function (data, rows, 
 	});
 
 	const showOfficers = () => {
-		d.set_title(data.title || __("Monitoring (M&E) Visits"));
+		d.set_title(meTitle);
 		d.fields_dict.html.$wrapper.html(`
 			<p class="text-muted" style="font-size:12px;margin-bottom:10px;">
 				${__("Field officer wise Monitoring visits. Click Total, Active, or In-Active for the visit documents.")}
@@ -1035,7 +1211,12 @@ frappe.tif_customization.show_monitoring_officer_dialog = function (data, rows, 
 		});
 		const kindLabel =
 			kind === "active" ? __("Active") : kind === "inactive" ? __("In-Active") : __("Total Visit");
-		d.set_title(__("{0} — {1}", [officer, kindLabel]));
+		d.set_title(
+			frappe.tif_customization.drilldown_title(
+				`${officer} · ${kindLabel}`,
+				filtered.length
+			)
+		);
 		const detailBody = filtered.length
 			? filtered
 					.map(

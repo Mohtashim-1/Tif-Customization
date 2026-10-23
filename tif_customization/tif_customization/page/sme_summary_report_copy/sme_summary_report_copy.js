@@ -166,6 +166,16 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					.sme-sum-kpi--spacer{visibility:hidden;pointer-events:none;border:0;background:transparent;box-shadow:none;min-height:1px}
 					.sme-sum-kpi[data-visit-metric],.sme-sum-kpi[data-points-kind],.sme-sum-kpi[data-card-kind]{cursor:pointer}
 					.sme-sum-kpi[data-visit-metric]:hover,.sme-sum-kpi[data-points-kind]:hover,.sme-sum-kpi[data-card-kind]:hover{box-shadow:0 4px 14px rgba(15,23,42,.12)}
+					.sme-sum-kpi.sme-sum-kpi--linked-hl{
+						box-shadow:0 0 0 2px #0d9488,0 6px 18px rgba(13,148,136,.22)!important;
+						background:#f0fdfa!important;
+						transform:translateY(-1px);
+						transition:box-shadow .15s ease,background .15s ease,transform .15s ease;
+					}
+					.sme-sum-kpi[data-highlight-targets]{position:relative}
+					.sme-sum-kpi[data-highlight-targets]:hover{
+						box-shadow:0 0 0 2px #334155,0 6px 18px rgba(15,23,42,.16)!important;
+					}
 					.sme-sum-kpi__label{color:#64748b;font-size:11px;margin-bottom:6px;line-height:1.25;overflow-wrap:anywhere;word-break:break-word}
 					.sme-sum-kpi__label-row{display:flex;flex-direction:column;align-items:flex-start;gap:4px;margin-bottom:6px}
 					.sme-sum-kpi__label-row .sme-sum-kpi__label{margin-bottom:0;width:100%}
@@ -173,7 +183,10 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					.sme-sum-kpi__value{color:#0f172a;font-size:22px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums}
 					.sme-sum-kpi__hint{margin-top:6px;font-size:10px;color:#94a3b8;overflow-wrap:anywhere;word-break:break-word}
 					.sme-sum-kpi--followup,.sme-sum-kpi--new,.sme-sum-kpi--marketing{border-top-color:#0d9488}
-					.sme-sum-kpi--workshop-arranged,.sme-sum-kpi--workshop{border-top-color:#d97706}
+					.sme-sum-kpi--workshop-arranged{border-top-color:#d97706}
+					.sme-sum-kpi--workshop{
+						background:#eef2ff;border-top-color:#6366f1
+					}
 					.sme-sum-kpi--meeting{border-top-color:#ca8a04}
 					.sme-sum-kpi--active,.sme-sum-kpi--inactive,.sme-sum-kpi--me{border-top-color:#7c3aed}
 					.sme-sum-kpi--schools,.sme-sum-kpi--participants,.sme-sum-kpi--training{border-top-color:#ea580c}
@@ -783,6 +796,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						value: this.fmt(cint(k.marketing) + cint(k.followup) + cint(k.me)),
 						style: "sme",
 						cardKind: "field_emp_summary",
+						highlightTargets: "marketing,followup,monitoring",
 						hint: __("Marketing Visit + Follow up Visit + Monitoring Visit (M&E)"),
 					},
 					{
@@ -916,10 +930,19 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		}
 		const attrs = [];
 		if (card.metric) attrs.push(`data-visit-metric="${frappe.utils.escape_html(card.metric)}"`);
+		if (card.metric) attrs.push(`data-highlight-id="${frappe.utils.escape_html(card.metric)}"`);
+		if (card.highlightId) attrs.push(`data-highlight-id="${frappe.utils.escape_html(card.highlightId)}"`);
+		if (card.highlightTargets) {
+			attrs.push(`data-highlight-targets="${frappe.utils.escape_html(card.highlightTargets)}"`);
+		}
 		if (card.useYtd) attrs.push(`data-use-ytd="1"`);
 		if (card.outcomeFy) attrs.push(`data-outcome-fy="1"`);
 		if (card.pointsKind) attrs.push(`data-points-kind="${frappe.utils.escape_html(card.pointsKind)}"`);
 		if (card.cardKind) attrs.push(`data-card-kind="${frappe.utils.escape_html(card.cardKind)}"`);
+		if (card.label) attrs.push(`data-card-label="${frappe.utils.escape_html(card.label)}"`);
+		if (card.value != null && card.value !== "") {
+			attrs.push(`data-card-count="${frappe.utils.escape_html(String(card.value).replace(/,/g, ""))}"`);
+		}
 		const clickable = card.metric || card.pointsKind || card.cardKind;
 		const hint = card.hint != null ? card.hint : clickable ? __("Click to see details") : __("Period total");
 		const badge = card.inProgress
@@ -1135,7 +1158,23 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		const $root = $(".sme-sum");
 		const me = this;
 
-		$root.off("click.smeSumVisit click.smeSumPoints click.smeSumCard click.smeSumExpense");
+		$root.off(
+			"click.smeSumVisit click.smeSumPoints click.smeSumCard click.smeSumExpense mouseenter.smeSumHl mouseleave.smeSumHl"
+		);
+
+		$root.on("mouseenter.smeSumHl", "[data-highlight-targets]", function () {
+			const targets = String($(this).attr("data-highlight-targets") || "")
+				.split(",")
+				.map((s) => s.trim())
+				.filter(Boolean);
+			$root.find(".sme-sum-kpi--linked-hl").removeClass("sme-sum-kpi--linked-hl");
+			targets.forEach((id) => {
+				$root.find(`.sme-sum-kpi[data-highlight-id="${id}"]`).addClass("sme-sum-kpi--linked-hl");
+			});
+		});
+		$root.on("mouseleave.smeSumHl", "[data-highlight-targets]", function () {
+			$root.find(".sme-sum-kpi--linked-hl").removeClass("sme-sum-kpi--linked-hl");
+		});
 
 		$root.on("click.smeSumVisit", "[data-visit-metric]", function (e) {
 			e.preventDefault();
@@ -1143,6 +1182,11 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			const metric = $(this).attr("data-visit-metric");
 			if (!metric) return;
 			const staff = $(this).attr("data-visit-staff") || "";
+			const cardLabel =
+				$(this).attr("data-card-label") ||
+				$(this).find(".sme-sum-kpi__label").first().text().trim() ||
+				"";
+			const cardCount = $(this).attr("data-card-count") || "";
 			const ctx = me.get_filters();
 			if (!ctx.from_date || !ctx.to_date) {
 				frappe.msgprint(__("Please select Visit From Date and Visit To Date."));
@@ -1177,6 +1221,8 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				city: ctx.city || "",
 				submitted_only: ctx.submitted_only || 1,
 				hideUnapproved: true,
+				cardLabel,
+				cardCount,
 			});
 		});
 
@@ -1190,6 +1236,12 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			e.preventDefault();
 			e.stopPropagation();
 			const kind = $(this).attr("data-card-kind");
+			const cardLabel =
+				$(this).attr("data-card-label") ||
+				$(this).find(".sme-sum-kpi__label").first().text().trim() ||
+				"";
+			const cardCount = $(this).attr("data-card-count") || "";
+			me._pending_card_title = { label: cardLabel, count: cardCount };
 			if (kind === "expenses") me.show_expense_detail();
 			else if (kind === "sme_count") me.show_sme_list();
 			else if (kind === "supervisor_list") me.show_supervisor_list();
@@ -1205,6 +1257,17 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			e.stopPropagation();
 			me.show_expense_detail($(this).attr("data-expense-staff") || "");
 		});
+	}
+
+	card_dialog_title(fallbackLabel, fallbackCount) {
+		const pending = this._pending_card_title || {};
+		this._pending_card_title = null;
+		const label = pending.label || fallbackLabel || __("Details");
+		const count = pending.count != null && pending.count !== "" ? pending.count : fallbackCount;
+		if (frappe.tif_customization && frappe.tif_customization.drilldown_title) {
+			return frappe.tif_customization.drilldown_title(label, count);
+		}
+		return __("{0}: {1}", [label, cint(count || 0)]);
 	}
 
 	show_total_schools_by_province() {
@@ -1240,29 +1303,78 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 								(row) => `<tr>
 					<td>${frappe.utils.escape_html(row.province || "—")}</td>
 					<td class="text-right">${this.fmt(row.active)}</td>
+					<td class="text-right">${this.fmt(row.new_schools)}</td>
+					<td class="text-right"><strong>${this.fmt(row.active_new)}</strong></td>
 					<td class="text-right">${this.fmt(row.model_0)}</td>
 					<td class="text-right"><strong>${this.fmt(row.total)}</strong></td>
 				</tr>`
 							)
 							.join("")
-					: `<tr><td colspan="4" class="text-muted text-center">${__(
+					: `<tr><td colspan="6" class="text-muted text-center">${__(
 							"No schools found"
 						)}</td></tr>`;
+				const exportProvince = () => {
+					const headers = [
+						__("Province"),
+						__("Active Schools"),
+						__("New Schools"),
+						__("Active New Schools"),
+						__("Model 0"),
+						__("Total Schools"),
+					];
+					const exportRows = rows.map((row) => [
+						row.province || "",
+						row.active || 0,
+						row.new_schools || 0,
+						row.active_new || 0,
+						row.model_0 || 0,
+						row.total || 0,
+					]);
+					if (rows.length) {
+						exportRows.push([
+							__("All provinces"),
+							totals.active || 0,
+							totals.new_schools || 0,
+							totals.active_new || 0,
+							totals.model_0 || 0,
+							totals.total || 0,
+						]);
+					}
+					if (frappe.tif_customization && frappe.tif_customization.export_rows_excel) {
+						frappe.tif_customization.export_rows_excel(
+							`total-schools-by-province-${from_date}-${to_date}`,
+							headers,
+							exportRows
+						);
+					}
+				};
 				const d = new frappe.ui.Dialog({
-					title: res.title || __("Total Schools by Province"),
-					size: "large",
+					title: this.card_dialog_title(
+						__("Total Schools by Province"),
+						(totals && totals.total) || rows.length
+					),
+					size: "extra-large",
 					fields: [{ fieldtype: "HTML", fieldname: "html" }],
 					primary_action_label: __("Close"),
 					primary_action: () => d.hide(),
+					secondary_action_label: __("Export Excel"),
+					secondary_action: () => exportProvince(),
 				});
-				d.$wrapper.find(".modal-dialog").css({ "max-width": "640px" });
+				d.$wrapper.find(".modal-dialog").css({ "max-width": "820px" });
 				d.fields_dict.html.$wrapper.html(`
+					<p class="text-muted" style="font-size:12px;margin-bottom:10px;">
+						${__(
+							"Active New Schools = Active Schools + New Schools (new schools merging into active)."
+						)}
+					</p>
 					<div class="table-responsive" style="max-height:420px;overflow:auto;">
 						<table class="table table-bordered table-hover" style="font-size:12px;margin:0;">
 							<thead>
 								<tr>
 									<th>${__("Province")}</th>
 									<th class="text-right">${__("Active Schools")}</th>
+									<th class="text-right">${__("New Schools")}</th>
+									<th class="text-right">${__("Active New Schools")}</th>
 									<th class="text-right">${__("Model 0")}</th>
 									<th class="text-right">${__("Total Schools")}</th>
 								</tr>
@@ -1273,6 +1385,8 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 									? `<tfoot><tr>
 								<th>${__("All provinces")}</th>
 								<th class="text-right">${this.fmt(totals.active)}</th>
+								<th class="text-right">${this.fmt(totals.new_schools)}</th>
+								<th class="text-right">${this.fmt(totals.active_new)}</th>
 								<th class="text-right">${this.fmt(totals.model_0)}</th>
 								<th class="text-right">${this.fmt(totals.total)}</th>
 							</tr></tfoot>`
@@ -1338,7 +1452,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					"No Model A / B / C schools for SMEs in this period"
 				)}</td></tr>`;
 		const d = new frappe.ui.Dialog({
-			title: __("Active Schools — Model A / B / C"),
+			title: this.card_dialog_title(__("Active Schools"), active),
 			size: "extra-large",
 			fields: [{ fieldtype: "HTML", fieldname: "html" }],
 			primary_action_label: __("Close"),
@@ -1444,7 +1558,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					).replace("{0}", this.fmt(cardTotal)).replace("{1}", this.fmt(staffSum))}</p>`
 				: "";
 		const d = new frappe.ui.Dialog({
-			title: __("New Registered School — by Field Staff"),
+			title: this.card_dialog_title(__("New Registered School"), cardTotal),
 			size: "large",
 			fields: [{ fieldtype: "HTML", fieldname: "html" }],
 			primary_action_label: __("Close"),
@@ -1495,7 +1609,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			: `<tr><td colspan="5" class="text-muted text-center">${__("No field supervisors found")}</td></tr>`;
 
 		const d = new frappe.ui.Dialog({
-			title: __("Field Supervisors"),
+			title: this.card_dialog_title(__("Field Supervisors"), stats.total || rows.length),
 			size: "large",
 			fields: [{ fieldtype: "HTML", fieldname: "html" }],
 			primary_action_label: __("Close"),
@@ -1604,7 +1718,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			: `<tr><td colspan="5" class="text-muted text-center">${__("No field employee visits in this period")}</td></tr>`;
 
 		const d = new frappe.ui.Dialog({
-			title: __("SME Summary"),
+			title: this.card_dialog_title(__("SME Summary"), rows.length),
 			size: "extra-large",
 			fields: [{ fieldtype: "HTML", fieldname: "html" }],
 			primary_action_label: __("Close"),
@@ -1708,7 +1822,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				const sumSchools = officers.reduce((a, o) => a + cint(o.school_count), 0);
 				const sumVisits = officers.reduce((a, o) => a + cint(o.visit_count), 0);
 				const d = new frappe.ui.Dialog({
-					title: __("Number of School Visit"),
+					title: this.card_dialog_title(__("Number of School Visit"), sumVisits),
 					size: "large",
 					fields: [{ fieldtype: "HTML", fieldname: "html" }],
 					primary_action_label: __("Close"),
@@ -1873,7 +1987,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 
 		const sumSchools = rows.reduce((a, r) => a + r.school_total, 0);
 		const d = new frappe.ui.Dialog({
-			title: __("SMEs in Report"),
+			title: this.card_dialog_title(__("SMEs in Report"), rows.length),
 			size: "extra-large",
 			fields: [{ fieldtype: "HTML", fieldname: "html" }],
 			primary_action_label: __("Close"),
@@ -2060,20 +2174,54 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 								: ""
 						}
 					</p>
-					<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
-						<button type="button" class="btn btn-xs btn-default sme-open-metric" data-metric="school_visits">${__("All")} (${this.fmt(
-					total,
-				)})</button>
-						<button type="button" class="btn btn-xs btn-default sme-open-metric" data-metric="new">${__("New")} (${this.fmt(
-					neu,
-				)})</button>
-						<button type="button" class="btn btn-xs btn-default sme-open-metric" data-metric="monitoring">${__("Monitoring")} (${this.fmt(
-					monitoring,
-				)})</button>
-						<button type="button" class="btn btn-xs btn-default sme-open-metric" data-metric="followup">${__("Follow up")} (${this.fmt(
-					followup,
-				)})</button>
+					<div class="sme-visit-metric-kpis" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;align-items:stretch;">
+						<button type="button" class="btn btn-default sme-open-metric sme-visit-kpi-chip" data-metric="school_visits">
+							<span class="sme-visit-kpi-label">${__("All")}</span>
+							<span class="sme-visit-kpi-count">${this.fmt(total)}</span>
+						</button>
+						<button type="button" class="btn btn-default sme-open-metric sme-visit-kpi-chip" data-metric="new">
+							<span class="sme-visit-kpi-label">${__("New")}</span>
+							<span class="sme-visit-kpi-count">${this.fmt(neu)}</span>
+						</button>
+						<button type="button" class="btn btn-default sme-open-metric sme-visit-kpi-chip" data-metric="monitoring">
+							<span class="sme-visit-kpi-label">${__("Monitoring")}</span>
+							<span class="sme-visit-kpi-count">${this.fmt(monitoring)}</span>
+						</button>
+						<button type="button" class="btn btn-default sme-open-metric sme-visit-kpi-chip" data-metric="followup">
+							<span class="sme-visit-kpi-label">${__("Follow up")}</span>
+							<span class="sme-visit-kpi-count">${this.fmt(followup)}</span>
+						</button>
 					</div>
+					<style>
+						.sme-visit-kpi-chip{
+							display:inline-flex !important;
+							flex-direction:row !important;
+							align-items:center !important;
+							justify-content:center !important;
+							gap:6px;
+							white-space:nowrap !important;
+							min-width:auto !important;
+							width:auto !important;
+							max-width:none !important;
+							height:auto !important;
+							padding:8px 14px !important;
+							border-radius:10px !important;
+							font-size:12px !important;
+							line-height:1.2 !important;
+							flex:0 0 auto;
+						}
+						.sme-visit-kpi-label{font-weight:600;color:#475569;}
+						.sme-visit-kpi-count{
+							display:inline-block;
+							min-width:1.6em;
+							padding:2px 8px;
+							border-radius:999px;
+							background:#e2e8f0;
+							color:#0f172a;
+							font-weight:700;
+							text-align:center;
+						}
+					</style>
 					<h5 style="margin:8px 0;">${__("School-wise count")}</h5>
 					<div class="table-responsive" style="max-height:220px;overflow:auto;margin-bottom:14px;">
 						<table class="table table-bordered table-hover" style="font-size:12px;margin:0;">
@@ -2124,8 +2272,11 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				`);
 				d.$wrapper.on("click", ".sme-open-metric", (e) => {
 					e.preventDefault();
-					const metric = $(e.currentTarget).attr("data-metric");
+					const $btn = $(e.currentTarget);
+					const metric = $btn.attr("data-metric");
 					if (!metric || !frappe.tif_customization.open_visit_drilldown) return;
+					const cardLabel = $btn.find(".sme-visit-kpi-label").text().trim() || metric;
+					const cardCount = $btn.find(".sme-visit-kpi-count").text().trim() || "";
 					frappe.tif_customization.open_visit_drilldown({
 						from_date: filters.from_date,
 						to_date: filters.to_date,
@@ -2136,6 +2287,8 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						city: filters.city || "",
 						submitted_only: filters.submitted_only || 1,
 						hideUnapproved: true,
+						cardLabel,
+						cardCount,
 					});
 				});
 				d.show();
@@ -2261,8 +2414,9 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			const isEmpId = ((this.data && this.data.rows) || []).some((r) => r.employee === staff);
 			filters.employee = isEmpId ? staff : "";
 		}
+		const expenseBaseLabel = staff ? __("Expenses — {0}", [staff]) : __("Expenses");
 		const d = new frappe.ui.Dialog({
-			title: staff ? __("Expenses — {0}", [staff]) : __("Expenses"),
+			title: this.card_dialog_title(expenseBaseLabel, 0),
 			size: "extra-large",
 			fields: [{ fieldtype: "HTML", fieldname: "html" }],
 			primary_action_label: __("Close"),
@@ -2280,6 +2434,11 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			callback: (r) => {
 				const payload = r.message || {};
 				const rows = payload.rows || [];
+				if (frappe.tif_customization && frappe.tif_customization.drilldown_title) {
+					d.set_title(
+						frappe.tif_customization.drilldown_title(expenseBaseLabel, rows.length)
+					);
+				}
 				const colCount = 10;
 				const fmtKm = (v) => (v == null || v === "" ? "—" : `${this.fmt_plain(v, 1)} km`);
 				const fmtRate = (v) =>
