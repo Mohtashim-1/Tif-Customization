@@ -702,7 +702,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					metric,
 					hint:
 						col.key === "workshop"
-							? __("Field Visit type = Workshop Conducted or Workshop")
+							? __("Workshop Conducted through SME (Onsite)")
 							: undefined,
 				};
 			}),
@@ -843,6 +843,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 							value: this.fmt(((data.outcome_fy || {}).active_schools || {}).actual),
 							style: "model-a",
 							cardKind: "active_school_models",
+							highlightTargets: "model_school_a,model_school_b,model_school_c",
 							outcomeFy: true,
 							hint: __(
 								"Schools with any program running. Model A + B + C. Click for model split."
@@ -858,15 +859,12 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						},
 						{
 							label: __("Total Schools"),
-							value: this.fmt(
-								cint(((data.outcome_fy || {}).active_schools || {}).actual) +
-									cint(((data.outcome_fy || {}).model_school_0 || {}).actual)
-							),
+							value: this.fmt(((data.outcome_fy || {}).total_schools || {}).actual),
 							style: "grand",
 							cardKind: "total_schools_by_province",
 							outcomeFy: true,
 							hint: __(
-								"Active Schools + Model 0. Click for province-wise school counts."
+								"Active + Active New + Model 0 (no double-count). Click for province-wise school counts."
 							),
 						},
 						// 4 empty card slots after Total Schools
@@ -1343,6 +1341,11 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 							exportRows
 						);
 					}
+				};
+				// Prefer API total so dialog title matches footer (not a stale card sum).
+				this._pending_card_title = {
+					label: (this._pending_card_title && this._pending_card_title.label) || __("Total Schools"),
+					count: (totals && totals.total) || 0,
 				};
 				const d = new frappe.ui.Dialog({
 					title: this.card_dialog_title(

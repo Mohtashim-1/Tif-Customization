@@ -1631,9 +1631,9 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 				</div>
 				<div class="kpi-col">
 					<div class="kpi-card summary-kpi pending-dispatches-kpi" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: black; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); cursor: pointer;" title="Click to open School Wise Demand Report">
-						<h5 class="kpi-title">Pending Dispatches</h5>
+						<h5 class="kpi-title">Pending Dispatches Report</h5>
 						<div class="kpi-value">${formatNumber(kpiData.pending_dispatches_count || 0)}</div>
-						<p class="kpi-sub">Sales Orders · Click for details</p>
+						<p class="kpi-sub">Open Sales Orders · Click for details</p>
 					</div>
 				</div>
 				<div class="kpi-col">

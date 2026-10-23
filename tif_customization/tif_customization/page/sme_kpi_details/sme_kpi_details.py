@@ -99,6 +99,8 @@ ONBOARDED_SCHOOL_SQL = """(
 # Model 0: school field visits only (not Internal Meeting / Meeting / HO / academic).
 SCHOOL_FIELD_VISIT_SQL = school_field_visit_type_sql("fv")
 MODEL_0_SQL = f"NOT ({ACTIVE_SCHOOL_SQL}) AND ({SCHOOL_FIELD_VISIT_SQL})"
+# Total Schools = Active ∪ New Registered ∪ Model 0 (matches province dialog).
+TOTAL_SCHOOLS_SQL = f"(({ACTIVE_SCHOOL_SQL}) OR ({MODEL_0_SQL}) OR ({ONBOARDED_SCHOOL_SQL}))"
 
 QUIZ_SQL = """
 	fv.type = 'Quiz Arranged'
@@ -378,6 +380,7 @@ def _enriched_actuals(from_date, to_date, staff, tokens):
 	actuals["active_schools"] = _distinct_schools(from_date, to_date, tokens, ACTIVE_SCHOOL_SQL)
 	actuals["model_school_0"] = _distinct_schools(from_date, to_date, tokens, MODEL_0_SQL)
 	actuals["inactive_schools"] = actuals["model_school_0"]
+	actuals["total_schools"] = _distinct_schools(from_date, to_date, tokens, TOTAL_SCHOOLS_SQL)
 	sum_participants = _training_participants(from_date, to_date, tokens)
 	actuals["workshop_registration"] = max(workshop_children, sum_participants)
 	online = _online_workshop_stats(from_date, to_date, tokens)

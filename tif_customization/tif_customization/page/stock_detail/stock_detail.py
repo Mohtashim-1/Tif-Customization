@@ -5,6 +5,8 @@ from frappe.utils import flt, cint
 from tif_customization.tif_customization.utils.supply_chain_books import (
 	SPECIFIC_ITEM_CODES,
 	TPS_ITEM_CODES,
+	sql_book_item_filter,
+	with_book_item_params,
 )
 
 
@@ -1466,58 +1468,47 @@ def calculate_kpis_for_specific_items(data, filters=None):
         }
 
 def get_pending_dispatches_count(filters=None):
-    """Get count of submitted Sales Orders that are pending delivery"""
-    try:
-        if filters is None:
-            filters = {}
+	"""Count open Sales Orders with pending book qty — same scope as School Wise Demand Report.
 
-        date_filter = ""
-        params = []
-        if filters.get("from_date") and filters.get("to_date"):
-            date_filter = "AND so.transaction_date BETWEEN %s AND %s"
-            params = [filters.get("from_date"), filters.get("to_date")]
-        elif filters.get("from_date"):
-            date_filter = "AND so.transaction_date >= %s"
-            params = [filters.get("from_date")]
-        elif filters.get("to_date"):
-            date_filter = "AND so.transaction_date <= %s"
-            params = [filters.get("to_date")]
-
-        count = frappe.db.sql(f"""
-            SELECT COUNT(DISTINCT so.name) as count
-            FROM `tabSales Order` so
-            WHERE so.docstatus = 1
-            AND IFNULL(so.status, '') NOT IN ('Closed', 'Cancelled', 'Completed', 'Stopped', 'On Hold')
-            AND IFNULL(so.status, '') NOT LIKE '%%Cancel%%'
-            AND (so.per_delivered < 100 OR so.per_delivered IS NULL)
-            {date_filter}
-        """, tuple(params) if params else (), as_dict=True)
-        
-        return cint(count[0].get('count', 0)) if count else 0
-    except Exception as e:
-        frappe.log_error(f"Error getting pending dispatches count: {str(e)}", "Pending Dispatches Count Error")
-        return 0
+	Stock Detail date filters are intentionally ignored: pending demand is current open
+	orders, not orders created only inside the stock period.
+	"""
+	try:
+		book_filter = sql_book_item_filter("soi.item_code").lstrip("AND ").strip()
+		params = with_book_item_params()
+		count = frappe.db.sql(
+			f"""
+			SELECT COUNT(DISTINCT so.name) AS count
+			FROM `tabSales Order` so
+			INNER JOIN `tabSales Order Item` soi ON soi.parent = so.name
+			WHERE so.docstatus = 1
+			AND so.status NOT IN ('Closed', 'Cancelled', 'Completed')
+			AND IFNULL(so.per_delivered, 0) < 100
+			AND (IFNULL(soi.qty, 0) - IFNULL(soi.delivered_qty, 0)) > 0
+			AND {book_filter}
+			""",
+			params,
+			as_dict=True,
+		)
+		return cint(count[0].get("count", 0)) if count else 0
+	except Exception as e:
+		frappe.log_error(
+			f"Error getting pending dispatches count: {str(e)}",
+			"Pending Dispatches Count Error",
+		)
+		return 0
 
 
 @frappe.whitelist()
 def get_pending_dispatches_details(filters=None):
-	"""List pending Sales Orders (submitted, not fully delivered)."""
+	"""List open Sales Orders with pending book qty (aligned with School Wise Demand Report)."""
 	try:
 		if isinstance(filters, str):
 			filters = frappe.parse_json(filters) or {}
 		filters = filters or {}
 
-		date_filter = ""
-		params = []
-		if filters.get("from_date") and filters.get("to_date"):
-			date_filter = "AND so.transaction_date BETWEEN %s AND %s"
-			params = [filters.get("from_date"), filters.get("to_date")]
-		elif filters.get("from_date"):
-			date_filter = "AND so.transaction_date >= %s"
-			params = [filters.get("from_date")]
-		elif filters.get("to_date"):
-			date_filter = "AND so.transaction_date <= %s"
-			params = [filters.get("to_date")]
+		book_filter = sql_book_item_filter("soi.item_code").lstrip("AND ").strip()
+		params = with_book_item_params()
 
 		rows = frappe.db.sql(
 			f"""
@@ -1532,20 +1523,19 @@ def get_pending_dispatches_details(filters=None):
 				so.grand_total,
 				COALESCE(SUM(soi.qty - soi.delivered_qty), 0) AS pending_qty
 			FROM `tabSales Order` so
-			LEFT JOIN `tabSales Order Item` soi ON soi.parent = so.name
+			INNER JOIN `tabSales Order Item` soi ON soi.parent = so.name
 			WHERE so.docstatus = 1
-			AND IFNULL(so.status, '') NOT IN ('Closed', 'Cancelled', 'Completed', 'Stopped', 'On Hold')
-			AND IFNULL(so.status, '') NOT LIKE '%%Cancel%%'
-			AND (so.per_delivered < 100 OR so.per_delivered IS NULL)
-			{date_filter}
+			AND so.status NOT IN ('Closed', 'Cancelled', 'Completed')
+			AND IFNULL(so.per_delivered, 0) < 100
+			AND (IFNULL(soi.qty, 0) - IFNULL(soi.delivered_qty, 0)) > 0
+			AND {book_filter}
 			GROUP BY so.name
 			ORDER BY so.transaction_date DESC, so.name DESC
 			LIMIT 500
 			""",
-			tuple(params) if params else (),
+			params,
 			as_dict=True,
 		)
-		# Extra safety: never return cancelled Sales Orders to the dashboard
 		rows = [
 			r for r in (rows or [])
 			if "cancel" not in (r.get("status") or "").lower()

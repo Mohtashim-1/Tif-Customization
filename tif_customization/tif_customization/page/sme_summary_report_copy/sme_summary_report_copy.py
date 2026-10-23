@@ -73,7 +73,7 @@ SUMMARY_TYPES = (
 # Activity (period) columns — aligned with SME KPI Details / Target Base KPI sheet
 KPI_COLUMNS = (
 	{"key": "workshop_arranged", "label": "Workshop Arranged", "metric": "workshop_arranged"},
-	{"key": "workshop", "label": "Workshop Conducted (Onsite)", "metric": "workshop_conducted"},
+	{"key": "workshop", "label": "Workshop Conducted through SME (Onsite)", "metric": "workshop_conducted"},
 	{"key": "meeting_ulama", "label": "Meeting / Ulama and Educationist", "metric": "meeting_ulama"},
 	{"key": "teachers_training_meeting", "label": "Teachers Training Meeting (Onsite School)", "metric": "teachers_training_meeting"},
 	{
@@ -624,6 +624,30 @@ def get_report_data(filters=None):
 		outcome_fy_from = outcome_fy_to
 	outcome_fy = _report_outcome_fy_totals(staff_rows, outcome_fy_from, outcome_fy_to)
 	outcome_fy_label = f"{outcome_fy_from.strftime('%d-%b-%Y')} → {outcome_fy_to.strftime('%d-%b-%Y')}"
+	# Total Schools card must match province drill-down (Active + Active New + Model 0).
+	try:
+		from tif_customization.tif_customization.api.field_visit_drilldown import (
+			get_total_schools_by_province,
+		)
+
+		prov = get_total_schools_by_province(
+			{
+				"from_date": str(outcome_fy_from),
+				"to_date": str(outcome_fy_to),
+				"supervisor": supervisor or "",
+				"province": province or "",
+				"city": city or "",
+				"submitted_only": 1,
+			}
+		)
+		outcome_fy["total_schools"] = {
+			"actual": cint((prov.get("totals") or {}).get("total") or 0),
+			"yearly_min": 0,
+			"metric": "total_schools",
+			"label": _("Total Schools"),
+		}
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "SME Total Schools Align Error")
 
 	# Model A + B + C = Number of School (follow-up visits + new school visits).
 	model_counts = {"model_a": 0, "model_b": 0, "model_c": 0}
@@ -763,6 +787,7 @@ def _report_outcome_fy_totals(staff_rows, ytd_from, to_date):
 		("active_schools", _("Active Schools")),
 		("inactive_schools", _("Inactive Schools")),
 		("model_school_0", _("Model 0 (No Program Selected)")),
+		("total_schools", _("Total Schools")),
 		("online_workshop", _("Online Workshop")),
 		("online_participants", _("Online Participants")),
 	):

@@ -27,9 +27,9 @@ METRIC_LABELS = {
 	"monitoring": _("Monitoring (M&E) Visits"),
 	"me": _("M&E Visits"),
 	"meeting": _("Meetings"),
-	"training": _("Workshop Conducted Onsite"),
+	"training": _("Workshop Conducted through SME (Onsite)"),
 	"workshop_arranged": _("Workshop Arranged"),
-	"workshop_conducted": _("Workshop Conducted Onsite"),
+	"workshop_conducted": _("Workshop Conducted through SME (Onsite)"),
 	"academic": _("Academic / Other"),
 	"other": _("Other Visits"),
 	"followup": _("Follow up Visits"),
@@ -270,12 +270,17 @@ def _metric_condition(metric: str, alias: str = "fv") -> str:
 			f" AND ({school_field_visit_type_sql(a)})"
 		)
 	if m == "total_schools":
-		# Active Schools + Model 0 (named school field visits).
+		# Same school set as Total Schools by Province:
+		# Active ∪ Active New ∪ Model 0 (named schools; no double-count at school level).
 		return f"""({named}) AND (
 			({registered_school_sql(a)})
 			OR (
 				NOT ({registered_school_sql(a)})
 				AND ({school_field_visit_type_sql(a)})
+			)
+			OR (
+				{a}.type = 'Registration of New Schools'
+				OR ({a}.type IN ('Marketing', 'Visits') AND IFNULL({a}.marketing_visit_category, '') = 'New')
 			)
 		)"""
 	if m == "online_workshop":
