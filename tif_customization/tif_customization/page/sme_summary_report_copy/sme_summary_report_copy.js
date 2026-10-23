@@ -1303,21 +1303,19 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 								(row) => `<tr>
 					<td>${frappe.utils.escape_html(row.province || "—")}</td>
 					<td class="text-right">${this.fmt(row.active)}</td>
-					<td class="text-right">${this.fmt(row.new_schools)}</td>
-					<td class="text-right"><strong>${this.fmt(row.active_new)}</strong></td>
+					<td class="text-right">${this.fmt(row.active_new)}</td>
 					<td class="text-right">${this.fmt(row.model_0)}</td>
 					<td class="text-right"><strong>${this.fmt(row.total)}</strong></td>
 				</tr>`
 							)
 							.join("")
-					: `<tr><td colspan="6" class="text-muted text-center">${__(
+					: `<tr><td colspan="5" class="text-muted text-center">${__(
 							"No schools found"
 						)}</td></tr>`;
 				const exportProvince = () => {
 					const headers = [
 						__("Province"),
 						__("Active Schools"),
-						__("New Schools"),
 						__("Active New Schools"),
 						__("Model 0"),
 						__("Total Schools"),
@@ -1325,7 +1323,6 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					const exportRows = rows.map((row) => [
 						row.province || "",
 						row.active || 0,
-						row.new_schools || 0,
 						row.active_new || 0,
 						row.model_0 || 0,
 						row.total || 0,
@@ -1334,7 +1331,6 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						exportRows.push([
 							__("All provinces"),
 							totals.active || 0,
-							totals.new_schools || 0,
 							totals.active_new || 0,
 							totals.model_0 || 0,
 							totals.total || 0,
@@ -1360,11 +1356,11 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					secondary_action_label: __("Export Excel"),
 					secondary_action: () => exportProvince(),
 				});
-				d.$wrapper.find(".modal-dialog").css({ "max-width": "820px" });
+				d.$wrapper.find(".modal-dialog").css({ "max-width": "720px" });
 				d.fields_dict.html.$wrapper.html(`
 					<p class="text-muted" style="font-size:12px;margin-bottom:10px;">
 						${__(
-							"Active New Schools = Active Schools + New Schools (new schools merging into active)."
+							"Active = schools with a program (excludes new in this period). Active New = new registrations only. Total = Active + Active New + Model 0."
 						)}
 					</p>
 					<div class="table-responsive" style="max-height:420px;overflow:auto;">
@@ -1373,7 +1369,6 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 								<tr>
 									<th>${__("Province")}</th>
 									<th class="text-right">${__("Active Schools")}</th>
-									<th class="text-right">${__("New Schools")}</th>
 									<th class="text-right">${__("Active New Schools")}</th>
 									<th class="text-right">${__("Model 0")}</th>
 									<th class="text-right">${__("Total Schools")}</th>
@@ -1385,7 +1380,6 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 									? `<tfoot><tr>
 								<th>${__("All provinces")}</th>
 								<th class="text-right">${this.fmt(totals.active)}</th>
-								<th class="text-right">${this.fmt(totals.new_schools)}</th>
 								<th class="text-right">${this.fmt(totals.active_new)}</th>
 								<th class="text-right">${this.fmt(totals.model_0)}</th>
 								<th class="text-right">${this.fmt(totals.total)}</th>
