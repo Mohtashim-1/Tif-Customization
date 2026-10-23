@@ -209,6 +209,31 @@ def set_roster_excluded(company, start_date, end_date, employees, excluded=1):
 	return {"updated": updated}
 
 
+def _payable_days_from_attendance(doc, month_days, deduction_days, unsynced_leave_days=0):
+	"""
+	Match Monthly Attendance Summary:
+	- as per need → present check-in days − (late/half after leave credit)
+	- otherwise → month_days − deduction_days
+	"""
+	try:
+		from hr_vfg.hr_ventureforce_global.report.monthly_attendance_summary.monthly_attendance_summary import (
+			_is_as_per_need,
+			_present_days_excluding_holidays,
+			_present_on_holiday_days,
+		)
+
+		if _is_as_per_need(doc.employment_type):
+			present_base = flt(_present_days_excluding_holidays(doc)) + flt(
+				_present_on_holiday_days(doc)
+			)
+			half_lates = flt(doc.lates_for_absent) + _uncovered_half_day_deduction(doc)
+			as_need_deduction = max(0.0, half_lates - flt(unsynced_leave_days))
+			return max(0.0, present_base - as_need_deduction)
+	except Exception:
+		pass
+	return max(0.0, flt(month_days) - flt(deduction_days))
+
+
 def _uncovered_half_day_deduction(doc):
 	"""0.5 per half-day not covered by an approved half-day leave on that date."""
 	try:
@@ -343,7 +368,8 @@ def attendance_by_employee(employees, end_date):
 		unsynced_leave_days = _unsynced_leave_credit(doc, leave_map.get(emp_name) or [])
 		deduction_days = max(0.0, charged_days - unsynced_leave_days)
 		month_days = flt(doc.month_days)
-		payable_days = max(0.0, month_days - deduction_days)
+		# Same payable rule as Monthly Attendance Summary (as-per-need = days worked)
+		payable_days = _payable_days_from_attendance(doc, month_days, deduction_days, unsynced_leave_days)
 
 		out[emp_name] = {
 			"has_attendance": 1,
