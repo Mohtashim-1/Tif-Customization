@@ -47,7 +47,7 @@ frappe.tif_customization.SchoolWiseBookDispatched = class SchoolWiseBookDispatch
 						display:none !important;
 					}
 					.swbd-kpis{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:12px;margin-bottom:16px}
-					@media (max-width:1400px){.swbd-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}}
+					@media (max-width:1500px){.swbd-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}}
 					@media (max-width:900px){.swbd-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
 					@media (max-width:720px){.swbd-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 					.swbd-kpi{
@@ -94,6 +94,7 @@ frappe.tif_customization.SchoolWiseBookDispatched = class SchoolWiseBookDispatch
 					.swbd-kpi--qaida{--swbd-accent:#059669}
 					.swbd-kpi--guide{--swbd-accent:#ea580c}
 					.swbd-kpi--kpk{--swbd-accent:#b45309}
+					.swbd-kpi--bal{--swbd-accent:#0e7490}
 					.swbd-kpi--dns{--swbd-accent:#0891b2}
 					.swbd-kpi.is-clickable{cursor:pointer;transition:transform .12s ease,box-shadow .12s ease}
 					.swbd-kpi.is-clickable:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(15,23,42,.1)}
@@ -213,7 +214,7 @@ frappe.tif_customization.SchoolWiseBookDispatched = class SchoolWiseBookDispatch
 			label: __("Book Type"),
 			fieldtype: "Select",
 			fieldname: "book_type",
-			options: "\nMQH\nQaida\nGuide\nKP Edition",
+			options: "\nMQH\nQaida\nGuide\nKP Edition\nBalouchistan Edition",
 		});
 	}
 
@@ -314,6 +315,7 @@ frappe.tif_customization.SchoolWiseBookDispatched = class SchoolWiseBookDispatch
 		let qaida_school_count = 0;
 		let guide_school_count = 0;
 		let kpk_school_count = 0;
+		let bal_school_count = 0;
 		this.rows.forEach((row) => {
 			const group = this.resolve_type_group(row);
 			row.customer_type_group = group;
@@ -324,6 +326,7 @@ frappe.tif_customization.SchoolWiseBookDispatched = class SchoolWiseBookDispatch
 				if (flt(row.qaida_qty) > 0) qaida_school_count += 1;
 				if (flt(row.guide_qty) > 0) guide_school_count += 1;
 				if (flt(row.kpk_qty) > 0) kpk_school_count += 1;
+				if (flt(row.bal_qty) > 0) bal_school_count += 1;
 			} else {
 				individual_count += 1;
 			}
@@ -335,6 +338,7 @@ frappe.tif_customization.SchoolWiseBookDispatched = class SchoolWiseBookDispatch
 			qaida_school_count,
 			guide_school_count,
 			kpk_school_count,
+			bal_school_count,
 		});
 	}
 
@@ -393,6 +397,15 @@ frappe.tif_customization.SchoolWiseBookDispatched = class SchoolWiseBookDispatch
 				bookType: "KP Edition",
 				clickable: true,
 			},
+			{
+				label: __("Balouchistan Edition"),
+				value: s.bal_qty || 0,
+				cls: "swbd-kpi--bal",
+				hint: __("Click for item-wise qty"),
+				extra: schoolCountPill(s.bal_school_count),
+				bookType: "Balouchistan Edition",
+				clickable: true,
+			},
 			{ label: __("Delivery Notes"), value: s.delivery_notes || 0, cls: "swbd-kpi--dns", hint: __("Submitted DNs") },
 		];
 		const $kpis = $(this.page.body).find("#swbd-kpis");
@@ -443,6 +456,7 @@ frappe.tif_customization.SchoolWiseBookDispatched = class SchoolWiseBookDispatch
 			{ key: "qaida_qty", label: __("Qaida"), num: true },
 			{ key: "guide_qty", label: __("Guide"), num: true },
 			{ key: "kpk_qty", label: __("KP Edition"), num: true },
+			{ key: "bal_qty", label: __("Balouchistan Edition"), num: true },
 			{ key: "other_qty", label: __("Other"), num: true },
 			{ key: "last_dispatch_date", label: __("Last Dispatch") },
 		];

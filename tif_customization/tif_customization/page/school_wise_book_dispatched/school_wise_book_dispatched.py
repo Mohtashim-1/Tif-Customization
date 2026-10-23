@@ -440,11 +440,12 @@ def _guide_case():
 
 
 def _mqh_case():
-	"""MQH textbooks only — exclude KP Edition and Teacher Guides (MQHTG)."""
+	"""MQH textbooks only — exclude KP / Balouchistan editions and Teacher Guides."""
 	return (
 		"(UPPER(COALESCE(dni.item_name,'')) LIKE '%%MQH%%' "
 		"OR UPPER(COALESCE(dni.item_code,'')) LIKE '%%MQH%%') "
 		f"AND NOT ({_kpk_edition_case()}) "
+		f"AND NOT ({_balouchistan_edition_case()}) "
 		f"AND NOT ({_guide_case()})"
 	)
 
@@ -459,11 +460,15 @@ def _apply_book_type_filter(where, book_type):
 		where.append(f"({_guide_case()})")
 	elif book_type in ("KP Edition", "KPK Edition"):
 		where.append(f"({_kpk_edition_case()})")
+	elif book_type in ("Balouchistan Edition", "Balochistan Edition"):
+		where.append(f"({_balouchistan_edition_case()})")
 
 
 def _classify_book_type(item_code, item_name):
 	code = cstr(item_code or "").upper()
 	name = cstr(item_name or "").upper()
+	if "BALOUCHISTAN" in name or "BALOCHISTAN" in name or "BALOUCHISTAN" in code or "BALOCHISTAN" in code:
+		return "Balouchistan Edition"
 	if (
 		code.startswith("MQKP")
 		or "KPK" in code
@@ -494,6 +499,7 @@ def _build_summary(rows):
 	qaida_school_count = 0
 	guide_school_count = 0
 	kpk_school_count = 0
+	bal_school_count = 0
 	for r in rows:
 		group = r.get("customer_type_group") or _customer_type_group(
 			r.get("customer_type"),
@@ -517,6 +523,8 @@ def _build_summary(rows):
 				guide_school_count += 1
 			if flt(r.get("kpk_qty")) > 0:
 				kpk_school_count += 1
+			if flt(r.get("bal_qty")) > 0:
+				bal_school_count += 1
 		else:
 			individual_count += 1
 
@@ -529,10 +537,12 @@ def _build_summary(rows):
 		"qaida_qty": sum(flt(r.get("qaida_qty")) for r in rows),
 		"guide_qty": sum(flt(r.get("guide_qty")) for r in rows),
 		"kpk_qty": sum(flt(r.get("kpk_qty")) for r in rows),
+		"bal_qty": sum(flt(r.get("bal_qty")) for r in rows),
 		"mqh_school_count": mqh_school_count,
 		"qaida_school_count": qaida_school_count,
 		"guide_school_count": guide_school_count,
 		"kpk_school_count": kpk_school_count,
+		"bal_school_count": bal_school_count,
 		"delivery_notes": sum(int(r.get("delivery_notes") or 0) for r in rows),
 	}
 
