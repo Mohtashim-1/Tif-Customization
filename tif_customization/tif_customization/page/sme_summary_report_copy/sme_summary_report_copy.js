@@ -2132,10 +2132,8 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						<td>${frappe.utils.escape_html(v.visit_date || "")}</td>
 						<td>${frappe.utils.escape_html(v.type || "")}</td>
 						<td>${schoolCell(v.school, cint(v.school_unapproved), cint(v.school_missing))}</td>
-						<td>${frappe.utils.escape_html(v.province || "—")}</td>
-						<td>${frappe.utils.escape_html(v.area || "—")}</td>
+						<td>${frappe.utils.escape_html(v.officer || "")}</td>
 						<td>${frappe.utils.escape_html(v.category || "")}</td>
-						<td>${frappe.utils.escape_html(v.status || "")}</td>
 						<td style="max-width:320px;white-space:normal;">${
 							frappe.tif_customization && frappe.tif_customization.format_visit_remarks
 								? frappe.tif_customization.format_visit_remarks(v.remarks)
@@ -2144,7 +2142,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					</tr>`,
 							)
 							.join("")
-					: `<tr><td colspan="9" class="text-muted text-center">${__("No documents")}</td></tr>`;
+					: `<tr><td colspan="7" class="text-muted text-center">${__("No documents")}</td></tr>`;
 
 				const d = new frappe.ui.Dialog({
 					title: __("School visits — {0}", [row.label || row.employee_name || ""]),
@@ -2248,18 +2246,17 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						</table>
 					</div>
 					<h5 style="margin:8px 0;">${__("Visit documents")}</h5>
+					<p class="text-muted" style="font-size:12px;margin:0 0 8px;">${__("Click a Document No to open that Field Visit.")}</p>
 					<div class="table-responsive" style="max-height:240px;overflow:auto;">
 						<table class="table table-bordered table-hover" style="font-size:12px;margin:0;">
 							<thead>
 								<tr>
 									<th>${__("Document No")}</th>
 									<th>${__("Visit Date")}</th>
-									<th>${__("Type")}</th>
-									<th>${__("School")}</th>
-									<th>${__("Province")}</th>
-									<th>${__("Area")}</th>
+									<th>${__("Type / Task")}</th>
+									<th>${__("School / Venue")}</th>
+									<th>${__("Officer")}</th>
 									<th>${__("Category")}</th>
-									<th>${__("Status")}</th>
 									<th>${__("Visit Summary")}</th>
 								</tr>
 							</thead>
