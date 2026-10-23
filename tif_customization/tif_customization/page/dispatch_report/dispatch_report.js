@@ -1,7 +1,7 @@
 frappe.pages['dispatch-report'].on_page_load = function(wrapper) {
 	let page = frappe.ui.make_app_page({
 		parent: wrapper,
-		title: 'School Wise Dispatch Report',
+		title: 'Book Distribution Report',
 		single_column: true
 	});
 	
@@ -529,6 +529,15 @@ if (typeof window.DispatchReport === 'undefined') {
 		$('#kpi-section .row').html(kpi_html);
 	}
 	
+	location_link(doctype, docname, label) {
+		const text = frappe.utils.escape_html(label || '') || '-';
+		if (!docname || !label) {
+			return text;
+		}
+		const href = frappe.utils.get_form_link(doctype, docname);
+		return `<a href="${href}" target="_blank">${text}</a>`;
+	}
+
 	render_table() {
 		let me = this;
 		let dispatch_data = me.data.dispatch_data || [];
@@ -547,22 +556,27 @@ if (typeof window.DispatchReport === 'undefined') {
 				total_quantity += qty;
 				
 				let item_display = row.item_name || row.item_code || '-';
-				let item_link = row.item_code ? `<a href="/app/item/${encodeURIComponent(row.item_code)}" target="_blank">${item_display}</a>` : item_display;
+				let item_link = row.item_code ? `<a href="/app/item/${encodeURIComponent(row.item_code)}" target="_blank">${frappe.utils.escape_html(item_display)}</a>` : frappe.utils.escape_html(item_display);
+				const city_cell = me.location_link('City', row.city_doc, row.city);
+				const province_cell = me.location_link('Province', row.province_doc, row.province);
+				const area_cell = me.location_link('Area', row.area_doc, row.area);
 				
 				let tr = $(`
 					<tr>
-						<td><a href="/app/delivery-note/${row.delivery_note_no}" target="_blank">${row.delivery_note_no || '-'}</a></td>
-						<td>${row.posting_date || '-'}</td>
-						<td>${row.customer_name || row.customer || '-'}</td>
-						<td>${row.country || '-'}</td>
-						<td>${row.city || '-'}</td>
-						<td>${row.province || '-'}</td>
-						<td>${row.area || '-'}</td>
+						<td><a href="/app/delivery-note/${encodeURIComponent(row.delivery_note_no || '')}" target="_blank">${frappe.utils.escape_html(row.delivery_note_no || '-')}</a></td>
+						<td>${frappe.utils.escape_html(row.posting_date || '-')}</td>
+						<td>${row.customer
+							? `<a href="/app/customer/${encodeURIComponent(row.customer)}" target="_blank">${frappe.utils.escape_html(row.customer_name || row.customer)}</a>`
+							: frappe.utils.escape_html(row.customer_name || '-')}</td>
+						<td>${frappe.utils.escape_html(row.country || '-')}</td>
+						<td>${city_cell}</td>
+						<td>${province_cell}</td>
+						<td>${area_cell}</td>
 						<td>${item_link}</td>
-						<td><span class="label ${row.book_type === 'MQH' ? 'label-primary' : row.book_type === 'Qaida' ? 'label-success' : 'label-default'}">${row.book_type || '-'}</span></td>
+						<td><span class="label ${row.book_type === 'MQH' ? 'label-primary' : row.book_type === 'Qaida' ? 'label-success' : 'label-default'}">${frappe.utils.escape_html(row.book_type || '-')}</span></td>
 						<td class="text-right">${format_number_value(row.qty || 0)}</td>
-						<td>${row.stock_uom || '-'}</td>
-						<td>${row.created_by_name || row.created_by || '-'}</td>
+						<td>${frappe.utils.escape_html(row.stock_uom || '-')}</td>
+						<td>${frappe.utils.escape_html(row.created_by_name || row.created_by || '-')}</td>
 					</tr>
 				`);
 				tbody.append(tr);

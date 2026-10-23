@@ -6,6 +6,9 @@ import json
 import frappe
 from frappe.utils import add_days, flt, getdate, today
 
+from tif_customization.tif_customization.page.dispatch_report.dispatch_report import (
+	_attach_location_links,
+)
 from tif_customization.tif_customization.utils.supply_chain_books import (
 	sql_book_item_filter,
 	with_book_item_params,
@@ -50,19 +53,19 @@ def _get_school_dispatch_rows(filters):
 
 	if filters.get("city"):
 		where.append(
-			"(COALESCE(s.city, addr.city, dn.custom_city, '') = %(city)s)"
+			"LOWER(TRIM(COALESCE(s.city, addr.city, dn.custom_city, ''))) = LOWER(%(city)s)"
 		)
 		params["city"] = filters["city"]
 
 	if filters.get("province"):
 		where.append(
-			"(COALESCE(s.province, addr.state, '') = %(province)s)"
+			"LOWER(TRIM(COALESCE(s.province, addr.state, ''))) = LOWER(%(province)s)"
 		)
 		params["province"] = filters["province"]
 
 	if filters.get("area"):
 		where.append(
-			"(COALESCE(s.area, addr.custom_area, dn.custom_area, '') = %(area)s)"
+			"LOWER(TRIM(COALESCE(s.area, addr.custom_area, dn.custom_area, ''))) = LOWER(%(area)s)"
 		)
 		params["area"] = filters["area"]
 
@@ -157,6 +160,7 @@ def _get_school_dispatch_rows(filters):
 		if row.get("last_dispatch_date"):
 			row["last_dispatch_date"] = str(getdate(row["last_dispatch_date"]))
 
+	_attach_location_links(rows)
 	return rows
 
 

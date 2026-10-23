@@ -1,7 +1,7 @@
 frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 	var page = frappe.ui.make_app_page({
 		parent: wrapper,
-		title: 'Stock Detail Report',
+		title: 'Supply chain Dashboard',
 		single_column: true
 	});
 
@@ -1630,7 +1630,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 					</div>
 				</div>
 				<div class="kpi-col">
-					<div class="kpi-card summary-kpi pending-dispatches-kpi" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: black; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); cursor: pointer;" title="Click to view pending dispatches">
+					<div class="kpi-card summary-kpi pending-dispatches-kpi" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: black; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); cursor: pointer;" title="Click to open School Wise Demand Report">
 						<h5 class="kpi-title">Pending Dispatches</h5>
 						<div class="kpi-value">${formatNumber(kpiData.pending_dispatches_count || 0)}</div>
 						<p class="kpi-sub">Sales Orders · Click for details</p>
@@ -1962,7 +1962,7 @@ frappe.pages['stock-detail'].on_page_load = function(wrapper) {
 		});
 
 		$('.pending-dispatches-kpi').on('click', function() {
-			showPendingDispatchesDialog();
+			frappe.set_route('school-wise-demand-report');
 		});
 
 		$('.sales-invoices-kpi').on('click', function() {

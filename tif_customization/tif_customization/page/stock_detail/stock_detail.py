@@ -73,16 +73,17 @@ def get_filtered_item_codes(filters=None):
 
 HEAD_OFFICE_WAREHOUSE = "TIF Head Office - TIF"
 OLD_OFFICE_WAREHOUSE = "Old TIF Office - TIF"
-FILTER_WAREHOUSES = (HEAD_OFFICE_WAREHOUSE, OLD_OFFICE_WAREHOUSE)
+NAZIMABAD_WAREHOUSE = "Nazimabad - TIF"
+FILTER_WAREHOUSES = (HEAD_OFFICE_WAREHOUSE, OLD_OFFICE_WAREHOUSE, NAZIMABAD_WAREHOUSE)
 
 
 def _filter_warehouses():
-	"""Only Head Office and Old TIF Office are used on this report."""
+	"""Head Office, Old TIF Office, and Nazimabad are used on this report."""
 	return [name for name in FILTER_WAREHOUSES if frappe.db.exists("Warehouse", name)]
 
 
 def _report_warehouses(filters=None):
-	"""Warehouses for KPI / available stock: Head Office + Old Office, or a subset."""
+	"""Warehouses for KPI / available stock: allowed filter warehouses, or a subset."""
 	allowed = _filter_warehouses()
 	filters = filters or {}
 	selected = _as_list(filters.get("warehouses"))
@@ -2047,7 +2048,7 @@ def get_stock_data(filters=None):
 
 @frappe.whitelist()
 def get_warehouses(txt=None):
-    """Warehouse filter: TIF Head Office and Old TIF Office only."""
+    """Warehouse filter: Head Office, Old TIF Office, and Nazimabad."""
     try:
         txt = (txt or "").strip().lower()
         rows = []

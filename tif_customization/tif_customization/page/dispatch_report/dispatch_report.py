@@ -1,11 +1,52 @@
 import frappe
 from frappe import _
-from frappe.utils import flt, getdate, today, add_days
+from frappe.utils import flt, getdate, today, add_days, cstr
 
 from tif_customization.tif_customization.utils.supply_chain_books import (
 	sql_book_item_filter,
 	with_book_item_params,
 )
+
+
+def _resolve_location_docs(labels, doctype):
+	"""Map address labels to real DocType names (case-insensitive)."""
+	resolved = {}
+	unique = sorted({cstr(v).strip() for v in (labels or []) if cstr(v).strip()})
+	if not unique or not frappe.db.exists("DocType", doctype):
+		return resolved
+	placeholders = ", ".join(["%s"] * len(unique))
+	rows = frappe.db.sql(
+		f"""
+		SELECT name
+		FROM `tab{doctype}`
+		WHERE LOWER(TRIM(name)) IN ({placeholders})
+		""",
+		tuple(n.lower() for n in unique),
+		as_dict=True,
+	)
+	by_lower = {cstr(r.name).strip().lower(): r.name for r in rows}
+	for name in unique:
+		docname = by_lower.get(name.lower())
+		if docname:
+			resolved[name] = docname
+	return resolved
+
+
+def _attach_location_links(rows):
+	"""Add city_doc / province_doc / area_doc for clickable links."""
+	if not rows:
+		return
+	city_map = _resolve_location_docs([r.get("city") for r in rows], "City")
+	province_map = _resolve_location_docs([r.get("province") for r in rows], "Province")
+	area_map = _resolve_location_docs([r.get("area") for r in rows], "Area")
+	for row in rows:
+		city = cstr(row.get("city") or "").strip()
+		province = cstr(row.get("province") or "").strip()
+		area = cstr(row.get("area") or "").strip()
+		row["city_doc"] = city_map.get(city) or ""
+		row["province_doc"] = province_map.get(province) or ""
+		row["area_doc"] = area_map.get(area) or ""
+
 
 @frappe.whitelist()
 def get_dispatch_report_data(filters=None):
@@ -164,7 +205,8 @@ def get_dispatch_data(filters):
 				row['book_type'] = 'Qaida'
 			else:
 				row['book_type'] = 'Other'
-		
+
+		_attach_location_links(results)
 		return results
 	except Exception as e:
 		frappe.log_error(f"Error in get_dispatch_data: {str(e)}", "Dispatch Report Error")

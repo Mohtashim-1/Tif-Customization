@@ -6,7 +6,7 @@ frappe.pages["dispatch-detail-report"].on_page_load = function (wrapper) {
 
 	const page = frappe.ui.make_app_page({
 		parent: wrapper,
-		title: __("Courier Dispatched Report"),
+		title: __("Dispatch & Courier Cost Report"),
 		single_column: true,
 	});
 

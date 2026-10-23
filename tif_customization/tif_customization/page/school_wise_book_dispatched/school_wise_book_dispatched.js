@@ -1,7 +1,7 @@
 frappe.pages["school-wise-book-dispatched"].on_page_load = function (wrapper) {
 	const page = frappe.ui.make_app_page({
 		parent: wrapper,
-		title: __("City Wise Book Dispatched"),
+		title: __("City Wise Dispatched Report"),
 		single_column: true,
 	});
 	new frappe.tif_customization.SchoolWiseBookDispatched(page).make();
@@ -108,13 +108,15 @@ frappe.tif_customization.SchoolWiseBookDispatched = class SchoolWiseBookDispatch
 		});
 		this.province = this.make_filter({
 			label: __("Province"),
-			fieldtype: "Data",
+			fieldtype: "Link",
 			fieldname: "province",
+			options: "Province",
 		});
 		this.area = this.make_filter({
 			label: __("Area"),
-			fieldtype: "Data",
+			fieldtype: "Link",
 			fieldname: "area",
+			options: "Area",
 		});
 		this.school_status = this.make_filter({
 			label: __("School Status"),
@@ -232,6 +234,15 @@ frappe.tif_customization.SchoolWiseBookDispatched = class SchoolWiseBookDispatch
 		];
 	}
 
+	location_link(doctype, docname, label) {
+		const text = frappe.utils.escape_html(label || "") || "";
+		if (!docname || !label) {
+			return text;
+		}
+		const href = frappe.utils.get_form_link(doctype, docname);
+		return `<a href="${href}" target="_blank">${text}</a>`;
+	}
+
 	render_table() {
 		const cols = this.columns();
 		if (!this.rows.length) {
@@ -251,6 +262,14 @@ frappe.tif_customization.SchoolWiseBookDispatched = class SchoolWiseBookDispatch
 						if (c.num) val = frappe.format(val || 0, { fieldtype: "Float", precision: 0 });
 						else if (c.key === "last_dispatch_date" && val)
 							val = frappe.datetime.str_to_user(val);
+						else if (c.key === "city")
+							val = this.location_link("City", row.city_doc, row.city);
+						else if (c.key === "province")
+							val = this.location_link("Province", row.province_doc, row.province);
+						else if (c.key === "area")
+							val = this.location_link("Area", row.area_doc, row.area);
+						else if (c.key === "school_name" && row.school)
+							val = `<a href="${frappe.utils.get_form_link("School", row.school)}" target="_blank">${frappe.utils.escape_html(val || "")}</a>`;
 						else val = frappe.utils.escape_html(val || "");
 						return `<td class="${c.num ? "swbd-num" : ""}">${val}</td>`;
 					})
