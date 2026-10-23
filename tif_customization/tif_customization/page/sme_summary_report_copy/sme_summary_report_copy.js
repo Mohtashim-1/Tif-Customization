@@ -1965,18 +1965,14 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			? rows
 					.map((r) => {
 						const key = r.employee || r.user_id || r.employee_name || "";
-						const staff = r.user_id || r.employee_name || r.employee || "";
-						const linkAttrs = `href="#" class="sme-school-count-link" data-officer-key="${frappe.utils.escape_html(
+						return `<tr class="sme-school-count-row" data-officer-key="${frappe.utils.escape_html(
 							key,
-						)}" data-visit-staff="${frappe.utils.escape_html(staff)}" title="${__(
-							"Click for school visit detail",
-						)}"`;
-						return `<tr>
-				<td><a ${linkAttrs}>${frappe.utils.escape_html(r.label || r.employee_name || "")}</a></td>
-				<td><a ${linkAttrs}>${frappe.utils.escape_html(r.employment_type || "—")}</a></td>
-				<td><a ${linkAttrs}>${frappe.utils.escape_html(r.province || "—")}</a></td>
-				<td><a ${linkAttrs}>${frappe.utils.escape_html(r.city || "—")}</a></td>
-				<td><a ${linkAttrs}>${frappe.utils.escape_html(r.area || "—")}</a></td>
+						)}" title="${__("Click for school visit detail")}" style="cursor:pointer;">
+				<td>${frappe.utils.escape_html(r.label || r.employee_name || "")}</td>
+				<td>${frappe.utils.escape_html(r.employment_type || "—")}</td>
+				<td>${frappe.utils.escape_html(r.province || "—")}</td>
+				<td>${frappe.utils.escape_html(r.city || "—")}</td>
+				<td>${frappe.utils.escape_html(r.area || "—")}</td>
 			</tr>`;
 					})
 					.join("")
@@ -2013,7 +2009,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				</table>
 			</div>
 		`);
-		d.$wrapper.on("click", ".sme-school-count-link", (e) => {
+		d.$wrapper.on("click", ".sme-school-count-row", (e) => {
 			e.preventDefault();
 			const key = $(e.currentTarget).attr("data-officer-key");
 			if (key) this.show_officer_school_detail(key);
