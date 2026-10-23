@@ -612,7 +612,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				},
 				{
 					key: "workshop",
-					label: __("Workshop Conducted (Onsite)"),
+					label: __("Workshop Conducted through SME (Onsite)"),
 					metric: "workshop_conducted",
 					value: (r) => cint(r.workshop),
 				},
@@ -764,7 +764,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					const ws = (data.outcome_fy || {}).workshop_conducted || {};
 					return [
 						{
-							label: __("Workshop Conducted (Onsite)"),
+							label: __("Workshop Conducted through SME (Onsite)"),
 							value: this.fmt(ws.actual),
 							style: "workshop",
 							metric: "workshop_conducted",
