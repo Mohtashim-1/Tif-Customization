@@ -95,6 +95,8 @@ frappe.tif_customization.SchoolWiseBookDispatched = class SchoolWiseBookDispatch
 					.swbd-kpi--guide{--swbd-accent:#ea580c}
 					.swbd-kpi--kpk{--swbd-accent:#b45309}
 					.swbd-kpi--dns{--swbd-accent:#0891b2}
+					.swbd-kpi.is-clickable{cursor:pointer;transition:transform .12s ease,box-shadow .12s ease}
+					.swbd-kpi.is-clickable:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(15,23,42,.1)}
 					.swbd-table-wrap{
 						overflow:auto;max-height:calc(100vh - 340px);
 						border:1px solid var(--border-color,#e5e7eb);border-radius:10px;background:#fff;
@@ -356,52 +358,75 @@ frappe.tif_customization.SchoolWiseBookDispatched = class SchoolWiseBookDispatch
 				hint: __("Total distinct"),
 				extra: schoolSplit,
 			},
-			{ label: __("Books Dispatched"), value: s.total_qty || 0, cls: "swbd-kpi--total", hint: __("All book items") },
+			{
+				label: __("Books Dispatched"),
+				value: s.total_qty || 0,
+				cls: "swbd-kpi--total",
+				hint: __("Click for item-wise qty"),
+				bookType: "",
+				clickable: true,
+			},
 			{
 				label: __("MQH"),
 				value: s.mqh_qty || 0,
 				cls: "swbd-kpi--mqh",
-				hint: __("MQH books"),
+				hint: __("Click for item-wise qty"),
 				extra: schoolCountPill(s.mqh_school_count),
+				bookType: "MQH",
+				clickable: true,
 			},
 			{
 				label: __("Qaida"),
 				value: s.qaida_qty || 0,
 				cls: "swbd-kpi--qaida",
-				hint: __("Qaida books"),
+				hint: __("Click for item-wise qty"),
 				extra: schoolCountPill(s.qaida_school_count),
-			},
-			{
-				label: __("Guide"),
-				value: s.guide_qty || 0,
-				cls: "swbd-kpi--guide",
-				hint: __("Guide books"),
-				extra: schoolCountPill(s.guide_school_count),
+				bookType: "Qaida",
+				clickable: true,
 			},
 			{
 				label: __("KP Edition"),
 				value: s.kpk_qty || 0,
 				cls: "swbd-kpi--kpk",
-				hint: __("KP / KPK textbooks"),
+				hint: __("Click for item-wise qty"),
 				extra: schoolCountPill(s.kpk_school_count),
+				bookType: "KP Edition",
+				clickable: true,
 			},
 			{ label: __("Delivery Notes"), value: s.delivery_notes || 0, cls: "swbd-kpi--dns", hint: __("Submitted DNs") },
 		];
-		$(this.page.body)
-			.find("#swbd-kpis")
-			.html(
-				cards
-					.map(
-						(c) => `
-					<div class="swbd-kpi ${c.cls}">
+		const $kpis = $(this.page.body).find("#swbd-kpis");
+		$kpis.html(
+			cards
+				.map(
+					(c) => `
+					<div class="swbd-kpi ${c.cls}${c.clickable ? " is-clickable" : ""}"
+						${c.clickable ? `data-book-type="${frappe.utils.escape_html(c.bookType || "")}" title="${__(
+							"Click for item-wise out qty"
+						)}"` : ""}>
 						<div class="label">${frappe.utils.escape_html(c.label)}</div>
 						<div class="value">${fmt(c.value)}</div>
 						${c.extra || ""}
 						<div class="hint">${frappe.utils.escape_html(c.hint || "")}</div>
 					</div>`
-					)
-					.join("")
-			);
+				)
+				.join("")
+		);
+		$kpis.find(".swbd-kpi.is-clickable").on("click", (e) => {
+			const bookType = $(e.currentTarget).attr("data-book-type") || "";
+			this.show_card_item_wise_qty(bookType);
+		});
+	}
+
+	show_card_item_wise_qty(bookType) {
+		const filters = Object.assign({}, this.get_filters(), {
+			card_scope: 1,
+			customer: "",
+			school: "",
+			school_name: "",
+			book_type: bookType || "",
+		});
+		this._open_item_wise_dialog(filters, bookType || __("All Books"));
 	}
 
 	columns() {
@@ -529,7 +554,12 @@ frappe.tif_customization.SchoolWiseBookDispatched = class SchoolWiseBookDispatch
 			customer: row.customer || "",
 			school: row.school || "",
 			school_name: row.school_name || row.customer_name || "",
+			card_scope: 0,
 		});
+		this._open_item_wise_dialog(filters, row.school_name || row.customer || "");
+	}
+
+	_open_item_wise_dialog(filters, fallbackLabel) {
 		frappe.call({
 			method:
 				"tif_customization.tif_customization.page.school_wise_book_dispatched.school_wise_book_dispatched.get_item_wise_dispatch",
@@ -540,6 +570,7 @@ frappe.tif_customization.SchoolWiseBookDispatched = class SchoolWiseBookDispatch
 				const res = r.message || {};
 				const items = res.rows || [];
 				const fmt = (n) => frappe.format(n || 0, { fieldtype: "Float", precision: 0 });
+				const showCustomers = cint(filters.card_scope);
 				let body;
 				if (!items.length) {
 					body = `<p class="text-muted">${__("No item dispatches found.")}</p>`;
@@ -560,6 +591,7 @@ frappe.tif_customization.SchoolWiseBookDispatched = class SchoolWiseBookDispatch
 										<th class="text-right">${__("Out Qty")}</th>
 										<th>${__("UOM")}</th>
 										<th class="text-right">${__("DNs")}</th>
+										${showCustomers ? `<th class="text-right">${__("Customers")}</th>` : ""}
 										<th>${__("Last Dispatch")}</th>
 									</tr>
 								</thead>
@@ -575,6 +607,7 @@ frappe.tif_customization.SchoolWiseBookDispatched = class SchoolWiseBookDispatch
 										<td class="text-right"><strong>${fmt(it.qty)}</strong></td>
 										<td>${frappe.utils.escape_html(it.uom || "")}</td>
 										<td class="text-right">${fmt(it.delivery_notes)}</td>
+										${showCustomers ? `<td class="text-right">${fmt(it.customers)}</td>` : ""}
 										<td>${it.last_dispatch_date ? frappe.datetime.str_to_user(it.last_dispatch_date) : "—"}</td>
 									</tr>`
 										)
@@ -584,14 +617,14 @@ frappe.tif_customization.SchoolWiseBookDispatched = class SchoolWiseBookDispatch
 									<tr>
 										<th colspan="3">${__("Total")}</th>
 										<th class="text-right">${fmt(res.total_qty)}</th>
-										<th colspan="3"></th>
+										<th colspan="${showCustomers ? 4 : 3}"></th>
 									</tr>
 								</tfoot>
 							</table>
 						</div>`;
 				}
 				const d = new frappe.ui.Dialog({
-					title: __("Item-wise Out Qty: {0}", [res.label || row.school_name || ""]),
+					title: __("Item-wise Out Qty: {0}", [res.label || fallbackLabel || ""]),
 					size: "extra-large",
 					fields: [{ fieldtype: "HTML", fieldname: "html" }],
 					primary_action_label: __("Close"),

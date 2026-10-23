@@ -4,7 +4,7 @@
 import json
 
 import frappe
-from frappe.utils import add_days, cstr, flt, getdate, today
+from frappe.utils import add_days, cint, cstr, flt, getdate, today
 
 from tif_customization.tif_customization.page.dispatch_report.dispatch_report import (
 	_attach_location_links,
@@ -24,13 +24,13 @@ def get_report_data(filters=None):
 
 @frappe.whitelist()
 def get_item_wise_dispatch(filters=None):
-	"""Item-wise outgoing qty for one school/customer within the report filters."""
+	"""Item-wise outgoing qty (one school/customer, or all under current filters / card)."""
 	filters = _parse_filters(filters)
 	customer = cstr(filters.get("customer") or "").strip()
 	school = cstr(filters.get("school") or "").strip()
 	school_name = cstr(filters.get("school_name") or "").strip()
-	if not customer and not school and not school_name:
-		frappe.throw(frappe._("Customer or school is required."))
+	# Card drill: no customer — use page filters + optional book_type
+	card_scope = cint(filters.get("card_scope") or 0)
 
 	where = [
 		"dn.docstatus = 1",
@@ -45,11 +45,10 @@ def get_item_wise_dispatch(filters=None):
 		}
 	)
 
-	# Prefer exact customer match when available
 	if customer:
 		where.append("dn.customer = %(customer)s")
 		params["customer"] = customer
-	else:
+	elif school or school_name:
 		_apply_school_name_filter(
 			where,
 			params,
@@ -57,20 +56,14 @@ def get_item_wise_dispatch(filters=None):
 			customer_field="dn.customer",
 			customer_name_field="dn.customer_name",
 		)
+	elif not card_scope:
+		frappe.throw(frappe._("Customer or school is required."))
+	else:
+		# Apply same page filters as the main report (city/province/etc.)
+		_apply_page_filters_for_items(where, params, filters)
 
 	book_type = (filters.get("book_type") or "").strip()
-	if book_type == "MQH":
-		where.append(f"({_mqh_case()})")
-	elif book_type == "Qaida":
-		where.append(
-			"(UPPER(COALESCE(dni.item_name,'')) LIKE '%%QAIDA%%' OR UPPER(COALESCE(dni.item_code,'')) LIKE '%%QAIDA%%')"
-		)
-	elif book_type == "Guide":
-		where.append(
-			"(UPPER(COALESCE(dni.item_name,'')) LIKE '%%GUIDE%%' OR UPPER(COALESCE(dni.item_code,'')) LIKE '%%GUIDE%%')"
-		)
-	elif book_type in ("KP Edition", "KPK Edition"):
-		where.append(f"({_kpk_edition_case()})")
+	_apply_book_type_filter(where, book_type)
 
 	where_clause = " AND ".join(where)
 	rows = frappe.db.sql(
@@ -81,9 +74,19 @@ def get_item_wise_dispatch(filters=None):
 			COALESCE(dni.stock_uom, dni.uom, 'Nos') AS uom,
 			SUM(COALESCE(dni.qty, 0)) AS qty,
 			COUNT(DISTINCT dn.name) AS delivery_notes,
+			COUNT(DISTINCT dn.customer) AS customers,
 			MAX(dn.posting_date) AS last_dispatch_date
 		FROM `tabDelivery Note` dn
 		INNER JOIN `tabDelivery Note Item` dni ON dni.parent = dn.name
+		LEFT JOIN `tabCustomer` cust ON cust.name = dn.customer
+		LEFT JOIN `tabAddress` addr ON (
+			addr.name = dn.shipping_address_name
+			OR addr.name = dn.customer_address
+		)
+		LEFT JOIN `tabSchool` s ON (
+			s.school_name = dn.customer_name
+			OR s.name = dn.customer
+		)
 		WHERE {where_clause}
 		GROUP BY
 			dni.item_code,
@@ -100,40 +103,67 @@ def get_item_wise_dispatch(filters=None):
 		row["qty"] = flt(row.get("qty"))
 		total_qty += row["qty"]
 		row["delivery_notes"] = int(row.get("delivery_notes") or 0)
+		row["customers"] = int(row.get("customers") or 0)
 		if row.get("last_dispatch_date"):
 			row["last_dispatch_date"] = str(getdate(row["last_dispatch_date"]))
-		# Book type label for display
-		code = cstr(row.get("item_code") or "").upper()
-		name = cstr(row.get("item_name") or "").upper()
-		if (
-			code.startswith("MQKP")
-			or "KPK" in code
-			or "KPK" in name
-			or " KP " in f" {name} "
-			or name.startswith("KP ")
-			or "KHYBER" in name
-			or "PAKHTUN" in name
-		):
-			row["book_type"] = "KP Edition"
-		elif "QAIDA" in name or "QAIDA" in code:
-			row["book_type"] = "Qaida"
-		elif "GUIDE" in name or "GUIDE" in code:
-			row["book_type"] = "Guide"
-		elif "MQH" in name or "MQH" in code:
-			row["book_type"] = "MQH"
-		else:
-			row["book_type"] = "Other"
+		row["book_type"] = _classify_book_type(row.get("item_code"), row.get("item_name"))
 
-	label = school_name or customer or school
+	if card_scope:
+		label = book_type or frappe._("All Books")
+	else:
+		label = school_name or customer or school
 	return {
 		"label": label,
 		"customer": customer,
+		"book_type": book_type,
 		"from_date": str(filters["from_date"]),
 		"to_date": str(filters["to_date"]),
 		"rows": rows,
 		"total_qty": total_qty,
 		"item_count": len(rows),
 	}
+
+
+def _apply_page_filters_for_items(where, params, filters):
+	"""Reuse city / province / area / status / customer type filters for card drill."""
+	if filters.get("school") or filters.get("school_name") or filters.get("customer"):
+		_apply_school_name_filter(
+			where,
+			params,
+			filters,
+			customer_field="dn.customer",
+			customer_name_field="dn.customer_name",
+		)
+	if filters.get("city"):
+		where.append(
+			"LOWER(TRIM(COALESCE(s.city, addr.city, dn.custom_city, ''))) = LOWER(%(city)s)"
+		)
+		params["city"] = filters["city"]
+	if filters.get("province"):
+		where.append(
+			"LOWER(TRIM(COALESCE(s.province, addr.state, ''))) = LOWER(%(province)s)"
+		)
+		params["province"] = filters["province"]
+	if filters.get("area"):
+		where.append(
+			"LOWER(TRIM(COALESCE(s.area, addr.custom_area, dn.custom_area, ''))) = LOWER(%(area)s)"
+		)
+		params["area"] = filters["area"]
+	if filters.get("school_status"):
+		where.append("s.status = %(school_status)s")
+		params["school_status"] = filters["school_status"]
+
+	customer_type = (filters.get("customer_type") or "").strip()
+	name_is_school = _school_name_sql(
+		"CONCAT_WS(' ', COALESCE(dn.customer_name, ''), COALESCE(dn.customer, ''), COALESCE(s.school_name, ''))"
+	)
+	if customer_type == "Individual":
+		where.append("IFNULL(cust.customer_type, '') = 'Individual'")
+		where.append(f"NOT ({name_is_school})")
+	elif customer_type == "School":
+		where.append(
+			f"(IFNULL(cust.customer_type, '') IN ('School', 'Company') OR ({name_is_school}))"
+		)
 
 
 def _parse_filters(filters):
@@ -203,18 +233,7 @@ def _get_school_dispatch_rows(filters):
 		)
 
 	book_type = (filters.get("book_type") or "").strip()
-	if book_type == "MQH":
-		where.append(f"({_mqh_case()})")
-	elif book_type == "Qaida":
-		where.append(
-			"(UPPER(COALESCE(dni.item_name,'')) LIKE '%%QAIDA%%' OR UPPER(COALESCE(dni.item_code,'')) LIKE '%%QAIDA%%')"
-		)
-	elif book_type == "Guide":
-		where.append(
-			"(UPPER(COALESCE(dni.item_name,'')) LIKE '%%GUIDE%%' OR UPPER(COALESCE(dni.item_code,'')) LIKE '%%GUIDE%%')"
-		)
-	elif book_type in ("KP Edition", "KPK Edition"):
-		where.append(f"({_kpk_edition_case()})")
+	_apply_book_type_filter(where, book_type)
 
 	where_clause = " AND ".join(where)
 	rows = frappe.db.sql(
@@ -239,15 +258,13 @@ def _get_school_dispatch_rows(filters):
 			) AS mqh_qty,
 			SUM(
 				CASE
-					WHEN UPPER(COALESCE(dni.item_name,'')) LIKE '%%QAIDA%%'
-						OR UPPER(COALESCE(dni.item_code,'')) LIKE '%%QAIDA%%'
+					WHEN {_qaida_case()}
 					THEN COALESCE(dni.qty, 0) ELSE 0
 				END
 			) AS qaida_qty,
 			SUM(
 				CASE
-					WHEN UPPER(COALESCE(dni.item_name,'')) LIKE '%%GUIDE%%'
-						OR UPPER(COALESCE(dni.item_code,'')) LIKE '%%GUIDE%%'
+					WHEN {_guide_case()}
 					THEN COALESCE(dni.qty, 0) ELSE 0
 				END
 			) AS guide_qty,
@@ -257,6 +274,12 @@ def _get_school_dispatch_rows(filters):
 					THEN COALESCE(dni.qty, 0) ELSE 0
 				END
 			) AS kpk_qty,
+			SUM(
+				CASE
+					WHEN {_balouchistan_edition_case()}
+					THEN COALESCE(dni.qty, 0) ELSE 0
+				END
+			) AS bal_qty,
 			MAX(dn.posting_date) AS last_dispatch_date
 		FROM `tabDelivery Note` dn
 		INNER JOIN `tabDelivery Note Item` dni ON dni.parent = dn.name
@@ -291,6 +314,7 @@ def _get_school_dispatch_rows(filters):
 		row["qaida_qty"] = flt(row.get("qaida_qty"))
 		row["guide_qty"] = flt(row.get("guide_qty"))
 		row["kpk_qty"] = flt(row.get("kpk_qty"))
+		row["bal_qty"] = flt(row.get("bal_qty"))
 		row["other_qty"] = max(
 			0.0,
 			flt(
@@ -299,6 +323,7 @@ def _get_school_dispatch_rows(filters):
 				- row["qaida_qty"]
 				- row["guide_qty"]
 				- row["kpk_qty"]
+				- row["bal_qty"]
 			),
 		)
 		row["delivery_notes"] = int(row.get("delivery_notes") or 0)
@@ -379,13 +404,87 @@ def _kpk_edition_case():
 	)
 
 
+def _balouchistan_edition_case():
+	"""Match Balouchistan / Balochistan Edition book lines."""
+	return (
+		"UPPER(COALESCE(dni.item_name,'')) LIKE '%%BALOUCHISTAN%%' "
+		"OR UPPER(COALESCE(dni.item_name,'')) LIKE '%%BALOCHISTAN%%' "
+		"OR UPPER(COALESCE(dni.item_code,'')) LIKE '%%BALOUCHISTAN%%' "
+		"OR UPPER(COALESCE(dni.item_code,'')) LIKE '%%BALOCHISTAN%%'"
+	)
+
+
+def _qaida_case():
+	"""Qaida items including Noorani Qaida Teacher Guide (NQTG)."""
+	return (
+		"UPPER(COALESCE(dni.item_name,'')) LIKE '%%QAIDA%%' "
+		"OR UPPER(COALESCE(dni.item_code,'')) LIKE '%%QAIDA%%' "
+		"OR UPPER(COALESCE(dni.item_code,'')) IN ('NQ1', 'NQW', 'NQTG')"
+	)
+
+
+def _guide_case():
+	"""MQH Teacher Guides only — not Qaida guides (NQTG) and not MQH textbooks."""
+	return (
+		"("
+		"UPPER(COALESCE(dni.item_code,'')) LIKE 'MQHTG%%' "
+		"OR ("
+		"(UPPER(COALESCE(dni.item_name,'')) LIKE '%%GUIDE%%' "
+		"OR UPPER(COALESCE(dni.item_code,'')) LIKE '%%GUIDE%%' "
+		"OR UPPER(COALESCE(dni.item_name,'')) LIKE '%%TEACHER%%GUIDE%%')"
+		f" AND NOT ({_qaida_case()})"
+		" AND UPPER(COALESCE(dni.item_code,'')) NOT LIKE 'MQHWB%%'"
+		")"
+		")"
+	)
+
+
 def _mqh_case():
-	"""MQH books excluding KP Edition so the two cards don't overlap."""
+	"""MQH textbooks only — exclude KP Edition and Teacher Guides (MQHTG)."""
 	return (
 		"(UPPER(COALESCE(dni.item_name,'')) LIKE '%%MQH%%' "
 		"OR UPPER(COALESCE(dni.item_code,'')) LIKE '%%MQH%%') "
-		f"AND NOT ({_kpk_edition_case()})"
+		f"AND NOT ({_kpk_edition_case()}) "
+		f"AND NOT ({_guide_case()})"
 	)
+
+
+def _apply_book_type_filter(where, book_type):
+	book_type = (book_type or "").strip()
+	if book_type == "MQH":
+		where.append(f"({_mqh_case()})")
+	elif book_type == "Qaida":
+		where.append(f"({_qaida_case()})")
+	elif book_type == "Guide":
+		where.append(f"({_guide_case()})")
+	elif book_type in ("KP Edition", "KPK Edition"):
+		where.append(f"({_kpk_edition_case()})")
+
+
+def _classify_book_type(item_code, item_name):
+	code = cstr(item_code or "").upper()
+	name = cstr(item_name or "").upper()
+	if (
+		code.startswith("MQKP")
+		or "KPK" in code
+		or "KPK" in name
+		or " KP " in f" {name} "
+		or name.startswith("KP ")
+		or "KHYBER" in name
+		or "PAKHTUN" in name
+	):
+		return "KP Edition"
+	if "QAIDA" in name or "QAIDA" in code or code in ("NQ1", "NQW", "NQTG"):
+		return "Qaida"
+	if code.startswith("MQHTG") or (
+		("GUIDE" in name or "GUIDE" in code or "TEACHER" in name and "GUIDE" in name)
+		and "QAIDA" not in name
+		and not code.startswith("MQHWB")
+	):
+		return "Guide"
+	if "MQH" in name or "MQH" in code:
+		return "MQH"
+	return "Other"
 
 
 def _build_summary(rows):
