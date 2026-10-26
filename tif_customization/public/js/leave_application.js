@@ -13,12 +13,19 @@ frappe.ui.form.on("Leave Application", {
 			setTimeout(() => build_allocated_leaves_dashboard(frm), 0);
 		}
 
-		// With workflow: line manager uses Approve action; only HR finalizes (submits).
+		// With workflow: hide primary Submit only while a Leave Approver is reviewing
+		// (Request For Leave Approver Approval). Applicants in Draft / new / rejected
+		// must keep Save and Actions → Submit (Tayyiba has Leave Approver + Employee).
 		if (frappe.model.has_workflow(frm.doctype) && frm.doc.docstatus === 0) {
 			const roles = frappe.user_roles || [];
 			const is_hr = roles.includes("HR Manager") || roles.includes("HR User");
 			const is_leave_approver = roles.includes("Leave Approver") && !is_hr;
-			if (is_leave_approver && frm.page.btn_primary) {
+			const state = (frm.doc.workflow_state || "").trim();
+			if (
+				is_leave_approver &&
+				state === "Request For Leave Approver Approval" &&
+				frm.page.btn_primary
+			) {
 				frm.page.btn_primary.hide();
 			}
 		}
