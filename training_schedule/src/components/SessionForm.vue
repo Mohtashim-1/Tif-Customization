@@ -230,7 +230,10 @@ async function onImportFile(event) {
 			importMsg.value = result.message || `Imported ${result.added || 0} row(s).`;
 			emit("saved", { ...result, silent: true });
 		} else {
-			const result = await apiPost(`${METHOD}.parse_attendance_csv`, { content });
+			const result = await apiPost(`${METHOD}.parse_attendance_csv`, {
+				content,
+				training_date: form.training_date || "",
+			});
 			mergeImportedRows(result.rows || [], importMode.value);
 			importMsg.value =
 				result.message ||
@@ -635,6 +638,8 @@ onMounted(load);
 					</div>
 					<p class="import-hint">
 						CSV: Name, Email, Join time, Leave time, Duration, Guest, Disclaimer, Waiting room.
+						For multi-day programs, only participants whose Zoom join date matches this
+						session date ({{ form.training_date || "—" }}) are imported — other days are skipped.
 						The file is saved as an attachment on this training after import.
 					</p>
 

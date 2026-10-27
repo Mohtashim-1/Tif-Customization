@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from datetime import time, timedelta
+from datetime import datetime, time, timedelta
 import re
 
 import frappe
@@ -374,6 +374,74 @@ def _attach_csv_to_training(doc, filename: str, content: str) -> str | None:
 	return file_url
 
 
+def _parse_zoom_join_date(value) -> object | None:
+	"""Extract calendar date from Zoom join/leave time (e.g. 8/6/2026 15:08)."""
+	text = str(value or "").strip()
+	if not text:
+		return None
+	# Drop timezone suffixes Zoom sometimes appends.
+	text = re.sub(r"\s*(GMT|UTC|[+-]\d{2}:?\d{2})\s*$", "", text, flags=re.I).strip()
+	# Time-only → no session day
+	if re.fullmatch(r"\d{1,2}:\d{2}(:\d{2})?", text):
+		return None
+	for fmt in (
+		"%m/%d/%Y %H:%M:%S",
+		"%m/%d/%Y %H:%M",
+		"%d/%m/%Y %H:%M:%S",
+		"%d/%m/%Y %H:%M",
+		"%Y-%m-%d %H:%M:%S",
+		"%Y-%m-%d %H:%M",
+		"%Y-%m-%dT%H:%M:%S",
+		"%m/%d/%Y",
+		"%d/%m/%Y",
+		"%Y-%m-%d",
+	):
+		try:
+			return getdate(datetime.strptime(text, fmt).date())
+		except ValueError:
+			continue
+	try:
+		return getdate(text)
+	except Exception:
+		return None
+
+
+def _filter_attendance_rows_for_training_date(rows: list[dict], training_date) -> tuple[list[dict], dict]:
+	"""Keep Zoom rows for this session day only (fixes multi-day programs sharing one CSV)."""
+	if not training_date:
+		return rows, {"filtered": 0, "kept": len(rows), "undated": 0, "other_dates": []}
+	target = getdate(training_date)
+	dated_rows = []
+	undated_rows = []
+	other_dates = set()
+	for row in rows:
+		join_date = _parse_zoom_join_date(row.get("join_time"))
+		if join_date is None:
+			undated_rows.append(row)
+			continue
+		if join_date == target:
+			dated_rows.append(row)
+		else:
+			other_dates.add(str(join_date))
+
+	# Prefer date-matched rows. If CSV has no dates at all, keep undated (legacy time-only).
+	if dated_rows or other_dates:
+		kept = dated_rows
+		undated_kept = 0
+	else:
+		kept = undated_rows
+		undated_kept = len(undated_rows)
+
+	stats = {
+		"filtered": max(0, len(rows) - len(kept)),
+		"kept": len(kept),
+		"undated": undated_kept,
+		"other_dates": sorted(other_dates),
+		"training_date": str(target),
+	}
+	return kept, stats
+
+
 def _parse_zoom_attendance_csv(content: str) -> list[dict]:
 	"""Parse Zoom participants report CSV into attendance row dicts."""
 	import csv
@@ -432,7 +500,10 @@ def _parse_zoom_attendance_csv(content: str) -> list[dict]:
 			}
 		)
 		if payload:
-			rows.append(_attendance_row_dict(payload))
+			row = _attendance_row_dict(payload)
+			# Preserve raw join_time for day filtering (Zoom includes calendar date).
+			row["join_time"] = payload.get("join_time") or row.get("join_time") or ""
+			rows.append(row)
 	return rows
 
 
@@ -1309,23 +1380,43 @@ def create_link_record(key=None, name=None):
 
 
 @frappe.whitelist()
-def parse_attendance_csv(content=None):
+def parse_attendance_csv(content=None, training_date=None):
 	"""Preview Zoom attendance CSV rows before saving to a training."""
 	_require_login()
 	if not frappe.has_permission(DOCTYPE, "read"):
 		frappe.throw(_("You are not permitted to view Upcoming Training."), frappe.PermissionError)
 	rows = _parse_zoom_attendance_csv(content or "")
+	stats = {}
+	if training_date:
+		rows, stats = _filter_attendance_rows_for_training_date(rows, training_date)
+	msg = _("Parsed {0} attendance row(s).").format(len(rows))
+	if stats.get("filtered"):
+		msg = _(
+			"Parsed {0} row(s) for {1} (skipped {2} from other day(s): {3})."
+		).format(
+			stats.get("kept") or 0,
+			stats.get("training_date") or training_date,
+			stats.get("filtered") or 0,
+			", ".join(stats.get("other_dates") or []) or _("n/a"),
+		)
 	return {
 		"ok": 1,
 		"count": len(rows),
 		"rows": rows,
-		"message": _("Parsed {0} attendance row(s).").format(len(rows)),
+		"filter_stats": stats,
+		"message": msg,
 	}
 
 
 @frappe.whitelist()
 def import_attendance(name=None, content=None, mode="replace", filename=None):
-	"""Bulk-import Zoom attendance CSV onto an Upcoming Training (tagged via Zoom ID on the doc)."""
+	"""Bulk-import Zoom attendance CSV onto one Upcoming Training day only.
+
+	Zoom CSVs include join timestamps with calendar dates. For multi-day programs
+	(same Zoom ID / program across several Upcoming Training rows), only rows whose
+	join date matches this training's training_date are imported — so day 1
+	attendance is not copied onto day 2 and day 3.
+	"""
 	_require_login()
 	if not name:
 		frappe.throw(_("Upcoming Training name is required to import attendance."))
@@ -1337,6 +1428,16 @@ def import_attendance(name=None, content=None, mode="replace", filename=None):
 		frappe.throw(_("No attendance rows found in the CSV."))
 
 	doc = frappe.get_doc(DOCTYPE, name)
+	rows, stats = _filter_attendance_rows_for_training_date(rows, doc.training_date)
+	if not rows:
+		other = ", ".join(stats.get("other_dates") or []) or _("none")
+		frappe.throw(
+			_(
+				"No Zoom attendance rows match this session date ({0}). "
+				"CSV has participants on: {1}. Open the Upcoming Training for that day and import there."
+			).format(stats.get("training_date") or doc.training_date, other)
+		)
+
 	mode = (mode or "replace").strip().lower()
 	if mode == "replace":
 		doc.set("attendance", [])
@@ -1362,6 +1463,14 @@ def import_attendance(name=None, content=None, mode="replace", filename=None):
 	doc.save(ignore_permissions=False)
 	frappe.db.commit()
 	attendance = [_attendance_row_dict(r) for r in doc.attendance or []]
+	msg = _("Imported {0} attendance row(s) for {1} ({2}).").format(
+		added, doc.name, stats.get("training_date") or doc.training_date
+	)
+	if stats.get("filtered"):
+		msg += " " + _("Skipped {0} row(s) from other day(s): {1}.").format(
+			stats.get("filtered"),
+			", ".join(stats.get("other_dates") or []) or _("n/a"),
+		)
 	return {
 		"ok": 1,
 		"name": doc.name,
@@ -1369,10 +1478,11 @@ def import_attendance(name=None, content=None, mode="replace", filename=None):
 		"zoom_attendance_file": file_url or getattr(doc, "zoom_attendance_file", None) or "",
 		"attachments": _list_training_files(doc.name),
 		"added": added,
+		"filter_stats": stats,
 		"attendance": attendance,
 		"attendance_present": sum(1 for a in attendance if a["attendance_status"] == "Present"),
 		"attendance_total": len(attendance),
-		"message": _("Imported {0} attendance row(s) for {1}.").format(added, doc.name),
+		"message": msg,
 	}
 
 def _file_row(file_doc) -> dict:
