@@ -14,9 +14,113 @@ class Reporting(Document):
 	pass
 
 
-def _can_view_all_reports():
-	user_roles = set(frappe.get_roles(frappe.session.user))
+def get_permission_query_conditions(user=None):
+	"""List view: own reports + User Permission team (reported_by / owner)."""
+	user = user or frappe.session.user
+	if not user or user == "Administrator":
+		return None
+	if _can_view_all_reports_for(user):
+		return None
+
+	permitted = _permitted_reported_by_users(user)
+	if permitted is None:
+		return None
+	users = sorted(u for u in permitted if u)
+	if not users:
+		return f"(`tabReporting`.`owner` = {frappe.db.escape(user)})"
+
+	in_list = ", ".join(frappe.db.escape(u) for u in users)
+	return f"""(
+		`tabReporting`.`owner` IN ({in_list})
+		OR `tabReporting`.`reported_by` IN ({in_list})
+	)"""
+
+
+def has_permission(doc, ptype=None, user=None):
+	"""Document access: managers all; others own or permitted reported_by."""
+	user = user or frappe.session.user
+	if not user or user == "Administrator":
+		return True
+	if _can_view_all_reports_for(user):
+		return True
+
+	permitted = _permitted_reported_by_users(user)
+	if permitted is None:
+		return True
+
+	owner = (getattr(doc, "owner", None) or "").strip()
+	reported = (getattr(doc, "reported_by", None) or "").strip()
+	if reported in ("", "frappe.session.user"):
+		reported = owner
+	return owner in permitted or reported in permitted
+
+
+def _can_view_all_reports_for(user=None):
+	user = user or frappe.session.user
+	user_roles = set(frappe.get_roles(user))
 	return bool(user_roles & {"System Manager", "COO", "Staff Reporting Manager"})
+
+
+def _can_view_all_reports():
+	return _can_view_all_reports_for(frappe.session.user)
+
+
+def _permitted_reported_by_users(user=None):
+	"""Users whose daily Reporting the session user may view.
+
+	- Staff Reporting Manager / COO / System Manager → None (unrestricted)
+	- Else: session user + User Permissions (Allow=User) + Employee UPs mapped to user_id
+	"""
+	user = (user or frappe.session.user or "").strip()
+	if not user or user == "Guest":
+		return {user} if user else set()
+	if _can_view_all_reports():
+		return None
+
+	allowed = {user}
+	for row in frappe.get_all(
+		"User Permission",
+		filters={"user": user, "allow": "User"},
+		fields=["for_value"],
+	):
+		if row.for_value:
+			allowed.add(row.for_value.strip())
+
+	emp_ids = [
+		row.for_value
+		for row in frappe.get_all(
+			"User Permission",
+			filters={"user": user, "allow": "Employee"},
+			fields=["for_value"],
+		)
+		if row.for_value
+	]
+	if emp_ids:
+		for emp in frappe.get_all(
+			"Employee",
+			filters={"name": ["in", emp_ids]},
+			fields=["user_id", "company_email"],
+		):
+			uid = (emp.user_id or emp.company_email or "").strip()
+			if uid:
+				allowed.add(uid)
+	return allowed
+
+
+def _permission_payload(can_view_all, permitted_users):
+	"""Flags for Reporting Report UI (employee filter lock / allowed users)."""
+	if can_view_all or permitted_users is None:
+		return {
+			"can_view_all": True,
+			"can_select_team": True,
+			"permitted_users": [],
+		}
+	users = sorted(u for u in permitted_users if u)
+	return {
+		"can_view_all": False,
+		"can_select_team": len(users) > 1,
+		"permitted_users": users,
+	}
 
 
 def _resolved_reported_by_sql():
@@ -384,8 +488,14 @@ def get_reporting_dashboard_data(
 		frappe.throw(_("From Date cannot be after To Date."))
 
 	can_view_all = _can_view_all_reports()
+	permitted_users = _permitted_reported_by_users()
+	# Non-managers: only self + users granted via User Permission.
 	if not can_view_all:
-		employee = frappe.session.user
+		employee = (employee or "").strip() or None
+		if employee and permitted_users is not None and employee not in permitted_users:
+			frappe.throw(_("You are not permitted to view daily reporting for this user."))
+		if not employee and permitted_users is not None and len(permitted_users) == 1:
+			employee = frappe.session.user
 
 	conditions = ["r.docstatus < 2"]
 	params = {}
@@ -407,6 +517,17 @@ def get_reporting_dashboard_data(
 			)"""
 		)
 		params["employee"] = employee
+	elif not can_view_all and permitted_users is not None:
+		conditions.append(
+			f"""(
+				{_resolved_reported_by_sql()} IN %(permitted_users)s
+				OR (
+					(r.reported_by = 'frappe.session.user' OR IFNULL(r.reported_by, '') = '')
+					AND r.owner IN %(permitted_users)s
+				)
+			)"""
+		)
+		params["permitted_users"] = tuple(permitted_users) or (frappe.session.user,)
 	if status:
 		conditions.append("sr.status = %(status)s")
 		params["status"] = status
@@ -418,7 +539,7 @@ def get_reporting_dashboard_data(
 		if not section_users:
 			empty_missing = _missing_report_payload(from_date, to_date, section=section, employee_user=employee)
 			return {
-				"can_view_all": can_view_all,
+				**_permission_payload(can_view_all, permitted_users),
 				"rows": [],
 				"kpis": {
 					"total_reports": 0,
@@ -497,7 +618,7 @@ def get_reporting_dashboard_data(
 	)
 
 	return {
-		"can_view_all": can_view_all,
+		**_permission_payload(can_view_all, permitted_users),
 		"rows": data,
 		"section_users_wise": section_users_wise,
 		"missing_reports": missing_reports,

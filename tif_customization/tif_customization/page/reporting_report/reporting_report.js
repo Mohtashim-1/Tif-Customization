@@ -217,13 +217,27 @@ class ReportingDataPage {
 	}
 
 	apply_permissions(payload) {
-		if (payload.can_view_all) {
+		const permitted = (payload.permitted_users || []).filter(Boolean);
+		const canPick =
+			payload.can_view_all || payload.can_select_team || permitted.length > 1;
+
+		if (canPick) {
 			this.filters.employee.df.read_only = 0;
+			// Limit link options to User Permission team (managers keep full User list).
+			if (!payload.can_view_all && permitted.length) {
+				this.filters.employee.df.get_query = () => ({
+					filters: { name: ["in", permitted] },
+				});
+			} else {
+				this.filters.employee.df.get_query = null;
+			}
 			this.filters.employee.refresh();
 			return;
 		}
 
+		// Only own reporting — lock filter to session user.
 		this.filters.employee.df.read_only = 1;
+		this.filters.employee.df.get_query = null;
 		if (this.filters.employee.get_value() !== frappe.session.user) {
 			this.set_filters({ employee: frappe.session.user });
 		}
@@ -246,7 +260,13 @@ class ReportingDataPage {
 			e.preventDefault();
 			const raw = $(e.currentTarget).attr("data-value") || "";
 			const value = decodeURIComponent(raw);
+			const permitted = (this.payload && this.payload.permitted_users) || [];
+			const canPick =
+				(this.payload && (this.payload.can_view_all || this.payload.can_select_team)) ||
+				permitted.length > 1;
 			if (this.filters.employee.df.read_only && value !== frappe.session.user) return;
+			if (!canPick && value !== frappe.session.user) return;
+			if (!this.payload?.can_view_all && permitted.length && !permitted.includes(value)) return;
 			this.set_filter_and_reload("employee", value);
 		});
 

@@ -165,11 +165,13 @@ jinja = {
 permission_query_conditions = {
 	"Field Visit": "tif_customization.tif_customization.field_visit_permissions.get_permission_query_conditions",
 	"Field Officer": "tif_customization.tif_customization.doctype.field_officer.field_officer_permissions.get_permission_query_conditions",
+	"Reporting": "tif_customization.tif_customization.doctype.reporting.reporting.get_permission_query_conditions",
 }
 
 has_permission = {
 	"Field Visit": "tif_customization.tif_customization.field_visit_permissions.has_permission",
 	"Field Officer": "tif_customization.tif_customization.doctype.field_officer.field_officer_permissions.has_permission",
+	"Reporting": "tif_customization.tif_customization.doctype.reporting.reporting.has_permission",
 }
 
 # DocType Class
