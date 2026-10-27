@@ -65,19 +65,70 @@ def _can_view_all_reports():
 	return _can_view_all_reports_for(frappe.session.user)
 
 
+def _employee_for_user(user):
+	"""Resolve Employee name for a login user."""
+	user = (user or "").strip()
+	if not user:
+		return None
+	return (
+		frappe.db.get_value("Employee", {"user_id": user}, "name")
+		or frappe.db.get_value("Employee", {"company_email": user}, "name")
+	)
+
+
+def _subordinate_user_ids(user):
+	"""All nested subordinates' User IDs (Employee.reports_to tree)."""
+	manager_emp = _employee_for_user(user)
+	if not manager_emp:
+		return set()
+
+	to_visit = [manager_emp]
+	seen_emps = {manager_emp}
+	sub_emps = set()
+	while to_visit:
+		current = to_visit.pop()
+		children = frappe.get_all(
+			"Employee",
+			filters={"reports_to": current},
+			pluck="name",
+		)
+		for child in children:
+			if child in seen_emps:
+				continue
+			seen_emps.add(child)
+			sub_emps.add(child)
+			to_visit.append(child)
+
+	if not sub_emps:
+		return set()
+
+	users = set()
+	for emp in frappe.get_all(
+		"Employee",
+		filters={"name": ["in", list(sub_emps)]},
+		fields=["user_id", "company_email"],
+	):
+		uid = (emp.user_id or emp.company_email or "").strip()
+		if uid:
+			users.add(uid)
+	return users
+
+
 def _permitted_reported_by_users(user=None):
 	"""Users whose daily Reporting the session user may view.
 
 	- Staff Reporting Manager / COO / System Manager → None (unrestricted)
-	- Else: session user + User Permissions (Allow=User) + Employee UPs mapped to user_id
+	- Else: self + reports_to subordinates + User Permissions (User / Employee)
 	"""
 	user = (user or frappe.session.user or "").strip()
 	if not user or user == "Guest":
 		return {user} if user else set()
-	if _can_view_all_reports():
+	if _can_view_all_reports_for(user):
 		return None
 
 	allowed = {user}
+	allowed.update(_subordinate_user_ids(user))
+
 	for row in frappe.get_all(
 		"User Permission",
 		filters={"user": user, "allow": "User"},

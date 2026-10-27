@@ -3,14 +3,42 @@
  "creation": "2026-02-16 16:03:40.462266",
  "docstatus": 0,
  "doctype": "Page",
- "idx": 0,
- "modified": "2026-04-10 15:44:24.096421",
+ "idx": 9,
+ "modified": "2026-10-27 14:56:04.946854",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "reporting-report",
  "owner": "Administrator",
  "page_name": "reporting-report",
- "roles": [],
+ "roles": [
+  {
+   "role": "All"
+  },
+  {
+   "role": "Employee"
+  },
+  {
+   "role": "Staff Reporting"
+  },
+  {
+   "role": "Staff Reporting Manager"
+  },
+  {
+   "role": "HOD"
+  },
+  {
+   "role": "HR Manager"
+  },
+  {
+   "role": "HR User"
+  },
+  {
+   "role": "COO"
+  },
+  {
+   "role": "System Manager"
+  }
+ ],
  "script": null,
  "standard": "Yes",
  "style": null,
