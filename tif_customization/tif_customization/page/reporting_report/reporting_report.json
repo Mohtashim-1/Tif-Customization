@@ -4,7 +4,7 @@
  "docstatus": 0,
  "doctype": "Page",
  "idx": 9,
- "modified": "2026-10-27 14:56:04.946854",
+ "modified": "2026-10-28 00:11:33.181547",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "reporting-report",
@@ -37,6 +37,12 @@
   },
   {
    "role": "System Manager"
+  },
+  {
+   "role": "Field Staff"
+  },
+  {
+   "role": "Desk User"
   }
  ],
  "script": null,

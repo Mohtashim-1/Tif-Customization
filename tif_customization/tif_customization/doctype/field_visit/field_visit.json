@@ -1975,7 +1975,9 @@
    "role": "System Manager",
    "share": 1,
    "submit": 1,
-   "write": 1
+   "write": 1,
+   "cancel": 1,
+   "select": 1
   },
   {
    "create": 1,
@@ -1984,10 +1986,11 @@
    "print": 1,
    "read": 1,
    "report": 1,
-   "role": "HR Manager",
+   "role": "Field Staff",
    "share": 1,
    "submit": 1,
-   "write": 1
+   "write": 1,
+   "select": 1
   },
   {
    "create": 1,
@@ -1996,34 +1999,11 @@
    "print": 1,
    "read": 1,
    "report": 1,
-   "role": "HR User",
+   "role": "Field Staff Manager",
    "share": 1,
    "submit": 1,
-   "write": 1
-  },
-  {
-   "create": 1,
-   "email": 1,
-   "export": 1,
-   "print": 1,
-   "read": 1,
-   "report": 1,
-   "role": "Sales User",
-   "share": 1,
-   "submit": 1,
-   "write": 1
-  },
-  {
-   "create": 1,
-   "email": 1,
-   "export": 1,
-   "print": 1,
-   "read": 1,
-   "report": 1,
-   "role": "Employee",
-   "share": 1,
-   "submit": 1,
-   "write": 1
+   "write": 1,
+   "select": 1
   }
  ],
  "row_format": "Dynamic",

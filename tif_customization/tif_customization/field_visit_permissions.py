@@ -40,21 +40,39 @@ def visit_day_sql(alias: str = "fv") -> str:
 	"""
 
 
-# Roles that can see all Field Visits / field staff reports
+# Who may open Field Visit at all (DocPerm should match this).
+FIELD_VISIT_ACCESS_ROLES = {
+	"System Manager",
+	"Field Staff",
+	"Field Staff Manager",
+}
+
+# Explicit users who always get Field Visit (IT / HR support).
+FIELD_VISIT_ADMIN_USERS = {
+	"farhan.hussain@tif.edu.pk",
+	"anas.khan@tif.edu.pk",
+}
+
+# Roles that can see every Field Visit (not just own/team).
 VIEW_ALL_ROLES = {
 	"System Manager",
-	"HR Manager",
-	"HR User",
 	"Field Staff Manager",
-	"HOD",
-	"COO",
-	"Staff Reporting Manager",
 }
+
+
+def can_access_field_visit(user: str | None = None) -> bool:
+	"""True if user is allowed Field Visit module access."""
+	user = user or frappe.session.user
+	if not user or user == "Guest":
+		return False
+	if user == "Administrator" or user in FIELD_VISIT_ADMIN_USERS:
+		return True
+	return bool(set(frappe.get_roles(user)) & FIELD_VISIT_ACCESS_ROLES)
 
 
 def can_view_all_field_visits(user: str | None = None) -> bool:
 	user = user or frappe.session.user
-	if user == "Administrator":
+	if user == "Administrator" or user in FIELD_VISIT_ADMIN_USERS:
 		return True
 	roles = set(frappe.get_roles(user))
 	return bool(roles & VIEW_ALL_ROLES)
@@ -435,6 +453,8 @@ def get_team_match_values(user: str | None = None) -> list[str]:
 def get_permission_query_conditions(user: str | None = None) -> str | None:
 	"""Restrict Field Visit list/query to own + team visits for field leads/staff."""
 	user = user or frappe.session.user
+	if not can_access_field_visit(user):
+		return "1=0"
 	if can_view_all_field_visits(user):
 		return None
 
@@ -466,6 +486,8 @@ def get_permission_query_conditions(user: str | None = None) -> str | None:
 
 def has_permission(doc, ptype: str = "read", user: str | None = None) -> bool:
 	user = user or frappe.session.user
+	if not can_access_field_visit(user):
+		return False
 	if can_view_all_field_visits(user):
 		return True
 
