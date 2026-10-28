@@ -389,6 +389,11 @@ function openEdit(name) {
 }
 
 function onSaved(result) {
+	// After auto-save during CSV import, bind the open form to the new doc name
+	// without closing — and without clearing import UI via a full remount race.
+	if (result?.bindName && formOpen.value) {
+		editingName.value = result.bindName;
+	}
 	if (result?.silent) {
 		if (activeNav.value === "dashboard" || activeNav.value === "schedule") loadRange();
 		else if (activeNav.value !== "settings") loadDirectory(activeNav.value);

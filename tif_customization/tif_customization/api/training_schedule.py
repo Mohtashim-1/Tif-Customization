@@ -384,7 +384,15 @@ def _parse_zoom_join_date(value) -> object | None:
 	# Time-only → no session day
 	if re.fullmatch(r"\d{1,2}:\d{2}(:\d{2})?", text):
 		return None
+	# Zoom often exports 12-hour clocks: 01/01/2026 03:57:00 PM
+	text_ampm = re.sub(r"\s+", " ", text)
 	for fmt in (
+		"%m/%d/%Y %I:%M:%S %p",
+		"%m/%d/%Y %I:%M %p",
+		"%d/%m/%Y %I:%M:%S %p",
+		"%d/%m/%Y %I:%M %p",
+		"%Y-%m-%d %I:%M:%S %p",
+		"%Y-%m-%d %I:%M %p",
 		"%m/%d/%Y %H:%M:%S",
 		"%m/%d/%Y %H:%M",
 		"%d/%m/%Y %H:%M:%S",
@@ -397,7 +405,7 @@ def _parse_zoom_join_date(value) -> object | None:
 		"%Y-%m-%d",
 	):
 		try:
-			return getdate(datetime.strptime(text, fmt).date())
+			return getdate(datetime.strptime(text_ampm, fmt).date())
 		except ValueError:
 			continue
 	try:
@@ -1409,13 +1417,12 @@ def parse_attendance_csv(content=None, training_date=None):
 
 
 @frappe.whitelist()
-def import_attendance(name=None, content=None, mode="replace", filename=None):
-	"""Bulk-import Zoom attendance CSV onto one Upcoming Training day only.
+def import_attendance(name=None, content=None, mode="replace", filename=None, ignore_date=0):
+	"""Bulk-import Zoom attendance CSV onto one Upcoming Training.
 
-	Zoom CSVs include join timestamps with calendar dates. For multi-day programs
-	(same Zoom ID / program across several Upcoming Training rows), only rows whose
-	join date matches this training's training_date are imported — so day 1
-	attendance is not copied onto day 2 and day 3.
+	By default only rows whose Zoom join date matches this training's training_date
+	are imported (multi-day programs). Pass ignore_date=1 to load every CSV row
+	onto this session (use when Zoom export date is wrong / single report for this day).
 	"""
 	_require_login()
 	if not name:
@@ -1428,49 +1435,67 @@ def import_attendance(name=None, content=None, mode="replace", filename=None):
 		frappe.throw(_("No attendance rows found in the CSV."))
 
 	doc = frappe.get_doc(DOCTYPE, name)
-	rows, stats = _filter_attendance_rows_for_training_date(rows, doc.training_date)
-	if not rows:
-		other = ", ".join(stats.get("other_dates") or []) or _("none")
-		frappe.throw(
-			_(
-				"No Zoom attendance rows match this session date ({0}). "
-				"CSV has participants on: {1}. Open the Upcoming Training for that day and import there."
-			).format(stats.get("training_date") or doc.training_date, other)
-		)
+	# Always keep the uploaded CSV on the training, even if date filter keeps 0 rows.
+	file_url = _attach_csv_to_training(doc, filename or "zoom_attendance.csv", content or "")
+
+	ignore_date = cint(ignore_date)
+	if ignore_date:
+		matched, stats = rows, {
+			"filtered": 0,
+			"kept": len(rows),
+			"undated": 0,
+			"other_dates": [],
+			"training_date": str(getdate(doc.training_date)) if doc.training_date else "",
+			"ignored_date_filter": 1,
+		}
+	else:
+		matched, stats = _filter_attendance_rows_for_training_date(rows, doc.training_date)
 
 	mode = (mode or "replace").strip().lower()
-	if mode == "replace":
-		doc.set("attendance", [])
-
-	existing_keys = {
-		((r.participant_name or "").strip().lower(), (r.email or "").strip().lower())
-		for r in (doc.attendance or [])
-	}
 	added = 0
-	for row in rows:
-		key = ((row.get("participant_name") or "").strip().lower(), (row.get("email") or "").strip().lower())
-		if mode == "append" and key in existing_keys:
-			continue
-		payload = _attendance_append_values(row)
-		if not payload:
-			continue
-		doc.append("attendance", payload)
-		existing_keys.add(key)
-		added += 1
+	if matched:
+		if mode == "replace":
+			doc.set("attendance", [])
 
-	file_url = _attach_csv_to_training(doc, filename or "zoom_attendance.csv", content or "")
+		existing_keys = {
+			((r.participant_name or "").strip().lower(), (r.email or "").strip().lower())
+			for r in (doc.attendance or [])
+		}
+		for row in matched:
+			key = ((row.get("participant_name") or "").strip().lower(), (row.get("email") or "").strip().lower())
+			if mode == "append" and key in existing_keys:
+				continue
+			payload = _attendance_append_values(row)
+			if not payload:
+				continue
+			doc.append("attendance", payload)
+			existing_keys.add(key)
+			added += 1
+	elif mode == "replace":
+		# CSV attached but no day match — clear stale attendance so the wrong day is not kept.
+		doc.set("attendance", [])
 
 	doc.save(ignore_permissions=False)
 	frappe.db.commit()
 	attendance = [_attendance_row_dict(r) for r in doc.attendance or []]
-	msg = _("Imported {0} attendance row(s) for {1} ({2}).").format(
-		added, doc.name, stats.get("training_date") or doc.training_date
-	)
-	if stats.get("filtered"):
-		msg += " " + _("Skipped {0} row(s) from other day(s): {1}.").format(
-			stats.get("filtered"),
-			", ".join(stats.get("other_dates") or []) or _("n/a"),
+	if not matched:
+		other = ", ".join(stats.get("other_dates") or []) or _("none")
+		msg = _(
+			"CSV attached, but no rows match this session date ({0}). "
+			"Participants in file are on: {1}. "
+			"Tick “Import all rows” and import again if this file is for this session."
+		).format(stats.get("training_date") or doc.training_date, other)
+	else:
+		msg = _("Imported {0} attendance row(s) for {1} ({2}).").format(
+			added, doc.name, stats.get("training_date") or doc.training_date
 		)
+		if ignore_date:
+			msg += " " + _("(Imported all CSV rows — join-date filter off.)")
+		elif stats.get("filtered"):
+			msg += " " + _("Skipped {0} row(s) from other day(s): {1}.").format(
+				stats.get("filtered"),
+				", ".join(stats.get("other_dates") or []) or _("n/a"),
+			)
 	return {
 		"ok": 1,
 		"name": doc.name,
@@ -1479,6 +1504,7 @@ def import_attendance(name=None, content=None, mode="replace", filename=None):
 		"attachments": _list_training_files(doc.name),
 		"added": added,
 		"filter_stats": stats,
+		"date_mismatch": 0 if matched else 1,
 		"attendance": attendance,
 		"attendance_present": sum(1 for a in attendance if a["attendance_status"] == "Present"),
 		"attendance_total": len(attendance),
@@ -1564,11 +1590,23 @@ def upload_attachment(name=None):
 
 	file_doc = save_file(filename, content, DOCTYPE, name, is_private=0)
 	frappe.db.commit()
+
+	# Return the attachment immediately. OCR is slow on scanned PDFs — run it in a
+	# follow-up API call from the portal so the user always sees "file attached".
+	lower_name = filename.lower()
+	needs_ocr = any(
+		lower_name.endswith(ext) for ext in (".pdf", ".png", ".jpg", ".jpeg", ".webp", ".tif", ".tiff")
+	)
 	return {
 		"ok": 1,
 		"file": _file_row(file_doc),
 		"files": _list_training_files(name),
 		"message": _("Attached {0}.").format(filename),
+		"needs_ocr": 1 if needs_ocr else 0,
+		"file_url": file_doc.file_url,
+		"file_name": filename,
+		"ocr": None,
+		"feedback_forms": [],
 	}
 
 

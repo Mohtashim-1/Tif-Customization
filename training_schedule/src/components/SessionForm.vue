@@ -21,10 +21,15 @@ const creatingLink = ref("");
 const error = ref("");
 const importMsg = ref("");
 const attachMsg = ref("");
+const attachErr = ref("");
+const attachStatus = ref(""); // Saving… / Uploading… / Running OCR…
 const importMode = ref("replace");
+const importAllDates = ref(false);
 const fileInput = ref(null);
 const attachmentInput = ref(null);
 const attachments = ref([]);
+const feedbackForms = ref([]);
+const OCR_METHOD = "tif_customization.tif_customization.api.workshop_feedback_ocr";
 const options = ref({
 	trainers: [],
 	programs: [],
@@ -124,7 +129,10 @@ function reset() {
 	});
 	importMsg.value = "";
 	attachMsg.value = "";
+	attachErr.value = "";
+	attachStatus.value = "";
 	attachments.value = [];
+	feedbackForms.value = [];
 }
 
 function formatFileSize(bytes) {
@@ -136,33 +144,77 @@ function formatFileSize(bytes) {
 }
 
 function triggerAttachmentUpload() {
-	if (!form.name) {
-		error.value = "Save the training first, then upload attachments.";
-		return;
-	}
+	attachErr.value = "";
+	attachMsg.value = "";
 	attachmentInput.value?.click();
 }
 
 async function onAttachmentFile(event) {
 	const file = event.target?.files?.[0];
-	if (!file) return;
-	if (!form.name) {
-		error.value = "Save the training first, then upload attachments.";
-		if (event.target) event.target.value = "";
+	if (!file) {
+		attachErr.value = "No file selected. Choose a PDF or image and try again.";
 		return;
 	}
 	uploadingAttachment.value = true;
 	error.value = "";
 	attachMsg.value = "";
+	attachErr.value = "";
+	attachStatus.value = "Saving session…";
 	try {
-		const result = await apiUpload(`${METHOD}.upload_attachment`, { name: form.name }, file);
+		// Attachments + OCR need a saved Upcoming Training — auto-save New Training first.
+		const name = await ensureTrainingSaved();
+		attachStatus.value = `Uploading ${file.name}…`;
+		const result = await apiUpload(`${METHOD}.upload_attachment`, { name }, file);
 		attachments.value = result.files || [];
 		attachMsg.value = result.message || `Attached ${file.name}.`;
+
+		if (result.needs_ocr && result.file_url) {
+			attachStatus.value = "Running OCR on feedback form…";
+			try {
+				const ocr = await apiPost(`${OCR_METHOD}.process_uploaded_feedback`, {
+					name,
+					file_url: result.file_url,
+					filename: result.file_name || file.name,
+				});
+				if (Array.isArray(ocr.feedback_forms)) feedbackForms.value = ocr.feedback_forms;
+				else await loadFeedbackForms(name);
+				attachMsg.value = ocr.message || attachMsg.value;
+				const ocrMeta = ocr.ocr || {};
+				if (ocrMeta.status === "Failed" || !(ocrMeta.processed > 0)) {
+					attachErr.value =
+						ocrMeta.error_message ||
+						"File attached, but OCR could not read form pages. Open Workshop Feedback OCR to review.";
+				}
+			} catch (ocrErr) {
+				await loadFeedbackForms(name);
+				attachErr.value =
+					(ocrErr && ocrErr.message) ||
+					"File attached, but OCR failed. You can retry from Workshop Feedback OCR.";
+			}
+		} else {
+			await loadFeedbackForms(name);
+		}
 	} catch (e) {
-		error.value = e.message || String(e);
+		const msg = e.message || String(e);
+		attachErr.value = msg;
+		error.value = msg;
 	} finally {
+		attachStatus.value = "";
 		uploadingAttachment.value = false;
 		if (event.target) event.target.value = "";
+	}
+}
+
+async function loadFeedbackForms(name) {
+	if (!name) {
+		feedbackForms.value = [];
+		return;
+	}
+	try {
+		const res = await apiGet(`${OCR_METHOD}.list_session_feedback`, { name });
+		feedbackForms.value = res?.rows || [];
+	} catch {
+		feedbackForms.value = [];
 	}
 }
 
@@ -209,6 +261,25 @@ function mergeImportedRows(rows, mode) {
 	}
 }
 
+async function ensureTrainingSaved() {
+	if (form.name) return form.name;
+	if (!(form.training_date || "").trim()) {
+		throw new Error("Set the session date, then import the CSV so the file can be attached.");
+	}
+	const payload = {
+		...form,
+		attendance: (form.attendance || []).filter((a) => (a.participant_name || "").trim()),
+	};
+	const saved = await apiPost(`${METHOD}.save_session`, { values: payload });
+	if (!saved?.name) {
+		throw new Error("Could not save the training before attaching the CSV. Try Save first.");
+	}
+	form.name = saved.name;
+	// Keep parent editingName in sync so later opens/reloads hit this doc — but stay silent.
+	emit("saved", { ...saved, silent: true, bindName: saved.name });
+	return form.name;
+}
+
 async function onImportFile(event) {
 	const file = event.target?.files?.[0];
 	if (!file) return;
@@ -217,28 +288,26 @@ async function onImportFile(event) {
 	importMsg.value = "";
 	try {
 		const content = await file.text();
-		if (form.name) {
-			const result = await apiPost(`${METHOD}.import_attendance`, {
-				name: form.name,
-				content,
-				mode: importMode.value,
-				filename: file.name,
-			});
-			form.attendance = (result.attendance || []).map((a) => ({ ...blankAttendee(), ...a }));
-			if (result.zoom_attendance_file) form.zoom_attendance_file = result.zoom_attendance_file;
-			if (result.attachments) attachments.value = result.attachments;
-			importMsg.value = result.message || `Imported ${result.added || 0} row(s).`;
-			emit("saved", { ...result, silent: true });
-		} else {
-			const result = await apiPost(`${METHOD}.parse_attendance_csv`, {
-				content,
-				training_date: form.training_date || "",
-			});
-			mergeImportedRows(result.rows || [], importMode.value);
-			importMsg.value =
+		// File attach needs a saved Upcoming Training — auto-save New Training first.
+		const name = await ensureTrainingSaved();
+		const result = await apiPost(`${METHOD}.import_attendance`, {
+			name,
+			content,
+			mode: importMode.value,
+			filename: file.name,
+			ignore_date: importAllDates.value ? 1 : 0,
+		});
+		// Re-fetch so the table always matches what was saved (avoids stale empty UI).
+		const doc = await apiGet(`${METHOD}.get_session`, { name });
+		await applySessionDoc(doc);
+		importMsg.value = result.message || `Imported ${result.added || 0} row(s).`;
+		if (result.date_mismatch) {
+			error.value =
 				result.message ||
-				`Loaded ${result.count || 0} row(s). Save the training to store attendance.`;
+				"CSV attached, but no rows match this session date. Tick “Import all rows” and import again.";
+			importMsg.value = "";
 		}
+		emit("saved", { ...result, silent: true, bindName: name });
 	} catch (e) {
 		error.value = e.message || String(e);
 	} finally {
@@ -312,21 +381,31 @@ watch(
 	}
 );
 
+async function applySessionDoc(doc) {
+	Object.assign(form, {
+		...doc,
+		attendance: (doc.attendance || []).map((a) => ({ ...blankAttendee(), ...a })),
+	});
+	attachments.value = doc.attachments || [];
+	if (doc.zoom_attendance_file) form.zoom_attendance_file = doc.zoom_attendance_file;
+	await loadFeedbackForms(form.name || doc.name);
+}
+
 async function load() {
 	if (!props.open) return;
+	// Don't wipe in-progress import / attachment UI with a concurrent reload.
+	if (importing.value || uploadingAttachment.value) return;
 	loading.value = true;
 	error.value = "";
+	importMsg.value = "";
+	attachMsg.value = "";
 	try {
 		options.value = await apiGet(`${METHOD}.get_form_options`);
 		if (props.sessionName) {
 			const doc = await apiGet(`${METHOD}.get_session`, {
 				name: props.sessionName,
 			});
-			Object.assign(form, {
-				...doc,
-				attendance: (doc.attendance || []).map((a) => ({ ...blankAttendee(), ...a })),
-			});
-			attachments.value = doc.attachments || [];
+			await applySessionDoc(doc);
 		} else {
 			reset();
 		}
@@ -558,21 +637,31 @@ onMounted(load);
 							<p>Upload Zoom CSV, photos, PDFs, or other training files.</p>
 						</div>
 						<div class="attend-actions">
-							<input ref="attachmentInput" type="file" hidden @change="onAttachmentFile" />
+							<input
+								ref="attachmentInput"
+								type="file"
+								accept=".pdf,.png,.jpg,.jpeg,.webp,.tif,.tiff,application/pdf,image/*"
+								hidden
+								@change="onAttachmentFile"
+							/>
 							<button
 								type="button"
 								class="ghost"
-								:disabled="uploadingAttachment || !form.name"
+								:disabled="uploadingAttachment"
 								@click="triggerAttachmentUpload"
 							>
-								{{ uploadingAttachment ? "Uploading…" : "+ Upload attachment" }}
+								{{ uploadingAttachment ? "Working…" : "+ Upload attachment" }}
 							</button>
 						</div>
 					</div>
-					<p v-if="!form.name" class="import-hint">
-						Save the training once, then you can upload attachments here.
+					<p class="import-hint">
+						Phase 1: upload a scanned Workshop Evaluation Form (PDF/image). New sessions are
+						saved automatically, then OCR extracts participant details and tags them to this
+						session as Workshop Feedback OCR. Keep files under ~50 MB (compress CamScanner PDFs if needed).
 					</p>
+					<p v-if="attachStatus" class="import-ok">{{ attachStatus }}</p>
 					<p v-if="attachMsg" class="import-ok">{{ attachMsg }}</p>
+					<p v-if="attachErr" class="attach-err">{{ attachErr }}</p>
 					<div v-if="attachments.length" class="attach-list">
 						<div v-for="file in attachments" :key="file.file_url || file.name" class="attach-item">
 							<div class="attach-item__main">
@@ -592,8 +681,37 @@ onMounted(load);
 							</button>
 						</div>
 					</div>
-					<div v-else-if="form.name" class="attend-empty">
-						No attachments yet. Upload a file or import Zoom CSV in Attendance below.
+					<div v-else class="attend-empty">
+						No attachments yet. Upload a feedback PDF/image or import Zoom CSV below.
+					</div>
+
+					<div v-if="feedbackForms.length" class="feedback-ocr-block">
+						<h4>OCR feedback forms ({{ feedbackForms.length }})</h4>
+						<div
+							v-for="fb in feedbackForms"
+							:key="fb.name"
+							class="feedback-ocr-card"
+							:data-status="fb.status"
+						>
+							<div class="feedback-ocr-top">
+								<strong>{{ fb.participant_name || "Unknown participant" }}</strong>
+								<span class="attach-tag">{{ fb.status }}</span>
+							</div>
+							<div class="feedback-ocr-meta">
+								<span v-if="fb.page_number">Page {{ fb.page_number }}<template v-if="fb.page_count">/{{ fb.page_count }}</template></span>
+								<span v-if="fb.school"> · {{ fb.school }}</span>
+								<span v-if="fb.mobile_no"> · {{ fb.mobile_no }}</span>
+								<span v-if="fb.feedback_date"> · {{ fb.feedback_date }}</span>
+								<span v-if="fb.topic"> · {{ fb.topic }}</span>
+							</div>
+							<div class="feedback-ocr-meta muted">
+								<a v-if="fb.name" :href="`/app/workshop-feedback-ocr/${fb.name}`" target="_blank" rel="noopener">
+									{{ fb.name }}
+								</a>
+								<span v-if="fb.source_file_name"> · {{ fb.source_file_name }}</span>
+								<span v-if="fb.error_message"> · {{ fb.error_message }}</span>
+							</div>
+						</div>
 					</div>
 				</section>
 
@@ -614,6 +732,10 @@ onMounted(load);
 									<option value="replace">Replace all</option>
 									<option value="append">Append new</option>
 								</select>
+							</label>
+							<label class="mode-pick check-inline" title="Use when Zoom export date does not match this session">
+								<input type="checkbox" v-model="importAllDates" />
+								Import all rows
 							</label>
 							<input
 								ref="fileInput"
@@ -638,9 +760,9 @@ onMounted(load);
 					</div>
 					<p class="import-hint">
 						CSV: Name, Email, Join time, Leave time, Duration, Guest, Disclaimer, Waiting room.
-						For multi-day programs, only participants whose Zoom join date matches this
-						session date ({{ form.training_date || "—" }}) are imported — other days are skipped.
-						The file is saved as an attachment on this training after import.
+						By default only rows whose Zoom join date matches this session date
+						({{ form.training_date || "—" }}) are imported.
+						If the Zoom file date is wrong, tick <strong>Import all rows</strong> before importing.
 					</p>
 
 					<div v-if="!form.attendance.length" class="attend-empty">
@@ -848,6 +970,19 @@ select:focus {
 .mode-pick {
 	min-width: 130px;
 }
+.mode-pick.check-inline {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	min-width: auto;
+	font-size: 12px;
+	font-weight: 600;
+	color: #4b5563;
+	padding-bottom: 8px;
+}
+.mode-pick.check-inline input {
+	margin: 0;
+}
 .import-hint {
 	margin: 0 0 8px;
 	font-size: 12px;
@@ -860,6 +995,15 @@ select:focus {
 	border-radius: 8px;
 	background: #ecfdf5;
 	color: #047857;
+	font-size: 12px;
+	font-weight: 600;
+}
+.attach-err {
+	margin: 0 0 8px;
+	padding: 8px 10px;
+	border-radius: 8px;
+	background: #fef2f2;
+	color: #b91c1c;
 	font-size: 12px;
 	font-weight: 600;
 }
@@ -889,6 +1033,50 @@ select:focus {
 	display: flex;
 	flex-direction: column;
 	gap: 8px;
+}
+.feedback-ocr-block {
+	margin-top: 14px;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+.feedback-ocr-block h4 {
+	margin: 0;
+	font-size: 13px;
+	font-weight: 700;
+	color: #374151;
+}
+.feedback-ocr-card {
+	border: 1px solid #e5e7eb;
+	border-radius: 10px;
+	padding: 10px 12px;
+	background: #fafafa;
+}
+.feedback-ocr-card[data-status="Failed"] {
+	border-color: #fecaca;
+	background: #fef2f2;
+}
+.feedback-ocr-card[data-status="Processed"] {
+	border-color: #a7f3d0;
+	background: #ecfdf5;
+}
+.feedback-ocr-top {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+}
+.feedback-ocr-meta {
+	margin-top: 4px;
+	font-size: 12px;
+	color: #4b5563;
+}
+.feedback-ocr-meta.muted {
+	color: #9ca3af;
+}
+.feedback-ocr-meta a {
+	color: #6366f1;
+	text-decoration: none;
 }
 .attach-item {
 	display: flex;

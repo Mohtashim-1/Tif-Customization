@@ -1,0 +1,331 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "format:WFOCR-{YYYY}-{#####}",
+ "creation": "2026-10-28 00:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_link",
+  "upcoming_training",
+  "source_file",
+  "source_file_name",
+  "status",
+  "column_break_meta",
+  "ocr_engine",
+  "processed_on",
+  "page_number",
+  "page_count",
+  "error_message",
+  "section_participant",
+  "participant_name",
+  "school",
+  "mobile_no",
+  "email",
+  "column_break_role",
+  "participant_role",
+  "feedback_date",
+  "trainer_name",
+  "topic",
+  "duration",
+  "section_ratings",
+  "rating_overall_quality",
+  "rating_objectives_clear",
+  "rating_trainer_knowledge",
+  "rating_trainer_communication",
+  "rating_participation",
+  "rating_activities",
+  "column_break_ratings2",
+  "rating_content_structure",
+  "rating_learning_environment",
+  "rating_time_management",
+  "rating_met_objectives",
+  "rating_classroom_application",
+  "rating_professional_development",
+  "section_json",
+  "extracted_json",
+  "section_raw",
+  "raw_ocr_text"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_link",
+   "fieldtype": "Section Break",
+   "label": "Session Link"
+  },
+  {
+   "fieldname": "upcoming_training",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Upcoming Training",
+   "options": "Upcoming Training",
+   "reqd": 1
+  },
+  {
+   "fieldname": "source_file",
+   "fieldtype": "Attach",
+   "label": "Source File"
+  },
+  {
+   "fieldname": "source_file_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Source File Name"
+  },
+  {
+   "default": "Pending",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Pending\nProcessed\nFailed"
+  },
+  {
+   "fieldname": "column_break_meta",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "ocr_engine",
+   "fieldtype": "Data",
+   "label": "OCR Engine",
+   "read_only": 1
+  },
+  {
+   "fieldname": "processed_on",
+   "fieldtype": "Datetime",
+   "label": "Processed On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "page_number",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Page Number",
+   "read_only": 1
+  },
+  {
+   "fieldname": "page_count",
+   "fieldtype": "Int",
+   "label": "PDF Page Count",
+   "read_only": 1
+  },
+  {
+   "fieldname": "error_message",
+   "fieldtype": "Small Text",
+   "label": "Error Message",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_participant",
+   "fieldtype": "Section Break",
+   "label": "Participant (from form)"
+  },
+  {
+   "fieldname": "participant_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Participant Name"
+  },
+  {
+   "fieldname": "school",
+   "fieldtype": "Data",
+   "label": "School"
+  },
+  {
+   "fieldname": "mobile_no",
+   "fieldtype": "Data",
+   "label": "Mobile No"
+  },
+  {
+   "fieldname": "email",
+   "fieldtype": "Data",
+   "label": "E-mail",
+   "options": "Email"
+  },
+  {
+   "fieldname": "column_break_role",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "participant_role",
+   "fieldtype": "Data",
+   "label": "Your Role"
+  },
+  {
+   "fieldname": "feedback_date",
+   "fieldtype": "Date",
+   "label": "Form Date"
+  },
+  {
+   "fieldname": "trainer_name",
+   "fieldtype": "Data",
+   "label": "Trainer Name"
+  },
+  {
+   "fieldname": "topic",
+   "fieldtype": "Data",
+   "label": "Topic"
+  },
+  {
+   "fieldname": "duration",
+   "fieldtype": "Data",
+   "label": "Duration"
+  },
+  {
+   "fieldname": "section_ratings",
+   "fieldtype": "Section Break",
+   "label": "Ratings (1-5)"
+  },
+  {
+   "description": "Overall quality and standard of the workshop",
+   "fieldname": "rating_overall_quality",
+   "fieldtype": "Int",
+   "label": "Overall Quality"
+  },
+  {
+   "description": "The workshop objectives were clear and well explained",
+   "fieldname": "rating_objectives_clear",
+   "fieldtype": "Int",
+   "label": "Objectives Clear"
+  },
+  {
+   "description": "The trainer demonstrated good knowledge of the topic",
+   "fieldname": "rating_trainer_knowledge",
+   "fieldtype": "Int",
+   "label": "Trainer Knowledge"
+  },
+  {
+   "description": "The trainer communicated the content clearly and effectively",
+   "fieldname": "rating_trainer_communication",
+   "fieldtype": "Int",
+   "label": "Trainer Communication"
+  },
+  {
+   "description": "The trainer encouraged participation, interaction, and questions",
+   "fieldname": "rating_participation",
+   "fieldtype": "Int",
+   "label": "Participation"
+  },
+  {
+   "description": "The activities and teaching strategies were relevant and practical",
+   "fieldname": "rating_activities",
+   "fieldtype": "Int",
+   "label": "Activities"
+  },
+  {
+   "fieldname": "column_break_ratings2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "The content was relevant, well-structured, and easy to follow",
+   "fieldname": "rating_content_structure",
+   "fieldtype": "Int",
+   "label": "Content Structure"
+  },
+  {
+   "description": "The workshop provided a positive and encouraging learning environment",
+   "fieldname": "rating_learning_environment",
+   "fieldtype": "Int",
+   "label": "Learning Environment"
+  },
+  {
+   "description": "The available time was managed effectively",
+   "fieldname": "rating_time_management",
+   "fieldtype": "Int",
+   "label": "Time Management"
+  },
+  {
+   "description": "The workshop met its stated learning objectives",
+   "fieldname": "rating_met_objectives",
+   "fieldtype": "Int",
+   "label": "Met Objectives"
+  },
+  {
+   "description": "The knowledge and strategies gained can be applied in my classroom",
+   "fieldname": "rating_classroom_application",
+   "fieldtype": "Int",
+   "label": "Classroom Application"
+  },
+  {
+   "description": "Overall, this workshop was useful for my professional development",
+   "fieldname": "rating_professional_development",
+   "fieldtype": "Int",
+   "label": "Professional Development"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "section_json",
+   "fieldtype": "Section Break",
+   "label": "Extracted JSON"
+  },
+  {
+   "fieldname": "extracted_json",
+   "fieldtype": "JSON",
+   "label": "Extracted JSON",
+   "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "section_raw",
+   "fieldtype": "Section Break",
+   "label": "Raw OCR"
+  },
+  {
+   "fieldname": "raw_ocr_text",
+   "fieldtype": "Long Text",
+   "label": "Raw OCR Text",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-10-28 00:00:00",
+ "modified_by": "Administrator",
+ "module": "TIF Customization",
+ "name": "Workshop Feedback OCR",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 0,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Field Staff",
+   "share": 0,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Field Staff Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

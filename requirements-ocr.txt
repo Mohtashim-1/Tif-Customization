@@ -1,0 +1,6 @@
+# Phase 1 Workshop Feedback OCR (Training Schedule attachments)
+pymupdf>=1.24.0
+rapidocr-onnxruntime>=1.4.0
+pytesseract>=0.3.10
+pdf2image>=1.17.0
+Pillow>=10.0.0
