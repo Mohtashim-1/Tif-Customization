@@ -724,9 +724,10 @@ def get_report_data(filters=None):
 			"model_a": cint(model_counts.get("model_a") or 0),
 			"model_b": cint(model_counts.get("model_b") or 0),
 			"model_c": cint(model_counts.get("model_c") or 0),
-			"model_school_a": cint(totals.get("outcome_model_school_a") or 0),
-			"model_school_b": cint(totals.get("outcome_model_school_b") or 0),
-			"new_schools": cint(totals.get("outcome_new_schools") or 0),
+			"model_school_a": cint(totals_out.get("outcome_model_school_a") or 0),
+			"model_school_b": cint(totals_out.get("outcome_model_school_b") or 0),
+			# Distinct onboarded schools (same as outcome_fy / table footer), not staff-column sum.
+			"new_schools": cint(totals_out.get("outcome_new_schools") or 0),
 		},
 		"regions": [{"key": rk, "label": REGION_LABELS[rk]} for rk in REGION_KEYS],
 	}

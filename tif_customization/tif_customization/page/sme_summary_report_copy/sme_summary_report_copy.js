@@ -465,7 +465,9 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 	}
 
 	fmt(n) {
-		return frappe.format(n || 0, { fieldtype: "Int" });
+		// inline: avoid <div style='text-align:right'>…</div> from Int formatter
+		// (that HTML broke data-card-count → dialog titles showed 0).
+		return frappe.format(n || 0, { fieldtype: "Int" }, { inline: 1 });
 	}
 
 	fmt_days(n) {
@@ -874,6 +876,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						{ spacer: true },
 						{
 							label: __("New Registered School"),
+							count: cint(((data.outcome_fy || {}).new_schools || {}).actual),
 							value: this.fmt(((data.outcome_fy || {}).new_schools || {}).actual),
 							style: "outcome",
 							cardKind: "active_school_by_staff",
@@ -938,8 +941,14 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		if (card.pointsKind) attrs.push(`data-points-kind="${frappe.utils.escape_html(card.pointsKind)}"`);
 		if (card.cardKind) attrs.push(`data-card-kind="${frappe.utils.escape_html(card.cardKind)}"`);
 		if (card.label) attrs.push(`data-card-label="${frappe.utils.escape_html(card.label)}"`);
-		if (card.value != null && card.value !== "") {
-			attrs.push(`data-card-count="${frappe.utils.escape_html(String(card.value).replace(/,/g, ""))}"`);
+		const rawCount =
+			card.count != null && card.count !== ""
+				? card.count
+				: card.value != null && card.value !== ""
+					? String(card.value).replace(/[^\d.-]/g, "")
+					: "";
+		if (rawCount !== "" && rawCount != null) {
+			attrs.push(`data-card-count="${frappe.utils.escape_html(String(rawCount))}"`);
 		}
 		const clickable = card.metric || card.pointsKind || card.cardKind;
 		const hint = card.hint != null ? card.hint : clickable ? __("Click to see details") : __("Period total");
@@ -1261,7 +1270,11 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		const pending = this._pending_card_title || {};
 		this._pending_card_title = null;
 		const label = pending.label || fallbackLabel || __("Details");
-		const count = pending.count != null && pending.count !== "" ? pending.count : fallbackCount;
+		let count = pending.count != null && pending.count !== "" ? pending.count : fallbackCount;
+		// Prefer computed total when DOM count is missing/unparseable (e.g. old HTML fmt).
+		if (fallbackCount != null && cint(count) === 0 && cint(fallbackCount) > 0) {
+			count = fallbackCount;
+		}
 		if (frappe.tif_customization && frappe.tif_customization.drilldown_title) {
 			return frappe.tif_customization.drilldown_title(label, count);
 		}
@@ -1554,6 +1567,13 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						"Per-staff counts can overlap. Card total is distinct schools ({0}); staff column sum is {1}."
 					).replace("{0}", this.fmt(cardTotal)).replace("{1}", this.fmt(staffSum))}</p>`
 				: "";
+		// Prefer distinct FY total in the title (not a stale/unparseable data-card-count).
+		this._pending_card_title = {
+			label:
+				(this._pending_card_title && this._pending_card_title.label) ||
+				__("New Registered School"),
+			count: cardTotal,
+		};
 		const d = new frappe.ui.Dialog({
 			title: this.card_dialog_title(__("New Registered School"), cardTotal),
 			size: "large",
