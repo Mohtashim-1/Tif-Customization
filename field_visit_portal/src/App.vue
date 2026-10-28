@@ -2258,7 +2258,7 @@ const steps = [
 								label-en="School Name"
 								label-ur="اسکول کا نام"
 								placeholder="Type to search school"
-								empty-text="No customers found"
+								empty-text="No schools found"
 								allow-create
 								required
 								:options="customerOptions"
@@ -2411,7 +2411,7 @@ const steps = [
 								label-en="Name of School"
 								label-ur="اسکول کا نام"
 								placeholder="Type to search school"
-								empty-text="No customers found"
+								empty-text="No schools found"
 								allow-create
 								required
 								:options="customerOptions"
@@ -2610,7 +2610,7 @@ const steps = [
 								label-en="Institute / School Name"
 								label-ur="ادارہ / اسکول کا نام"
 								placeholder="Select customer or type a name"
-								empty-text="No customers found"
+								empty-text="No schools found"
 								allow-custom
 								allow-create
 								required
@@ -3250,7 +3250,7 @@ const steps = [
 								label-en="School / Madrasa Name"
 								label-ur="اسکول / مدرسہ کا نام"
 								placeholder="Type to search school"
-								empty-text="No customers found"
+								empty-text="No schools found"
 								allow-create
 								required
 								:options="customerOptions"

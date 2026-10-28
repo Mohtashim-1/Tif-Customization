@@ -46,7 +46,7 @@ METRIC_LABELS = {
 	"headoffice_visit": _("Head office / Regional / Out of station"),
 	"academic_task": _("Academic Task (Content Development)"),
 	"other_official": _("Other Official Tasks"),
-	"co_curricular": _("Stall Activity / Exhibition"),
+	"co_curricular": _("Staff Activity / Exhibition / Demo Class"),
 	"quiz": _("Quiz Arranged"),
 	"new_school_registration": _("New Registered Schools"),
 	"new_schools": _("New Registered Schools"),

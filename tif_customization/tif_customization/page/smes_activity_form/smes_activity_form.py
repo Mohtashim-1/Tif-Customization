@@ -960,12 +960,160 @@ def _customer_link_options(txt="", city="", limit=4000):
 	return out
 
 
+def _school_opening_link_options(txt="", city="", limit=50, exclude_values=None):
+	"""School Opening Application rows for School Name typeahead (incl. pending drafts)."""
+	if not frappe.db.exists("DocType", "School Opening Application"):
+		return []
+	txt = (txt or "").strip()
+	city = (city or "").strip()
+	limit = max(1, min(cint(limit) or 50, 100))
+	exclude = {cstr(v).strip().lower() for v in (exclude_values or []) if cstr(v).strip()}
+	meta = frappe.get_meta("School Opening Application")
+	has_city = meta.has_field("city")
+	has_province = meta.has_field("province")
+	has_type = meta.has_field("type_of_school")
+	has_customer = meta.has_field("customer")
+	where = ["IFNULL(soa.school_name, '') != ''"]
+	params = {}
+	tokens = [t for t in txt.split() if t]
+	for i, token in enumerate(tokens):
+		key = f"soa_t{i}"
+		parts = [
+			f"soa.name LIKE %({key})s",
+			f"soa.school_name LIKE %({key})s",
+		]
+		if has_customer:
+			parts.append(f"IFNULL(soa.customer, '') LIKE %({key})s")
+		where.append(f"({' OR '.join(parts)})")
+		params[key] = f"%{token}%"
+	if city and has_city:
+		where.append("(IFNULL(soa.city, '') = '' OR soa.city = %(soa_city)s)")
+		params["soa_city"] = city
+	city_sql = "IFNULL(soa.city, '')" if has_city else "''"
+	province_sql = "IFNULL(soa.province, '')" if has_province else "''"
+	type_sql = "IFNULL(soa.type_of_school, '')" if has_type else "''"
+	customer_sql = "IFNULL(soa.customer, '')" if has_customer else "''"
+	rows = frappe.db.sql(
+		f"""
+		SELECT
+			soa.name,
+			TRIM(soa.school_name) AS school_name,
+			{customer_sql} AS customer,
+			{city_sql} AS city,
+			{province_sql} AS province,
+			{type_sql} AS type_of_school,
+			soa.docstatus
+		FROM `tabSchool Opening Application` soa
+		WHERE {" AND ".join(where)}
+		ORDER BY
+			CASE WHEN IFNULL(soa.customer, '') != '' THEN 0 ELSE 1 END,
+			soa.modified DESC
+		LIMIT {limit * 3}
+		""",
+		params,
+		as_dict=True,
+	)
+	out = []
+	seen = set(exclude)
+	for row in rows:
+		school_name = cstr(row.get("school_name") or "").strip()
+		customer = cstr(row.get("customer") or "").strip()
+		if not school_name:
+			continue
+		# Prefer Customer link when SOA already created one.
+		value = customer if customer and frappe.db.exists("Customer", customer) else school_name
+		key = value.lower()
+		if not value or key in seen:
+			continue
+		seen.add(key)
+		seen.add(school_name.lower())
+		status = _("Pending School Opening") if cint(row.get("docstatus")) == 0 and not customer else _("School Opening")
+		bits = [b for b in [row.get("city"), row.get("province"), status] if b]
+		school_type = _school_type_from_customer(row.get("type_of_school"))
+		out.append(
+			{
+				"value": value,
+				"label": school_name,
+				"description": " · ".join(bits),
+				"city": cstr(row.get("city") or "").strip(),
+				"province": cstr(row.get("province") or "").strip(),
+				"school_type": school_type,
+				"source": "school_opening",
+				"application": cstr(row.get("name") or "").strip(),
+				"pending": 1 if not customer else 0,
+			}
+		)
+		if len(out) >= limit:
+			break
+	return out
+
+
+def _find_school_opening_by_name(value):
+	"""Match School Opening Application by doc name or exact school_name."""
+	val = cstr(value).strip()
+	if not val or not frappe.db.exists("DocType", "School Opening Application"):
+		return None
+	if frappe.db.exists("School Opening Application", val):
+		return frappe.db.get_value(
+			"School Opening Application",
+			val,
+			["name", "school_name", "customer", "city", "province", "address", "docstatus"],
+			as_dict=True,
+		)
+	rows = frappe.db.sql(
+		"""
+		SELECT name, school_name, IFNULL(customer, '') AS customer,
+			IFNULL(city, '') AS city, IFNULL(province, '') AS province,
+			IFNULL(address, '') AS address, docstatus
+		FROM `tabSchool Opening Application`
+		WHERE TRIM(school_name) = %(val)s
+		ORDER BY
+			CASE WHEN IFNULL(customer, '') != '' THEN 0 ELSE 1 END,
+			docstatus DESC,
+			modified DESC
+		LIMIT 1
+		""",
+		{"val": val},
+		as_dict=True,
+	)
+	return rows[0] if rows else None
+
+
 @frappe.whitelist()
 def search_school_customers(txt=None, city=None, limit=50):
-	"""Typeahead for School Name — Field Visit links this to Customer."""
+	"""Typeahead for School Name — Customers + School Opening Applications."""
 	if frappe.session.user == "Guest":
 		frappe.throw(_("Please log in"), frappe.AuthenticationError)
-	return _customer_link_options(txt=txt, city=city, limit=max(1, min(cint(limit) or 50, 100)))
+	limit = max(1, min(cint(limit) or 50, 100))
+	# Keep room for School Opening hits (pending drafts are often missing from Customer).
+	cust_cap = max(10, (limit * 2) // 3)
+	customers = _customer_link_options(txt=txt, city=city, limit=cust_cap)
+	seen = {cstr(r.get("value") or "").strip().lower() for r in customers if r.get("value")}
+	seen.update(
+		cstr(r.get("label") or "").strip().lower() for r in customers if r.get("label")
+	)
+	soa_cap = max(limit - len(customers), limit // 3, 15)
+	soa_rows = _school_opening_link_options(
+		txt=txt, city=city, limit=soa_cap, exclude_values=seen
+	)
+	merged = customers + soa_rows
+	# Prefer exact / prefix matches first when user typed something.
+	needle = (txt or "").strip().lower()
+	if needle:
+
+		def _rank(row):
+			label = cstr(row.get("label") or "").strip().lower()
+			value = cstr(row.get("value") or "").strip().lower()
+			# Pending SOA slightly ahead of same-rank Customer so drafts are visible.
+			pending_boost = 0 if cint(row.get("pending")) else 1
+			if label == needle or value == needle:
+				return (0, pending_boost)
+			if label.startswith(needle) or value.startswith(needle):
+				return (1, pending_boost)
+			return (2, pending_boost)
+
+		merged.sort(key=_rank)
+	return merged[:limit]
 
 
 @frappe.whitelist()
@@ -1826,6 +1974,14 @@ def submit_smes_activity(data):
 
 	raw_school = cstr(data.get("school_name")).strip()
 	resolved_school = _resolve_customer_link(raw_school)
+	existing_soa = None
+	if not resolved_school and raw_school:
+		existing_soa = _find_school_opening_by_name(raw_school)
+		soa_customer = cstr((existing_soa or {}).get("customer") or "").strip()
+		if soa_customer:
+			resolved_school = _resolve_customer_link(soa_customer) or (
+				soa_customer if frappe.db.exists("Customer", soa_customer) else ""
+			)
 	school_opening_data = data.get("school_opening")
 	soa_doc = None
 	if school_opening_data and not resolved_school:
@@ -1853,10 +2009,10 @@ def submit_smes_activity(data):
 					"School Opening request {0} was saved. Book Demand can be submitted after this school is added to the School Database."
 				).format(soa_doc.name),
 			}
-	elif doc_type in SCHOOL_NAME_LINK_TYPES and raw_school and not resolved_school:
+	elif doc_type in SCHOOL_NAME_LINK_TYPES and raw_school and not resolved_school and not existing_soa:
 		frappe.throw(
 			_(
-				"School Name '{0}' was not found in Customer. Select a school from the list or Create School."
+				"School Name '{0}' was not found in Customer or School Opening Applications. Select a school from the list or Create School."
 			).format(raw_school),
 			frappe.LinkValidationError,
 		)
@@ -1866,18 +2022,36 @@ def submit_smes_activity(data):
 	doc.school_type = data.get("school_type")
 	doc.reference = data.get("reference")
 	doc.school_additional_remarks = data.get("school_additional_remarks")
-	if soa_doc:
-		pending_name = cstr(soa_doc.school_name or raw_school).strip()
+	pending_soa = soa_doc
+	if not pending_soa and existing_soa and not resolved_school:
+		# Selected a pending School Opening Application (no Customer yet).
+		pending_soa = frappe._dict(existing_soa)
+	if pending_soa:
+		pending_name = cstr(
+			getattr(pending_soa, "school_name", None)
+			or (pending_soa.get("school_name") if isinstance(pending_soa, dict) else None)
+			or raw_school
+		).strip()
+		soa_name = cstr(
+			getattr(pending_soa, "name", None)
+			or (pending_soa.get("name") if isinstance(pending_soa, dict) else None)
+			or ""
+		).strip()
 		fv_meta = frappe.get_meta("Field Visit")
 		if fv_meta.has_field("pending_school_name"):
 			doc.pending_school_name = pending_name
-		note = _("Pending school (School Opening {0}): {1}").format(soa_doc.name, pending_name)
+		note = _("Pending school (School Opening {0}): {1}").format(soa_name or "—", pending_name)
 		extra = cstr(doc.school_additional_remarks or "").strip()
 		doc.school_additional_remarks = f"{note}\n{extra}".strip() if extra else note
-		if not cstr(doc.school_address or "").strip() and soa_doc.address:
-			doc.school_address = soa_doc.address
-		if not cstr(doc.reference or "").strip():
-			doc.reference = soa_doc.name
+		soa_address = cstr(
+			getattr(pending_soa, "address", None)
+			or (pending_soa.get("address") if isinstance(pending_soa, dict) else None)
+			or ""
+		).strip()
+		if not cstr(doc.school_address or "").strip() and soa_address:
+			doc.school_address = soa_address
+		if not cstr(doc.reference or "").strip() and soa_name:
+			doc.reference = soa_name
 
 	doc.qps_affiliated = data.get("qps_affiliated")
 	doc.tps_affiliated = data.get("tps_affiliated")
