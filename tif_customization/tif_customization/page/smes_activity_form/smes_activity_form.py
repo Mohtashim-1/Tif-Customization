@@ -369,7 +369,7 @@ def get_active_field_officer_staff():
 		officers = frappe.get_all(
 			"Field Officer",
 			filters={"status": "Active"},
-			fields=["name", "name1", "employee", "user", "division"],
+			fields=["name", "name1", "employee", "user", "division", "province", "city", "area"],
 		)
 		for row in officers:
 			emp = row.employee
@@ -391,6 +391,9 @@ def get_active_field_officer_staff():
 				"employee_name": emp_row.employee_name or row.name1 or emp_row.name,
 				"user": user or "",
 				"division": row.division or "",
+				"province": cstr(row.get("province") or "").strip(),
+				"city": cstr(row.get("city") or "").strip(),
+				"area": cstr(row.get("area") or "").strip(),
 			}
 
 	# 2) Users with field officer roles
@@ -491,21 +494,62 @@ def get_form_meta():
 	current_emp = _employee_for_user(frappe.session.user)
 	staff_name = ""
 	staff_employee = ""
+	staff_province = ""
+	staff_city = ""
+	staff_area = ""
 	if current_emp and current_emp.name in staff_by_emp:
 		staff_name = staff_by_emp[current_emp.name]["employee_name"]
 		staff_employee = current_emp.name
+		staff_province = cstr(staff_by_emp[current_emp.name].get("province") or "").strip()
+		staff_city = cstr(staff_by_emp[current_emp.name].get("city") or "").strip()
+		staff_area = cstr(staff_by_emp[current_emp.name].get("area") or "").strip()
 	elif current_emp and current_emp.employee_name in staff_names:
 		staff_name = current_emp.employee_name
 		staff_employee = current_emp.name
+		row = next((s for s in staff_list if s.get("employee_name") == staff_name), None) or {}
+		staff_province = cstr(row.get("province") or "").strip()
+		staff_city = cstr(row.get("city") or "").strip()
+		staff_area = cstr(row.get("area") or "").strip()
 	elif current_emp and _user_has_field_officer_roles(frappe.session.user):
 		# FO-role user matched by name but not yet in compiled list
 		staff_name = current_emp.employee_name
 		staff_employee = current_emp.name
 
+	# Fallback: Field Officer linked by user / employee even if not in staff_by_emp earlier.
+	if (not staff_province and not staff_city) and frappe.db.exists("DocType", "Field Officer"):
+		fo = None
+		if frappe.session.user:
+			fo = frappe.db.get_value(
+				"Field Officer",
+				{"user": frappe.session.user, "status": "Active"},
+				["province", "city", "area", "employee", "name1"],
+				as_dict=True,
+			)
+		if not fo and staff_employee:
+			fo = frappe.db.get_value(
+				"Field Officer",
+				{"employee": staff_employee, "status": "Active"},
+				["province", "city", "area", "employee", "name1"],
+				as_dict=True,
+			)
+		if fo:
+			staff_province = staff_province or cstr(fo.province or "").strip()
+			staff_city = staff_city or cstr(fo.city or "").strip()
+			staff_area = staff_area or cstr(fo.area or "").strip()
+			if not staff_name:
+				staff_name = cstr(fo.name1 or "").strip() or staff_name
+
+	# Normalize short province codes (KPK → Khyber Pakhtunkhwa) for portal selects.
+	if staff_province in PROVINCE_MAP:
+		staff_province = PROVINCE_MAP[staff_province]
+
 	return {
 		"customers": _customer_link_options(limit=5000),
 		"staff_name": staff_name,
 		"staff_employee": staff_employee,
+		"staff_province": staff_province,
+		"staff_city": staff_city,
+		"staff_area": staff_area,
 		"staff_options": staff_list,
 		"staff_names": staff_names,
 		"can_manage_supervisor_only": can_manage_supervisor_only_field_visits(),

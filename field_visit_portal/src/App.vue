@@ -765,12 +765,37 @@ async function submitViewedVisit() {
 	}
 }
 
+function applyStaffLocationDefaults(force = false) {
+	const province = (meta.value.staff_province || "").trim();
+	const city = (meta.value.staff_city || "").trim();
+	const area = (meta.value.staff_area || "").trim();
+	if (!province && !city && !area) return;
+
+	const targets = [visit, meeting, training, me, volunteerVisit, ambassadorVisit, eventForm];
+	for (const t of targets) {
+		if (!t || typeof t !== "object") continue;
+		if (province && (force || !String(t.province || "").trim() || t.province === "Punjab")) {
+			// Replace hard-coded Punjab default with FO province when available.
+			if (force || t.province === "Punjab" || !String(t.province || "").trim()) {
+				t.province = province;
+			}
+		}
+		if (city && (force || !String(t.city || "").trim())) {
+			t.city = city;
+		}
+		if (area && "area" in t && (force || !String(t.area || "").trim())) {
+			t.area = area;
+		}
+	}
+}
+
 async function ensureFormMeta() {
 	try {
 		meta.value = { ...meta.value, ...(await apiGet(`${METHOD}.get_form_meta`)) };
 		training.entryFilledBy = meta.value.staff_name || training.entryFilledBy;
 		training.trainerName = meta.value.staff_name || training.trainerName;
 		visit.visitBy = visit.visitBy || meta.value.staff_name || "";
+		applyStaffLocationDefaults(true);
 		if (!participantForm.course && courseOptions.value[0]) participantForm.course = courseOptions.value[0];
 	} catch (e) {
 		error.value = e.message || "Could not load form.";
@@ -1934,11 +1959,14 @@ function resetForm() {
 	selectedId.value = "";
 	participants.value = [];
 	volunteers.value = [];
+	const defProvince = (meta.value.staff_province || "").trim() || "Punjab";
+	const defCity = (meta.value.staff_city || "").trim();
+	const defArea = (meta.value.staff_area || "").trim();
 	Object.assign(volunteerVisit, {
 		date: todayISO(),
-		city: "",
-		area: "",
-		province: "Punjab",
+		city: defCity,
+		area: defArea,
+		province: defProvince,
 		registered: "Yes",
 		remarks: "",
 	});
@@ -1946,17 +1974,17 @@ function resetForm() {
 	ambassadors.value = [];
 	Object.assign(ambassadorVisit, {
 		date: todayISO(),
-		city: "",
-		area: "",
-		province: "Punjab",
+		city: defCity,
+		area: defArea,
+		province: defProvince,
 		registered: "Yes",
 		remarks: "",
 	});
 	Object.assign(ambassadorForm, emptyAmbassadorForm());
 	Object.assign(eventForm, {
 		date: todayISO(),
-		province: "Punjab",
-		city: "",
+		province: defProvince,
+		city: defCity,
 		activity: "",
 		venue: "",
 		noOfSchools: "1",
@@ -2004,9 +2032,22 @@ function resetForm() {
 	training.taskAssignedBy = "";
 	training.taskAssignedByOther = "";
 	training.fieldOfficer = "";
+	visit.province = defProvince;
+	visit.city = defCity;
+	visit.area = defArea;
+	meeting.province = defProvince;
+	meeting.city = defCity;
+	meeting.area = defArea;
+	training.province = defProvince;
+	training.city = defCity;
+	if ("area" in training) training.area = defArea;
+	if ("province" in me) me.province = defProvince;
+	if ("city" in me) me.city = defCity;
+	if ("area" in me) me.area = defArea;
 	travel.distance = "";
 	travel.cost = "";
 	savedName.value = "";
+	applyStaffLocationDefaults(true);
 }
 
 const steps = [
