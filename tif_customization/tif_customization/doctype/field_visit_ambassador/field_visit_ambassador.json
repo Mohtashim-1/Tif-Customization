@@ -27,14 +27,16 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Ambassador Name",
-   "reqd": 1
+   "reqd": 1,
+   "allow_on_submit": 1
   },
   {
    "columns": 1,
    "fieldname": "contact_number",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Contact Number"
+   "label": "Contact Number",
+   "allow_on_submit": 1
   },
   {
    "columns": 2,
@@ -42,19 +44,22 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Email",
-   "options": "Email"
+   "options": "Email",
+   "allow_on_submit": 1
   },
   {
    "columns": 1,
    "fieldname": "profession",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Profession"
+   "label": "Profession",
+   "allow_on_submit": 1
   },
   {
    "fieldname": "contribution",
    "fieldtype": "Small Text",
-   "label": "What is he/she doing (role / contribution)"
+   "label": "What is he/she doing (role / contribution)",
+   "allow_on_submit": 1
   },
   {
    "fieldname": "column_break_loc",
@@ -66,7 +71,8 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Province",
-   "options": "Punjab\nSindh\nKhyber Pakhtunkhwa\nBalochistan\nAzad Jammu & Kashmir\nGilgit-Baltistan\nIslamabad Capital Territory"
+   "options": "Punjab\nSindh\nKhyber Pakhtunkhwa\nBalochistan\nAzad Jammu & Kashmir\nGilgit-Baltistan\nIslamabad Capital Territory",
+   "allow_on_submit": 1
   },
   {
    "columns": 1,
@@ -74,17 +80,20 @@
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "City",
-   "options": "City"
+   "options": "City",
+   "allow_on_submit": 1
   },
   {
    "fieldname": "area",
    "fieldtype": "Data",
-   "label": "Area / Locality"
+   "label": "Area / Locality",
+   "allow_on_submit": 1
   },
   {
    "fieldname": "address",
    "fieldtype": "Small Text",
-   "label": "Address"
+   "label": "Address",
+   "allow_on_submit": 1
   },
   {
    "columns": 2,
@@ -92,7 +101,8 @@
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "School (optional)",
-   "options": "Customer"
+   "options": "Customer",
+   "allow_on_submit": 1
   },
   {
    "columns": 1,
@@ -101,12 +111,14 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Ambassador Form Submitted",
-   "options": "Yes\nNo"
+   "options": "Yes\nNo",
+   "allow_on_submit": 1
   },
   {
    "fieldname": "remarks",
    "fieldtype": "Small Text",
-   "label": "Other / Remarks"
+   "label": "Other / Remarks",
+   "allow_on_submit": 1
   }
  ],
  "grid_page_length": 50,

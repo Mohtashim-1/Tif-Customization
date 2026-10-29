@@ -114,7 +114,9 @@ class FieldVisit(Document):
 		if can_edit_submitted_field_visit():
 			return
 		frappe.throw(
-			_("You cannot edit a submitted Field Visit. Contact your supervisor if a correction is needed."),
+			_(
+				"Submitted Field Visits are locked. Only Mohtashim, Farhan, or Anwar can make changes."
+			),
 			frappe.PermissionError,
 		)
 

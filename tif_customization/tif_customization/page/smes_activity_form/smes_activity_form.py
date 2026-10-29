@@ -15,7 +15,10 @@ from tif_customization.tif_customization.field_visit_supervisor_only import (
 	SUPERVISOR_ONLY_ACTIVITY_TYPES,
 	can_manage_supervisor_only_field_visits,
 )
-from tif_customization.tif_customization.field_visit_permissions import get_assigned_field_officers
+from tif_customization.tif_customization.field_visit_permissions import (
+	can_edit_submitted_field_visit,
+	get_assigned_field_officers,
+)
 from tif_customization.tif_customization.field_visit_travel_cost import sync_travel_cost
 from tif_customization.tif_customization.model_school import sync_model_school_field
 from tif_customization.tif_customization.api.school_opening_form import (
@@ -509,6 +512,7 @@ def get_form_meta():
 		"assigned_field_officers": get_assigned_field_officers(),
 		"can_manage_enrolment_participants": can_manage_farhan_only_field_visit(),
 		"can_manage_farhan_only": can_manage_farhan_only_field_visit(),
+		"can_edit_submitted": can_edit_submitted_field_visit(),
 		"bulk_import_template_url": get_bulk_import_template_url(),
 		"today": today(),
 		"cities": [
@@ -2908,6 +2912,10 @@ def get_field_visit_easy_view(name=None):
 	# Portal always uses English status keys so the UI can detect Draft reliably
 	status_en = {0: "Draft", 1: "Submitted", 2: "Cancelled"}.get(docstatus, str(docstatus))
 	can_submit = docstatus == 0 and bool(frappe.has_permission("Field Visit", "submit", doc))
+	can_edit = bool(
+		docstatus == 0
+		or (docstatus == 1 and can_edit_submitted_field_visit() and frappe.has_permission("Field Visit", "write", doc))
+	)
 	return {
 		"name": doc.name,
 		"type": doc.type or "",
@@ -2915,6 +2923,7 @@ def get_field_visit_easy_view(name=None):
 		"status_label": status_map.get(docstatus, status_en),
 		"docstatus": docstatus,
 		"can_submit": can_submit,
+		"can_edit": can_edit,
 		"visit_date": visit_date,
 		"school": school,
 		"officer": officer,

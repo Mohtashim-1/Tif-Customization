@@ -1048,16 +1048,21 @@ frappe.ui.form.on("Field Visit", {
 			});
 		}
 
-		// Field Officers cannot edit submitted visits (managers/admins still can).
-		const roles = frappe.user_roles || [];
-		const canEditSubmitted =
-			frappe.session.user === "Administrator" ||
-			roles.includes("System Manager") ||
-			roles.includes("Field Staff Manager");
+		// Only Mohtashim / Farhan / Anwar may edit submitted visits.
+		const submittedEditors = new Set([
+			"Administrator",
+			"mothashim@tif.edu.pk",
+			"shoaibmohtashim973@gmail.com",
+			"farhan.hussain@tif.edu.pk",
+			"anwar.khan@tif.edu.pk",
+		]);
+		const canEditSubmitted = submittedEditors.has(frappe.session.user);
 		if (cint(frm.doc.docstatus) === 1 && !canEditSubmitted) {
 			frm.disable_form();
 			frm.set_intro(
-				__("Submitted visits are read-only for Field Officers. Contact your supervisor for corrections."),
+				__(
+					"Submitted visits are locked. Only Mohtashim, Farhan, or Anwar can make changes."
+				),
 				"orange"
 			);
 		}

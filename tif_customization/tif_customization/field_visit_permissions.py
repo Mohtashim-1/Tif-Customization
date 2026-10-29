@@ -60,10 +60,14 @@ VIEW_ALL_ROLES = {
 	"Field Staff Manager",
 }
 
-# Who may still change a submitted Field Visit (Field Officers cannot).
-SUBMITTED_EDIT_ROLES = {
-	"System Manager",
-	"Field Staff Manager",
+# Only these users may change a submitted Field Visit (Desk + portal).
+# Everyone else: create/submit drafts only — no edit after submit.
+FIELD_VISIT_SUBMITTED_EDIT_USERS = {
+	"Administrator",
+	"mothashim@tif.edu.pk",
+	"shoaibmohtashim973@gmail.com",
+	"farhan.hussain@tif.edu.pk",
+	"anwar.khan@tif.edu.pk",
 }
 
 
@@ -86,13 +90,11 @@ def can_view_all_field_visits(user: str | None = None) -> bool:
 
 
 def can_edit_submitted_field_visit(user: str | None = None) -> bool:
-	"""Managers/admins only — Field Officers cannot edit submitted visits."""
-	user = user or frappe.session.user
+	"""Only Mohtashim / Farhan / Anwar may edit submitted Field Visits."""
+	user = (user or frappe.session.user or "").strip()
 	if not user or user == "Guest":
 		return False
-	if user == "Administrator" or user in FIELD_VISIT_ADMIN_USERS:
-		return True
-	return bool(set(frappe.get_roles(user)) & SUBMITTED_EDIT_ROLES)
+	return user in FIELD_VISIT_SUBMITTED_EDIT_USERS
 
 
 def _field_visit_docstatus(doc) -> int:
