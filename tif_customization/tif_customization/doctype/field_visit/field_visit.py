@@ -85,6 +85,7 @@ class FieldVisit(Document):
 			self.type = "Enrolment of Participants"
 
 	def validate(self):
+		self._block_field_officer_edit_on_submit()
 		sync_model_school_field(self)
 		sync_travel_cost(self)
 		self._sync_pending_school_name()
@@ -99,6 +100,23 @@ class FieldVisit(Document):
 		self._validate_enrolment_participants()
 		self._validate_workshop_attendees()
 		self._sync_school_contacts()
+
+	def _block_field_officer_edit_on_submit(self):
+		"""Field Officers may create/submit, but cannot change submitted visits."""
+		from frappe.utils import cint
+
+		from tif_customization.tif_customization.field_visit_permissions import (
+			can_edit_submitted_field_visit,
+		)
+
+		if self.is_new() or cint(self.docstatus) != 1:
+			return
+		if can_edit_submitted_field_visit():
+			return
+		frappe.throw(
+			_("You cannot edit a submitted Field Visit. Contact your supervisor if a correction is needed."),
+			frappe.PermissionError,
+		)
 
 	def before_submit(self):
 		if self.type in ("Training", "Workshop", "Teachers Training Meeting"):

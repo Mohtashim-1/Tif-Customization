@@ -27,16 +27,14 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Volunteer Name",
-   "reqd": 1,
-   "allow_on_submit": 1
+   "reqd": 1
   },
   {
    "columns": 1,
    "fieldname": "contact_number",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Contact Number",
-   "allow_on_submit": 1
+   "label": "Contact Number"
   },
   {
    "columns": 2,
@@ -44,22 +42,19 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Email",
-   "options": "Email",
-   "allow_on_submit": 1
+   "options": "Email"
   },
   {
    "columns": 1,
    "fieldname": "profession",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Profession",
-   "allow_on_submit": 1
+   "label": "Profession"
   },
   {
    "fieldname": "contribution",
    "fieldtype": "Small Text",
-   "label": "What is he/she doing (role / contribution)",
-   "allow_on_submit": 1
+   "label": "What is he/she doing (role / contribution)"
   },
   {
    "fieldname": "column_break_loc",
@@ -71,8 +66,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Province",
-   "options": "Punjab\nSindh\nKhyber Pakhtunkhwa\nBalochistan\nAzad Jammu & Kashmir\nGilgit-Baltistan\nIslamabad Capital Territory",
-   "allow_on_submit": 1
+   "options": "Punjab\nSindh\nKhyber Pakhtunkhwa\nBalochistan\nAzad Jammu & Kashmir\nGilgit-Baltistan\nIslamabad Capital Territory"
   },
   {
    "columns": 1,
@@ -80,20 +74,17 @@
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "City",
-   "options": "City",
-   "allow_on_submit": 1
+   "options": "City"
   },
   {
    "fieldname": "area",
    "fieldtype": "Data",
-   "label": "Area / Locality",
-   "allow_on_submit": 1
+   "label": "Area / Locality"
   },
   {
    "fieldname": "address",
    "fieldtype": "Small Text",
-   "label": "Address",
-   "allow_on_submit": 1
+   "label": "Address"
   },
   {
    "columns": 2,
@@ -101,8 +92,7 @@
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "School (optional)",
-   "options": "Customer",
-   "allow_on_submit": 1
+   "options": "Customer"
   },
   {
    "columns": 1,
@@ -111,14 +101,12 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Volunteer Form Submitted",
-   "options": "Yes\nNo",
-   "allow_on_submit": 1
+   "options": "Yes\nNo"
   },
   {
    "fieldname": "remarks",
    "fieldtype": "Small Text",
-   "label": "Other / Remarks",
-   "allow_on_submit": 1
+   "label": "Other / Remarks"
   }
  ],
  "grid_page_length": 50,

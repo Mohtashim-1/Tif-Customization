@@ -92,10 +92,34 @@ function sync_model_school_from_departments(frm) {
 
 function set_hidden(frm, fields, hidden) {
 	(fields || []).forEach((field) => {
-		if (frm.fields_dict[field]) {
-			frm.set_df_property(field, "hidden", hidden ? 1 : 0);
+		if (!frm.fields_dict[field]) return;
+		const hide = !!hidden;
+		frm.set_df_property(field, "hidden", hide ? 1 : 0);
+		// set_df_property(hidden) alone can lose to depends_on / layout refresh
+		if (typeof frm.toggle_display === "function") {
+			frm.toggle_display(field, !hide);
 		}
 	});
+}
+
+function apply_attachment_visibility(frm) {
+	/** Workshop-only attaches + visit video; keeps Desk in sync with depends_on. */
+	const type = (frm.doc.type || "").trim();
+	const workshopOnly = ["Workshop", "Workshop Conducted"];
+	const videoTypes = [
+		"Marketing",
+		"Visits",
+		"Registration of New Schools",
+		"Joint Visit with SME",
+		"Workshop",
+		"Workshop Conducted",
+	];
+	set_hidden(
+		frm,
+		["attendance_sheet_attach", "training_awareness_pictures", "attendance_sheet_excel"],
+		!workshopOnly.includes(type)
+	);
+	set_hidden(frm, ["visit_video"], !videoTypes.includes(type));
 }
 
 let _supervisor_field_visit_access = null;
@@ -335,15 +359,32 @@ function apply_field_visit_logic(frm) {
 		"volunteer_enrolments",
 	];
 
-	const attachment_fields = [
+	const attachment_common_fields = [
 		"section_break_attachments",
 		"meeting_picture",
 		"school_picture",
 		"visiting_card_attach",
+	];
+	const attachment_video_fields = ["visit_video"];
+	const attachment_workshop_fields = [
 		"attendance_sheet_attach",
 		"training_awareness_pictures",
 		"attendance_sheet_excel",
 	];
+	const attachment_fields = [
+		...attachment_common_fields,
+		...attachment_video_fields,
+		...attachment_workshop_fields,
+	];
+	const VIDEO_ATTACHMENT_TYPES = [
+		"Marketing",
+		"Visits",
+		"Registration of New Schools",
+		"Joint Visit with SME",
+		"Workshop",
+		"Workshop Conducted",
+	];
+	const WORKSHOP_ATTACHMENT_TYPES = ["Workshop", "Workshop Conducted"];
 
 	const me_fields = [
 		"me_timestamp",
@@ -590,7 +631,9 @@ function apply_field_visit_logic(frm) {
 	// School + attachments for school-visit types
 	if (SCHOOL_TYPES.includes(type)) {
 		set_hidden(frm, school_fields, false);
-		set_hidden(frm, attachment_fields, false);
+		set_hidden(frm, attachment_common_fields, false);
+		set_hidden(frm, attachment_video_fields, !VIDEO_ATTACHMENT_TYPES.includes(type));
+		set_hidden(frm, attachment_workshop_fields, !WORKSHOP_ATTACHMENT_TYPES.includes(type));
 		if (type === "M&E") {
 			set_hidden(frm, ["registered_volunteer"], false);
 			set_hidden(frm, ["section_break_volunteers", "volunteer_enrolments"], true);
@@ -669,8 +712,11 @@ function apply_field_visit_logic(frm) {
 			);
 		}
 	} else if (type) {
-		// Meetings / Academic / Co-curricular / Enrolment / Workshop still get attachments
-		set_hidden(frm, attachment_fields, false);
+		// Meetings / Academic / Co-curricular / Enrolment: common attaches only.
+		// Attendance / Training pictures / Excel only for Workshop types.
+		set_hidden(frm, attachment_common_fields, false);
+		set_hidden(frm, attachment_video_fields, !VIDEO_ATTACHMENT_TYPES.includes(type));
+		set_hidden(frm, attachment_workshop_fields, !WORKSHOP_ATTACHMENT_TYPES.includes(type));
 	}
 
 	if (type) {
@@ -844,6 +890,7 @@ function apply_field_visit_logic(frm) {
 		true,
 	);
 
+	apply_attachment_visibility(frm);
 	sync_model_school_from_departments(frm);
 }
 
@@ -987,13 +1034,32 @@ frappe.ui.form.on("Field Visit", {
 		apply_visible_type_options(frm);
 		setup_city_area_school_queries(frm);
 		apply_field_visit_logic(frm);
+		apply_attachment_visibility(frm);
 		if ((frm.doc.type || "").trim()) {
 			sync_field_visit_travel_cost(frm);
 		}
 		if (_supervisor_field_visit_access) {
 			apply_supervisor_field_visit_restrictions(frm);
+			apply_attachment_visibility(frm);
 		} else {
-			fetch_supervisor_field_visit_access(frm, () => apply_supervisor_field_visit_restrictions(frm));
+			fetch_supervisor_field_visit_access(frm, () => {
+				apply_supervisor_field_visit_restrictions(frm);
+				apply_attachment_visibility(frm);
+			});
+		}
+
+		// Field Officers cannot edit submitted visits (managers/admins still can).
+		const roles = frappe.user_roles || [];
+		const canEditSubmitted =
+			frappe.session.user === "Administrator" ||
+			roles.includes("System Manager") ||
+			roles.includes("Field Staff Manager");
+		if (cint(frm.doc.docstatus) === 1 && !canEditSubmitted) {
+			frm.disable_form();
+			frm.set_intro(
+				__("Submitted visits are read-only for Field Officers. Contact your supervisor for corrections."),
+				"orange"
+			);
 		}
 
 		frm.add_custom_button(__("Open Easy Form"), () => {
@@ -1235,6 +1301,7 @@ frappe.ui.form.on("Field Visit", {
 
 	type(frm) {
 		apply_field_visit_logic(frm);
+		apply_attachment_visibility(frm);
 		const access = _supervisor_field_visit_access || {};
 		const canFarhan = access.can_manage_farhan_only ?? access.can_manage_enrolment_participants;
 		const farhanBlocked = new Set(farhan_only_types(access));

@@ -7,6 +7,7 @@ from __future__ import annotations
 import re
 
 import frappe
+from frappe.utils import cint
 
 
 def visit_day_sql(alias: str = "fv") -> str:
@@ -59,6 +60,12 @@ VIEW_ALL_ROLES = {
 	"Field Staff Manager",
 }
 
+# Who may still change a submitted Field Visit (Field Officers cannot).
+SUBMITTED_EDIT_ROLES = {
+	"System Manager",
+	"Field Staff Manager",
+}
+
 
 def can_access_field_visit(user: str | None = None) -> bool:
 	"""True if user is allowed Field Visit module access."""
@@ -76,6 +83,24 @@ def can_view_all_field_visits(user: str | None = None) -> bool:
 		return True
 	roles = set(frappe.get_roles(user))
 	return bool(roles & VIEW_ALL_ROLES)
+
+
+def can_edit_submitted_field_visit(user: str | None = None) -> bool:
+	"""Managers/admins only — Field Officers cannot edit submitted visits."""
+	user = user or frappe.session.user
+	if not user or user == "Guest":
+		return False
+	if user == "Administrator" or user in FIELD_VISIT_ADMIN_USERS:
+		return True
+	return bool(set(frappe.get_roles(user)) & SUBMITTED_EDIT_ROLES)
+
+
+def _field_visit_docstatus(doc) -> int:
+	if doc is None:
+		return 0
+	if isinstance(doc, str):
+		return cint(frappe.db.get_value("Field Visit", doc, "docstatus") or 0)
+	return cint(getattr(doc, "docstatus", 0) or 0)
 
 
 def get_employee_for_user(user: str | None = None) -> dict | None:
@@ -488,15 +513,48 @@ def has_permission(doc, ptype: str = "read", user: str | None = None) -> bool:
 	user = user or frappe.session.user
 	if not can_access_field_visit(user):
 		return False
+
+	# Field Officers: read submitted OK; no write/cancel/delete/amend on submitted.
+	mutating = ptype in ("write", "cancel", "delete", "amend")
+	if mutating and _field_visit_docstatus(doc) >= 1 and not can_edit_submitted_field_visit(user):
+		return False
+
 	if can_view_all_field_visits(user):
 		return True
 
 	owners = {o.lower() for o in get_team_owners(user)}
 	owner = (getattr(doc, "owner", None) or "").strip().lower()
+	if isinstance(doc, str):
+		owner = (frappe.db.get_value("Field Visit", doc, "owner") or "").strip().lower()
 	if owner and owner in owners:
 		return True
 
 	values = {v.lower() for v in get_team_match_values(user)}
+	if isinstance(doc, str):
+		row = frappe.db.get_value(
+			"Field Visit",
+			doc,
+			[
+				"visit_by",
+				"me_visit_by",
+				"mt_visit_by",
+				"training_entry_filled_by",
+				"training_trainer_name",
+			],
+			as_dict=True,
+		) or {}
+		for field in (
+			"visit_by",
+			"me_visit_by",
+			"mt_visit_by",
+			"training_entry_filled_by",
+			"training_trainer_name",
+		):
+			c = row.get(field)
+			if c and str(c).strip().lower() in values:
+				return True
+		return False
+
 	for field in (
 		"visit_by",
 		"me_visit_by",

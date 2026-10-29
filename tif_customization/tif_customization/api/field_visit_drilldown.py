@@ -600,8 +600,53 @@ def _me_status_note(row) -> tuple[str, str]:
 	return "Status not filled", "Active / Inactive was left blank, so this visit is not counted as In-Active"
 
 
+def _category_active_inactive(row) -> str:
+	"""Same Active / Inactive label used in every drilldown Category column."""
+	vtype = cstr(row.get("type") or "").strip()
+	if vtype == "M&E":
+		category, _why = _me_status_note(row)
+		if category == "In-Active":
+			return "Inactive"
+		if category == "Active":
+			return "Active"
+		return _visit_active_inactive_label(row, vtype) or category or ""
+	return _visit_active_inactive_label(row, vtype) or ""
+
+
+def _inactive_reason_line(row) -> str:
+	"""Always emit Inactive reason when Category would show Inactive (any visit type)."""
+	if _category_active_inactive(row) != "Inactive":
+		return ""
+
+	reason = _clean(row.get("me_inactive_reasons") or row.get("me_reason_of_above"))
+	vtype = cstr(row.get("type") or "").strip()
+	if vtype == "M&E":
+		label, why = _me_status_note(row)
+		if why:
+			return f"Inactive reason: {label}. {why}"
+		if reason:
+			return f"Inactive reason: Inactive. {reason}"
+		return "Inactive reason: Inactive. Reason not entered on the Field Visit"
+
+	book = _me_norm(row.get("me_mqh_book_status"))
+	activity = _me_norm(row.get("me_activity_status"))
+	if book == "inactive" or activity == "inactive":
+		why = reason or "Marked In-Active on the Field Visit"
+		return f"Inactive reason: Inactive. {why}"
+	if reason:
+		return f"Inactive reason: Inactive. {reason}"
+	# Visits / Marketing / etc.: Inactive because no program indicators.
+	return (
+		"Inactive reason: Inactive. "
+		"No TIF program running (QPS / TPS / CEE not affiliated or no active book status)."
+	)
+
+
 def _visit_remarks(row) -> str:
-	"""Books / Workshop / Program / Visit Summary (every card drilldown)."""
+	"""Books / Workshop / Program / Visit Summary (every card drilldown).
+
+	Wherever Category is Inactive, Inactive reason is shown before Visit Summary.
+	"""
 	notes = []
 	for key in (
 		"mt_remarks",
@@ -620,12 +665,11 @@ def _visit_remarks(row) -> str:
 		f"Books: {_books_heading(row) or '—'}",
 		f"Workshop: {_workshop_heading(row) or '—'}",
 		f"Program: {_program_heading(row) or '—'}",
-		f"Visit Summary: {notes_text}",
 	]
-	if (row.get("type") or "") == "M&E":
-		label, why = _me_status_note(row)
-		if why:
-			parts.append(f"Inactive reason: {label}. {why}")
+	inactive_line = _inactive_reason_line(row)
+	if inactive_line:
+		parts.append(inactive_line)
+	parts.append(f"Visit Summary: {notes_text}")
 	return " | ".join(parts)
 
 
@@ -1349,16 +1393,8 @@ def get_visit_drilldown(filters=None, metric=None, staff=None):
 			r.training_entry_filled_by,
 			owner_names.get(r.owner) or r.owner,
 		)
-		if vtype == "M&E":
-			# Drilldown Category column: Active / Inactive only (no reason text)
-			category, _why = _me_status_note(r)
-			if category == "In-Active":
-				category = "Inactive"
-			elif category != "Active":
-				category = _visit_active_inactive_label(r, vtype) or category or ""
-		else:
-			# e.g. "1st Follow up visit (Active)" → "Active" / "Inactive" only
-			category = _visit_active_inactive_label(r, vtype) or ""
+		# Category + Inactive reason share the same Active/Inactive helper.
+		category = _category_active_inactive(r)
 		remarks = _visit_remarks(r)
 		school = (r.school or "").strip() or child_schools.get(r.name, "")
 		# Volunteer / ambassador / participant enrolment: school is optional on the visit.

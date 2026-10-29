@@ -2086,6 +2086,8 @@ def submit_smes_activity(data):
 	doc.meeting_picture = data.get("meeting_picture")
 	doc.school_picture = data.get("school_picture")
 	doc.visiting_card_attach = data.get("visiting_card_attach")
+	if hasattr(doc, "visit_video"):
+		doc.visit_video = data.get("visit_video")
 	doc.attendance_sheet_attach = data.get("attendance_sheet_attach")
 	doc.training_awareness_pictures = data.get("training_awareness_pictures")
 	doc.attendance_sheet_excel = data.get("attendance_sheet_excel")

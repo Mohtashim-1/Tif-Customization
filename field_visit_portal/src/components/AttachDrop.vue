@@ -11,17 +11,54 @@ const props = defineProps({
 	hintEn: { type: String, default: "" },
 	hintUr: { type: String, default: "" },
 	required: { type: Boolean, default: false },
+	/** Max video length in seconds (0 = no check). */
+	maxDurationSec: { type: Number, default: 0 },
 });
 const emit = defineEmits(["pick"]);
 const previewUrl = ref("");
 const captured = ref("");
 const missingCapture = ref(false);
+const durationError = ref("");
 
 function clearPreview() {
 	if (previewUrl.value) URL.revokeObjectURL(previewUrl.value);
 	previewUrl.value = "";
 	captured.value = "";
 	missingCapture.value = false;
+	durationError.value = "";
+}
+
+function readVideoDuration(file) {
+	return new Promise((resolve) => {
+		const url = URL.createObjectURL(file);
+		const video = document.createElement("video");
+		video.preload = "metadata";
+		video.onloadedmetadata = () => {
+			const d = Number(video.duration) || 0;
+			URL.revokeObjectURL(url);
+			resolve(d);
+		};
+		video.onerror = () => {
+			URL.revokeObjectURL(url);
+			resolve(0);
+		};
+		video.src = url;
+	});
+}
+
+async function acceptFile(f) {
+	if (!f) return;
+	durationError.value = "";
+	const isVideo = String(f.type || "").startsWith("video/") || /\.(mp4|mov|webm|m4v|3gp)$/i.test(f.name || "");
+	if (isVideo && props.maxDurationSec > 0) {
+		const dur = await readVideoDuration(f);
+		if (dur > props.maxDurationSec + 0.5) {
+			durationError.value = `Video is ${Math.round(dur)}s — keep it about 30 seconds (max ${props.maxDurationSec}s).`;
+			emit("pick", null);
+			return;
+		}
+	}
+	emit("pick", f);
 }
 
 watch(
@@ -44,11 +81,12 @@ onBeforeUnmount(clearPreview);
 function onDrop(e) {
 	e.preventDefault();
 	const f = e.dataTransfer.files?.[0];
-	if (f) emit("pick", f);
+	if (f) acceptFile(f);
 }
 function onChange(e) {
 	const f = e.target.files?.[0];
-	if (f) emit("pick", f);
+	if (f) acceptFile(f);
+	e.target.value = "";
 }
 </script>
 
@@ -77,6 +115,7 @@ function onChange(e) {
 					<div v-if="mode !== 'en'" class="urdu">وقت نہیں ملا۔ اصل تصویر لگائیں، کاپی نہیں۔</div>
 				</div>
 				<div v-else-if="file" class="ready">✓ {{ (file.size / 1024).toFixed(0) }} KB ready / تیار</div>
+				<div v-if="durationError" class="missing">{{ durationError }}</div>
 			</div>
 		</div>
 	</div>

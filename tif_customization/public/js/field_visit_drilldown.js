@@ -80,14 +80,30 @@ frappe.tif_customization.format_visit_remarks = function (remarks) {
 		"Remarks:",
 		"Inactive reason:",
 	];
-	const parts = text.split(" | ").filter(Boolean);
+	// Preferred display order: Inactive reason before Visit Summary.
+	const order = [
+		"School Status:",
+		"Books:",
+		"Workshop:",
+		"Program:",
+		"Inactive reason:",
+		"Visit Summary:",
+		"Remarks:",
+	];
+	let parts = text.split(" | ").filter(Boolean);
 	const hasHeadings = parts.some((p) => labeled.some((h) => p.startsWith(h)));
 	if (!hasHeadings) {
 		return frappe.utils.escape_html(text);
 	}
-	return parts
-		.map((part) => {
+	const ranked = parts
+		.map((part, idx) => {
 			const heading = labeled.find((h) => part.startsWith(h));
+			const rank = heading ? order.indexOf(heading) : order.length + idx;
+			return { part, heading, rank: rank < 0 ? order.length + idx : rank, idx };
+		})
+		.sort((a, b) => a.rank - b.rank || a.idx - b.idx);
+	return ranked
+		.map(({ part, heading }) => {
 			if (!heading) {
 				return `<div style="margin-bottom:3px;line-height:1.35;">${frappe.utils.escape_html(
 					part

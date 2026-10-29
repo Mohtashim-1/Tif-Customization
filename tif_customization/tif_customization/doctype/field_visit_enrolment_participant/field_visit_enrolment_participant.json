@@ -21,16 +21,14 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Name",
-   "reqd": 1,
-   "allow_on_submit": 1
+   "reqd": 1
   },
   {
    "columns": 1,
    "fieldname": "contact_number",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Contact #",
-   "allow_on_submit": 1
+   "label": "Contact #"
   },
   {
    "columns": 1,
@@ -38,8 +36,7 @@
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "City",
-   "options": "City",
-   "allow_on_submit": 1
+   "options": "City"
   },
   {
    "columns": 1,
@@ -47,8 +44,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Province",
-   "options": "Punjab\nSindh\nKhyber Pakhtunkhwa\nBalochistan\nAzad Jammu & Kashmir\nGilgit-Baltistan\nIslamabad Capital Territory",
-   "allow_on_submit": 1
+   "options": "Punjab\nSindh\nKhyber Pakhtunkhwa\nBalochistan\nAzad Jammu & Kashmir\nGilgit-Baltistan\nIslamabad Capital Territory"
   },
   {
    "columns": 2,
@@ -57,24 +53,21 @@
    "in_list_view": 1,
    "label": "Enroll in (Course Name)",
    "options": "\nTECC - Foundation\nTECC - Professional\nELP - Education Leadership Program\nETQ - Effective Teaching of the Holy Quran\nTTC - 90 Days Tajweed Training Course\nOnline Tajweed Customized Course 30/60/90 Days\nOther Special Session Offered by TIF",
-   "reqd": 1,
-   "allow_on_submit": 1
+   "reqd": 1
   },
   {
    "columns": 1,
    "fieldname": "date_of_enrolment",
    "fieldtype": "Date",
    "in_list_view": 1,
-   "label": "Date of Enrolment",
-   "allow_on_submit": 1
+   "label": "Date of Enrolment"
   },
   {
    "columns": 2,
    "fieldname": "other_special_session_name",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Name of Other Special Session",
-   "allow_on_submit": 1
+   "label": "Name of Other Special Session"
   }
  ],
  "grid_page_length": 50,

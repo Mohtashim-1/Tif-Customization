@@ -380,6 +380,7 @@ const attachments = reactive({
 	meeting_picture: null,
 	school_picture: null,
 	visiting_card_attach: null,
+	visit_video: null,
 	attendance_sheet_attach: null,
 	training_awareness_pictures: null,
 	attendance_sheet_excel: null,
@@ -388,6 +389,11 @@ const attachments = reactive({
 });
 
 const selected = computed(() => ACTIVITY_CARDS.find((c) => c.id === selectedId.value) || null);
+/** Workshop Conducted / Workshop — only these keep attendance / training / excel attachments. */
+const isWorkshopCard = computed(() => {
+	const id = selected.value?.id || "";
+	return id === "workshop_conducted" || id === "workshop";
+});
 const summaryLocation = computed(() => {
 	const group = selected.value?.group;
 	if (group === "visits" || group === "books" || group === "me") return visit;
@@ -1617,19 +1623,35 @@ function buildPayload(submitDoc) {
 async function uploadAttachments(docname) {
 	const card = selected.value;
 	const jobs = [];
-	const map = card?.group === "visits" || card?.group === "me"
-		? [
-				["meeting_picture", "meeting_picture"],
-				["school_picture", "school_picture"],
-				["visiting_card_attach", "visiting_card_attach"],
-				["attendance_sheet_attach", "attendance_sheet_attach"],
-				["training_awareness_pictures", "training_awareness_pictures"],
-				["attendance_sheet_excel", "attendance_sheet_excel"],
-			]
-		: [
-				["card", "visiting_card_attach"],
-				["meeting", attachField(card)],
-			];
+	let map;
+	if (card?.group === "visits") {
+		map = [
+			["meeting_picture", "meeting_picture"],
+			["school_picture", "school_picture"],
+			["visiting_card_attach", "visiting_card_attach"],
+			["visit_video", "visit_video"],
+		];
+	} else if (card?.group === "me") {
+		map = [
+			["school_picture", "school_picture"],
+			["visiting_card_attach", "visiting_card_attach"],
+			["attendance_sheet_attach", "attendance_sheet_attach"],
+		];
+	} else if (isWorkshopCard.value) {
+		map = [
+			["meeting", "meeting_picture"],
+			["attendance_sheet_attach", "attendance_sheet_attach"],
+			["training_awareness_pictures", "training_awareness_pictures"],
+			["attendance_sheet_excel", "attendance_sheet_excel"],
+			["visit_video", "visit_video"],
+		];
+	} else {
+		map = [
+			["card", "visiting_card_attach"],
+			["meeting", attachField(card)],
+			["visit_video", "visit_video"],
+		];
+	}
 	for (const [key, fieldname] of map) {
 		if (attachments[key]) {
 			jobs.push(fileWithCaptureTime(attachments[key]).then((file) => uploadFile(file, { doctype: "Field Visit", docname, fieldname })));
@@ -1729,10 +1751,6 @@ async function saveVisit(submitDoc) {
 	) {
 		error.value = "Select a school (Customer) or use Create School.";
 		return;
-	}
-	if (selected.value.group === "visits" && !attachments.school_picture) {
-		error.value = "School Picture is required.";
-		return;	
 	}
 	if (selected.value.group === "volunteer") {
 		if (!volunteers.value.length) {
@@ -1852,10 +1870,6 @@ async function goToVisitFeedback(visitName, feedbackUrl) {
 
 function continueToTravel() {
 	error.value = "";
-	if (selected.value?.group === "visits" && !attachments.school_picture) {
-		error.value = "School Picture is required.";
-		return;
-	}
 	if (!assertRemarksFilled()) {
 		return;
 	}
@@ -1903,6 +1917,7 @@ function resetForm() {
 	attachments.meeting_picture = null;
 	attachments.school_picture = null;
 	attachments.visiting_card_attach = null;
+	attachments.visit_video = null;
 	attachments.attendance_sheet_attach = null;
 	attachments.training_awareness_pictures = null;
 	attachments.attendance_sheet_excel = null;
@@ -2357,11 +2372,19 @@ const steps = [
 						<div class="block-title">Attachments / منسلکات</div>
 						<div class="attach-grid">
 							<AttachDrop :mode="lang" label-en="Meeting Picture" label-ur="ملاقات کی تصویر" :file="attachments.meeting_picture" @pick="attachments.meeting_picture = $event" />
-							<AttachDrop :mode="lang" label-en="School Picture" label-ur="اسکول کی تصویر" required :file="attachments.school_picture" @pick="attachments.school_picture = $event" />
+							<AttachDrop :mode="lang" label-en="School Picture" label-ur="اسکول کی تصویر" :file="attachments.school_picture" @pick="attachments.school_picture = $event" />
 							<AttachDrop :mode="lang" label-en="Visiting Card" label-ur="وزٹنگ کارڈ" :file="attachments.visiting_card_attach" @pick="attachments.visiting_card_attach = $event" />
-							<AttachDrop :mode="lang" label-en="Attendance Sheet" label-ur="حاضری شیٹ" :file="attachments.attendance_sheet_attach" @pick="attachments.attendance_sheet_attach = $event" />
-							<AttachDrop :mode="lang" label-en="Pictures of Training & Awareness Session" label-ur="تربیت و آگاہی کی تصاویر" :file="attachments.training_awareness_pictures" @pick="attachments.training_awareness_pictures = $event" />
-							<AttachDrop :mode="lang" label-en="MS Excel of Attendance Sheet" label-ur="حاضری کا ایکسل" accept=".xlsx,.xls,.csv" :file="attachments.attendance_sheet_excel" @pick="attachments.attendance_sheet_excel = $event" />
+							<AttachDrop
+								:mode="lang"
+								label-en="Visit Video (~30 sec)"
+								label-ur="وزٹ ویڈیو (تقریباً ۳۰ سیکنڈ)"
+								accept="video/*,.mp4,.mov,.webm,.m4v,.3gp"
+								hint-en="Upload a short clip (~30 seconds, max 45s)"
+								hint-ur="مختصر ویڈیو لگائیں (تقریباً ۳۰ سیکنڈ، زیادہ سے زیادہ ۴۵)"
+								:max-duration-sec="45"
+								:file="attachments.visit_video"
+								@pick="attachments.visit_video = $event"
+							/>
 						</div>
 					</div>
 
@@ -2894,6 +2917,22 @@ const steps = [
 							<div style="font-size: 13px; font-weight: 600">Attachments / منسلکات</div>
 							<div class="attach-grid">
 								<AttachDrop :mode="lang" label-en="Pictures" label-ur="تصاویر" :file="attachments.meeting" @pick="attachments.meeting = $event" />
+								<template v-if="isWorkshopCard">
+									<AttachDrop :mode="lang" label-en="Attendance Sheet" label-ur="حاضری شیٹ" :file="attachments.attendance_sheet_attach" @pick="attachments.attendance_sheet_attach = $event" />
+									<AttachDrop :mode="lang" label-en="Pictures of Training & Awareness Session" label-ur="تربیت و آگاہی کی تصاویر" :file="attachments.training_awareness_pictures" @pick="attachments.training_awareness_pictures = $event" />
+									<AttachDrop :mode="lang" label-en="MS Excel of Attendance Sheet" label-ur="حاضری کا ایکسل" accept=".xlsx,.xls,.csv" :file="attachments.attendance_sheet_excel" @pick="attachments.attendance_sheet_excel = $event" />
+									<AttachDrop
+										:mode="lang"
+										label-en="Visit Video (~30 sec)"
+										label-ur="وزٹ ویڈیو (تقریباً ۳۰ سیکنڈ)"
+										accept="video/*,.mp4,.mov,.webm,.m4v,.3gp"
+										hint-en="Upload a short clip (~30 seconds, max 45s)"
+										hint-ur="مختصر ویڈیو لگائیں (تقریباً ۳۰ سیکنڈ، زیادہ سے زیادہ ۴۵)"
+										:max-duration-sec="45"
+										:file="attachments.visit_video"
+										@pick="attachments.visit_video = $event"
+									/>
+								</template>
 							</div>
 						</div>
 					</div>

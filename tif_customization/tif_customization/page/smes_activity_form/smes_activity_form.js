@@ -170,6 +170,7 @@ class SmesActivityForm {
 			meeting_picture: "",
 			school_picture: "",
 			visiting_card_attach: "",
+			visit_video: "",
 			attendance_sheet_attach: "",
 			training_awareness_pictures: "",
 			attendance_sheet_excel: "",
@@ -1480,6 +1481,19 @@ class SmesActivityForm {
 	}
 
 	html_attachments() {
+		const t = this.data.activity_type || "";
+		const isWorkshop = t === "Workshop" || t === "Workshop Conducted";
+		const workshopBits = isWorkshop
+			? `
+				${this.attach_field("attendance_sheet_attach", __("Attendance Sheet (Not any other Pictures)"), "image/*,.pdf")}
+				${this.attach_field("training_awareness_pictures", __("Pictures of Training & Awareness Session"), "image/*,.pdf")}
+				${this.attach_field("attendance_sheet_excel", __("MS Excel of Attendance Sheet"), ".xlsx,.xls,.csv,image/*,.pdf")}
+			`
+			: "";
+		const videoBit =
+			isWorkshop || t === "Visits" || t === "Marketing" || t === "Registration of New Schools"
+				? this.attach_field("visit_video", __("Visit Video (~30 sec)"), "video/*,.mp4,.mov,.webm")
+				: "";
 		return `
 			<h3>${__("Attachments")}</h3>
 			<p class="text-muted">${__("Attach your relevant pictures")}</p>
@@ -1487,9 +1501,8 @@ class SmesActivityForm {
 				${this.attach_field("meeting_picture", __("Meeting Picture"), "image/*")}
 				${this.attach_field("school_picture", __("School Picture"), "image/*")}
 				${this.attach_field("visiting_card_attach", __("Visiting Card"), "image/*,.pdf")}
-				${this.attach_field("attendance_sheet_attach", __("Attendance Sheet (Not any other Pictures)"), "image/*,.pdf")}
-				${this.attach_field("training_awareness_pictures", __("Pictures of Training & Awareness Session"), "image/*,.pdf")}
-				${this.attach_field("attendance_sheet_excel", __("MS Excel of Attendance Sheet"), ".xlsx,.xls,.csv,image/*,.pdf")}
+				${videoBit}
+				${workshopBits}
 			</div>
 		`;
 	}

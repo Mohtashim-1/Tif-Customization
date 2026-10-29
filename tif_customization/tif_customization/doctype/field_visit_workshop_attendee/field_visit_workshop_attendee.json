@@ -20,16 +20,14 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Attendee Name",
-   "reqd": 1,
-   "allow_on_submit": 1
+   "reqd": 1
   },
   {
    "columns": 1,
    "fieldname": "contact_number",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Contact Number",
-   "allow_on_submit": 1
+   "label": "Contact Number"
   },
   {
    "columns": 2,
@@ -37,32 +35,28 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Email",
-   "options": "Email",
-   "allow_on_submit": 1
+   "options": "Email"
   },
   {
    "columns": 2,
    "fieldname": "school_organization",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "School / Organization",
-   "allow_on_submit": 1
+   "label": "School / Organization"
   },
   {
    "columns": 2,
    "fieldname": "training_venue",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Training Venue",
-   "allow_on_submit": 1
+   "label": "Training Venue"
   },
   {
    "columns": 1,
    "fieldname": "training_date",
    "fieldtype": "Date",
    "in_list_view": 1,
-   "label": "Training Date",
-   "allow_on_submit": 1
+   "label": "Training Date"
   }
  ],
  "grid_page_length": 50,
