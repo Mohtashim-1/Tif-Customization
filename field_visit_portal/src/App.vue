@@ -23,9 +23,30 @@ import {
 	currentMonthName,
 	currentQuarter,
 	karachiClock,
+	quarterFromMonth,
 	resolveActivityType,
 	todayISO,
 } from "./lib/activities";
+
+const MONTH_TO_NUM = {
+	January: 1,
+	February: 2,
+	March: 3,
+	April: 4,
+	May: 5,
+	June: 6,
+	July: 7,
+	August: 8,
+	September: 9,
+	October: 10,
+	November: 11,
+	December: 12,
+};
+
+function syncFiscalQuarterFromMonth(target) {
+	const m = MONTH_TO_NUM[String(target.month || "").trim()];
+	if (m) target.quarter = quarterFromMonth(m);
+}
 
 const boot = window.field_visit_portal_boot || {};
 const step = ref(1);
@@ -809,6 +830,15 @@ function tickClock() {
 watch(
 	() => [travel.distance, travel.mode, meta.value.staff_name],
 	() => refreshTravelCost(),
+);
+
+watch(
+	() => visit.month,
+	() => syncFiscalQuarterFromMonth(visit)
+);
+watch(
+	() => training.month,
+	() => syncFiscalQuarterFromMonth(training)
 );
 
 function pickCard(card) {

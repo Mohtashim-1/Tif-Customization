@@ -181,11 +181,12 @@ export const TRAVEL_MODE_UR = {
 	Other: "دیگر",
 };
 
+// Fiscal year Jul–Jun (same as SME / expense reports).
 export const QUARTER_OPTIONS = [
-	{ value: "Q1", label: "Q1 - Jan-Mar" },
-	{ value: "Q2", label: "Q2 - Apr-Jun" },
-	{ value: "Q3", label: "Q3 - Jul-Sep" },
-	{ value: "Q4", label: "Q4 - Oct-Dec" },
+	{ value: "Q1", label: "Q1 - Jul-Sep" },
+	{ value: "Q2", label: "Q2 - Oct-Dec" },
+	{ value: "Q3", label: "Q3 - Jan-Mar" },
+	{ value: "Q4", label: "Q4 - Apr-Jun" },
 ];
 
 /** Always show these to field officers even if meta.activity_types is stale */
@@ -243,14 +244,21 @@ export function currentMonthName() {
 	return new Intl.DateTimeFormat("en", { timeZone: "Asia/Karachi", month: "long" }).format(new Date());
 }
 
+/** Map calendar month (1–12) → fiscal quarter (FY starts July). */
+export function quarterFromMonth(month) {
+	const m = Number(month) || 0;
+	if (m >= 7 && m <= 9) return "Q1";
+	if (m >= 10 && m <= 12) return "Q2";
+	if (m >= 1 && m <= 3) return "Q3";
+	if (m >= 4 && m <= 6) return "Q4";
+	return "Q1";
+}
+
 export function currentQuarter() {
 	const month = Number(
 		new Intl.DateTimeFormat("en", { timeZone: "Asia/Karachi", month: "numeric" }).format(new Date())
 	);
-	if (month <= 3) return "Q1";
-	if (month <= 6) return "Q2";
-	if (month <= 9) return "Q3";
-	return "Q4";
+	return quarterFromMonth(month);
 }
 
 export function karachiClock() {
