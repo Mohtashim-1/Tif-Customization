@@ -1752,6 +1752,29 @@ async function saveVisit(submitDoc) {
 		error.value = "Select a school (Customer) or use Create School.";
 		return;
 	}
+	if (selected.value.group === "visits") {
+		if (!(visit.schoolAddress || "").trim() && !(schoolOpening.address || "").trim()) {
+			error.value = "School Address is required.";
+			return;
+		}
+		const filledContacts = (schoolContacts.value || []).filter(
+			(r) => (r.person_name || "").trim() && (r.contact_number || "").trim()
+		);
+		if (!filledContacts.length) {
+			error.value = "Add at least one Contact Person with name and phone number.";
+			return;
+		}
+	}
+	if (selected.value.group === "books") {
+		if (!(visit.schoolAddress || "").trim() && !(schoolOpening.address || "").trim()) {
+			error.value = "School Address is required.";
+			return;
+		}
+		if (!(visit.meetingWith || "").trim() || !(visit.contactNumber || "").trim()) {
+			error.value = "Contact Person name and phone number are required.";
+			return;
+		}
+	}
 	if (selected.value.group === "volunteer") {
 		if (!volunteers.value.length) {
 			error.value = "Add at least one volunteer.";
@@ -2312,7 +2335,7 @@ const steps = [
 								@create="startCreateSchool"
 							/>
 							<FieldSelect :mode="lang" label-en="School Type" label-ur="اسکول کی قسم" :options="schoolTypeOptions" placeholder-en="Select" placeholder-ur="منتخب کریں" v-model="visit.schoolType" />
-							<FieldTextarea :mode="lang" label-en="School Address" label-ur="اسکول کا پتہ" v-model="visit.schoolAddress" />
+							<FieldTextarea :mode="lang" label-en="School Address" label-ur="اسکول کا پتہ" required v-model="visit.schoolAddress" />
 							<FieldTextarea :mode="lang" label-en="Visit Summary regarding School" label-ur="اسکول کے بارے میں دورے کا خلاصہ" required v-model="visit.schoolAdditionalRemarks" />
 							<FieldInput :mode="lang" label-en="Reference" label-ur="حوالہ" v-model="visit.reference" />
 							<label class="check-row" style="margin-top: 0">
@@ -2331,27 +2354,27 @@ const steps = [
 							@cancel="cancelCreateSchool"
 						/>
 
-						<div class="block-title">Contact Person / رابطہ شخص</div>
+						<div class="block-title">Contact Person / رابطہ شخص <span style="color:#dc2626">*</span></div>
 						<div class="table-head">
 							<div>
 								<div style="font-weight: 600; font-size: 13px"><Bi :mode="lang" en="Contact Persons" ur="رابطہ افراد" /></div>
-								<div style="font-size: 11px; color: #71717a">Add one row per person if you met more than one contact.</div>
+								<div style="font-size: 11px; color: #71717a">At least one contact with name and phone is required. Add more rows if needed.</div>
 							</div>
 							<button class="btn btn-green" type="button" @click="addSchoolContact">+ Add row</button>
 						</div>
 						<div class="contact-table">
 							<div class="contact-head">
 								<div>No.</div>
-								<div>Contact Person Name</div>
-								<div>Contact Number</div>
+								<div>Contact Person Name *</div>
+								<div>Contact Number *</div>
 								<div>Designation</div>
 								<div>Other Designation</div>
 								<div></div>
 							</div>
 							<div v-for="(row, idx) in schoolContacts" :key="row.id" class="contact-row">
 								<div class="idx">{{ idx + 1 }}</div>
-								<input v-model="row.person_name" placeholder="Name" />
-								<input v-model="row.contact_number" placeholder="03XX-" />
+								<input v-model="row.person_name" placeholder="Name *" required />
+								<input v-model="row.contact_number" placeholder="03XX- *" required />
 								<select v-model="row.designation">
 									<option value="">Select</option>
 									<option v-for="d in designationOptions" :key="d" :value="d">{{ d }}</option>
@@ -3356,9 +3379,9 @@ const steps = [
 								@create="(name) => addArea(name, visit)"
 							/>
 							<FieldDate :mode="lang" label-en="Date" label-ur="تاریخ" required v-model="visit.visitDate" />
-							<FieldInput :mode="lang" label-en="Contact Person" label-ur="رابطہ شخص" v-model="visit.meetingWith" />
-							<FieldInput :mode="lang" label-en="Contact No." label-ur="رابطہ نمبر" placeholder="03XX-XXXXXXX" v-model="visit.contactNumber" />
-							<FieldTextarea :mode="lang" label-en="School / Madrasa Address" label-ur="اسکول / مدرسہ کا پتہ" v-model="visit.schoolAddress" />
+							<FieldInput :mode="lang" label-en="Contact Person" label-ur="رابطہ شخص" required v-model="visit.meetingWith" />
+							<FieldInput :mode="lang" label-en="Contact No." label-ur="رابطہ نمبر" placeholder="03XX-XXXXXXX" required v-model="visit.contactNumber" />
+							<FieldTextarea :mode="lang" label-en="School / Madrasa Address" label-ur="اسکول / مدرسہ کا پتہ" required v-model="visit.schoolAddress" />
 							<FieldTextarea :mode="lang" label-en="Visit Summary" label-ur="دورے کا خلاصہ" required v-model="visit.schoolAdditionalRemarks" />
 						</div>
 

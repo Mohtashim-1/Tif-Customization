@@ -193,7 +193,7 @@ function contact(role) {
 
 		<div class="block-title">6 Location</div>
 		<div class="academic-work">
-			<FieldTextarea :mode="mode" label-en="Address" label-ur="پتہ" v-model="model.address" />
+			<FieldTextarea :mode="mode" label-en="Address" label-ur="پتہ" required v-model="model.address" />
 			<div class="grid-2" style="margin-top: 0">
 				<FieldSelect :mode="mode" label-en="Province" label-ur="صوبہ" :options="provinces" v-model="model.province" />
 				<FieldInput :mode="mode" label-en="City" label-ur="شہر" v-model="model.city" />

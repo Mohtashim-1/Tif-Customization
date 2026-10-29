@@ -1934,6 +1934,44 @@ def submit_smes_activity(data):
 
 	activity_label = data.get("activity_type")
 	doc_type = ACTIVITY_TYPE_MAP.get(activity_label, activity_label)
+
+	# School visits: address + at least one contact (name + phone) required.
+	_school_contact_types = {
+		"Visits",
+		"Marketing",
+		"Registration of New Schools",
+		"Enrolment of Volunteers",
+		"Enrolment of Ambassadors",
+		"Model School A",
+		"Model School B",
+		"Books Demand (Quantity)",
+		"Joint Visit with SME",
+	}
+	if doc_type in _school_contact_types:
+		address = cstr(data.get("school_address") or "").strip()
+		if not address:
+			frappe.throw(_("School Address is required."))
+		contact_rows = data.get("school_contacts") or []
+		if isinstance(contact_rows, str):
+			try:
+				contact_rows = frappe.parse_json(contact_rows) or []
+			except Exception:
+				contact_rows = []
+		valid_contacts = [
+			r
+			for r in contact_rows
+			if isinstance(r, dict)
+			and cstr(r.get("person_name") or "").strip()
+			and cstr(r.get("contact_number") or "").strip()
+		]
+		# Books Demand portal uses single contact fields instead of the table.
+		if not valid_contacts:
+			single_name = cstr(data.get("contact_person_name") or data.get("meeting_with") or "").strip()
+			single_phone = cstr(data.get("contact_number") or "").strip()
+			if single_name and single_phone:
+				valid_contacts = [{"person_name": single_name, "contact_number": single_phone}]
+		if not valid_contacts:
+			frappe.throw(_("Add at least one Contact Person with name and phone number."))
 	for_officer = _officer_for_academic_card(doc_type, data)
 
 	if not data.get("visit_by") and not data.get("staff_employee"):

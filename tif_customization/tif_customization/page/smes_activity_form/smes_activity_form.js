@@ -1375,9 +1375,11 @@ class SmesActivityForm {
 						</button>
 					</div>
 					${this.multi_field(idx, "school_contact", "person_name", __("Contact Person Name"), "text", {
+						reqd: 1,
 						value: row.person_name,
 					})}
 					${this.multi_field(idx, "school_contact", "contact_number", __("Contact Number"), "tel", {
+						reqd: 1,
 						value: row.contact_number,
 					})}
 					${this.multi_field(idx, "school_contact", "designation", __("Designation"), "radio", {
@@ -2178,14 +2180,14 @@ class SmesActivityForm {
 			}
 			const rows = this.data.school_contacts || [];
 			const filled = rows.filter(
-				(r) =>
-					cstr(r.person_name).trim() ||
-					cstr(r.contact_number).trim() ||
-					cstr(r.designation).trim(),
+				(r) => cstr(r.person_name).trim() && cstr(r.contact_number).trim(),
 			);
-			if (!filled.length || !cstr((filled[0] || {}).designation).trim()) {
+			if (!filled.length) {
 				frappe.show_alert(
-					{ message: __("Select Designation for at least one contact person"), indicator: "orange" },
+					{
+						message: __("Add at least one Contact Person with name and phone number"),
+						indicator: "orange",
+					},
 					5,
 				);
 				return false;
