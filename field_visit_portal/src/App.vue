@@ -2035,12 +2035,19 @@ const steps = [
 					<button type="button" class="btn btn-ghost" @click="navigatePortal('dashboard')">Dashboard</button>
 					<button type="button" class="btn btn-ghost" @click="navigatePortal('new')">New visit</button>
 					<a
-						v-if="viewDoc?.desk_url"
+						v-if="viewDoc?.desk_url && viewDoc?.can_edit"
+						class="btn btn-green"
+						:href="viewDoc.desk_url"
+						target="_blank"
+						rel="noopener"
+					>Edit Visit / ترمیم کریں</a>
+					<a
+						v-else-if="viewDoc?.desk_url"
 						class="btn btn-ghost"
 						:href="viewDoc.desk_url"
 						target="_blank"
 						rel="noopener"
-					>Desk form</a>
+					>Open Desk form</a>
 					<button
 						v-if="viewIsDraft"
 						type="button"
@@ -2076,6 +2083,23 @@ const steps = [
 							This visit is still a draft — submit it to finalize. /
 							<span class="urdu"> یہ وزٹ ابھی ڈرافٹ ہے — جمع کر کے حتمی بنائیں۔</span>
 						</p>
+						<p
+							v-else-if="Number(viewDoc.docstatus) === 1 && viewDoc.can_edit"
+							class="view-sub"
+							style="color: #065f46"
+						>
+							Submitted — you can edit it from Desk. Click
+							<strong>Edit Visit</strong> above. /
+							<span class="urdu"> جمع شدہ — ترمیم کے لیے اوپر <strong>Edit Visit</strong> دبائیں۔</span>
+						</p>
+						<p
+							v-else-if="Number(viewDoc.docstatus) === 1"
+							class="view-sub"
+							style="color: #92400e"
+						>
+							Submitted visits are locked. Only Mohtashim, Farhan, or Anwar can edit. /
+							<span class="urdu"> جمع شدہ وزٹ مقفل ہے — صرف مختصص صارفین ترمیم کر سکتے ہیں۔</span>
+						</p>
 						<div v-if="viewIsDraft" style="margin-top: 14px">
 							<button
 								type="button"
@@ -2085,6 +2109,11 @@ const steps = [
 							>
 								{{ submittingView ? "Submitting…" : "Submit Visit / جمع کرائیں ✓" }}
 							</button>
+						</div>
+						<div v-else-if="Number(viewDoc.docstatus) === 1 && viewDoc.can_edit && viewDoc.desk_url" style="margin-top: 14px">
+							<a class="btn btn-green" :href="viewDoc.desk_url" target="_blank" rel="noopener">
+								Edit Visit / ترمیم کریں
+							</a>
 						</div>
 					</div>
 					<div v-for="section in viewDoc.sections || []" :key="section.title" class="view-section">
