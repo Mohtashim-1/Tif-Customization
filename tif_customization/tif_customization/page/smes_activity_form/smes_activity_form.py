@@ -56,6 +56,7 @@ HIDDEN_ACTIVITY_TYPE_LABELS = {
 # Same order as Field Visit Type of Activity (Target Base sheet).
 SHEET_ACTIVITY_TYPES = [
 	"Visits",
+	"Joint Visit with SME",
 	"M&E",
 	"Workshop",
 	"Meeting with Ulama and Educationist",
@@ -249,6 +250,7 @@ ACTIVITY_TYPE_MAP = {
 	"Model School B": "Model School B",
 	"Marketing Visit": "Marketing",
 	"M&E Visit": "M&E",
+	"Joint Visit with SME": "Joint Visit with SME",
 	"Joint Visit with SME (Only for Supervisor)": "Joint Visit with SME",
 	"Trainings & Workshops / Teachers Training Meeting": "Training",
 	"Meetings": "Meeting",

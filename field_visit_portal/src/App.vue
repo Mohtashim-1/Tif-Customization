@@ -91,6 +91,8 @@ const meta = ref({
 	designations: [],
 	affiliation_options: [],
 	marketing_visit_categories: [],
+	sme_name_options: [],
+	joint_skill_ratings: [],
 	qps_services: [],
 	tps_services: [],
 	cee_services: [],
@@ -156,6 +158,8 @@ const visit = reactive({
 	meetingWith: "",
 	reference: "",
 	reasonsIfNotAgreed: "",
+	jointVisitWithSmes: [],
+	jointSmeSkillRating: "",
 	services: {},
 });
 function emptyMe() {
@@ -584,7 +588,20 @@ const marketingCategories = computed(() => {
 	return base;
 });
 const isMarketingWorkshopArranged = computed(
-	() => selected.value?.group === "visits" && visit.marketingVisitCategory === "Workshop Arranged"
+	() =>
+		selected.value?.group === "visits" &&
+		selected.value?.id !== "joint" &&
+		visit.marketingVisitCategory === "Workshop Arranged"
+);
+const isJointVisit = computed(() => selected.value?.id === "joint");
+const smeNameOptions = computed(() => nonempty(meta.value.sme_name_options, []));
+const jointSkillRatings = computed(() =>
+	nonempty(meta.value.joint_skill_ratings, [
+		"Excellent - Highly skilled and professional",
+		"Good - Meets expectations",
+		"Average - Needs some improvement",
+		"Poor - Requires immediate training/support",
+	])
 );
 const statusOptions = computed(() =>
 	nonempty(meta.value.statuses, [
@@ -1354,11 +1371,14 @@ function attachField(card) {
 function buildPayload(submitDoc) {
 	const card = selected.value;
 	let activityType = resolveActivityType(card, training.otType, meta.value.activity_types || []);
-	if (card?.group === "visits" && visit.marketingVisitCategory === "Workshop Arranged") {
+	if (card?.id === "joint") {
+		activityType = "Joint Visit with SME";
+	} else if (card?.group === "visits" && visit.marketingVisitCategory === "Workshop Arranged") {
 		activityType = "Workshop Arranged";
 	}
 	const schoolForm = card?.group === "visits" || card?.group === "books" || card?.group === "me";
-	const marketingWorkshop = card?.group === "visits" && visit.marketingVisitCategory === "Workshop Arranged";
+	const marketingWorkshop =
+		card?.group === "visits" && card?.id !== "joint" && visit.marketingVisitCategory === "Workshop Arranged";
 	const volunteerFormGroup = card?.group === "volunteer";
 	const ambassadorFormGroup = card?.group === "ambassador";
 	const eventFormGroup = card?.group === "event";
@@ -1445,7 +1465,13 @@ function buildPayload(submitDoc) {
 	}
 
 	if (card?.group === "visits") {
-		payload.marketing_visit_category = visit.marketingVisitCategory;
+		if (card?.id === "joint") {
+			payload.joint_visit_with_smes = [...(visit.jointVisitWithSmes || [])];
+			payload.joint_sme_skill_rating = visit.jointSmeSkillRating || "";
+			payload.frequency_of_visits = visit.marketingVisitCategory || visit.frequency || "";
+		} else {
+			payload.marketing_visit_category = visit.marketingVisitCategory;
+		}
 		if (marketingWorkshop) {
 			payload.training_quarter = training.quarter || visit.quarter;
 			payload.training_school_category = training.schoolCategory;
@@ -1877,7 +1903,17 @@ async function saveVisit(submitDoc) {
 		error.value = "Select a school (Customer) or use Create School.";
 		return;
 	}
-	if (selected.value.group === "visits" && visit.marketingVisitCategory === "Workshop Arranged") {
+	if (selected.value.id === "joint") {
+		if (!(visit.jointVisitWithSmes || []).length) {
+			error.value = "Select at least one SME for Joint Visit.";
+			return;
+		}
+		if (!(visit.jointSmeSkillRating || "").trim()) {
+			error.value = "SME Skill / Professional Level is required.";
+			return;
+		}
+	}
+	if (selected.value.group === "visits" && selected.value.id !== "joint" && visit.marketingVisitCategory === "Workshop Arranged") {
 		if (!(training.date || visit.visitDate || "").trim()) {
 			error.value = "Workshop date is required.";
 			return;
@@ -1887,7 +1923,10 @@ async function saveVisit(submitDoc) {
 			return;
 		}
 	}
-	if (selected.value.group === "visits" && visit.marketingVisitCategory !== "Workshop Arranged") {
+	if (
+		selected.value.group === "visits" &&
+		!(selected.value.id !== "joint" && visit.marketingVisitCategory === "Workshop Arranged")
+	) {
 		if (!(visit.schoolAddress || "").trim() && !(schoolOpening.address || "").trim()) {
 			error.value = "School Address is required.";
 			return;
@@ -2096,6 +2135,9 @@ function resetForm() {
 	visit.contactNumber = "";
 	visit.schoolAddress = "";
 	visit.schoolAdditionalRemarks = "";
+	visit.jointVisitWithSmes = [];
+	visit.jointSmeSkillRating = "";
+	visit.marketingVisitCategory = "";
 	visit.services = {};
 	Object.assign(me, emptyMe());
 	cancelCreateSchool();
@@ -2416,7 +2458,7 @@ const steps = [
 						<div class="meta-row">
 							<div class="readonly-box">
 								<div class="k">Type of Activity / سرگرمی کی قسم</div>
-								<div class="v">Visits</div>
+								<div class="v">{{ isJointVisit ? "Joint Visit with SME" : "Visits" }}</div>
 							</div>
 							<div class="readonly-box">
 								<div class="k">Series / سیریز</div>
@@ -2428,12 +2470,48 @@ const steps = [
 							</div>
 						</div>
 
+						<template v-if="isJointVisit">
+							<SectionTitle
+								:mode="lang"
+								title-en="Joint Visit with SME"
+								title-ur="SME کے ساتھ مشترکہ وزٹ"
+								sub-en="Select SME(s) and rate skill level"
+								sub-ur="SME منتخب کریں اور مہارت کی سطح درج کریں"
+							/>
+							<div class="field" style="margin-bottom: 16px">
+								<label>
+									<span class="en">Visit with (SME Name)</span>
+									<span v-if="lang !== 'en'" class="ur urdu">وزٹ کس SME کے ساتھ</span>
+									<span style="color:#dc2626"> *</span>
+								</label>
+								<div class="work-types">
+									<label v-for="sme in smeNameOptions" :key="sme" class="work-chip">
+										<input type="checkbox" :value="sme" v-model="visit.jointVisitWithSmes" />
+										<span>{{ sme }}</span>
+									</label>
+								</div>
+								<div v-if="!smeNameOptions.length" style="font-size: 12px; color: #71717a; margin-top: 6px">
+									No SME names loaded. Refresh the page or ask admin to check Field Officers.
+								</div>
+							</div>
+							<FieldSelect
+								:mode="lang"
+								label-en="SME Skill / Professional Level"
+								label-ur="SME مہارت / پیشہ ورانہ سطح"
+								:options="jointSkillRatings"
+								placeholder-en="Select"
+								placeholder-ur="منتخب کریں"
+								required
+								v-model="visit.jointSmeSkillRating"
+							/>
+						</template>
+
 						<SectionTitle :mode="lang" title-en="Visit Details" title-ur="دورے کی تفصیلات" sub-en="Same fields as Field Visit" sub-ur="فیلڈ وزٹ والے تمام فیلڈز" />
 						<div class="grid-3">
 							<FieldSelect :mode="lang" label-en="Month" label-ur="مہینہ" :options="meta.months" v-model="visit.month" />
 							<FieldSelect :mode="lang" label-en="Quarter" label-ur="سہ ماہی" :options="QUARTER_OPTIONS" v-model="visit.quarter" />
 							<FieldSelect :mode="lang" label-en="Name of Staff" label-ur="سٹاف کا نام" :options="staffOptions" required v-model="visit.visitBy" />
-							<FieldSelect :mode="lang" label-en="Marketing Visit Category" label-ur="مارکیٹنگ وزٹ کیٹیگری" :options="marketingCategories" placeholder-en="Select" placeholder-ur="منتخب کریں" v-model="visit.marketingVisitCategory" />
+							<FieldSelect v-if="!isJointVisit" :mode="lang" label-en="Marketing Visit Category" label-ur="مارکیٹنگ وزٹ کیٹیگری" :options="marketingCategories" placeholder-en="Select" placeholder-ur="منتخب کریں" v-model="visit.marketingVisitCategory" />
 							<FieldSelect v-if="!isMarketingWorkshopArranged" :mode="lang" label-en="Status" label-ur="سٹیٹس" :options="statusOptions" placeholder-en="Select" placeholder-ur="منتخب کریں" v-model="visit.status" />
 							<FieldDate v-if="!isMarketingWorkshopArranged" :mode="lang" label-en="Visit Date" label-ur="وزٹ کی تاریخ" required v-model="visit.visitDate" />
 							<FieldTime v-if="!isMarketingWorkshopArranged" :mode="lang" label-en="Visiting Starting Time" label-ur="آغاز کا وقت" required v-model="visit.startTime" />
