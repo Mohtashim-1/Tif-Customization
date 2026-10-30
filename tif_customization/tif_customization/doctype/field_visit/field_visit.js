@@ -224,7 +224,7 @@ function apply_supervisor_field_visit_restrictions(frm) {
 		frappe.show_alert(
 			{
 				message: __(
-					"Enrolment of Participants, Workshop Conducted, and Half day Workshop attendance can only be edited by Farhan Hussain.",
+					"Half day Workshop attendance / Registration in Workshops can only be edited by Farhan Hussain or Anwar Khan.",
 				),
 				indicator: "orange",
 			},

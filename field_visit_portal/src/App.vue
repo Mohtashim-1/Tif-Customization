@@ -552,6 +552,9 @@ const isOtherOfficialTask = computed(
 const isFollowUpCallsTask = computed(
 	() => selected.value?.group === "academic" && String(training.otType || "").includes("Follow up")
 );
+const isInternalMeetingTask = computed(
+	() => selected.value?.group === "academic" && training.otType === "Internal Meeting"
+);
 const isStaffMeetingTask = computed(
 	() =>
 		selected.value?.group === "academic" &&
@@ -1572,6 +1575,12 @@ function buildPayload(submitDoc) {
 				payload.designation = first.designation;
 				payload.designation_other = first.designation_other;
 			}
+		} else if (training.otType === "Internal Meeting") {
+			payload.mt_agenda = training.academicWorkDetail || meeting.agenda;
+			payload.mt_remarks = meeting.remarks || training.academicWorkDetail;
+			payload.mt_resolution = meeting.resolution;
+			payload.mt_trainer = training.trainerName || staffName.value;
+			payload.school_additional_remarks = meeting.remarks || training.academicWorkDetail;
 		} else if (
 			String(training.otType || "").includes("Meeting of Regional") ||
 			String(training.otType || "").includes("Head Office") ||
@@ -3011,6 +3020,31 @@ const steps = [
 								placeholder="Describe the official task / آفیشل ٹاسک کی تفصیل لکھیں"
 								required
 								v-model="training.academicWorkDetail"
+							/>
+							<FieldSelect :mode="lang" label-en="Hours Spent" label-ur="صرف شدہ گھنٹے" :options="hoursSpentOptions" v-model="training.academicHours" />
+						</div>
+						<div v-else-if="isInternalMeetingTask" class="academic-work" style="margin-top: 16px">
+							<FieldTextarea
+								:mode="lang"
+								label-en="Agenda"
+								label-ur="ایجنڈا"
+								placeholder="Meeting agenda / میٹنگ کا ایجنڈا"
+								required
+								v-model="training.academicWorkDetail"
+							/>
+							<FieldTextarea
+								:mode="lang"
+								label-en="Remarks / Discussion"
+								label-ur="ریمارکس / مباحثہ"
+								placeholder="Discussion points and outcome / مباحثہ اور نتیجہ"
+								required
+								v-model="meeting.remarks"
+							/>
+							<FieldTextarea
+								:mode="lang"
+								label-en="Resolution"
+								label-ur="قرار داد"
+								v-model="meeting.resolution"
 							/>
 							<FieldSelect :mode="lang" label-en="Hours Spent" label-ur="صرف شدہ گھنٹے" :options="hoursSpentOptions" v-model="training.academicHours" />
 						</div>

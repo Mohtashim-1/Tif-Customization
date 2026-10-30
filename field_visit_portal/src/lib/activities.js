@@ -34,10 +34,10 @@ export const ACTIVITY_CARDS = [
 		type: "Internal Meeting",
 		group: "internal_meeting",
 		emoji: "🗓️",
-		titleEn: "Internal Meeting",
-		titleUr: "اندرونی میٹنگ",
-		subEn: "Meeting with TIF staff",
-		subUr: "ٹی آئی ایف سٹاف کے ساتھ میٹنگ",
+		titleEn: "Internal Meeting / HO / RO Visit",
+		titleUr: "اندرونی میٹنگ / ہیڈ آفس / ریجنل آفس دورہ",
+		subEn: "Internal meeting · Head Office / Regional Office visit",
+		subUr: "اندرونی میٹنگ · ہیڈ آفس / ریجنل آفس دورہ",
 	},
 	{
 		id: "training",
@@ -54,7 +54,7 @@ export const ACTIVITY_CARDS = [
 		type: "Workshop Conducted",
 		altTypes: ["Workshop"],
 		group: "training",
-		farhanOnly: true,
+		alwaysShow: true,
 		emoji: "🛠️",
 		titleEn: "Workshop Conducted",
 		titleUr: "ورکشاپ منعقد",
@@ -143,10 +143,10 @@ export const ACTIVITY_CARDS = [
 		],
 		group: "academic",
 		emoji: "🏛️",
-		titleEn: "Academic Task / HO / RO Visit",
-		titleUr: "تعلیمی / ہیڈ آفس / ریجنل آفس کا دورہ",
-		subEn: "Head Office / Regional Office tasks",
-		subUr: "ہیڈ آفس / ریجنل آفس کے کام",
+		titleEn: "Academic Task",
+		titleUr: "تعلیمی کام",
+		subEn: "Academic tasks · HO / RO visits",
+		subUr: "تعلیمی کام · ہیڈ آفس / ریجنل آفس دورے",
 	},
 	{
 		id: "books",
@@ -194,6 +194,8 @@ const OPEN_FIELD_OFFICER_CARD_TYPES = new Set([
 	"Enrolment of Participants",
 	"Quiz Arranged",
 	"Co-curricular Activity",
+	"Workshop Conducted",
+	"Workshop",
 ]);
 
 export function cardsForUser(activityTypes = []) {

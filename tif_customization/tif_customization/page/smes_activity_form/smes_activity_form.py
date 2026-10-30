@@ -137,6 +137,8 @@ FIELD_OFFICER_OPEN_ACTIVITY_TYPES = frozenset(
 		"Enrolment of Participant in ELP/ TECC/ TTC/ Online Tajweed",
 		"Quiz Arranged",
 		"Co-curricular Activity",
+		"Workshop Conducted",
+		"Workshop",
 	}
 )
 
