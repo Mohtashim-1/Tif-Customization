@@ -570,15 +570,21 @@ const isOfficialVisitTask = computed(() => {
 	);
 });
 const assignedByOptions = ["Head Office", "Regional Office", "Supervisor", "Out of Station", "Other"];
-const marketingCategories = computed(() =>
-	nonempty(meta.value.marketing_visit_categories, [
+const marketingCategories = computed(() => {
+	const base = nonempty(meta.value.marketing_visit_categories, [
 		"New",
 		"1st Follow up visit",
 		"2nd Follow up visit",
 		"3rd Follow up visit",
 		"4th Follow up visit",
 		"Other Visits",
-	])
+		"Workshop Arranged",
+	]);
+	if (!base.includes("Workshop Arranged")) return [...base, "Workshop Arranged"];
+	return base;
+});
+const isMarketingWorkshopArranged = computed(
+	() => selected.value?.group === "visits" && visit.marketingVisitCategory === "Workshop Arranged"
 );
 const statusOptions = computed(() =>
 	nonempty(meta.value.statuses, [
@@ -867,6 +873,33 @@ watch(
 watch(
 	() => training.month,
 	() => syncFiscalQuarterFromMonth(training)
+);
+watch(
+	() => visit.marketingVisitCategory,
+	(cat) => {
+		if (cat !== "Workshop Arranged") return;
+		training.month = visit.month || training.month;
+		training.quarter = visit.quarter || training.quarter;
+		training.province = visit.province || training.province;
+		training.city = visit.city || training.city;
+		training.date = visit.visitDate || training.date || todayISO();
+		training.trainerName = visit.visitBy || training.trainerName || staffName.value;
+		training.entryFilledBy = training.entryFilledBy || staffName.value;
+		if (!training.trainingCategory || training.trainingCategory.includes("Teachers Training")) {
+			training.trainingCategory = "Half Day Workshop";
+		}
+	}
+);
+watch(
+	() => [visit.province, visit.city, visit.month, visit.quarter, visit.visitBy],
+	() => {
+		if (visit.marketingVisitCategory !== "Workshop Arranged") return;
+		training.province = visit.province || training.province;
+		training.city = visit.city || training.city;
+		training.month = visit.month || training.month;
+		training.quarter = visit.quarter || training.quarter;
+		if (visit.visitBy) training.trainerName = visit.visitBy;
+	}
 );
 
 function pickCard(card) {
@@ -1320,8 +1353,12 @@ function attachField(card) {
 
 function buildPayload(submitDoc) {
 	const card = selected.value;
-	const activityType = resolveActivityType(card, training.otType, meta.value.activity_types || []);
+	let activityType = resolveActivityType(card, training.otType, meta.value.activity_types || []);
+	if (card?.group === "visits" && visit.marketingVisitCategory === "Workshop Arranged") {
+		activityType = "Workshop Arranged";
+	}
 	const schoolForm = card?.group === "visits" || card?.group === "books" || card?.group === "me";
+	const marketingWorkshop = card?.group === "visits" && visit.marketingVisitCategory === "Workshop Arranged";
 	const volunteerFormGroup = card?.group === "volunteer";
 	const ambassadorFormGroup = card?.group === "ambassador";
 	const eventFormGroup = card?.group === "event";
@@ -1409,30 +1446,50 @@ function buildPayload(submitDoc) {
 
 	if (card?.group === "visits") {
 		payload.marketing_visit_category = visit.marketingVisitCategory;
-		payload.school_address = visit.schoolAddress;
-		payload.school_type = visit.schoolType;
-		payload.reference = visit.reference;
-		payload.marketing_material_provided = visit.marketingMaterial;
-		payload.qps_affiliated = visit.qpsAffiliated;
-		payload.tps_affiliated = visit.tpsAffiliated;
-		payload.cee_affiliated = visit.ceeAffiliated;
-		payload.reasons_if_not_agreed = visit.reasonsIfNotAgreed;
-		payload.school_contacts = schoolContacts.value
-			.filter((r) => r.person_name || r.contact_number || r.designation)
-			.map((r) => ({
-				person_name: r.person_name,
-				contact_number: r.contact_number,
-				designation: r.designation,
-				designation_other: r.designation_other,
-			}));
-		const firstContact = payload.school_contacts[0];
-		if (firstContact) {
-			payload.contact_person_name = firstContact.person_name;
-			payload.contact_number = firstContact.contact_number;
-			payload.designation = firstContact.designation;
-			payload.designation_other = firstContact.designation_other;
+		if (marketingWorkshop) {
+			payload.training_quarter = training.quarter || visit.quarter;
+			payload.training_school_category = training.schoolCategory;
+			payload.training_session_category = training.trainingCategory;
+			payload.training_workshop_topic = training.topics;
+			payload.training_mode = training.mode;
+			payload.training_trainer_name = training.trainerName || visit.visitBy || staffName.value;
+			payload.training_entry_filled_by = training.entryFilledBy || staffName.value;
+			payload.training_venue_name = training.venueName;
+			payload.training_no_of_participants = training.noOfParticipants;
+			payload.training_no_of_schools = training.noOfSchools;
+			payload.visit_date = training.date || visit.visitDate || visitDate;
+			payload.school_name = training.venueName || visit.schoolName;
+			payload.school_additional_remarks = meeting.remarks || visit.schoolAdditionalRemarks;
+			payload.month = training.month || visit.month || payload.month;
+			payload.quarter = training.quarter || visit.quarter;
+			payload.city = training.city || visit.city || city;
+			payload.province = training.province || visit.province;
+		} else {
+			payload.school_address = visit.schoolAddress;
+			payload.school_type = visit.schoolType;
+			payload.reference = visit.reference;
+			payload.marketing_material_provided = visit.marketingMaterial;
+			payload.qps_affiliated = visit.qpsAffiliated;
+			payload.tps_affiliated = visit.tpsAffiliated;
+			payload.cee_affiliated = visit.ceeAffiliated;
+			payload.reasons_if_not_agreed = visit.reasonsIfNotAgreed;
+			payload.school_contacts = schoolContacts.value
+				.filter((r) => r.person_name || r.contact_number || r.designation)
+				.map((r) => ({
+					person_name: r.person_name,
+					contact_number: r.contact_number,
+					designation: r.designation,
+					designation_other: r.designation_other,
+				}));
+			const firstContact = payload.school_contacts[0];
+			if (firstContact) {
+				payload.contact_person_name = firstContact.person_name;
+				payload.contact_number = firstContact.contact_number;
+				payload.designation = firstContact.designation;
+				payload.designation_other = firstContact.designation_other;
+			}
+			Object.assign(payload, visit.services);
 		}
-		Object.assign(payload, visit.services);
 	}
 
 	if (card?.group === "me") {
@@ -1748,6 +1805,9 @@ async function uploadSoaAttachments(docname) {
 
 function activityRemarksText() {
 	const g = selected.value?.group;
+	if (g === "visits" && visit.marketingVisitCategory === "Workshop Arranged") {
+		return (meeting.remarks || visit.schoolAdditionalRemarks || "").trim();
+	}
 	if (g === "visits" || g === "me" || g === "books") {
 		return (visit.schoolAdditionalRemarks || "").trim();
 	}
@@ -1811,12 +1871,23 @@ async function saveVisit(submitDoc) {
 	if (
 		(selected.value.group === "visits" || selected.value.group === "me" || selected.value.group === "books") &&
 		!creatingSchool.value &&
-		!(visit.schoolName || "").trim()
+		!(visit.schoolName || "").trim() &&
+		!(selected.value.group === "visits" && visit.marketingVisitCategory === "Workshop Arranged")
 	) {
 		error.value = "Select a school (Customer) or use Create School.";
 		return;
 	}
-	if (selected.value.group === "visits") {
+	if (selected.value.group === "visits" && visit.marketingVisitCategory === "Workshop Arranged") {
+		if (!(training.date || visit.visitDate || "").trim()) {
+			error.value = "Workshop date is required.";
+			return;
+		}
+		if (!(training.venueName || "").trim()) {
+			error.value = "Venue Name is required for Workshop Arranged.";
+			return;
+		}
+	}
+	if (selected.value.group === "visits" && visit.marketingVisitCategory !== "Workshop Arranged") {
 		if (!(visit.schoolAddress || "").trim() && !(schoolOpening.address || "").trim()) {
 			error.value = "School Address is required.";
 			return;
@@ -2363,10 +2434,10 @@ const steps = [
 							<FieldSelect :mode="lang" label-en="Quarter" label-ur="سہ ماہی" :options="QUARTER_OPTIONS" v-model="visit.quarter" />
 							<FieldSelect :mode="lang" label-en="Name of Staff" label-ur="سٹاف کا نام" :options="staffOptions" required v-model="visit.visitBy" />
 							<FieldSelect :mode="lang" label-en="Marketing Visit Category" label-ur="مارکیٹنگ وزٹ کیٹیگری" :options="marketingCategories" placeholder-en="Select" placeholder-ur="منتخب کریں" v-model="visit.marketingVisitCategory" />
-							<FieldSelect :mode="lang" label-en="Status" label-ur="سٹیٹس" :options="statusOptions" placeholder-en="Select" placeholder-ur="منتخب کریں" v-model="visit.status" />
-							<FieldDate :mode="lang" label-en="Visit Date" label-ur="وزٹ کی تاریخ" required v-model="visit.visitDate" />
-							<FieldTime :mode="lang" label-en="Visiting Starting Time" label-ur="آغاز کا وقت" required v-model="visit.startTime" />
-							<FieldTime :mode="lang" label-en="Visit Ending Time" label-ur="اختتام کا وقت" required v-model="visit.endTime" />
+							<FieldSelect v-if="!isMarketingWorkshopArranged" :mode="lang" label-en="Status" label-ur="سٹیٹس" :options="statusOptions" placeholder-en="Select" placeholder-ur="منتخب کریں" v-model="visit.status" />
+							<FieldDate v-if="!isMarketingWorkshopArranged" :mode="lang" label-en="Visit Date" label-ur="وزٹ کی تاریخ" required v-model="visit.visitDate" />
+							<FieldTime v-if="!isMarketingWorkshopArranged" :mode="lang" label-en="Visiting Starting Time" label-ur="آغاز کا وقت" required v-model="visit.startTime" />
+							<FieldTime v-if="!isMarketingWorkshopArranged" :mode="lang" label-en="Visit Ending Time" label-ur="اختتام کا وقت" required v-model="visit.endTime" />
 							<FieldSelect :mode="lang" label-en="Province" label-ur="صوبہ" :options="provinceOptions" required v-model="visit.province" />
 							<FieldLink
 								:mode="lang"
@@ -2380,6 +2451,7 @@ const steps = [
 								v-model="visit.city"
 							/>
 							<FieldLink
+								v-if="!isMarketingWorkshopArranged"
 								:mode="lang"
 								label-en="Area"
 								label-ur="علاقہ"
@@ -2396,7 +2468,7 @@ const steps = [
 							/>
 						</div>
 						<FieldSelect
-							v-if="visit.status === 'Not Agree' || visit.status === 'Other'"
+							v-if="!isMarketingWorkshopArranged && (visit.status === 'Not Agree' || visit.status === 'Other')"
 							:mode="lang"
 							label-en="Reasons if not Agreed"
 							label-ur="نامنظور کی وجہ"
@@ -2404,6 +2476,45 @@ const steps = [
 							v-model="visit.reasonsIfNotAgreed"
 						/>
 
+						<template v-if="isMarketingWorkshopArranged">
+							<SectionTitle
+								:mode="lang"
+								title-en="Workshop Arranged Details"
+								title-ur="ورکشاپ اہتمام کی تفصیلات"
+								sub-en="Same fields as Workshop Arranged"
+								sub-ur="ورکشاپ اہتمام والے فیلڈز"
+							/>
+							<div class="grid-3">
+								<FieldInput :mode="lang" label-en="School Category" label-ur="اسکول کی کیٹیگری" v-model="training.schoolCategory" />
+								<FieldInput :mode="lang" label-en="No. of Schools" label-ur="اسکولوں کی تعداد" v-model="training.noOfSchools" />
+								<FieldDate :mode="lang" label-en="Workshop Date" label-ur="ورکشاپ کی تاریخ" required v-model="training.date" />
+								<FieldInput :mode="lang" label-en="Name of Trainer / Staff" label-ur="ٹرینر / سٹاف کا نام" required v-model="training.trainerName" />
+								<FieldInput :mode="lang" label-en="Venue Name" label-ur="مقام کا نام" required v-model="training.venueName" />
+								<FieldInput :mode="lang" label-en="Entry Filled By" label-ur="اندراج کنندہ" v-model="training.entryFilledBy" />
+								<FieldInput :mode="lang" label-en="No. of Participants" label-ur="شرکاء کی تعداد" v-model="training.noOfParticipants" />
+								<FieldSelect
+									:mode="lang"
+									label-en="Training Category"
+									label-ur="تربیت کی قسم"
+									:options="['Full Day Session', 'Half Day Workshop', 'Teachers Training Meeting (One to One)']"
+									v-model="training.trainingCategory"
+								/>
+								<FieldSelect :mode="lang" label-en="Mode" label-ur="طریقہ" :options="['Onsite / In Person', 'Online', 'Hybrid']" v-model="training.mode" />
+							</div>
+							<div class="grid-2" style="margin-top: 16px">
+								<FieldInput :mode="lang" label-en="Topics / Detail" label-ur="موضوعات / تفصیل" v-model="training.topics" />
+								<FieldTextarea
+									:mode="lang"
+									label-en="Visit Summary"
+									label-ur="دورے کا خلاصہ"
+									placeholder="Visit summary about this workshop"
+									required
+									v-model="meeting.remarks"
+								/>
+							</div>
+						</template>
+
+						<template v-else>
 						<div class="block-title">School Related Detail / اسکول کی تفصیل</div>
 						<div class="grid-2">
 							<FieldLink
@@ -2506,23 +2617,40 @@ const steps = [
 								</div>
 							</div>
 						</div>
+						</template>
 
 						<div class="block-title">Attachments / منسلکات</div>
 						<div class="attach-grid">
-							<AttachDrop :mode="lang" label-en="Meeting Picture" label-ur="ملاقات کی تصویر" :file="attachments.meeting_picture" @pick="attachments.meeting_picture = $event" />
-							<AttachDrop :mode="lang" label-en="School Picture" label-ur="اسکول کی تصویر" :file="attachments.school_picture" @pick="attachments.school_picture = $event" />
-							<AttachDrop :mode="lang" label-en="Visiting Card" label-ur="وزٹنگ کارڈ" :file="attachments.visiting_card_attach" @pick="attachments.visiting_card_attach = $event" />
-							<AttachDrop
-								:mode="lang"
-								label-en="Visit Video (~30 sec)"
-								label-ur="وزٹ ویڈیو (تقریباً ۳۰ سیکنڈ)"
-								accept="video/*,.mp4,.mov,.webm,.m4v,.3gp"
-								hint-en="Upload a short clip (~30 seconds, max 45s)"
-								hint-ur="مختصر ویڈیو لگائیں (تقریباً ۳۰ سیکنڈ، زیادہ سے زیادہ ۴۵)"
-								:max-duration-sec="45"
-								:file="attachments.visit_video"
-								@pick="attachments.visit_video = $event"
-							/>
+							<template v-if="isMarketingWorkshopArranged">
+								<AttachDrop :mode="lang" label-en="Pictures" label-ur="تصاویر" :file="attachments.meeting_picture" @pick="attachments.meeting_picture = $event" />
+								<AttachDrop
+									:mode="lang"
+									label-en="Visit Video (~30 sec)"
+									label-ur="وزٹ ویڈیو (تقریباً ۳۰ سیکنڈ)"
+									accept="video/*,.mp4,.mov,.webm,.m4v,.3gp"
+									hint-en="Upload a short clip (~30 seconds, max 45s)"
+									hint-ur="مختصر ویڈیو لگائیں (تقریباً ۳۰ سیکنڈ، زیادہ سے زیادہ ۴۵)"
+									:max-duration-sec="45"
+									:file="attachments.visit_video"
+									@pick="attachments.visit_video = $event"
+								/>
+							</template>
+							<template v-else>
+								<AttachDrop :mode="lang" label-en="Meeting Picture" label-ur="ملاقات کی تصویر" :file="attachments.meeting_picture" @pick="attachments.meeting_picture = $event" />
+								<AttachDrop :mode="lang" label-en="School Picture" label-ur="اسکول کی تصویر" :file="attachments.school_picture" @pick="attachments.school_picture = $event" />
+								<AttachDrop :mode="lang" label-en="Visiting Card" label-ur="وزٹنگ کارڈ" :file="attachments.visiting_card_attach" @pick="attachments.visiting_card_attach = $event" />
+								<AttachDrop
+									:mode="lang"
+									label-en="Visit Video (~30 sec)"
+									label-ur="وزٹ ویڈیو (تقریباً ۳۰ سیکنڈ)"
+									accept="video/*,.mp4,.mov,.webm,.m4v,.3gp"
+									hint-en="Upload a short clip (~30 seconds, max 45s)"
+									hint-ur="مختصر ویڈیو لگائیں (تقریباً ۳۰ سیکنڈ، زیادہ سے زیادہ ۴۵)"
+									:max-duration-sec="45"
+									:file="attachments.visit_video"
+									@pick="attachments.visit_video = $event"
+								/>
+							</template>
 						</div>
 					</div>
 

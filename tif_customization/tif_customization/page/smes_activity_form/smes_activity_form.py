@@ -621,6 +621,7 @@ def get_form_meta():
 			"3rd Follow up visit",
 			"4th Follow up visit",
 			"Other Visits",
+			"Workshop Arranged",
 		],
 		"frequencies": [
 			"New",
