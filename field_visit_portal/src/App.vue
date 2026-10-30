@@ -1914,7 +1914,13 @@ async function saveVisit(submitDoc) {
 		await uploadAttachments(visitName);
 		if (result.school_opening) await uploadSoaAttachments(result.school_opening);
 		if (submitDoc) {
-			await apiPost(`${METHOD}.submit_field_visit_doc`, { name: visitName });
+			const submitted = await apiPost(`${METHOD}.submit_field_visit_doc`, { name: visitName });
+			if (!submitted || submitted.submitted === false || Number(submitted.docstatus) === 0) {
+				error.value =
+					(submitted && (submitted.message || submitted.status_message)) ||
+					"Visit was saved as Draft but could not be submitted. Open My Visits and submit it, or try again.";
+				return;
+			}
 		}
 		success.value = true;
 		// Volunteer / Ambassador: open Easy View so enrolled people details are visible.

@@ -1119,10 +1119,10 @@ def _get_sme_staff(filters):
 
 
 def _present_days_by_employee(from_date, to_date, employee_ids):
-	"""Present days in the report range, using the same rule as Employee Attendance.
+	"""Present days in the report range — same rule as Individual Attendance Sheet.
 
-	A day counts when the employee checked in and was not absent.
-	A Saturday marked as a half day counts as 0.5.
+	A day counts when there is check-in and check-out, and the day is not absent.
+	(Matches attendance_sheet.get_individual_attendance_sheet_html.)
 	"""
 	ids = [e for e in (employee_ids or []) if e]
 	if not ids or not frappe.db.table_exists("Employee Attendance Table"):
@@ -1132,10 +1132,11 @@ def _present_days_by_employee(from_date, to_date, employee_ids):
 		SELECT ea.employee AS employee,
 			SUM(
 				CASE
-					WHEN DAYOFWEEK(t.date) = 7 AND IFNULL(t.sat_halfday, 0) = 1 THEN 0.5
-					WHEN IFNULL(t.absent, 0) = 0
+					WHEN IFNULL(t.absent, 0) <> 1
 						AND t.check_in_1 IS NOT NULL
 						AND TIME(t.check_in_1) <> '00:00:00'
+						AND t.check_out_1 IS NOT NULL
+						AND TIME(t.check_out_1) <> '00:00:00'
 					THEN 1
 					ELSE 0
 				END

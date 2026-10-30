@@ -1001,7 +1001,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		const tail_tds = (src, visitStaff, expenseStaff) => `
 					${this.expense_td(src, expenseStaff)}
 					${this.click_td(src.visited_days, "visited_days", visitStaff)}
-					<td class="num" title="${__("Attendance present days in this date range")}">${this.fmt_days(src.present_days)}</td>`;
+					<td class="num" title="${__("Days with check-in and check-out (same as Individual Attendance Sheet)")}">${this.fmt_days(src.present_days)}</td>`;
 
 		const body = rows.length
 			? rows

@@ -516,10 +516,20 @@ def has_permission(doc, ptype: str = "read", user: str | None = None) -> bool:
 	if not can_access_field_visit(user):
 		return False
 
-	# Field Officers: read submitted OK; no write/cancel/delete/amend on submitted.
+	# Field Officers: read submitted OK; no write/cancel/delete/amend on already-submitted docs.
+	# Important: during submit(), Frappe sets in-memory docstatus=1 before checking write —
+	# use DB docstatus so the draft→submit transition is still allowed for Field Staff.
 	mutating = ptype in ("write", "cancel", "delete", "amend")
-	if mutating and _field_visit_docstatus(doc) >= 1 and not can_edit_submitted_field_visit(user):
-		return False
+	if mutating and not can_edit_submitted_field_visit(user):
+		name = doc if isinstance(doc, str) else getattr(doc, "name", None)
+		db_status = 0
+		if name and frappe.db.exists("Field Visit", name):
+			db_status = cint(frappe.db.get_value("Field Visit", name, "docstatus") or 0)
+		elif _field_visit_docstatus(doc) >= 1:
+			# No DB row / new doc already marked submitted — treat as locked.
+			db_status = _field_visit_docstatus(doc)
+		if db_status >= 1:
+			return False
 
 	if can_view_all_field_visits(user):
 		return True

@@ -102,7 +102,11 @@ class FieldVisit(Document):
 		self._sync_school_contacts()
 
 	def _block_field_officer_edit_on_submit(self):
-		"""Field Officers may create/submit, but cannot change submitted visits."""
+		"""Field Officers may create/submit, but cannot change already-submitted visits.
+
+		During submit(), in-memory docstatus becomes 1 before validate runs — allow that
+		transition when the DB row is still Draft (0).
+		"""
 		from frappe.utils import cint
 
 		from tif_customization.tif_customization.field_visit_permissions import (
@@ -112,6 +116,10 @@ class FieldVisit(Document):
 		if self.is_new() or cint(self.docstatus) != 1:
 			return
 		if can_edit_submitted_field_visit():
+			return
+		# Draft → Submit is allowed for Field Officers.
+		db_status = cint(frappe.db.get_value(self.doctype, self.name, "docstatus") or 0)
+		if db_status == 0:
 			return
 		frappe.throw(
 			_(
