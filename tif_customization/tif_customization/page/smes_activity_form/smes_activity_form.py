@@ -2363,11 +2363,22 @@ def submit_smes_activity(data):
 		can_manage_supervisor_only_field_visits,
 	)
 
+	school_for_rule = (
+		cstr(getattr(doc, "school_name", None) or "").strip()
+		or cstr(getattr(doc, "me_school_name", None) or "").strip()
+		or cstr(getattr(doc, "pending_school_name", None) or "").strip()
+		or cstr(data.get("school_name") or "").strip()
+	)
+	owner_for_rule = (
+		((for_officer or {}).get("user") if for_officer else None)
+		or frappe.session.user
+	)
 	approval = evaluate_approval_requirements(
 		doc_type=doc_type,
 		activity_date=doc.get_visit_date() or doc.visit_date,
-		school_name=getattr(doc, "school_name", None) or data.get("school_name"),
+		school_name=school_for_rule,
 		visit_by=doc.visit_by or data.get("visit_by"),
+		owner=owner_for_rule,
 		force_skip=can_manage_supervisor_only_field_visits(),
 	)
 	needs_approval = bool(approval.get("needs_approval"))

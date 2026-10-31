@@ -76,23 +76,60 @@ def is_backdated_beyond_window(activity_date, hours=BACKDATE_HOURS):
 	return day_end < cutoff
 
 
-def count_same_school_visits_in_month(school_name, activity_date, visit_by=None, exclude_name=None):
-	school = cstr(school_name or "").strip()
-	if not school or not activity_date:
+def _school_match_keys(school_name):
+	"""Customer id + display name variants so visits match even if stored differently."""
+	raw = cstr(school_name or "").strip()
+	if not raw:
+		return []
+	keys = {raw}
+	if frappe.db.exists("Customer", raw):
+		keys.add(raw)
+		cname = cstr(frappe.db.get_value("Customer", raw, "customer_name") or "").strip()
+		if cname:
+			keys.add(cname)
+	else:
+		# Look up by customer_name
+		found = frappe.db.get_value("Customer", {"customer_name": raw}, "name")
+		if found:
+			keys.add(cstr(found))
+			keys.add(raw)
+	return [k for k in keys if k]
+
+
+def count_same_school_visits_in_month(
+	school_name,
+	activity_date,
+	visit_by=None,
+	owner=None,
+	exclude_name=None,
+):
+	"""Count this officer's non-cancelled visits to the same school in the calendar month.
+
+	1st and 2nd are free; when this returns >= 2, the next visit is the 3rd+ and needs approval.
+	"""
+	keys = _school_match_keys(school_name)
+	if not keys or not activity_date:
 		return 0
 	d = getdate(activity_date)
 	month_start = get_first_day(d)
 	month_end = get_last_day(d)
-	params = {"school": school, "from_date": month_start, "to_date": month_end}
+	params = {
+		"from_date": month_start,
+		"to_date": month_end,
+		"keys": tuple(keys),
+	}
 	extra = ""
-	if visit_by:
+	# Prefer owner (portal user) — more reliable than free-text visit_by
+	if owner:
+		params["owner"] = cstr(owner).strip()
+		extra += " AND fv.owner = %(owner)s"
+	elif visit_by:
 		params["visit_by"] = cstr(visit_by).strip()
 		extra += " AND TRIM(IFNULL(fv.visit_by, '')) = %(visit_by)s"
 	if exclude_name:
 		params["exclude"] = exclude_name
 		extra += " AND fv.name != %(exclude)s"
 
-	# Exclude rejected approvals
 	reject_join = ""
 	reject_filter = ""
 	if frappe.db.table_exists("tabField Visit Approval Request"):
@@ -105,7 +142,11 @@ def count_same_school_visits_in_month(school_name, activity_date, visit_by=None,
 		FROM `tabField Visit` fv
 		{reject_join}
 		WHERE fv.docstatus < 2
-			AND TRIM(IFNULL(fv.school_name, '')) = %(school)s
+			AND (
+				TRIM(IFNULL(fv.school_name, '')) IN %(keys)s
+				OR TRIM(IFNULL(fv.me_school_name, '')) IN %(keys)s
+				OR TRIM(IFNULL(fv.pending_school_name, '')) IN %(keys)s
+			)
 			AND COALESCE(fv.visit_date, fv.me_visit_date, fv.training_date, fv.mt_meeting_date, fv.ot_date)
 				BETWEEN %(from_date)s AND %(to_date)s
 			{reject_filter}
@@ -123,12 +164,18 @@ def evaluate_approval_requirements(
 	activity_date,
 	school_name=None,
 	visit_by=None,
+	owner=None,
 	exclude_name=None,
 	force_skip=False,
 ):
+	"""Apply backdate + same-school rules.
+
+	Same school: 2 visits/month allowed for the officer; from the 3rd visit onward
+	supervisor approval is required.
+	"""
 	reasons = []
 	if force_skip:
-		return {"needs_approval": False, "reasons": [], "same_school_count": 0}
+		return {"needs_approval": False, "reasons": [], "same_school_count": 0, "visit_number": 0}
 
 	if is_backdated_beyond_window(activity_date):
 		reasons.append(
@@ -136,21 +183,30 @@ def evaluate_approval_requirements(
 		)
 
 	same_count = 0
+	visit_number = 0
 	if (doc_type or "").strip() in SCHOOL_VISIT_TYPES and cstr(school_name or "").strip():
 		same_count = count_same_school_visits_in_month(
-			school_name, activity_date, visit_by=visit_by, exclude_name=exclude_name
+			school_name,
+			activity_date,
+			visit_by=visit_by,
+			owner=owner,
+			exclude_name=exclude_name,
 		)
+		visit_number = same_count + 1  # this new visit
 		if same_count >= SAME_SCHOOL_FREE_VISITS:
 			reasons.append(
 				_(
-					"Same school already visited {0} time(s) this month — 3rd+ visit needs supervisor approval."
-				).format(same_count)
+					"Same school: {0} visit(s) already this month. "
+					"Only 2 visits per school per month are allowed without approval — "
+					"this {1}th visit needs supervisor approval."
+				).format(same_count, visit_number)
 			)
 
 	return {
 		"needs_approval": bool(reasons),
 		"reasons": reasons,
 		"same_school_count": same_count,
+		"visit_number": visit_number,
 	}
 
 
@@ -339,6 +395,7 @@ def check_field_visit_approval(data=None):
 		activity_date=activity_date,
 		school_name=data.get("school_name"),
 		visit_by=data.get("visit_by"),
+		owner=frappe.session.user,
 		force_skip=can_manage_supervisor_only_field_visits(),
 	)
 	result["activity_date"] = cstr(activity_date or "")
