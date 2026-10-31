@@ -129,6 +129,9 @@ class FieldVisit(Document):
 		)
 
 	def before_submit(self):
+		from tif_customization.tif_customization.field_visit_approval import block_submit_if_pending
+
+		block_submit_if_pending(self)
 		if self.type in ("Training", "Workshop", "Teachers Training Meeting"):
 			self._ensure_feedback_tokens()
 

@@ -12,12 +12,26 @@ const emit = defineEmits(["navigate", "open-visit"]);
 const loading = ref(true);
 const error = ref("");
 const data = ref(null);
+const approvals = ref({
+	to_approve_count: 0,
+	my_pending_count: 0,
+	total_count: 0,
+	is_supervisor: false,
+});
 
 async function load() {
 	loading.value = true;
 	error.value = "";
 	try {
 		data.value = await apiGet(`${METHOD}.get_portal_dashboard`);
+		try {
+			approvals.value = await apiGet(
+				"tif_customization.tif_customization.field_visit_approval.list_pending_approvals",
+				{ limit: 50 }
+			);
+		} catch {
+			approvals.value = { to_approve_count: 0, my_pending_count: 0, total_count: 0 };
+		}
 	} catch (e) {
 		error.value = e.message || "Could not load dashboard.";
 	} finally {
@@ -87,6 +101,44 @@ function maxType() {
 					</div>
 				</div>
 			</div>
+
+			<button
+				type="button"
+				class="portal-panel"
+				style="width: 100%; margin: 16px 0 0; text-align: left; cursor: pointer; border: 1px solid #fdba74; background: linear-gradient(135deg, #fff7ed, #fff)"
+				@click="emit('navigate', 'approvals')"
+			>
+				<div class="portal-panel-h" style="margin-bottom: 0">
+					<div>
+						<strong style="color: #9a3412">
+							<Bi :mode="lang" en="Pending Approvals" ur="زیر التواء منظوری" />
+						</strong>
+						<div class="portal-muted" style="margin-top: 4px">
+							<template v-if="approvals.is_supervisor">
+								<Bi
+									:mode="lang"
+									:en="`${approvals.to_approve_count || 0} to approve · ${approvals.my_pending_count || 0} your requests`"
+									:ur="`${approvals.to_approve_count || 0} منظوری · ${approvals.my_pending_count || 0} آپ کی درخواستیں`"
+								/>
+							</template>
+							<template v-else>
+								<Bi
+									:mode="lang"
+									:en="`${approvals.my_pending_count || 0} of your visits await supervisor`"
+									:ur="`${approvals.my_pending_count || 0} وزٹ سپروائزر کے پاس`"
+								/>
+							</template>
+						</div>
+					</div>
+					<span
+						class="portal-badge"
+						:style="{
+							background: (approvals.total_count || 0) ? '#ea580c' : '#e4e4e7',
+							color: (approvals.total_count || 0) ? '#fff' : '#52525b',
+						}"
+					>{{ approvals.total_count || 0 }}</span>
+				</div>
+			</button>
 
 			<div class="portal-dash-grid">
 				<div class="portal-panel">

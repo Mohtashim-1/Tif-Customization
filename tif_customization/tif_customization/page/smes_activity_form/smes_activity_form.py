@@ -2352,27 +2352,60 @@ def submit_smes_activity(data):
 	_apply_travel_fields(doc, data)
 	sync_travel_cost(doc)
 
+	# Supervisor approval: backdated >48h or 3rd+ same-school visit in the month.
+	from tif_customization.tif_customization.field_visit_approval import (
+		apply_pending_approval,
+		evaluate_approval_requirements,
+		get_supervisor_user_for_employee,
+		notify_supervisor_pending,
+	)
+	from tif_customization.tif_customization.field_visit_supervisor_only import (
+		can_manage_supervisor_only_field_visits,
+	)
+
+	approval = evaluate_approval_requirements(
+		doc_type=doc_type,
+		activity_date=doc.get_visit_date() or doc.visit_date,
+		school_name=getattr(doc, "school_name", None) or data.get("school_name"),
+		visit_by=doc.visit_by or data.get("visit_by"),
+		force_skip=can_manage_supervisor_only_field_visits(),
+	)
+	needs_approval = bool(approval.get("needs_approval"))
+
 	doc.insert(ignore_permissions=False)
 	if for_officer and for_officer.get("user") and for_officer["user"] != frappe.session.user:
 		frappe.db.set_value("Field Visit", doc.name, "owner", for_officer["user"], update_modified=False)
 		doc.owner = for_officer["user"]
 	submitted = False
-	if data.get("submit_doc") in (True, 1, "1", "true", "True"):
+	if needs_approval:
+		sup_user = get_supervisor_user_for_employee(
+			employee=(staff_meta or {}).get("employee"),
+			user=((for_officer or {}).get("user") if for_officer else None) or frappe.session.user,
+		)
+		apply_pending_approval(doc, approval.get("reasons") or [], supervisor_user=sup_user)
+		notify_supervisor_pending(doc, sup_user)
+	elif data.get("submit_doc") in (True, 1, "1", "true", "True"):
 		doc.submit()
 		submitted = True
 	frappe.db.commit()
 
+	status_message = _("Activity saved as {0}").format(doc.name)
+	if needs_approval:
+		status_message = _(
+			"Visit {0} saved as Draft and sent to your supervisor for approval.\n{1}"
+		).format(doc.name, "\n".join(approval.get("reasons") or []))
+	elif soa_doc:
+		status_message += _(" School Opening request {0} was also saved.").format(soa_doc.name)
+
 	out = {
 		"name": doc.name,
 		"submitted": submitted,
+		"needs_supervisor_approval": needs_approval,
+		"approval_status": "Pending" if needs_approval else "",
+		"approval_reasons": approval.get("reasons") or [],
 		"url": get_url(f"/app/field-visit/{doc.name}"),
 		"school_opening": soa_doc.name if soa_doc else None,
-		"status_message": _("Activity saved as {0}").format(doc.name)
-		+ (
-			_(" School Opening request {0} was also saved.").format(soa_doc.name)
-			if soa_doc
-			else ""
-		),
+		"status_message": status_message,
 	}
 	try:
 		from tif_customization.tif_customization.api.feedback_studio import _sme_form_url_for_field_visit
@@ -2400,6 +2433,9 @@ def submit_field_visit_doc(name):
 		frappe.throw(_("Not permitted to submit this Field Visit."), frappe.PermissionError)
 	if cint(doc.docstatus) == 2:
 		frappe.throw(_("Cancelled visits cannot be submitted."))
+	from tif_customization.tif_customization.field_visit_approval import block_submit_if_pending
+
+	block_submit_if_pending(doc)
 	if cint(doc.docstatus) == 0:
 		doc.submit()
 		frappe.db.commit()
@@ -2984,6 +3020,27 @@ def get_field_visit_easy_view(name=None):
 		[row(_("Visit Summary"), "\n".join(visit_summary_notes))],
 	)
 
+	from tif_customization.tif_customization.field_visit_approval import (
+		approval_payload_for_visit,
+		user_can_approve_field_visit,
+	)
+
+	approval_info = approval_payload_for_visit(doc.name)
+	approval_status = cstr(approval_info.get("approval_status") or "").strip()
+	needs_approval = cint(approval_info.get("needs_supervisor_approval") or 0)
+	if needs_approval or approval_status:
+		add_section(
+			_("Supervisor Approval"),
+			[
+				row(_("Needs Approval"), _("Yes") if needs_approval else _("No")),
+				row(_("Approval Status"), approval_status),
+				row(_("Approval Reasons"), approval_info.get("approval_reasons")),
+				row(_("Approved / Rejected By"), approval_info.get("approved_by")),
+				row(_("Approved / Rejected On"), approval_info.get("approved_on")),
+				row(_("Approver Remarks"), approval_info.get("approver_remarks")),
+			],
+		)
+
 	images = []
 	for field, label in (
 		("school_picture", _("School Picture")),
@@ -2998,11 +3055,17 @@ def get_field_visit_easy_view(name=None):
 	docstatus = cint(doc.docstatus)
 	# Portal always uses English status keys so the UI can detect Draft reliably
 	status_en = {0: "Draft", 1: "Submitted", 2: "Cancelled"}.get(docstatus, str(docstatus))
-	can_submit = docstatus == 0 and bool(frappe.has_permission("Field Visit", "submit", doc))
+	pending_approval = needs_approval and approval_status == "Pending"
+	can_submit = (
+		docstatus == 0
+		and not pending_approval
+		and bool(frappe.has_permission("Field Visit", "submit", doc))
+	)
 	can_edit = bool(
 		docstatus == 0
 		or (docstatus == 1 and can_edit_submitted_field_visit() and frappe.has_permission("Field Visit", "write", doc))
 	)
+	can_approve = pending_approval and user_can_approve_field_visit(doc)
 	return {
 		"name": doc.name,
 		"type": doc.type or "",
@@ -3011,6 +3074,10 @@ def get_field_visit_easy_view(name=None):
 		"docstatus": docstatus,
 		"can_submit": can_submit,
 		"can_edit": can_edit,
+		"can_approve": can_approve,
+		"needs_supervisor_approval": needs_approval,
+		"approval_status": approval_status,
+		"approval_reasons": cstr(approval_info.get("approval_reasons") or ""),
 		"visit_date": visit_date,
 		"school": school,
 		"officer": officer,

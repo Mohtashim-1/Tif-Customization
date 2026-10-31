@@ -816,6 +816,17 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						hint: __("Follow up Visit + New School Visit in this period."),
 					},
 					{
+						label: __("New Registered School"),
+						count: cint(((data.outcome_fy || {}).new_schools || {}).actual),
+						value: this.fmt(((data.outcome_fy || {}).new_schools || {}).actual),
+						style: "outcome",
+						cardKind: "active_school_by_staff",
+						outcomeFy: true,
+						hint: __(
+							"Onboarded schools (Registration of New Schools / New visits). Click for field staff counts."
+						),
+					},
+					{
 						label: __("Working Days"),
 						value: this.fmt(data.working_days),
 						style: "visited",

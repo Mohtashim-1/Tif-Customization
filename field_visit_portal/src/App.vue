@@ -13,6 +13,7 @@ import SchoolOpeningPanel from "./components/SchoolOpeningPanel.vue";
 import PortalNav from "./components/PortalNav.vue";
 import PortalDashboard from "./components/PortalDashboard.vue";
 import PortalVisitList from "./components/PortalVisitList.vue";
+import PortalApprovals from "./components/PortalApprovals.vue";
 import { apiGet, apiPost, uploadFile, METHOD, TRAVEL_METHOD } from "./lib/api";
 import { fileWithCaptureTime } from "./lib/captureTime";
 import {
@@ -723,6 +724,7 @@ function portalPageFromUrl() {
 		const p = (params.get("page") || "").trim().toLowerCase();
 		if (p === "dashboard" || p === "home") return "dashboard";
 		if (p === "list" || p === "visits" || p === "records") return "list";
+		if (p === "approvals" || p === "approval" || p === "notifications") return "approvals";
 		if (p === "new" || p === "form") return "new";
 	} catch {
 		/* ignore */
@@ -737,6 +739,7 @@ function setPortalUrl(page, { replace = true } = {}) {
 		url.searchParams.delete("visit");
 		if (page === "dashboard") url.searchParams.set("page", "dashboard");
 		else if (page === "list") url.searchParams.set("page", "list");
+		else if (page === "approvals") url.searchParams.set("page", "approvals");
 		else url.searchParams.set("page", "new");
 		const next = url.pathname + url.search + url.hash;
 		if (replace) window.history.replaceState({}, "", next);
@@ -776,6 +779,11 @@ const viewIsDraft = computed(() => {
 
 async function submitViewedVisit() {
 	if (!viewDoc.value?.name || !viewIsDraft.value || submittingView.value) return;
+	if (viewDoc.value.approval_status === "Pending" && viewDoc.value.needs_supervisor_approval) {
+		error.value =
+			"This visit is pending supervisor approval and cannot be submitted yet. / یہ وزٹ سپروائزر کی منظوری کا منتظر ہے۔";
+		return;
+	}
 	if (!window.confirm(`Submit ${viewDoc.value.name}? / کیا آپ یہ وزٹ جمع کرنا چاہتے ہیں؟`)) return;
 	submittingView.value = true;
 	error.value = "";
@@ -786,6 +794,47 @@ async function submitViewedVisit() {
 		viewNotice.value = res.message || `Submitted ${viewDoc.value.name}`;
 	} catch (e) {
 		error.value = e.message || "Could not submit visit.";
+	} finally {
+		submittingView.value = false;
+	}
+}
+
+async function approveViewedVisit() {
+	if (!viewDoc.value?.name || !viewDoc.value.can_approve || submittingView.value) return;
+	if (!window.confirm(`Approve and submit ${viewDoc.value.name}? / منظوری دے کر جمع کریں؟`)) return;
+	submittingView.value = true;
+	error.value = "";
+	viewNotice.value = "";
+	try {
+		const res = await apiPost(
+			"tif_customization.tif_customization.field_visit_approval.approve_field_visit",
+			{ name: viewDoc.value.name, submit: 1 }
+		);
+		viewDoc.value = await apiGet(`${METHOD}.get_field_visit_easy_view`, { name: viewDoc.value.name });
+		viewNotice.value = res.message || `Approved ${viewDoc.value.name}`;
+	} catch (e) {
+		error.value = e.message || "Could not approve visit.";
+	} finally {
+		submittingView.value = false;
+	}
+}
+
+async function rejectViewedVisit() {
+	if (!viewDoc.value?.name || !viewDoc.value.can_approve || submittingView.value) return;
+	const remarks = window.prompt("Rejection reason / مسترد کرنے کی وجہ:", "") || "";
+	if (!window.confirm(`Reject ${viewDoc.value.name}? / مسترد کریں؟`)) return;
+	submittingView.value = true;
+	error.value = "";
+	viewNotice.value = "";
+	try {
+		const res = await apiPost(
+			"tif_customization.tif_customization.field_visit_approval.reject_field_visit",
+			{ name: viewDoc.value.name, remarks }
+		);
+		viewDoc.value = await apiGet(`${METHOD}.get_field_visit_easy_view`, { name: viewDoc.value.name });
+		viewNotice.value = res.message || `Rejected ${viewDoc.value.name}`;
+	} catch (e) {
+		error.value = e.message || "Could not reject visit.";
 	} finally {
 		submittingView.value = false;
 	}
@@ -2023,6 +2072,20 @@ async function saveVisit(submitDoc) {
 		savedName.value = visitName;
 		await uploadAttachments(visitName);
 		if (result.school_opening) await uploadSoaAttachments(result.school_opening);
+		if (result.needs_supervisor_approval) {
+			success.value = true;
+			error.value = "";
+			viewNotice.value = result.status_message || "Saved as Draft — waiting for supervisor approval.";
+			window.alert(
+				result.status_message ||
+					"Visit saved as Draft and sent to your supervisor for approval.\nBackdated (>48h) or 3rd+ visit to the same school this month needs approval."
+			);
+			setTimeout(() => {
+				success.value = false;
+				window.location.assign(`/field-visit-easy?name=${encodeURIComponent(visitName)}`);
+			}, 1200);
+			return;
+		}
 		if (submitDoc) {
 			const submitted = await apiPost(`${METHOD}.submit_field_visit_doc`, { name: visitName });
 			if (!submitted || submitted.submitted === false || Number(submitted.docstatus) === 0) {
@@ -2271,13 +2334,31 @@ const steps = [
 						rel="noopener"
 					>Open Desk form</a>
 					<button
-						v-if="viewIsDraft"
+						v-if="viewIsDraft && viewDoc?.can_submit"
 						type="button"
 						class="btn btn-green"
 						:disabled="submittingView"
 						@click="submitViewedVisit"
 					>
 						{{ submittingView ? "Submitting…" : "Submit Visit / جمع کرائیں" }}
+					</button>
+					<button
+						v-if="viewDoc?.can_approve"
+						type="button"
+						class="btn btn-green"
+						:disabled="submittingView"
+						@click="approveViewedVisit"
+					>
+						{{ submittingView ? "Working…" : "Approve & Submit / منظوری" }}
+					</button>
+					<button
+						v-if="viewDoc?.can_approve"
+						type="button"
+						class="btn btn-ghost"
+						:disabled="submittingView"
+						@click="rejectViewedVisit"
+					>
+						Reject / مسترد
 					</button>
 				</div>
 				<div v-if="viewNotice" class="success-banner">{{ viewNotice }}</div>
@@ -2292,6 +2373,11 @@ const steps = [
 								:class="'ds-' + Number(viewDoc.docstatus || 0)"
 								style="margin-left: 10px; vertical-align: middle"
 							>{{ viewDoc.status }}</span>
+							<span
+								v-if="viewDoc.approval_status"
+								class="portal-badge"
+								style="margin-left: 8px; vertical-align: middle; background: #fef3c7; color: #92400e"
+							>{{ viewDoc.approval_status }}</span>
 						</h1>
 						<p class="view-sub">
 							<span v-if="viewDoc.type">{{ viewDoc.type }}</span>
@@ -2301,7 +2387,16 @@ const steps = [
 							<span v-if="viewDoc.school"><strong>School:</strong> {{ viewDoc.school }}</span>
 							<span v-if="viewDoc.officer"><strong> · Officer:</strong> {{ viewDoc.officer }}</span>
 						</p>
-						<p v-if="viewIsDraft" class="view-sub" style="color: #92400e">
+						<p
+							v-if="viewDoc.needs_supervisor_approval && viewDoc.approval_status === 'Pending'"
+							class="view-sub"
+							style="color: #9a3412; white-space: pre-line"
+						>
+							Pending supervisor approval — cannot submit until approved. /
+							<span class="urdu"> سپروائزر کی منظوری کا منتظر — منظوری سے پہلے جمع نہیں ہو سکتا۔</span>
+							<span v-if="viewDoc.approval_reasons">\n{{ viewDoc.approval_reasons }}</span>
+						</p>
+						<p v-else-if="viewIsDraft" class="view-sub" style="color: #92400e">
 							This visit is still a draft — submit it to finalize. /
 							<span class="urdu"> یہ وزٹ ابھی ڈرافٹ ہے — جمع کر کے حتمی بنائیں۔</span>
 						</p>
@@ -2322,7 +2417,25 @@ const steps = [
 							Submitted visits are locked. Only Mohtashim, Farhan, or Anwar can edit. /
 							<span class="urdu"> جمع شدہ وزٹ مقفل ہے — صرف مختصص صارفین ترمیم کر سکتے ہیں۔</span>
 						</p>
-						<div v-if="viewIsDraft" style="margin-top: 14px">
+						<div v-if="viewDoc?.can_approve" style="margin-top: 14px; display: flex; flex-wrap: wrap; gap: 8px">
+							<button
+								type="button"
+								class="btn btn-green"
+								:disabled="submittingView"
+								@click="approveViewedVisit"
+							>
+								{{ submittingView ? "Working…" : "Approve & Submit / منظوری" }}
+							</button>
+							<button
+								type="button"
+								class="btn btn-ghost"
+								:disabled="submittingView"
+								@click="rejectViewedVisit"
+							>
+								Reject / مسترد
+							</button>
+						</div>
+						<div v-else-if="viewIsDraft && viewDoc?.can_submit" style="margin-top: 14px">
 							<button
 								type="button"
 								class="btn btn-green"
@@ -2380,6 +2493,13 @@ const steps = [
 				@open-visit="openVisit"
 			/>
 
+			<PortalApprovals
+				v-else-if="portalPage === 'approvals'"
+				:lang="lang"
+				@navigate="navigatePortal"
+				@open-visit="openVisit"
+			/>
+
 			<section v-else-if="step === 1" class="fade">
 				<h1 class="hero">
 					Select Activity Type / سرگرمی کی قسم منتخب کریں
@@ -2432,8 +2552,8 @@ const steps = [
 						<span class="fw">Tip / ٹپ:</span>
 						Form auto Asia/Karachi time pe set hai.
 						<span class="urdu"> فارم خودکار طور پر کراچی کے وقت پر سیٹ ہے۔</span>
-						Aapko Series FV-.MM.-.YY.- jaisa code likhne ki zaroorat nahi — system khud generate kar dega.
-						<span class="urdu"> سسٹم خود کوڈ بنا دے گا۔</span>
+						Backdated entries older than 48 hours, and a 3rd+ visit to the same school in a month, go to your supervisor for approval.
+						<span class="urdu"> ۴۸ گھنٹے سے پرانی بیک ڈیٹ یا ایک ماہ میں ایک ہی اسکول کی تیسری وزٹ سپروائزر کی منظوری کے لیے جاتی ہے۔</span>
 					</div>
 				</div>
 			</section>
