@@ -170,15 +170,17 @@ frappe.tif_customization.show_school_metric_drilldown_dialog = function (data, o
 	opts = opts || {};
 	const hideUnapproved = frappe.tif_customization.should_hide_school_unapproved(opts);
 	const rows = (data.rows || []).filter((r) => (r.school || "").trim());
+	// Report cards count distinct school names. Old UI keyed school||province||area
+	// (e.g. 463) which was higher than the card (449). Match the card: one row per school name.
 	const schoolMap = {};
 	rows.forEach((row) => {
 		const school = (row.school || "").trim();
 		const province = (row.province || "").trim();
 		const area = (row.area || "").trim();
-		const key = `${school}||${province}||${area}`;
-		if (!schoolMap[key]) {
-			schoolMap[key] = {
-				key,
+		const nameKey = school.toLowerCase();
+		if (!schoolMap[nameKey]) {
+			schoolMap[nameKey] = {
+				key: nameKey,
 				school,
 				province,
 				area,
@@ -186,12 +188,21 @@ frappe.tif_customization.show_school_metric_drilldown_dialog = function (data, o
 				docs: [],
 			};
 		}
-		schoolMap[key].visits += 1;
-		schoolMap[key].docs.push(row);
+		schoolMap[nameKey].visits += 1;
+		schoolMap[nameKey].docs.push(row);
+		// Keep latest visit's province/area on the row.
+		const latest = schoolMap[nameKey].docs[0] || row;
+		schoolMap[nameKey].province = (latest.province || "").trim() || province;
+		schoolMap[nameKey].area = (latest.area || "").trim() || area;
 	});
 	const schoolRows = Object.values(schoolMap).sort(
 		(a, b) => b.visits - a.visits || String(a.school).localeCompare(String(b.school))
 	);
+	const distinctSchools = schoolRows.length;
+	const cardTotal =
+		opts.cardCount != null && opts.cardCount !== ""
+			? cint(opts.cardCount)
+			: distinctSchools;
 	const label = data.label || __("Schools");
 	const exportSchoolList = () => {
 		const headers = [
@@ -247,7 +258,7 @@ frappe.tif_customization.show_school_metric_drilldown_dialog = function (data, o
 		frappe.tif_customization.export_rows_excel(fname, headers, exportRows);
 	};
 	const d = new frappe.ui.Dialog({
-		title: frappe.tif_customization.drilldown_title(label, schoolRows.length),
+		title: frappe.tif_customization.drilldown_title(label, cardTotal),
 		size: "extra-large",
 		fields: [{ fieldtype: "HTML", fieldname: "html" }],
 		primary_action_label: __("Close"),
@@ -278,12 +289,14 @@ frappe.tif_customization.show_school_metric_drilldown_dialog = function (data, o
 					})
 					.join("")
 			: `<tr><td colspan="7" class="text-muted text-center">${__("No schools found")}</td></tr>`;
-		d.set_title(frappe.tif_customization.drilldown_title(label, schoolRows.length));
+		d.set_title(frappe.tif_customization.drilldown_title(label, cardTotal));
 		d.fields_dict.html.$wrapper.html(`
 			<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px;">
-				<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;">
+				<div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:8px;padding:8px 12px;" title="${__(
+					"Same as the report card: each school name counted once"
+				)}">
 					<span class="text-muted" style="font-size:11px;">${__("Schools")}</span>
-					<div style="font-size:20px;font-weight:700;">${cint(schoolRows.length).toLocaleString()}</div>
+					<div style="font-size:20px;font-weight:700;">${cint(distinctSchools).toLocaleString()}</div>
 				</div>
 				<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;">
 					<span class="text-muted" style="font-size:11px;">${__("Field Visits")}</span>
