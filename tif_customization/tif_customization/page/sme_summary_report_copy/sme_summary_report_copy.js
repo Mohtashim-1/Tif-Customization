@@ -912,7 +912,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 							cardKind: "active_school_by_staff",
 							outcomeFy: true,
 							hint: __(
-								"Fiscal year to date ({0}): onboarded schools. Not limited to Visit From–To.",
+								"Fiscal year only ({0}): onboarded schools from 1 July to date. Not Visit From–To.",
 								[data.outcome_fy_label || __("1 July to date")]
 							),
 						},
@@ -1568,8 +1568,8 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 
 	show_active_schools_by_staff() {
 		const data = this.data || {};
-		// Card total = distinct schools (FY YTD). Prefer new_schools_ytd; Overview uses period.
-		// Summing per-staff counts is higher when the same school is visited by more than one officer.
+		const fyLabel = data.outcome_fy_label || __("1 July to date");
+		// Outcomes card = fiscal YTD (1 July→today), same as sibling outcome cards.
 		const cardTotal = cint(
 			(
 				(data.outcome_fy || {}).new_schools_ytd ||
@@ -1598,13 +1598,19 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					)
 					.join("")
 			: `<tr><td colspan="2" class="text-muted text-center">${__("No registered schools in this period")}</td></tr>`;
+		const overlap = Math.max(0, staffSum - cardTotal);
 		const overlapNote =
 			staffSum > cardTotal
-				? `<p class="text-muted" style="font-size:11px;margin:0 0 10px;">${__(
-						"Per-staff counts can overlap. Card total is distinct schools ({0}); staff column sum is {1}."
-					).replace("{0}", this.fmt(cardTotal)).replace("{1}", this.fmt(staffSum))}</p>`
+				? `<div style="font-size:12px;margin:0 0 12px;padding:8px 10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;color:#9a3412;">
+					<strong>${__("Not a bug.")}</strong>
+					${__(
+						"ERP card = {0} unique schools (each school counted once). Excel SUM of this staff column = {1}. Difference {2} = same school registered by more than one officer (counted once in ERP, twice/more in Excel)."
+					)
+						.replace("{0}", this.fmt(cardTotal))
+						.replace("{1}", this.fmt(staffSum))
+						.replace("{2}", this.fmt(overlap))}
+				</div>`
 				: "";
-		// Prefer distinct FY total in the title (not a stale/unparseable data-card-count).
 		this._pending_card_title = {
 			label:
 				(this._pending_card_title && this._pending_card_title.label) ||
@@ -1619,15 +1625,27 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			primary_action: () => d.hide(),
 		});
 		d.fields_dict.html.$wrapper.html(`
-			<p class="text-muted" style="font-size:12px;margin-bottom:10px;">
-				${__("Total")}: <strong>${this.fmt(cardTotal)}</strong>
-				${data.outcome_fy_label ? ` · ${frappe.utils.escape_html(data.outcome_fy_label)}` : ""}
+			<p style="font-size:13px;margin-bottom:8px;">
+				<strong>${__("Unique schools (ERP)")}: ${this.fmt(cardTotal)}</strong>
+				 · ${frappe.utils.escape_html(fyLabel)}
+				<br>
+				<span class="text-muted">${__("Excel / staff column sum")}: <strong>${this.fmt(
+					staffSum
+				)}</strong></span>
 			</p>
 			${overlapNote}
 			<div class="table-responsive" style="max-height:420px;overflow:auto;">
 				<table class="table table-bordered table-hover" style="font-size:12px;margin:0;">
 					<thead><tr><th>${__("Field Staff")}</th><th class="text-right">${__("Schools")}</th></tr></thead>
 					<tbody>${body}</tbody>
+					<tfoot><tr>
+						<th>${__("Sum of staff column (Excel)")}</th>
+						<th class="text-right">${this.fmt(staffSum)}</th>
+					</tr>
+					<tr>
+						<th>${__("Unique schools (ERP card)")}</th>
+						<th class="text-right">${this.fmt(cardTotal)}</th>
+					</tr></tfoot>
 				</table>
 			</div>
 		`);

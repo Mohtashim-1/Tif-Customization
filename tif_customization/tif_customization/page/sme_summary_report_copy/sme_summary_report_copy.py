@@ -33,7 +33,9 @@ from tif_customization.tif_customization.page.smes_target_base___k.smes_target_b
 	REGION_SUMMARY,
 )
 from tif_customization.tif_customization.page.sme_kpi_details.sme_kpi_details import (
+	ONBOARDED_SCHOOL_SQL,
 	OUTCOME_TARGETS,
+	_distinct_schools,
 	_enriched_actuals,
 )
 from tif_customization.tif_customization.page.smes_target_base___k.smes_target_base___k import (
@@ -540,6 +542,26 @@ def get_report_data(filters=None):
 			else:
 				row[col["key"]] = cint(actuals.get(col["key"]) or 0)
 		row.update(_outcome_row_fields(staff, ytd_from, to_date))
+		# Visit From→To onboarded schools (matches Overview / Outcomes New Registered cards).
+		period_tokens = list(
+			{
+				*(staff.get("match_values") or []),
+				*(
+					expand_staff_tokens(
+						(staff.get("user_id") or staff.get("employee_name") or staff.get("employee") or "").strip()
+					)
+					if (staff.get("user_id") or staff.get("employee_name") or staff.get("employee"))
+					else []
+				),
+				*(expand_staff_tokens(staff["employee"]) if staff.get("employee") else []),
+			}
+		)
+		period_tokens = [str(t).strip() for t in period_tokens if t]
+		row["outcome_new_schools_period"] = (
+			cint(_distinct_schools(from_date, to_date, period_tokens, ONBOARDED_SCHOOL_SQL))
+			if period_tokens
+			else 0
+		)
 		rows.append(row)
 		for k in (
 			"followup",
@@ -627,16 +649,12 @@ def get_report_data(filters=None):
 		outcome_fy_from = outcome_fy_to
 	outcome_fy = _report_outcome_fy_totals(staff_rows, outcome_fy_from, outcome_fy_to)
 	outcome_fy_label = f"{outcome_fy_from.strftime('%d-%b-%Y')} → {outcome_fy_to.strftime('%d-%b-%Y')}"
-	# Keep full FY new-schools for Outcomes (1 July→today). Overview / legacy JS that still
-	# reads outcome_fy.new_schools must show Visit From→To only (not 273 for a 2-day filter).
+	# Outcomes card = full FY (1 July→today). Overview card uses kpis.new_schools_period (Visit From→To).
 	fy_new_schools = dict(outcome_fy.get("new_schools") or {})
 	outcome_fy["new_schools_ytd"] = fy_new_schools
 	outcome_fy["new_schools"] = {
 		**(fy_new_schools or {}),
-		"actual": period_new_schools,
-		"metric": "new_schools",
-		"label": _("New Registered School"),
-		"scope": "visit_period",
+		"scope": "fiscal_ytd",
 	}
 	# Total Schools card must match province drill-down (Active + Active New + Model 0).
 	try:
