@@ -2355,12 +2355,10 @@ def submit_smes_activity(data):
 	# Supervisor approval: backdated >48h or 3rd+ same-school visit in the month.
 	from tif_customization.tif_customization.field_visit_approval import (
 		apply_pending_approval,
+		can_bypass_visit_approval_rules,
 		evaluate_approval_requirements,
 		get_supervisor_user_for_employee,
 		notify_supervisor_pending,
-	)
-	from tif_customization.tif_customization.field_visit_supervisor_only import (
-		can_manage_supervisor_only_field_visits,
 	)
 
 	school_for_rule = (
@@ -2379,7 +2377,7 @@ def submit_smes_activity(data):
 		school_name=school_for_rule,
 		visit_by=doc.visit_by or data.get("visit_by"),
 		owner=owner_for_rule,
-		force_skip=can_manage_supervisor_only_field_visits(),
+		force_skip=can_bypass_visit_approval_rules(),
 	)
 	needs_approval = bool(approval.get("needs_approval"))
 

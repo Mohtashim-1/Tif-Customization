@@ -557,7 +557,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Volunteer Dashboard",
+   "label": "Volunteer Dashboard  (UAT)",
    "link_count": 0,
    "link_to": "volunteer-dashboard",
    "link_type": "Page",
@@ -567,7 +567,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Ambassador Dashboard",
+   "label": "Ambassador Dashboard (UAT)",
    "link_count": 0,
    "link_to": "ambassador-dashboard",
    "link_type": "Page",
@@ -587,7 +587,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Supervisor Target Base KPI (UAT)",
+   "label": "Supervisor KPI Detail (UAT)",
    "link_count": 0,
    "link_to": "supervisor-target-ba",
    "link_type": "Page",
@@ -603,37 +603,9 @@
    "link_type": "Page",
    "onboard": 0,
    "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "School Impact",
-   "link_count": 2,
-   "onboard": 0,
-   "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Feedback Studio (UAT)",
-   "link_count": 0,
-   "link_to": "feedback-studio",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "School Impact (UAT)",
-   "link_count": 0,
-   "link_to": "school-impact",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
   }
  ],
- "modified": "2026-10-23 09:33:04.944945",
+ "modified": "2026-11-02 12:02:45.830176",
  "modified_by": "farhan.hussain@tif.edu.pk",
  "module": "Tif Customization",
  "name": "Reports",

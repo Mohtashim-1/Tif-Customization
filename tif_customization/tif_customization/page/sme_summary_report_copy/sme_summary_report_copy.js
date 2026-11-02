@@ -817,13 +817,20 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					},
 					{
 						label: __("New Registered School"),
-						count: cint(((data.outcome_fy || {}).new_schools || {}).actual),
-						value: this.fmt(((data.outcome_fy || {}).new_schools || {}).actual),
+						count: cint(
+							k.new_schools_period != null
+								? k.new_schools_period
+								: ((data.outcome_fy || {}).new_schools || {}).actual
+						),
+						value: this.fmt(
+							k.new_schools_period != null
+								? k.new_schools_period
+								: ((data.outcome_fy || {}).new_schools || {}).actual
+						),
 						style: "outcome",
-						cardKind: "active_school_by_staff",
-						outcomeFy: true,
+						metric: "new_schools",
 						hint: __(
-							"Onboarded schools (Registration of New Schools / New visits). Click for field staff counts."
+							"Visit From–To only: distinct onboarded schools (Registration of New Schools / New visits). Not fiscal year."
 						),
 					},
 					{
@@ -887,13 +894,26 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						{ spacer: true },
 						{
 							label: __("New Registered School"),
-							count: cint(((data.outcome_fy || {}).new_schools || {}).actual),
-							value: this.fmt(((data.outcome_fy || {}).new_schools || {}).actual),
+							count: cint(
+								(
+									(data.outcome_fy || {}).new_schools_ytd ||
+									(data.outcome_fy || {}).new_schools ||
+									{}
+								).actual
+							),
+							value: this.fmt(
+								(
+									(data.outcome_fy || {}).new_schools_ytd ||
+									(data.outcome_fy || {}).new_schools ||
+									{}
+								).actual
+							),
 							style: "outcome",
 							cardKind: "active_school_by_staff",
 							outcomeFy: true,
 							hint: __(
-								"Onboarded schools (Registration of New Schools / New visits). Click for field staff counts."
+								"Fiscal year to date ({0}): onboarded schools. Not limited to Visit From–To.",
+								[data.outcome_fy_label || __("1 July to date")]
 							),
 						},
 						{
@@ -1548,9 +1568,15 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 
 	show_active_schools_by_staff() {
 		const data = this.data || {};
-		// Card total = distinct schools (same as outcome_fy.new_schools). Summing per-staff
-		// counts is higher when the same school is visited by more than one officer.
-		const cardTotal = cint(((data.outcome_fy || {}).new_schools || {}).actual);
+		// Card total = distinct schools (FY YTD). Prefer new_schools_ytd; Overview uses period.
+		// Summing per-staff counts is higher when the same school is visited by more than one officer.
+		const cardTotal = cint(
+			(
+				(data.outcome_fy || {}).new_schools_ytd ||
+				(data.outcome_fy || {}).new_schools ||
+				{}
+			).actual
+		);
 		const rows = [...(data.rows || [])]
 			.map((r) => ({
 				name: r.employee_name || r.user_id || r.employee || "",

@@ -601,6 +601,9 @@ def get_report_data(filters=None):
 	totals_out["expenses"] = expense_total
 
 	period_outcome = _report_outcome_fy_totals(staff_rows, ytd_from, to_date)
+	# Distinct new schools strictly inside Visit From → Visit To (Overview card).
+	period_filter_outcome = _report_outcome_fy_totals(staff_rows, from_date, to_date)
+	period_new_schools = cint((period_filter_outcome.get("new_schools") or {}).get("actual") or 0)
 	# Table footer is 1 July (current fiscal year) through the selected Visit To date.
 	for cfg in OUTCOME_TARGETS:
 		okey = f"outcome_{cfg['key']}"
@@ -624,6 +627,17 @@ def get_report_data(filters=None):
 		outcome_fy_from = outcome_fy_to
 	outcome_fy = _report_outcome_fy_totals(staff_rows, outcome_fy_from, outcome_fy_to)
 	outcome_fy_label = f"{outcome_fy_from.strftime('%d-%b-%Y')} → {outcome_fy_to.strftime('%d-%b-%Y')}"
+	# Keep full FY new-schools for Outcomes (1 July→today). Overview / legacy JS that still
+	# reads outcome_fy.new_schools must show Visit From→To only (not 273 for a 2-day filter).
+	fy_new_schools = dict(outcome_fy.get("new_schools") or {})
+	outcome_fy["new_schools_ytd"] = fy_new_schools
+	outcome_fy["new_schools"] = {
+		**(fy_new_schools or {}),
+		"actual": period_new_schools,
+		"metric": "new_schools",
+		"label": _("New Registered School"),
+		"scope": "visit_period",
+	}
 	# Total Schools card must match province drill-down (Active + Active New + Model 0).
 	try:
 		from tif_customization.tif_customization.api.field_visit_drilldown import (
@@ -726,8 +740,10 @@ def get_report_data(filters=None):
 			"model_c": cint(model_counts.get("model_c") or 0),
 			"model_school_a": cint(totals_out.get("outcome_model_school_a") or 0),
 			"model_school_b": cint(totals_out.get("outcome_model_school_b") or 0),
-			# Distinct onboarded schools (same as outcome_fy / table footer), not staff-column sum.
+			# Distinct onboarded schools (FY YTD Jul→to_date via period_outcome totals).
 			"new_schools": cint(totals_out.get("outcome_new_schools") or 0),
+			# Distinct onboarded schools inside Visit From → Visit To only.
+			"new_schools_period": period_new_schools,
 		},
 		"regions": [{"key": rk, "label": REGION_LABELS[rk]} for rk in REGION_KEYS],
 	}

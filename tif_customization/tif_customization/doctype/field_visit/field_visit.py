@@ -129,9 +129,53 @@ class FieldVisit(Document):
 		)
 
 	def before_submit(self):
-		from tif_customization.tif_customization.field_visit_approval import block_submit_if_pending
+		from tif_customization.tif_customization.field_visit_approval import (
+			block_submit_if_pending,
+			can_bypass_visit_approval_rules,
+			evaluate_approval_requirements,
+			apply_pending_approval,
+			get_supervisor_user_for_employee,
+			notify_supervisor_pending,
+		)
 
 		block_submit_if_pending(self)
+
+		# Safety net: same-school / backdate must not submit without approval
+		# (covers Desk submit and any path that skipped portal checks).
+		if not can_bypass_visit_approval_rules() and not getattr(self.flags, "skip_visit_approval_gate", False):
+			school = (
+				(self.school_name or "").strip()
+				or (getattr(self, "me_school_name", None) or "").strip()
+				or (getattr(self, "pending_school_name", None) or "").strip()
+			)
+			check = evaluate_approval_requirements(
+				doc_type=self.type,
+				activity_date=self.get_visit_date() or self.visit_date,
+				school_name=school,
+				visit_by=self.visit_by,
+				owner=self.owner or frappe.session.user,
+				exclude_name=self.name,
+				force_skip=False,
+			)
+			if check.get("needs_approval"):
+				from tif_customization.tif_customization.field_visit_approval import get_approval_request
+
+				req = get_approval_request(self.name)
+				# Approved requests may submit; Pending / missing still block
+				if req and (req.status or "") == "Approved":
+					pass
+				else:
+					if not req:
+						sup = get_supervisor_user_for_employee(user=self.owner or frappe.session.user)
+						apply_pending_approval(self, check.get("reasons") or [], supervisor_user=sup)
+						notify_supervisor_pending(self, sup)
+					frappe.throw(
+						_(
+							"This visit needs supervisor approval before submit.\n{0}"
+						).format("\n".join(check.get("reasons") or [])),
+						title=_("Supervisor Approval Required"),
+					)
+
 		if self.type in ("Training", "Workshop", "Teachers Training Meeting"):
 			self._ensure_feedback_tokens()
 

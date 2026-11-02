@@ -158,6 +158,20 @@ def count_same_school_visits_in_month(
 	return cint(row[0].cnt) if row else 0
 
 
+def can_bypass_visit_approval_rules(user: str | None = None) -> bool:
+	"""Only System Manager / full Field Visit viewers may skip approval rules.
+
+	Field Supervisors (is_group) must still follow backdate + same-school limits
+	when filing school visits themselves.
+	"""
+	user = user or frappe.session.user
+	if user in ("Administrator",) or "System Manager" in frappe.get_roles(user):
+		return True
+	from tif_customization.tif_customization.field_visit_permissions import can_view_all_field_visits
+
+	return bool(can_view_all_field_visits(user))
+
+
 def evaluate_approval_requirements(
 	*,
 	doc_type,
@@ -381,9 +395,6 @@ def check_field_visit_approval(data=None):
 	if isinstance(data, str):
 		data = frappe.parse_json(data) or {}
 	data = data or {}
-	from tif_customization.tif_customization.field_visit_supervisor_only import (
-		can_manage_supervisor_only_field_visits,
-	)
 	from tif_customization.tif_customization.page.smes_activity_form.smes_activity_form import (
 		ACTIVITY_TYPE_MAP,
 	)
@@ -396,7 +407,7 @@ def check_field_visit_approval(data=None):
 		school_name=data.get("school_name"),
 		visit_by=data.get("visit_by"),
 		owner=frappe.session.user,
-		force_skip=can_manage_supervisor_only_field_visits(),
+		force_skip=can_bypass_visit_approval_rules(),
 	)
 	result["activity_date"] = cstr(activity_date or "")
 	return result
@@ -420,6 +431,8 @@ def approve_field_visit(name, remarks=None, submit=1):
 	submitted = False
 	if cint(submit) and cint(doc.docstatus) == 0:
 		doc.reload()
+		# Already approved — do not re-block on same-school/backdate gate
+		doc.flags.skip_visit_approval_gate = True
 		doc.submit()
 		submitted = True
 	frappe.db.commit()
