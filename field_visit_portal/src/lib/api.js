@@ -142,11 +142,17 @@ export async function apiPost(method, args = {}) {
 
 export async function uploadFile(file, { doctype, docname, fieldname, isPrivate = true } = {}) {
 	if (!file) throw new Error("No file selected for upload.");
+	// Mobile WebViews sometimes prefix FormData text fields with CRLF
+	// (server then looks up doctype "\r\nField Visit" and crashes).
+	const clean = (v) => (v == null ? "" : String(v).replace(/^\uFEFF/, "").trim());
 	const fd = new FormData();
 	fd.append("file", file, file.name || "attachment");
-	if (doctype) fd.append("doctype", doctype);
-	if (docname) fd.append("docname", docname);
-	if (fieldname) fd.append("fieldname", fieldname);
+	const dt = clean(doctype);
+	const dn = clean(docname);
+	const fn = clean(fieldname);
+	if (dt) fd.append("doctype", dt);
+	if (dn) fd.append("docname", dn);
+	if (fn) fd.append("fieldname", fn);
 	fd.append("is_private", isPrivate ? "1" : "0");
 	const res = await fetch("/api/method/upload_file", {
 		method: "POST",

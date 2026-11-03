@@ -274,6 +274,8 @@ override_whitelisted_methods = {
 	"frappe.desk.desktop.get_workspace_sidebar_items": "tif_customization.tif_customization.overrides.workspace_sidebar.get_workspace_sidebar_items",
 	"frappe.desk.doctype.workspace.workspace.save_page": "tif_customization.tif_customization.overrides.workspace_save.save_page",
 	"erpnext.selling.doctype.sales_order.sales_order.make_delivery_note": "tif_customization.tif_customization.overrides.sales_order.make_delivery_note",
+	# Mobile FormData sometimes prefixes doctype with CRLF ("\r\nField Visit").
+	"upload_file": "tif_customization.tif_customization.overrides.upload_file.upload_file",
 }
 #
 # each overriding function accepts a `data` argument;
