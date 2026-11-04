@@ -144,11 +144,100 @@ def _parse_date(raw):
 	return None
 
 
+def _norm_person(value):
+	"""Collapse punctuation/spaces so 'Syed Rehman Haider' ≈ 'S. Rahman Haider'."""
+	text = cstr(value).lower().replace("\u2019", "'")
+	text = re.sub(r"[^a-z0-9]+", " ", text)
+	return re.sub(r"\s+", " ", text).strip()
+
+
+def _compact_person(value):
+	return _norm_person(value).replace(" ", "")
+
+
+def _core_person(value):
+	"""Drop common honorifics/prefixes so Muhammad Adnan ≈ M. Adnan."""
+	tokens = _norm_person(value).split()
+	skip = {"muhammad", "mohammad", "mohammed", "syed", "hafiz", "sahibzada", "mr", "mrs", "ms"}
+	core = [t for t in tokens if t not in skip and len(t) > 1]
+	return "".join(core) or _compact_person(value)
+
+
+def _resolve_field_officer(officer_name):
+	"""Resolve sheet TIF Representative text to a Field Officer name (link)."""
+	from difflib import SequenceMatcher
+
+	officer = cstr(officer_name).strip()
+	if not officer:
+		return ""
+	if not frappe.db.exists("DocType", "Field Officer"):
+		return ""
+	if frappe.db.exists("Field Officer", officer):
+		return officer
+	found = frappe.db.get_value("Field Officer", {"name1": officer}, "name")
+	if found:
+		return found
+	rows = frappe.db.sql(
+		"""
+		SELECT name FROM `tabField Officer`
+		WHERE LOWER(TRIM(IFNULL(name1, ''))) = %s
+		   OR LOWER(TRIM(IFNULL(name, ''))) = %s
+		LIMIT 1
+		""",
+		(officer.lower(), officer.lower()),
+	)
+	if rows:
+		return rows[0][0]
+
+	needle = _norm_person(officer)
+	needle_c = _compact_person(officer)
+	needle_core = _core_person(officer)
+	if not needle_c:
+		return ""
+
+	candidates = frappe.db.sql(
+		"""
+		SELECT name, name1 FROM `tabField Officer`
+		WHERE IFNULL(status, 'Active') != 'Inactive'
+		""",
+		as_dict=True,
+	)
+	best_name = ""
+	best_score = 0.0
+	for row in candidates:
+		label = row.name1 or row.name
+		norm = _norm_person(label)
+		comp = _compact_person(label)
+		core = _core_person(label)
+		if not comp:
+			continue
+		if norm == needle or comp == needle_c or core == needle_core:
+			return row.name
+		if needle in norm or norm in needle or needle_c in comp or comp in needle_c:
+			score = 0.95
+		else:
+			score = max(
+				SequenceMatcher(None, needle_c, comp).ratio(),
+				SequenceMatcher(None, needle_core, core).ratio(),
+			)
+		if score > best_score:
+			best_score = score
+			best_name = row.name
+	# Accept strong fuzzy matches (handles Rehman/Rahman, Samiullah/Sami Ullah, etc.)
+	if best_name and best_score >= 0.82:
+		return best_name
+	return ""
+
+
 def _resolve_employee(employee_id, officer_name):
 	emp = cstr(employee_id).strip()
 	if emp and frappe.db.exists("Employee", emp):
 		return emp
 	officer = cstr(officer_name).strip()
+	if officer and frappe.db.exists("DocType", "Field Officer"):
+		fo_emp = frappe.db.get_value("Field Officer", officer, "employee")
+		if fo_emp:
+			return fo_emp
 	if not officer:
 		return ""
 	found = frappe.db.get_value("Employee", {"employee_name": officer}, "name")
@@ -453,8 +542,15 @@ def import_online_workshop_participants(
 
 		visit_date = _parse_date(row.get("visit_date")) or fallback_date
 		participants = cint(row.get("participants") or 0) or 1
-		officer = cstr(row.get("officer")).strip()
-		employee = _resolve_employee(row.get("employee"), officer)
+		officer_raw = cstr(row.get("officer")).strip()
+		officer = _resolve_field_officer(officer_raw)
+		if officer_raw and not officer:
+			errors.append(
+				_("Row {0}: TIF Representative '{1}' not matched to Field Officer (saved blank)").format(
+					idx, officer_raw
+				)
+			)
+		employee = _resolve_employee(row.get("employee"), officer or officer_raw)
 
 		doc = frappe.get_doc(
 			{
@@ -478,7 +574,7 @@ def import_online_workshop_participants(
 				"school_venue": cstr(row.get("school_venue")).strip(),
 				"school_contact_number": cstr(row.get("school_contact_number")).strip(),
 				"how_did_you_hear": cstr(row.get("how_did_you_hear")).strip(),
-				"officer": officer,
+				"officer": officer or None,
 				"employee": employee or None,
 				"participants": participants,
 				"category": cstr(row.get("category")).strip() or "Online",

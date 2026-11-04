@@ -465,6 +465,10 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 		frappe.tif_customization.show_workshop_participant_dialog(data, opts);
 		return;
 	}
+	if (data.metric === "online_participants") {
+		frappe.tif_customization.show_online_workshop_officer_dialog(data, opts);
+		return;
+	}
 	const schoolListMetrics = new Set([
 		"model_school_a",
 		"model_school_b",
@@ -692,6 +696,370 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 			frappe.tif_customization.download_online_workshop_template();
 		});
 	}
+	d.show();
+};
+
+frappe.tif_customization.show_online_workshop_officer_dialog = function (data, opts) {
+	opts = opts || {};
+	const rows = data.rows || [];
+	const programOf = (row) =>
+		(row.type || row.training_program || "").trim() || __("Unknown program");
+	const byOfficer = {};
+	rows.forEach((row) => {
+		const officer = (row.officer || "").trim() || __("Unknown officer");
+		if (!byOfficer[officer]) {
+			byOfficer[officer] = { officer, rows: [], participants: 0, programs: {} };
+		}
+		byOfficer[officer].rows.push(row);
+		byOfficer[officer].participants += cint(row.participants) || 1;
+		const program = programOf(row);
+		if (!byOfficer[officer].programs[program]) {
+			byOfficer[officer].programs[program] = {
+				program,
+				rows: [],
+				participants: 0,
+			};
+		}
+		byOfficer[officer].programs[program].rows.push(row);
+		byOfficer[officer].programs[program].participants += cint(row.participants) || 1;
+	});
+	const officers = Object.values(byOfficer).sort(
+		(a, b) =>
+			b.participants - a.participants ||
+			b.rows.length - a.rows.length ||
+			a.officer.localeCompare(b.officer)
+	);
+	const totalHeads = rows.reduce((sum, row) => sum + (cint(row.participants) || 1), 0);
+	const totalCount = data.count != null ? cint(data.count) : totalHeads;
+	const owTitle = frappe.tif_customization.drilldown_title(
+		data.label || __("Online Workshop Participants through SME"),
+		totalCount
+	);
+
+	const exportOfficerList = () => {
+		const headers = [__("Field Officer"), __("Participants"), __("Entries"), __("Programs")];
+		const exportRows = officers.map((o) => [
+			o.officer,
+			o.participants,
+			o.rows.length,
+			Object.keys(o.programs).length,
+		]);
+		const fname = `${data.label || "online-workshop"}-by-officer-${data.from_date || ""}-${
+			data.to_date || ""
+		}`.replace(/\s+/g, "-");
+		frappe.tif_customization.export_rows_excel(fname, headers, exportRows);
+	};
+	const exportProgramList = (officer) => {
+		const bucket = byOfficer[officer];
+		const programs = Object.values((bucket && bucket.programs) || {}).sort(
+			(a, b) =>
+				b.participants - a.participants ||
+				b.rows.length - a.rows.length ||
+				a.program.localeCompare(b.program)
+		);
+		const headers = [__("Field Officer"), __("Program"), __("Participants"), __("Entries")];
+		const exportRows = programs.map((p) => [
+			officer,
+			p.program,
+			p.participants,
+			p.rows.length,
+		]);
+		const fname = `${officer || "officer"}-programs-${data.from_date || ""}`.replace(/\s+/g, "-");
+		frappe.tif_customization.export_rows_excel(fname, headers, exportRows);
+	};
+	const exportProgramDetail = (officer, program) => {
+		const bucket = byOfficer[officer];
+		const prog = bucket && bucket.programs && bucket.programs[program];
+		const detail = (prog && prog.rows) || [];
+		const headers = [
+			__("Document No"),
+			__("Visit Date"),
+			__("Program"),
+			__("School / Venue"),
+			__("Participant"),
+			__("Contact"),
+			__("Category"),
+			__("Visit Summary"),
+			__("Participants"),
+		];
+		const exportRows = detail.map((row) => [
+			row.name || "",
+			row.visit_date || "",
+			programOf(row),
+			row.school || "",
+			row.full_name || "",
+			row.whatsapp_contact || row.email || "",
+			row.category || "",
+			(row.remarks || "").replace(/\s+/g, " ").trim(),
+			cint(row.participants) || 1,
+		]);
+		const fname = `${officer || "officer"}-${program || "program"}-${data.from_date || ""}`.replace(
+			/\s+/g,
+			"-"
+		);
+		frappe.tif_customization.export_rows_excel(fname, headers, exportRows);
+	};
+
+	const d = new frappe.ui.Dialog({
+		title: owTitle,
+		size: "extra-large",
+		fields: [{ fieldtype: "HTML", fieldname: "html" }],
+		primary_action_label: __("Close"),
+		primary_action: () => d.hide(),
+		secondary_action_label: __("Export Excel"),
+		secondary_action: () => exportOfficerList(),
+	});
+
+	const importBar = `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 10px;">
+		<button type="button" class="btn btn-default btn-sm tif-ow-import">${__("Import")}</button>
+		<button type="button" class="btn btn-link btn-sm tif-ow-template" style="padding-left:0;">${__(
+			"Download template"
+		)}</button>
+		<span class="text-muted" style="font-size:12px;">${__(
+			"Upload CSV/Excel to add Online Workshop Participants for this card."
+		)}</span>
+	</div>`;
+
+	const detailTable = (detailRows) => {
+		if (!detailRows.length) {
+			return `<tr><td colspan="7" class="text-muted text-center">${__(
+				"No participants for this program."
+			)}</td></tr>`;
+		}
+		return detailRows
+			.map((row) => {
+				const docLabel = frappe.utils.escape_html(row.name || "—");
+				const docCell = cint(row.imported)
+					? `<span title="${__("Imported entry")}">${docLabel}</span>`
+					: `<a href="#" class="tif-open-visit" data-visit="${docLabel}">${docLabel}</a>`;
+				const summary = row.remarks
+					? frappe.tif_customization.format_visit_remarks(row.remarks)
+					: "—";
+				return `<tr>
+					<td>${docCell}</td>
+					<td>${frappe.utils.escape_html(row.visit_date || "")}</td>
+					<td>${frappe.utils.escape_html(row.school || "—")}</td>
+					<td>${frappe.utils.escape_html(row.full_name || "—")}</td>
+					<td>${frappe.utils.escape_html(row.whatsapp_contact || row.email || "—")}</td>
+					<td class="text-right">${cint(row.participants || 1).toLocaleString()}</td>
+					<td style="max-width:280px;white-space:normal;">${summary}</td>
+				</tr>`;
+			})
+			.join("");
+	};
+
+	const showOfficers = () => {
+		d.set_title(owTitle);
+		d.get_secondary_btn().show().text(__("Export Excel")).off("click").on("click", () => exportOfficerList());
+		const body = officers.length
+			? officers
+					.map(
+						(o) => `<tr class="ow-officer-row" data-officer="${frappe.utils.escape_html(
+							o.officer
+						)}" style="cursor:pointer;">
+					<td style="font-weight:600;color:#0f766e;">${frappe.utils.escape_html(o.officer)}</td>
+					<td class="text-right"><a href="#" class="ow-officer-count" data-officer="${frappe.utils.escape_html(
+						o.officer
+					)}">${cint(o.participants).toLocaleString()}</a></td>
+					<td class="text-right">${cint(o.rows.length).toLocaleString()}</td>
+					<td class="text-right">${cint(Object.keys(o.programs).length).toLocaleString()}</td>
+				</tr>`
+					)
+					.join("")
+			: `<tr><td colspan="4" class="text-muted text-center">${__(
+					"No Online Workshop Participants in this period."
+				)}</td></tr>`;
+		d.fields_dict.html.$wrapper.html(`
+			${importBar}
+			<p class="text-muted" style="font-size:12px;margin-bottom:10px;">
+				${__("Level 1 — Field Officer. Click an officer to see programs.")}
+				&nbsp;·&nbsp; ${__("Total")}: <strong>${cint(totalCount).toLocaleString()}</strong>
+			</p>
+			<div class="table-responsive" style="max-height:420px;overflow:auto;">
+				<table class="table table-bordered table-hover" style="font-size:12px;margin:0;">
+					<thead>
+						<tr>
+							<th>${__("Field Officer")}</th>
+							<th class="text-right">${__("Participants")}</th>
+							<th class="text-right">${__("Entries")}</th>
+							<th class="text-right">${__("Programs")}</th>
+						</tr>
+					</thead>
+					<tbody>${body}</tbody>
+					<tfoot>
+						<tr>
+							<th>${__("Total")}</th>
+							<th class="text-right">${cint(totalCount).toLocaleString()}</th>
+							<th class="text-right">${cint(rows.length).toLocaleString()}</th>
+							<th></th>
+						</tr>
+					</tfoot>
+				</table>
+			</div>
+		`);
+	};
+
+	const showPrograms = (officer) => {
+		const bucket = byOfficer[officer];
+		if (!bucket) return;
+		const programs = Object.values(bucket.programs || {}).sort(
+			(a, b) =>
+				b.participants - a.participants ||
+				b.rows.length - a.rows.length ||
+				a.program.localeCompare(b.program)
+		);
+		d.set_title(
+			frappe.tif_customization.drilldown_title(officer || __("Programs"), bucket.participants)
+		);
+		d.get_secondary_btn()
+			.show()
+			.text(__("Export Excel"))
+			.off("click")
+			.on("click", () => exportProgramList(officer));
+		const body = programs.length
+			? programs
+					.map(
+						(p) => `<tr class="ow-program-row" data-officer="${frappe.utils.escape_html(
+							officer
+						)}" data-program="${frappe.utils.escape_html(p.program)}" style="cursor:pointer;">
+					<td style="font-weight:600;color:#0f766e;">${frappe.utils.escape_html(p.program)}</td>
+					<td class="text-right"><a href="#" class="ow-program-count" data-officer="${frappe.utils.escape_html(
+						officer
+					)}" data-program="${frappe.utils.escape_html(p.program)}">${cint(
+							p.participants
+						).toLocaleString()}</a></td>
+					<td class="text-right">${cint(p.rows.length).toLocaleString()}</td>
+				</tr>`
+					)
+					.join("")
+			: `<tr><td colspan="3" class="text-muted text-center">${__(
+					"No programs for this officer."
+				)}</td></tr>`;
+		d.fields_dict.html.$wrapper.html(`
+			<p style="margin-bottom:10px;">
+				<a href="#" class="ow-officer-back">${__("← Field officers")}</a>
+				&nbsp;·&nbsp; ${frappe.utils.escape_html(officer || "")}
+				&nbsp;·&nbsp; ${__("Participants")}: <strong>${cint(bucket.participants).toLocaleString()}</strong>
+				&nbsp;·&nbsp; ${__("Programs")}: <strong>${programs.length}</strong>
+			</p>
+			<p class="text-muted" style="font-size:12px;margin-bottom:10px;">
+				${__("Level 2 — Programs. Click a program to see participant documents.")}
+			</p>
+			<div class="table-responsive" style="max-height:420px;overflow:auto;">
+				<table class="table table-bordered table-hover" style="font-size:12px;margin:0;">
+					<thead>
+						<tr>
+							<th>${__("Program")}</th>
+							<th class="text-right">${__("Participants")}</th>
+							<th class="text-right">${__("Entries")}</th>
+						</tr>
+					</thead>
+					<tbody>${body}</tbody>
+				</table>
+			</div>
+		`);
+	};
+
+	const showPeople = (officer, program) => {
+		const bucket = byOfficer[officer];
+		const prog = bucket && bucket.programs && bucket.programs[program];
+		const detail = (prog && prog.rows) || [];
+		const heads = prog ? prog.participants : detail.length;
+		d.set_title(
+			frappe.tif_customization.drilldown_title(
+				`${officer || ""} · ${program || __("Participants")}`,
+				heads
+			)
+		);
+		d.get_secondary_btn()
+			.show()
+			.text(__("Export Excel"))
+			.off("click")
+			.on("click", () => exportProgramDetail(officer, program));
+		d.fields_dict.html.$wrapper.html(`
+			<p style="margin-bottom:10px;">
+				<a href="#" class="ow-officer-back">${__("← Field officers")}</a>
+				&nbsp;·&nbsp;
+				<a href="#" class="ow-program-back" data-officer="${frappe.utils.escape_html(
+					officer || ""
+				)}">${__("← Programs")}</a>
+				&nbsp;·&nbsp; ${frappe.utils.escape_html(officer || "")}
+				&nbsp;·&nbsp; ${frappe.utils.escape_html(program || "")}
+				&nbsp;·&nbsp; ${__("Participants")}: <strong>${cint(heads).toLocaleString()}</strong>
+				&nbsp;·&nbsp; ${__("Entries")}: <strong>${detail.length}</strong>
+			</p>
+			<p class="text-muted" style="font-size:12px;margin-bottom:10px;">
+				${__("Level 3 — Document details.")}
+			</p>
+			<div class="table-responsive" style="max-height:420px;overflow:auto;">
+				<table class="table table-bordered table-hover" style="font-size:12px;margin:0;">
+					<thead>
+						<tr>
+							<th>${__("Document No")}</th>
+							<th>${__("Visit Date")}</th>
+							<th>${__("School / Venue")}</th>
+							<th>${__("Participant")}</th>
+							<th>${__("Contact")}</th>
+							<th class="text-right">${__("Participants")}</th>
+							<th>${__("Visit Summary")}</th>
+						</tr>
+					</thead>
+					<tbody>${detailTable(detail)}</tbody>
+				</table>
+			</div>
+		`);
+	};
+
+	if (data.staff && officers.length === 1) {
+		showPrograms(officers[0].officer);
+	} else {
+		showOfficers();
+	}
+
+	d.$wrapper.on("click", ".ow-officer-count, .ow-officer-row", (e) => {
+		e.preventDefault();
+		const officer =
+			$(e.currentTarget).attr("data-officer") ||
+			$(e.target).closest("[data-officer]").attr("data-officer");
+		if (officer) showPrograms(officer);
+	});
+	d.$wrapper.on("click", ".ow-program-count, .ow-program-row", (e) => {
+		e.preventDefault();
+		const $el = $(e.currentTarget).closest("[data-program]");
+		const officer = $el.attr("data-officer") || $(e.currentTarget).attr("data-officer");
+		const program = $el.attr("data-program") || $(e.currentTarget).attr("data-program");
+		if (officer && program) showPeople(officer, program);
+	});
+	d.$wrapper.on("click", ".ow-officer-back", (e) => {
+		e.preventDefault();
+		showOfficers();
+	});
+	d.$wrapper.on("click", ".ow-program-back", (e) => {
+		e.preventDefault();
+		const officer = $(e.currentTarget).attr("data-officer");
+		if (officer) showPrograms(officer);
+		else showOfficers();
+	});
+	d.$wrapper.on("click", ".tif-open-visit", (e) => {
+		e.preventDefault();
+		const name = $(e.currentTarget).attr("data-visit");
+		if (!name) return;
+		frappe.tif_customization.open_field_visit_easy(name);
+	});
+	d.$wrapper.on("click", ".tif-ow-import", (e) => {
+		e.preventDefault();
+		frappe.tif_customization.open_online_workshop_import({
+			onDone: () => {
+				d.hide();
+				frappe.tif_customization.open_visit_drilldown(opts);
+				if (typeof opts.onImported === "function") opts.onImported();
+			},
+		});
+	});
+	d.$wrapper.on("click", ".tif-ow-template", (e) => {
+		e.preventDefault();
+		frappe.tif_customization.download_online_workshop_template();
+	});
 	d.show();
 };
 

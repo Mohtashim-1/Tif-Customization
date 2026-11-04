@@ -226,10 +226,11 @@
   {
    "description": "Maps from TIF Representative in the registration sheet",
    "fieldname": "officer",
-   "fieldtype": "Data",
+   "fieldtype": "Link",
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "label": "TIF Representative"
+   "label": "TIF Representative",
+   "options": "Field Officer"
   },
   {
    "fieldname": "column_break_t1",
