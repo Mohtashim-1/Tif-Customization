@@ -453,6 +453,7 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 				)}</p>`
 			: "";
 	const showRemarks = true;
+	const showImages = true;
 	// Official / HO / Academic / volunteer enrolment — school optional or N/A.
 	const noSchoolMetrics = new Set([
 		"academic_task",
@@ -468,7 +469,8 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 	]);
 	const hideSchool = noSchoolMetrics.has(data.metric);
 	const hideType = false;
-	const colCount = (hideSchool ? 5 : 6) - (hideType ? 1 : 0) + (showRemarks ? 1 : 0);
+	const colCount =
+		(hideSchool ? 5 : 6) - (hideType ? 1 : 0) + (showRemarks ? 1 : 0) + (showImages ? 1 : 0);
 	const schoolCell = (row) => {
 		const school = frappe.utils.escape_html(row.school || "—");
 		let badge = "";
@@ -482,6 +484,33 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 			? `<span style="display:inline-block;margin-left:6px;padding:1px 6px;border:1px solid #dc2626;border-radius:999px;background:#fef2f2;color:#b91c1c;font-size:11px;font-weight:700;white-space:nowrap;">${badge}</span>`
 			: "";
 		return `${school}${badge}`;
+	};
+	const photoWhen = (img) => {
+		const raw = (img && (img.captured || img.uploaded || img.taken_at)) || "";
+		if (!raw) return "";
+		const user = frappe.datetime.str_to_user(raw);
+		return user && user !== "Invalid date" ? user : raw;
+	};
+	const schoolImageCell = (row) => {
+		const images = row.images || [];
+		if (!images.length) {
+			return `<td class="text-muted">—</td>`;
+		}
+		const first = images[0] || {};
+		const src = frappe.utils.escape_html(first.url || "");
+		const when = photoWhen(first);
+		const visit = frappe.utils.escape_html(row.name || "");
+		return `<td>
+			<button type="button" class="tif-visit-photo-card" data-visit="${visit}" title="${__(
+				"Click to view school images"
+			)}" style="display:inline-flex;align-items:center;gap:8px;padding:4px 8px;border:1px solid #e5e7eb;border-radius:10px;background:#fff;cursor:pointer;">
+				<img src="${src}" alt="" style="width:48px;height:48px;object-fit:cover;border-radius:8px;border:1px solid #e5e7eb;background:#f3f4f6;">
+				<span style="font-size:12px;font-weight:700;color:#334155;text-align:left;line-height:1.25;">
+					${images.length}
+					${when ? `<small style="display:block;font-weight:500;color:#64748b;">${frappe.utils.escape_html(when)}</small>` : ""}
+				</span>
+			</button>
+		</td>`;
 	};
 	const body = rows.length
 		? rows
@@ -502,6 +531,7 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 							)}</td>`
 						: ""
 				}
+				${showImages ? schoolImageCell(row) : ""}
 			</tr>`
 				)
 				.join("")
@@ -517,12 +547,21 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 		if (!hideSchool) headers.push(__("School / Venue"));
 		headers.push(__("Officer"), __("Category"));
 		if (showRemarks) headers.push(__("Visit Summary"));
+		if (showImages) headers.push(__("School Images"));
 		const exportRows = rows.map((row) => {
 			const r = [row.name || "", row.visit_date || ""];
 			if (!hideType) r.push(row.type || "");
 			if (!hideSchool) r.push(row.school || "");
 			r.push(row.officer || "", row.category || "");
 			if (showRemarks) r.push((row.remarks || "").replace(/\s+/g, " ").trim());
+			if (showImages) {
+				const imgs = row.images || [];
+				r.push(
+					imgs.length
+						? imgs.map((img) => img.url || "").filter(Boolean).join(" | ")
+						: ""
+				);
+			}
 			return r;
 		});
 		const fname = `${data.label || data.metric || "visits"}-${data.from_date || ""}-${
@@ -546,7 +585,7 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 				: ""
 		}
 		${categoryHint}
-		<p class="text-muted" style="font-size:12px;">${__("Click a Document No to open that Field Visit.")}</p>
+		<p class="text-muted" style="font-size:12px;">${__("Click a Document No to open that Field Visit. Click a school image to enlarge.")}</p>
 		<div class="table-responsive" style="max-height:420px;overflow:auto;">
 			<table class="table table-bordered table-hover" style="font-size:12px;margin:0;">
 				<thead>
@@ -558,6 +597,7 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 						<th>${__("Officer")}</th>
 						<th>${__("Category")}</th>
 						${showRemarks ? `<th>${__("Visit Summary")}</th>` : ""}
+						${showImages ? `<th>${__("School Images")}</th>` : ""}
 					</tr>
 				</thead>
 				<tbody>${body}</tbody>
@@ -569,6 +609,12 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 		const name = $(e.currentTarget).attr("data-visit");
 		if (!name) return;
 		frappe.tif_customization.open_field_visit_easy(name);
+	});
+	d.$wrapper.on("click", ".tif-visit-photo-card", (e) => {
+		e.preventDefault();
+		const name = $(e.currentTarget).attr("data-visit");
+		const row = (rows || []).find((r) => r.name === name);
+		if (row) frappe.tif_customization.show_visit_photo_dialog(row);
 	});
 	d.show();
 };

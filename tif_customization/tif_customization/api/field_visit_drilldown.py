@@ -1245,10 +1245,23 @@ def _capture_time_from_filename(file_name: str) -> str:
 	return f"{year:04d}-{month:02d}-{day:02d} {hour:02d}:{minute:02d}:{second:02d}"
 
 
+# Attach fields used on Field Visit form for school / visit photos.
+_VISIT_IMAGE_FIELDS = (
+	("school_picture", "School Picture"),
+	("meeting_picture", "Meeting Picture"),
+	("training_awareness_pictures", "Training & Awareness"),
+	("mt_meeting_picture", "Meeting Picture"),
+)
+
+
 def _visit_images(visit_names: list[str]) -> dict:
-	"""Photos on each Field Visit, with the phone capture time when the file name has it."""
+	"""Photos on each Field Visit, with the phone capture time when the file name has it.
+
+	Includes File attachments and school/meeting picture fields from the form.
+	"""
 	if not visit_names:
 		return {}
+	names = tuple(visit_names)
 	rows = frappe.db.sql(
 		"""
 		SELECT attached_to_name AS visit, file_url, file_name, creation
@@ -1263,7 +1276,7 @@ def _visit_images(visit_names: list[str]) -> dict:
 		  )
 		ORDER BY creation ASC
 		""",
-		{"names": tuple(visit_names)},
+		{"names": names},
 		as_dict=True,
 	)
 	out: dict[str, list] = {}
@@ -1281,10 +1294,77 @@ def _visit_images(visit_names: list[str]) -> dict:
 			{
 				"url": url,
 				"file_name": row.file_name or "",
+				"label": "Attachment",
 				"captured": captured,
 				"uploaded": str(row.creation)[:19] if row.creation else "",
 			}
 		)
+
+	# Also pull form Attach fields (school_picture etc.) in case File rows are missing.
+	field_sql = ", ".join(f"fv.`{fname}`" for fname, _ in _VISIT_IMAGE_FIELDS)
+	field_rows = frappe.db.sql(
+		f"""
+		SELECT fv.name AS visit, {field_sql}
+		FROM `tabField Visit` fv
+		WHERE fv.name IN %(names)s
+		""",
+		{"names": names},
+		as_dict=True,
+	)
+	file_meta = {}
+	pending_urls = []
+	for row in field_rows:
+		for fname, label in _VISIT_IMAGE_FIELDS:
+			url = cstr(row.get(fname) or "").strip()
+			if not url:
+				continue
+			key = (row.visit, url)
+			if key in seen:
+				continue
+			seen.add(key)
+			pending_urls.append(url)
+			out.setdefault(row.visit, []).append(
+				{
+					"url": url,
+					"file_name": url.rsplit("/", 1)[-1],
+					"label": label,
+					"captured": _capture_time_from_filename(url),
+					"uploaded": "",
+				}
+			)
+
+	if pending_urls:
+		meta_rows = frappe.db.sql(
+			"""
+			SELECT file_url, file_name, MIN(creation) AS creation
+			FROM `tabFile`
+			WHERE file_url IN %(urls)s
+			GROUP BY file_url, file_name
+			""",
+			{"urls": tuple(sorted(set(pending_urls)))},
+			as_dict=True,
+		)
+		for m in meta_rows:
+			url = (m.file_url or "").strip()
+			if not url:
+				continue
+			file_meta[url] = {
+				"file_name": m.file_name or "",
+				"uploaded": str(m.creation)[:19] if m.creation else "",
+				"captured": _capture_time_from_filename(m.file_name or url),
+			}
+		for visit, images in out.items():
+			for img in images:
+				meta = file_meta.get(img.get("url") or "")
+				if not meta:
+					continue
+				if meta.get("uploaded") and not img.get("uploaded"):
+					img["uploaded"] = meta["uploaded"]
+				if meta.get("captured") and not img.get("captured"):
+					img["captured"] = meta["captured"]
+				if meta.get("file_name"):
+					img["file_name"] = meta["file_name"]
+
 	return out
 
 
