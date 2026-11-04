@@ -728,8 +728,12 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					"workshop_registration",
 					"volunteers",
 				]);
+				let cardLabel = col.label;
+				if (col.metric === "enrolment") {
+					cardLabel = __("Enrollment of Participants in Online Course through SME");
+				}
 				const card = {
-					label: col.label,
+					label: cardLabel,
 					value: this.fmt(actual),
 					style:
 						col.metric === "quiz"

@@ -145,6 +145,9 @@ def _summary_outcome_columns():
 		if item.get("metric") == "workshop_registration":
 			item["label"] = _("Onsite Workshop Participants through SME")
 			item["short_label"] = _("Onsite Workshop Participants through SME")
+		if item.get("metric") == "enrolment":
+			item["label"] = _("Enrollment of Participants in Online Course through SME")
+			item["short_label"] = _("Enrollment of Participants in Online Course through SME")
 		out.append(item)
 		seen.add(item["key"])
 		if item.get("metric") == "new_schools":
