@@ -422,11 +422,13 @@ def approve_field_visit(name, remarks=None, submit=1):
 	req = get_approval_request(name)
 	if not req or cstr(req.status or "") != "Pending":
 		frappe.throw(_("This visit is not pending approval."))
+	remarks_text = cstr(remarks or "").strip()
+	if not remarks_text:
+		frappe.throw(_("Please add Supervisor Remarks explaining why you are approving this visit."))
 	req.status = "Approved"
 	req.decided_by = frappe.session.user
 	req.decided_on = now_datetime()
-	if remarks:
-		req.approver_remarks = cstr(remarks)
+	req.approver_remarks = remarks_text
 	req.save(ignore_permissions=True)
 	submitted = False
 	if cint(submit) and cint(doc.docstatus) == 0:
@@ -455,10 +457,13 @@ def reject_field_visit(name, remarks=None):
 	req = get_approval_request(name)
 	if not req or cstr(req.status or "") != "Pending":
 		frappe.throw(_("This visit is not pending approval."))
+	remarks_text = cstr(remarks or "").strip()
+	if not remarks_text:
+		frappe.throw(_("Please add Supervisor Remarks explaining why you are rejecting this visit."))
 	req.status = "Rejected"
 	req.decided_by = frappe.session.user
 	req.decided_on = now_datetime()
-	req.approver_remarks = cstr(remarks or _("Rejected by supervisor"))
+	req.approver_remarks = remarks_text
 	req.save(ignore_permissions=True)
 	frappe.db.commit()
 	return {

@@ -33,6 +33,11 @@ class ReportingDataPage {
 		return dt.toISOString().slice(0, 10);
 	}
 
+	/** Reports are entered at day end, so the default range ends yesterday. */
+	get_default_to_date() {
+		return frappe.datetime.add_days(frappe.datetime.get_today(), -1);
+	}
+
 	setup_layout() {
 		this.body = $(`
 			<div class="p-2">
@@ -113,7 +118,7 @@ class ReportingDataPage {
 				label: __("To Date"),
 				fieldname: "to_date",
 				fieldtype: "Date",
-				default: frappe.datetime.get_today()
+				default: this.get_default_to_date()
 			}),
 			employee: this.make_filter({
 				label: __("Employee"),
@@ -165,7 +170,7 @@ class ReportingDataPage {
 		this.body.find(".reporting-reset-filter").on("click", () => {
 			const values = {
 				from_date: this.get_month_start(),
-				to_date: frappe.datetime.get_today(),
+				to_date: this.get_default_to_date(),
 				section: "",
 				status: "",
 				work_type: ""

@@ -3046,7 +3046,7 @@ def get_field_visit_easy_view(name=None):
 				row(_("Approval Reasons"), approval_info.get("approval_reasons")),
 				row(_("Approved / Rejected By"), approval_info.get("approved_by")),
 				row(_("Approved / Rejected On"), approval_info.get("approved_on")),
-				row(_("Approver Remarks"), approval_info.get("approver_remarks")),
+				row(_("Supervisor Remarks"), approval_info.get("approver_remarks")),
 			],
 		)
 
@@ -3087,6 +3087,7 @@ def get_field_visit_easy_view(name=None):
 		"needs_supervisor_approval": needs_approval,
 		"approval_status": approval_status,
 		"approval_reasons": cstr(approval_info.get("approval_reasons") or ""),
+		"approver_remarks": cstr(approval_info.get("approver_remarks") or ""),
 		"visit_date": visit_date,
 		"school": school,
 		"officer": officer,

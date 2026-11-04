@@ -13,6 +13,7 @@ const loading = ref(true);
 const error = ref("");
 const notice = ref("");
 const busyName = ref("");
+const remarksByName = ref({});
 const data = ref({
 	to_approve: [],
 	my_pending: [],
@@ -21,6 +22,15 @@ const data = ref({
 	total_count: 0,
 	is_supervisor: false,
 });
+
+function remarksFor(row) {
+	return String(remarksByName.value[row?.name] || "").trim();
+}
+
+function setRemarks(row, value) {
+	if (!row?.name) return;
+	remarksByName.value = { ...remarksByName.value, [row.name]: value };
+}
 
 async function load() {
 	loading.value = true;
@@ -46,6 +56,12 @@ const hasAny = computed(
 
 async function approveRow(row) {
 	if (!row?.name || busyName.value) return;
+	const remarks = remarksFor(row);
+	if (!remarks) {
+		error.value =
+			"Please add Supervisor Remarks explaining why you are approving. / براہ کرم سپروائزر ریمارکس لکھیں۔";
+		return;
+	}
 	if (!window.confirm(`Approve and submit ${row.name}? / منظوری دے کر جمع کریں؟`)) return;
 	busyName.value = row.name;
 	error.value = "";
@@ -53,9 +69,12 @@ async function approveRow(row) {
 	try {
 		const res = await apiPost(
 			"tif_customization.tif_customization.field_visit_approval.approve_field_visit",
-			{ name: row.name, submit: 1 }
+			{ name: row.name, remarks, submit: 1 }
 		);
 		notice.value = res.message || `Approved ${row.name}`;
+		const next = { ...remarksByName.value };
+		delete next[row.name];
+		remarksByName.value = next;
 		await load();
 	} catch (e) {
 		error.value = e.message || "Could not approve.";
@@ -66,7 +85,12 @@ async function approveRow(row) {
 
 async function rejectRow(row) {
 	if (!row?.name || busyName.value) return;
-	const remarks = window.prompt("Rejection reason / مسترد کرنے کی وجہ:", "") || "";
+	const remarks = remarksFor(row);
+	if (!remarks) {
+		error.value =
+			"Please add Supervisor Remarks explaining why you are rejecting. / براہ کرم سپروائزر ریمارکس لکھیں۔";
+		return;
+	}
 	if (!window.confirm(`Reject ${row.name}? / مسترد کریں؟`)) return;
 	busyName.value = row.name;
 	error.value = "";
@@ -77,6 +101,9 @@ async function rejectRow(row) {
 			{ name: row.name, remarks }
 		);
 		notice.value = res.message || `Rejected ${row.name}`;
+		const next = { ...remarksByName.value };
+		delete next[row.name];
+		remarksByName.value = next;
 		await load();
 	} catch (e) {
 		error.value = e.message || "Could not reject.";
@@ -168,6 +195,17 @@ function schoolLabel(row) {
 						</div>
 						<div class="portal-recent-sub">{{ schoolLabel(row) }}</div>
 						<pre v-if="row.approval_reasons" class="approval-reasons">{{ row.approval_reasons }}</pre>
+						<label class="approval-remarks-label">
+							Supervisor Remarks / سپروائزر ریمارکس
+							<span style="color: #b91c1c">*</span>
+						</label>
+						<textarea
+							class="approval-remarks-input"
+							rows="3"
+							:value="remarksByName[row.name] || ''"
+							placeholder="Why approve or reject? / منظوری یا مسترد کی وجہ؟"
+							@input="setRemarks(row, $event.target.value)"
+						></textarea>
 						<div class="approval-actions">
 							<button
 								type="button"
@@ -241,6 +279,26 @@ function schoolLabel(row) {
 	white-space: pre-wrap;
 	font-family: inherit;
 	color: #9a3412;
+}
+.approval-remarks-label {
+	display: block;
+	margin-top: 10px;
+	font-size: 12px;
+	font-weight: 700;
+	color: #71717a;
+}
+.approval-remarks-input {
+	width: 100%;
+	margin-top: 6px;
+	padding: 10px 12px;
+	border: 1px solid #e4e4e7;
+	border-radius: 10px;
+	font: inherit;
+	font-size: 13px;
+	line-height: 1.45;
+	resize: vertical;
+	min-height: 72px;
+	background: #fffbeb;
 }
 .approval-actions {
 	display: flex;

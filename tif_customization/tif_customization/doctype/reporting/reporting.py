@@ -358,12 +358,16 @@ def _leave_dates_by_employee(from_date, to_date, employee_ids):
 
 
 def _working_dates(from_date, to_date):
-	"""Mon–Sat dates in range, excluding Sunday, gazetted holidays, and any day after today."""
+	"""Mon–Sat dates in range, excluding Sunday, gazetted holidays, and today onward.
+
+	Daily reports are entered at day end, so today is not yet expected.
+	"""
 	if not from_date or not to_date:
 		return []
 	start = getdate(from_date)
 	end = getdate(to_date)
-	cutoff = getdate(today())
+	# Cap at yesterday — staff submit reports at close of day
+	cutoff = add_days(getdate(today()), -1)
 	if end > cutoff:
 		end = cutoff
 	if start > end:

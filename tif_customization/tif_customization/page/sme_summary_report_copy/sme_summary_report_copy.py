@@ -52,11 +52,14 @@ EXCLUDED_SME_NAME_NEEDLES = ("hafiz shahnawaz",)
 
 # Activity types that roll into the summary columns / visited days
 # "Visits" is the current school-visit form; "Marketing" is the legacy type.
+# Internal Meeting counts toward Visited Days (office / staff meeting day) but
+# does not inflate Marketing / Meeting / M&E KPI columns below.
 SUMMARY_TYPES = (
 	"Marketing",
 	"Visits",
 	"Registration of New Schools",
 	"Meeting",
+	"Internal Meeting",
 	"M&E",
 	"Training",
 	"Workshop",
@@ -1388,9 +1391,11 @@ def _load_visit_stats(from_date, to_date, staff_rows, city=None, province=None):
 	}
 
 	for row in rows:
-		staff_key = _resolve_staff_key(row, index)
-		if not staff_key:
+		matched_keys = _resolve_staff_keys(row, index)
+		if not matched_keys:
 			continue
+		# Activity KPI columns stay on the primary match (trainer-first for workshops).
+		staff_key = matched_keys[0]
 		bucket = stats[staff_key]
 		vtype = row.get("type") or ""
 
@@ -1448,8 +1453,11 @@ def _load_visit_stats(from_date, to_date, staff_rows, city=None, province=None):
 		if area:
 			bucket["_area_counts"][area] = bucket["_area_counts"].get(area, 0) + 1
 
+		# Visited Days: credit every matched SME on the visit (e.g. arranger + trainer).
 		if row.get("visit_day"):
-			bucket["_days"].add(str(row.visit_day))
+			day = str(row.visit_day)
+			for key in matched_keys:
+				stats[key]["_days"].add(day)
 
 	for key, bucket in stats.items():
 		bucket["visited_days"] = len(bucket.pop("_days"))
@@ -1485,44 +1493,56 @@ def _effective_me_status(activity, book_status) -> str:
 	return ""
 
 
-def _resolve_staff_key(row, index):
+def _staff_candidates(row):
+	"""Ordered identity fields for a Field Visit, by activity type."""
 	vtype = row.get("type") or ""
-	candidates = []
 	if vtype in ("Marketing", "Visits", "Registration of New Schools"):
-		candidates.extend([row.get("visit_by"), row.get("owner")])
-	elif vtype == "M&E":
-		candidates.extend([row.get("me_visit_by"), row.get("visit_by"), row.get("owner")])
-	elif vtype == "Meeting":
-		candidates.extend([row.get("mt_visit_by"), row.get("owner")])
-	elif vtype in ("Training", "Workshop", "Workshop Conducted", "Workshop Arranged", "Teachers Training Meeting"):
+		return [row.get("visit_by"), row.get("owner")]
+	if vtype == "M&E":
+		return [row.get("me_visit_by"), row.get("visit_by"), row.get("owner")]
+	if vtype in ("Meeting", "Internal Meeting"):
+		return [row.get("mt_visit_by"), row.get("owner")]
+	if vtype in (
+		"Training",
+		"Workshop",
+		"Workshop Conducted",
+		"Workshop Arranged",
+		"Teachers Training Meeting",
+	):
 		# Trainer first — SMEs often appear as trainer while another officer fills the form.
-		candidates.extend(
-			[
-				row.get("training_trainer_name"),
-				row.get("visit_by"),
-				row.get("training_entry_filled_by"),
-				row.get("owner"),
-			]
-		)
-	else:
-		candidates.extend(
-			[
-				row.get("visit_by"),
-				row.get("me_visit_by"),
-				row.get("mt_visit_by"),
-				row.get("training_trainer_name"),
-				row.get("training_entry_filled_by"),
-				row.get("owner"),
-			]
-		)
+		return [
+			row.get("training_trainer_name"),
+			row.get("visit_by"),
+			row.get("training_entry_filled_by"),
+			row.get("owner"),
+		]
+	return [
+		row.get("visit_by"),
+		row.get("me_visit_by"),
+		row.get("mt_visit_by"),
+		row.get("training_trainer_name"),
+		row.get("training_entry_filled_by"),
+		row.get("owner"),
+	]
 
-	for c in candidates:
+
+def _resolve_staff_keys(row, index):
+	"""All distinct SME keys that appear on this visit (preserves candidate order)."""
+	keys = []
+	seen = set()
+	for c in _staff_candidates(row):
 		if not c:
 			continue
 		key = index.get(str(c).strip().lower())
-		if key:
-			return key
-	return None
+		if key and key not in seen:
+			seen.add(key)
+			keys.append(key)
+	return keys
+
+
+def _resolve_staff_key(row, index):
+	keys = _resolve_staff_keys(row, index)
+	return keys[0] if keys else None
 
 
 def _staff_key_index(staff_rows):

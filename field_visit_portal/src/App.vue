@@ -767,6 +767,7 @@ function openVisit(name) {
 
 const submittingView = ref(false);
 const viewNotice = ref("");
+const supervisorRemarks = ref("");
 
 const viewIsDraft = computed(() => {
 	const d = viewDoc.value;
@@ -799,8 +800,20 @@ async function submitViewedVisit() {
 	}
 }
 
+function getSupervisorRemarksOrError() {
+	const remarks = String(supervisorRemarks.value || "").trim();
+	if (!remarks) {
+		error.value =
+			"Please add Supervisor Remarks explaining your decision. / براہ کرم سپروائزر ریمارکس لکھیں کہ آپ یہ فیصلہ کیوں کر رہے ہیں۔";
+		return null;
+	}
+	return remarks;
+}
+
 async function approveViewedVisit() {
 	if (!viewDoc.value?.name || !viewDoc.value.can_approve || submittingView.value) return;
+	const remarks = getSupervisorRemarksOrError();
+	if (!remarks) return;
 	if (!window.confirm(`Approve and submit ${viewDoc.value.name}? / منظوری دے کر جمع کریں؟`)) return;
 	submittingView.value = true;
 	error.value = "";
@@ -808,9 +821,10 @@ async function approveViewedVisit() {
 	try {
 		const res = await apiPost(
 			"tif_customization.tif_customization.field_visit_approval.approve_field_visit",
-			{ name: viewDoc.value.name, submit: 1 }
+			{ name: viewDoc.value.name, remarks, submit: 1 }
 		);
 		viewDoc.value = await apiGet(`${METHOD}.get_field_visit_easy_view`, { name: viewDoc.value.name });
+		supervisorRemarks.value = "";
 		viewNotice.value = res.message || `Approved ${viewDoc.value.name}`;
 	} catch (e) {
 		error.value = e.message || "Could not approve visit.";
@@ -821,7 +835,8 @@ async function approveViewedVisit() {
 
 async function rejectViewedVisit() {
 	if (!viewDoc.value?.name || !viewDoc.value.can_approve || submittingView.value) return;
-	const remarks = window.prompt("Rejection reason / مسترد کرنے کی وجہ:", "") || "";
+	const remarks = getSupervisorRemarksOrError();
+	if (!remarks) return;
 	if (!window.confirm(`Reject ${viewDoc.value.name}? / مسترد کریں؟`)) return;
 	submittingView.value = true;
 	error.value = "";
@@ -832,6 +847,7 @@ async function rejectViewedVisit() {
 			{ name: viewDoc.value.name, remarks }
 		);
 		viewDoc.value = await apiGet(`${METHOD}.get_field_visit_easy_view`, { name: viewDoc.value.name });
+		supervisorRemarks.value = "";
 		viewNotice.value = res.message || `Rejected ${viewDoc.value.name}`;
 	} catch (e) {
 		error.value = e.message || "Could not reject visit.";
@@ -2417,23 +2433,36 @@ const steps = [
 							Submitted visits are locked. Only Mohtashim, Farhan, or Anwar can edit. /
 							<span class="urdu"> جمع شدہ وزٹ مقفل ہے — صرف مختصص صارفین ترمیم کر سکتے ہیں۔</span>
 						</p>
-						<div v-if="viewDoc?.can_approve" style="margin-top: 14px; display: flex; flex-wrap: wrap; gap: 8px">
-							<button
-								type="button"
-								class="btn btn-green"
-								:disabled="submittingView"
-								@click="approveViewedVisit"
-							>
-								{{ submittingView ? "Working…" : "Approve & Submit / منظوری" }}
-							</button>
-							<button
-								type="button"
-								class="btn btn-ghost"
-								:disabled="submittingView"
-								@click="rejectViewedVisit"
-							>
-								Reject / مسترد
-							</button>
+						<div v-if="viewDoc?.can_approve" class="supervisor-remarks-box" style="margin-top: 14px">
+							<label class="view-label" for="supervisor-remarks-top">
+								Supervisor Remarks / سپروائزر ریمارکس
+								<span style="color: #b91c1c">*</span>
+							</label>
+							<textarea
+								id="supervisor-remarks-top"
+								v-model="supervisorRemarks"
+								class="supervisor-remarks-input"
+								rows="3"
+								placeholder="Why are you approving or rejecting this visit? / آپ یہ منظوری یا مسترد کیوں کر رہے ہیں؟"
+							></textarea>
+							<div style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px">
+								<button
+									type="button"
+									class="btn btn-green"
+									:disabled="submittingView"
+									@click="approveViewedVisit"
+								>
+									{{ submittingView ? "Working…" : "Approve & Submit / منظوری" }}
+								</button>
+								<button
+									type="button"
+									class="btn btn-ghost"
+									:disabled="submittingView"
+									@click="rejectViewedVisit"
+								>
+									Reject / مسترد
+								</button>
+							</div>
 						</div>
 						<div v-else-if="viewIsDraft && viewDoc?.can_submit" style="margin-top: 14px">
 							<button
@@ -2457,6 +2486,43 @@ const steps = [
 							<div v-for="field in section.fields || []" :key="field.label" class="view-field">
 								<div class="view-label">{{ field.label }}</div>
 								<div class="view-value">{{ field.value }}</div>
+							</div>
+						</div>
+					</div>
+					<div v-if="viewDoc.can_approve" class="view-section">
+						<div class="view-section-title">Supervisor Remarks / سپروائزر ریمارکس</div>
+						<div class="supervisor-remarks-box">
+							<label class="view-label" for="supervisor-remarks-section">
+								Why are you approving or rejecting? / آپ یہ فیصلہ کیوں کر رہے ہیں؟
+								<span style="color: #b91c1c">*</span>
+							</label>
+							<textarea
+								id="supervisor-remarks-section"
+								v-model="supervisorRemarks"
+								class="supervisor-remarks-input"
+								rows="4"
+								placeholder="Add your remarks here… / یہاں ریمارکس لکھیں…"
+							></textarea>
+							<p class="view-sub" style="margin-top: 6px; color: #71717a">
+								Required before Approve or Reject. / منظوری یا مسترد سے پہلے ضروری ہے۔
+							</p>
+							<div style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px">
+								<button
+									type="button"
+									class="btn btn-green"
+									:disabled="submittingView"
+									@click="approveViewedVisit"
+								>
+									{{ submittingView ? "Working…" : "Approve & Submit / منظوری" }}
+								</button>
+								<button
+									type="button"
+									class="btn btn-ghost"
+									:disabled="submittingView"
+									@click="rejectViewedVisit"
+								>
+									Reject / مسترد
+								</button>
 							</div>
 						</div>
 					</div>

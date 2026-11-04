@@ -210,7 +210,16 @@ def _metric_condition(metric: str, alias: str = "fv") -> str:
 	if m in ("visits", "all", "total"):
 		return "1=1"
 	if m == "visited_days":
-		return f"{a}.type IN ('Marketing', 'Visits', 'Meeting', 'M&E', 'Training', 'Workshop', 'Workshop Conducted', 'Workshop Arranged', 'Academic Task', 'Other Official Tasks')"
+		# Keep in sync with sme_summary_report_copy.SUMMARY_TYPES
+		return (
+			f"{a}.type IN ("
+			"'Marketing', 'Visits', 'Registration of New Schools', 'Meeting', 'Internal Meeting', "
+			"'M&E', 'Training', 'Workshop', 'Workshop Conducted', 'Workshop Arranged', "
+			"'Meeting with Ulama and Educationist', 'Teachers Training Meeting', "
+			"'Academic Task', 'Academic / Other Official Tasks', 'Other Official Tasks', "
+			"'Headoffice/ Regional Office/ Out of Station Visit', 'Co-curricular Activity', 'Quiz Arranged'"
+			")"
+		)
 	if m in ("school_visits", "school_visit"):
 		return f"{a}.type IN ('Marketing', 'Visits', 'M&E')"
 	if m == "marketing":
