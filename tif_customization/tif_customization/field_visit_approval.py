@@ -3,7 +3,7 @@
 """Supervisor approval rules for Field Visit (portal + desk).
 
 Rules for field officers (supervisors / managers skip):
-1. Backdated activity older than 48 hours → Pending Supervisor Approval
+1. Backdated activity older than 72 hours → Pending Supervisor Approval
 2. Same school visited 2+ times already in the calendar month → 3rd+ needs approval
 
 Approval state lives on DocType "Field Visit Approval Request" (avoids Field Visit row-size limits).
@@ -39,7 +39,7 @@ SCHOOL_VISIT_TYPES = frozenset(
 	}
 )
 
-BACKDATE_HOURS = 48
+BACKDATE_HOURS = 72
 SAME_SCHOOL_FREE_VISITS = 2
 APPROVAL_DT = "Field Visit Approval Request"
 

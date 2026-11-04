@@ -2352,7 +2352,7 @@ def submit_smes_activity(data):
 	_apply_travel_fields(doc, data)
 	sync_travel_cost(doc)
 
-	# Supervisor approval: backdated >48h or 3rd+ same-school visit in the month.
+	# Supervisor approval: backdated >72h or 3rd+ same-school visit in the month.
 	from tif_customization.tif_customization.field_visit_approval import (
 		apply_pending_approval,
 		can_bypass_visit_approval_rules,

@@ -2094,7 +2094,7 @@ async function saveVisit(submitDoc) {
 			viewNotice.value = result.status_message || "Saved as Draft — waiting for supervisor approval.";
 			window.alert(
 				result.status_message ||
-					"Visit saved as Draft and sent to your supervisor for approval.\nBackdated (>48h) or 3rd+ visit to the same school this month needs approval."
+					"Visit saved as Draft and sent to your supervisor for approval.\nBackdated (>72h) or 3rd+ visit to the same school this month needs approval."
 			);
 			setTimeout(() => {
 				success.value = false;
@@ -2618,7 +2618,7 @@ const steps = [
 						<span class="fw">Tip / ٹپ:</span>
 						Form auto Asia/Karachi time pe set hai.
 						<span class="urdu"> فارم خودکار طور پر کراچی کے وقت پر سیٹ ہے۔</span>
-						Backdated entries older than 48 hours, and a 3rd+ visit to the same school in a month, go to your supervisor for approval.
+						Backdated entries older than 72 hours, and a 3rd+ visit to the same school in a month, go to your supervisor for approval.
 						<span class="urdu"> ۴۸ گھنٹے سے پرانی بیک ڈیٹ یا ایک ماہ میں ایک ہی اسکول کی تیسری وزٹ سپروائزر کی منظوری کے لیے جاتی ہے۔</span>
 					</div>
 				</div>
