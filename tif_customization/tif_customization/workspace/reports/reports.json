@@ -134,16 +134,6 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "School Wise Demand Report",
-   "link_count": 0,
-   "link_to": "school-wise-demand-report",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
    "label": "Procurement",
    "link_count": 2,
    "onboard": 0,
@@ -605,7 +595,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-11-02 12:02:45.830176",
+ "modified": "2026-11-04 13:42:48.263542",
  "modified_by": "farhan.hussain@tif.edu.pk",
  "module": "Tif Customization",
  "name": "Reports",
