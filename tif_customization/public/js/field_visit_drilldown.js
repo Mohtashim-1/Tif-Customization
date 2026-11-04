@@ -142,6 +142,7 @@ frappe.tif_customization.open_visit_drilldown = function (opts) {
 				province: opts.province || "",
 				city: opts.city || "",
 				submitted_only: opts.submitted_only || opts.submitted || 0,
+				sme_roster: opts.sme_roster || 0,
 			},
 			metric,
 			staff,
@@ -150,13 +151,28 @@ frappe.tif_customization.open_visit_drilldown = function (opts) {
 		freeze_message: __("Loading documents..."),
 		callback: (r) => {
 			const data = r.message || {};
-			// Prefer the KPI card label so header matches what the user clicked
+			// Prefer the KPI card label so header matches what the user clicked.
+			// For school metrics, prefer API distinct-school count over the card attribute
+			// so title and the Schools chip inside the dialog stay in sync.
 			if (opts.cardLabel) {
 				data.label = opts.cardLabel;
+				const schoolMetrics = new Set([
+					"model_school_a",
+					"model_school_b",
+					"model_school_c",
+					"model_school_0",
+					"model_0",
+					"inactive_schools",
+					"new_schools",
+					"active_schools",
+					"total_schools",
+				]);
 				const count =
-					opts.cardCount != null && opts.cardCount !== ""
-						? opts.cardCount
-						: data.count;
+					schoolMetrics.has(metric) && data.count != null && data.count !== ""
+						? data.count
+						: opts.cardCount != null && opts.cardCount !== ""
+							? opts.cardCount
+							: data.count;
 				data.title = frappe.tif_customization.drilldown_title(opts.cardLabel, count);
 			} else if (!data.title || !String(data.title).includes(":")) {
 				data.title = frappe.tif_customization.resolve_drilldown_title(data);
@@ -170,14 +186,25 @@ frappe.tif_customization.show_school_metric_drilldown_dialog = function (data, o
 	opts = opts || {};
 	const hideUnapproved = frappe.tif_customization.should_hide_school_unapproved(opts);
 	const rows = (data.rows || []).filter((r) => (r.school || "").trim());
+	// Same key as KPI SQL: lowercase + collapse all whitespace (spaces/tabs).
+	const schoolKey = (name) =>
+		String(name || "")
+			.replace(/[\t\n\r]+/g, " ")
+			.trim()
+			.toLowerCase()
+			.replace(/\s+/g, " ");
 	// Report cards count distinct school names. Old UI keyed school||province||area
 	// (e.g. 463) which was higher than the card (449). Match the card: one row per school name.
 	const schoolMap = {};
 	rows.forEach((row) => {
-		const school = (row.school || "").trim();
+		const school = String(row.school || "")
+			.replace(/[\t\n\r]+/g, " ")
+			.trim()
+			.replace(/\s+/g, " ");
 		const province = (row.province || "").trim();
 		const area = (row.area || "").trim();
-		const nameKey = school.toLowerCase();
+		const nameKey = schoolKey(school);
+		if (!nameKey) return;
 		if (!schoolMap[nameKey]) {
 			schoolMap[nameKey] = {
 				key: nameKey,
@@ -199,10 +226,13 @@ frappe.tif_customization.show_school_metric_drilldown_dialog = function (data, o
 		(a, b) => b.visits - a.visits || String(a.school).localeCompare(String(b.school))
 	);
 	const distinctSchools = schoolRows.length;
+	// Prefer API distinct-school count, then card, then local regroup.
 	const cardTotal =
-		opts.cardCount != null && opts.cardCount !== ""
-			? cint(opts.cardCount)
-			: distinctSchools;
+		data.count != null && data.count !== ""
+			? cint(data.count)
+			: opts.cardCount != null && opts.cardCount !== ""
+				? cint(opts.cardCount)
+				: distinctSchools;
 	const label = data.label || __("Schools");
 	const exportSchoolList = () => {
 		const headers = [
@@ -296,7 +326,7 @@ frappe.tif_customization.show_school_metric_drilldown_dialog = function (data, o
 					"Same as the report card: each school name counted once"
 				)}">
 					<span class="text-muted" style="font-size:11px;">${__("Schools")}</span>
-					<div style="font-size:20px;font-weight:700;">${cint(distinctSchools).toLocaleString()}</div>
+					<div style="font-size:20px;font-weight:700;">${cint(cardTotal).toLocaleString()}</div>
 				</div>
 				<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;">
 					<span class="text-muted" style="font-size:11px;">${__("Field Visits")}</span>

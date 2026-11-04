@@ -1260,6 +1260,8 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				province: ctx.province || "",
 				city: ctx.city || "",
 				submitted_only: ctx.submitted_only || 1,
+				// Same SME/FO roster as outcome KPI cards (avoids 56 vs 55 mismatches).
+				sme_roster: staff ? 0 : 1,
 				hideUnapproved: true,
 				cardLabel,
 				cardCount,

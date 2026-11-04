@@ -399,14 +399,29 @@ def _enriched_actuals(from_date, to_date, staff, tokens):
 	return actuals
 
 
+def _normalize_school_sql(expr: str) -> str:
+	"""Lowercase school key; strip spaces/tabs so KPI and drilldown match."""
+	# MySQL TRIM() only drops spaces (0x20), not tabs — many school names have trailing tabs.
+	cleaned = f"REPLACE(REPLACE(REPLACE({expr}, CHAR(9), ' '), CHAR(10), ' '), CHAR(13), ' ')"
+	return f"LOWER(TRIM({cleaned}))"
+
+
 def _school_expr(alias="fv"):
 	a = alias
-	return f"""LOWER(TRIM(COALESCE(
+	raw = f"""COALESCE(
 		NULLIF(TRIM({a}.school_name), ''),
 		NULLIF(TRIM({a}.pending_school_name), ''),
 		NULLIF(TRIM({a}.me_school_name), ''),
-		NULLIF(TRIM({a}.training_venue_name), '')
-	)))"""
+		NULLIF(TRIM({a}.mt_institute_or_organization_name), ''),
+		NULLIF(TRIM({a}.training_venue_name), ''),
+		(
+			SELECT NULLIF(TRIM(soa.school_name), '')
+			FROM `tabSchool Opening Application` soa
+			WHERE soa.name = {a}.reference
+			LIMIT 1
+		)
+	)"""
+	return _normalize_school_sql(raw)
 
 
 def _staff_params(from_date, to_date, tokens):

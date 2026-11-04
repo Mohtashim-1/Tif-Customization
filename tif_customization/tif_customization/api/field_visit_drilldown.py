@@ -751,7 +751,15 @@ def _owner_display_names(owners) -> dict:
 	return out
 
 
+def _normalize_school_sql(expr: str) -> str:
+	"""Lowercase school key; strip spaces/tabs so KPI cards and drilldown lists match."""
+	# MySQL TRIM() only drops spaces (0x20), not tabs — school names often have trailing tabs.
+	cleaned = f"REPLACE(REPLACE(REPLACE({expr}, CHAR(9), ' '), CHAR(10), ' '), CHAR(13), ' ')"
+	return f"LOWER(TRIM({cleaned}))"
+
+
 def _school_sql(alias="fv"):
+	"""Display / resolve school name (preserves original casing for UI)."""
 	a = alias
 	return f"""COALESCE(
 		NULLIF(TRIM({a}.school_name), ''),
@@ -768,9 +776,14 @@ def _school_sql(alias="fv"):
 	)"""
 
 
+def _school_key_sql(alias="fv"):
+	"""Distinct-school key matching SME KPI `_school_expr`."""
+	return _normalize_school_sql(_school_sql(alias))
+
+
 def _has_named_school_sql(alias="fv"):
 	"""Match KPI distinct-school counts: only rows that resolve to a school name."""
-	return f"NULLIF(({_school_sql(alias)}), '') IS NOT NULL"
+	return f"NULLIF(({_school_key_sql(alias)}), '') IS NOT NULL"
 
 
 def _school_unapproved_sql(alias="fv"):
@@ -1409,6 +1422,7 @@ def get_visit_drilldown(filters=None, metric=None, staff=None):
 	params = {"from_date": from_date, "to_date": to_date}
 	apply_team_scope_to_conditions(conditions, params, alias="fv")
 	supervisor = (filters.get("supervisor") or "").strip()
+	sme_roster = cint(filters.get("sme_roster") or 0)
 	if staff:
 		tokens = expand_staff_tokens(staff)
 		params["staff_tokens"] = tuple(t.lower() for t in tokens) or ("__none__",)
@@ -1417,6 +1431,16 @@ def get_visit_drilldown(filters=None, metric=None, staff=None):
 		# KPI / total clicks with a supervisor filter: only that supervisor's assigned FOs.
 		team_tokens = _supervisor_team_tokens(supervisor)
 		params["staff_tokens"] = tuple(t.lower() for t in team_tokens) or ("__none__",)
+		conditions.append(staff_match_sql("fv", "staff_tokens"))
+	elif sme_roster:
+		# Match SME Summary outcome cards: only the report's SME / FO roster.
+		from tif_customization.tif_customization.page.sme_summary_report_copy.sme_summary_report_copy import (
+			_get_sme_staff,
+			_staff_token_list,
+		)
+
+		roster_tokens = _staff_token_list(_get_sme_staff(filters))
+		params["staff_tokens"] = tuple(t.lower() for t in roster_tokens) or ("__none__",)
 		conditions.append(staff_match_sql("fv", "staff_tokens"))
 	if province:
 		conditions.append(
@@ -1545,12 +1569,33 @@ def get_visit_drilldown(filters=None, metric=None, staff=None):
 	label = METRIC_LABELS.get(metric, metric.replace("_", " ").title())
 	parts = [f"{b['type']} {b['count']}" for b in breakdown]
 	subtitle = " · ".join(parts) if parts else _("No documents")
+	school_metrics = {
+		"model_school_a",
+		"model_school_b",
+		"model_school_c",
+		"model_school_0",
+		"model_0",
+		"inactive_schools",
+		"new_schools",
+		"new_school",
+		"active_schools",
+		"total_schools",
+	}
 	if metric == "enrolment":
 		count = len(participants)
 	elif metric == "volunteers":
 		count = len(participants) or len(out)
 	elif metric == "workshop_registration":
 		count = sum(cint(v.get("participants")) for v in out)
+	elif metric in school_metrics:
+		# Distinct schools (normalized), not visit rows — matches KPI cards.
+		count = len(
+			{
+				" ".join(cstr(v.get("school") or "").split()).strip().lower()
+				for v in out
+				if cstr(v.get("school") or "").strip()
+			}
+		)
 	else:
 		count = len(out)
 
