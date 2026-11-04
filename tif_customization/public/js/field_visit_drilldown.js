@@ -167,8 +167,14 @@ frappe.tif_customization.open_visit_drilldown = function (opts) {
 					"active_schools",
 					"total_schools",
 				]);
+				// Prefer live API count after import (and for headcount metrics).
+				const preferApiCount =
+					schoolMetrics.has(metric) ||
+					metric === "online_participants" ||
+					metric === "workshop_registration" ||
+					opts.preferApiCount;
 				const count =
-					schoolMetrics.has(metric) && data.count != null && data.count !== ""
+					preferApiCount && data.count != null && data.count !== ""
 						? data.count
 						: opts.cardCount != null && opts.cardCount !== ""
 							? opts.cardCount
