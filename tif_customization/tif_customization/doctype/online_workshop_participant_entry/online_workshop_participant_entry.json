@@ -1,23 +1,49 @@
 {
  "actions": [],
  "allow_import": 1,
- "allow_rename": 0,
  "autoname": "hash",
- "creation": "2026-11-04 17:30:00.000000",
+ "creation": "2026-11-04 17:30:00",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "serial_no",
+  "training_program",
   "visit_date",
-  "column_break_1",
+  "column_break_top",
   "participants",
-  "section_break_details",
+  "section_participant",
+  "full_name",
+  "column_break_p1",
+  "father_husband_name",
+  "column_break_p2",
+  "whatsapp_contact",
+  "father_husband_phone",
+  "email",
+  "section_address",
+  "home_address",
+  "column_break_a1",
+  "city",
+  "column_break_a2",
+  "province",
+  "section_profile",
+  "subject",
+  "column_break_pr1",
+  "qualification_education",
+  "job_title_teaching_role",
+  "column_break_pr2",
+  "marital_status",
+  "quranic_core_values",
+  "section_school",
   "school_venue",
-  "column_break_2",
+  "column_break_s1",
+  "school_contact_number",
+  "how_did_you_hear",
+  "section_tif",
   "officer",
+  "column_break_t1",
   "employee",
-  "column_break_3",
   "category",
-  "section_break_remarks",
+  "section_remarks",
   "visit_summary",
   "section_break_meta",
   "import_batch",
@@ -25,15 +51,26 @@
  ],
  "fields": [
   {
+   "fieldname": "serial_no",
+   "fieldtype": "Data",
+   "label": "S.No."
+  },
+  {
+   "fieldname": "training_program",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Training Program"
+  },
+  {
    "fieldname": "visit_date",
    "fieldtype": "Date",
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "label": "Visit Date",
-   "reqd": 1
+   "label": "Visit / Workshop Date"
   },
   {
-   "fieldname": "column_break_1",
+   "fieldname": "column_break_top",
    "fieldtype": "Column Break"
   },
   {
@@ -46,26 +83,157 @@
    "reqd": 1
   },
   {
-   "fieldname": "section_break_details",
-   "fieldtype": "Section Break"
+   "fieldname": "section_participant",
+   "fieldtype": "Section Break",
+   "label": "Participant"
+  },
+  {
+   "fieldname": "full_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Full Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_p1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "father_husband_name",
+   "fieldtype": "Data",
+   "label": "Father/Husband Name"
+  },
+  {
+   "fieldname": "column_break_p2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "whatsapp_contact",
+   "fieldtype": "Data",
+   "label": "WhatsApp / Contact Number"
+  },
+  {
+   "fieldname": "father_husband_phone",
+   "fieldtype": "Data",
+   "label": "Father/Husband Phone / WhatsApp"
+  },
+  {
+   "fieldname": "email",
+   "fieldtype": "Data",
+   "label": "Email",
+   "options": "Email"
+  },
+  {
+   "fieldname": "section_address",
+   "fieldtype": "Section Break",
+   "label": "Address"
+  },
+  {
+   "fieldname": "home_address",
+   "fieldtype": "Small Text",
+   "label": "Home Address"
+  },
+  {
+   "fieldname": "column_break_a1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "city",
+   "fieldtype": "Data",
+   "in_standard_filter": 1,
+   "label": "City"
+  },
+  {
+   "fieldname": "column_break_a2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "province",
+   "fieldtype": "Data",
+   "in_standard_filter": 1,
+   "label": "Province"
+  },
+  {
+   "fieldname": "section_profile",
+   "fieldtype": "Section Break",
+   "label": "Profile"
+  },
+  {
+   "fieldname": "subject",
+   "fieldtype": "Data",
+   "label": "Subject"
+  },
+  {
+   "fieldname": "column_break_pr1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "qualification_education",
+   "fieldtype": "Data",
+   "label": "Qualification / Education"
+  },
+  {
+   "fieldname": "job_title_teaching_role",
+   "fieldtype": "Data",
+   "label": "Job Title / Teaching Role"
+  },
+  {
+   "fieldname": "column_break_pr2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "marital_status",
+   "fieldtype": "Data",
+   "label": "Marital Status"
+  },
+  {
+   "fieldname": "quranic_core_values",
+   "fieldtype": "Small Text",
+   "label": "Qur'anic Core Values"
+  },
+  {
+   "fieldname": "section_school",
+   "fieldtype": "Section Break",
+   "label": "School / Institute"
   },
   {
    "fieldname": "school_venue",
    "fieldtype": "Data",
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "label": "School / Venue"
+   "label": "School / Institute / Organization"
   },
   {
-   "fieldname": "column_break_2",
+   "fieldname": "column_break_s1",
    "fieldtype": "Column Break"
   },
   {
+   "fieldname": "school_contact_number",
+   "fieldtype": "Data",
+   "label": "School Contact Number"
+  },
+  {
+   "fieldname": "how_did_you_hear",
+   "fieldtype": "Data",
+   "label": "How Did You Hear About Us?"
+  },
+  {
+   "fieldname": "section_tif",
+   "fieldtype": "Section Break",
+   "label": "TIF"
+  },
+  {
+   "description": "Maps from TIF Representative in the registration sheet",
    "fieldname": "officer",
    "fieldtype": "Data",
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "label": "Officer"
+   "label": "TIF Representative"
+  },
+  {
+   "fieldname": "column_break_t1",
+   "fieldtype": "Column Break"
   },
   {
    "fieldname": "employee",
@@ -75,22 +243,19 @@
    "options": "Employee"
   },
   {
-   "fieldname": "column_break_3",
-   "fieldtype": "Column Break"
-  },
-  {
+   "default": "Online",
    "fieldname": "category",
    "fieldtype": "Data",
    "label": "Category"
   },
   {
-   "fieldname": "section_break_remarks",
+   "fieldname": "section_remarks",
    "fieldtype": "Section Break"
   },
   {
    "fieldname": "visit_summary",
    "fieldtype": "Small Text",
-   "label": "Visit Summary"
+   "label": "Visit Summary / Notes"
   },
   {
    "fieldname": "section_break_meta",
@@ -110,9 +275,8 @@
    "read_only": 1
   }
  ],
- "index_web_pages_for_search": 0,
  "links": [],
- "modified": "2026-11-04 17:30:00.000000",
+ "modified": "2026-11-04 18:12:14.004921",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Online Workshop Participant Entry",
@@ -147,21 +311,19 @@
   },
   {
    "create": 1,
-   "delete": 0,
-   "email": 0,
    "export": 1,
    "import": 1,
    "print": 1,
    "read": 1,
    "report": 1,
    "role": "Employee",
-   "share": 0,
    "write": 1
   }
  ],
- "sort_field": "visit_date",
+ "row_format": "Dynamic",
+ "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],
- "title_field": "school_venue",
+ "title_field": "full_name",
  "track_changes": 1
 }

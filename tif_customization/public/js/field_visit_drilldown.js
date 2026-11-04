@@ -726,10 +726,20 @@ frappe.tif_customization.open_online_workshop_import = function (opts) {
 				fieldname: "help",
 				options: `<p class="text-muted" style="margin:0 0 8px;">
 					${__(
-						"Upload a CSV or Excel file with columns: Visit Date, School / Venue, Officer, Employee ID, Participants, Category, Visit Summary."
+						"Upload the registration sheet (CSV/Excel): S.No., Training Program, Full Name, Father/Husband Name, WhatsApp / Contact Number, Father/Husband Phone / WhatsApp, Email, Home Address, City, Province, Subject, Qualification / Education, Job Title / Teaching Role, Marital Status, Qur'anic Core Values, School / Institute / Organization, School Contact Number, How Did You Hear About Us?, TIF Representative. Optional: Visit Date."
 					)}
 				</p>
 				<p><a href="#" class="tif-ow-template-link">${__("Download template")}</a></p>`,
+			},
+			{
+				fieldname: "default_visit_date",
+				fieldtype: "Date",
+				label: __("Workshop / Visit Date (if missing in file)"),
+				default: frappe.datetime.get_today(),
+				reqd: 1,
+				description: __(
+					"Used for rows that do not have a Visit Date column. Required so the card can filter by period."
+				),
 			},
 			{
 				fieldname: "import_file",
@@ -747,7 +757,10 @@ frappe.tif_customization.open_online_workshop_import = function (opts) {
 			}
 			frappe.call({
 				method: "tif_customization.tif_customization.api.online_workshop_import.import_online_workshop_participants",
-				args: { file_url },
+				args: {
+					file_url,
+					default_visit_date: values.default_visit_date,
+				},
 				freeze: true,
 				freeze_message: __("Importing..."),
 				callback: (r) => {
