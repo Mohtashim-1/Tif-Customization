@@ -542,13 +542,26 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 			</button>
 		</td>`;
 	};
+	const docCell = (row) => {
+		const name = frappe.utils.escape_html(row.name || "");
+		if (cint(row.imported)) {
+			return `<span title="${__("Imported entry")}">${name}</span>`;
+		}
+		return `<a href="#" class="tif-open-visit" data-visit="${name}">${name}</a>`;
+	};
+	const remarksForRow = (row) => {
+		let text = row.remarks || "";
+		if (data.metric === "online_participants" && cint(row.participants)) {
+			const head = `${__("Participants")}: ${cint(row.participants)}`;
+			text = text ? `${head} | ${text}` : head;
+		}
+		return frappe.tif_customization.format_visit_remarks(text);
+	};
 	const body = rows.length
 		? rows
 				.map(
 					(row) => `<tr>
-				<td><a href="#" class="tif-open-visit" data-visit="${frappe.utils.escape_html(
-					row.name || ""
-				)}">${frappe.utils.escape_html(row.name)}</a></td>
+				<td>${docCell(row)}</td>
 				<td>${frappe.utils.escape_html(row.visit_date || "")}</td>
 				${hideType ? "" : `<td>${frappe.utils.escape_html(row.type || "")}</td>`}
 				${hideSchool ? "" : `<td>${schoolCell(row)}</td>`}
@@ -556,9 +569,7 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 				<td>${frappe.utils.escape_html(row.category || "")}</td>
 				${
 					showRemarks
-						? `<td style="max-width:320px;white-space:normal;">${frappe.tif_customization.format_visit_remarks(
-								row.remarks
-							)}</td>`
+						? `<td style="max-width:320px;white-space:normal;">${remarksForRow(row)}</td>`
 						: ""
 				}
 				${showImages ? schoolImageCell(row) : ""}

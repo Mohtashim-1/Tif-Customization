@@ -1265,6 +1265,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				hideUnapproved: true,
 				cardLabel,
 				cardCount,
+				onImported: () => me.load_data(),
 			});
 		});
 
