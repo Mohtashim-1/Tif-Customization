@@ -1581,11 +1581,33 @@ def get_visit_drilldown(filters=None, metric=None, staff=None):
 		"active_schools",
 		"total_schools",
 	}
+	# Merge imported Online Workshop Participant rows into this card's drilldown.
+	if metric == "online_participants":
+		try:
+			from tif_customization.tif_customization.api.online_workshop_import import (
+				imported_online_rows,
+			)
+
+			raw_tokens = params.get("staff_tokens") if isinstance(params, dict) else None
+			if raw_tokens is None:
+				imported = imported_online_rows(from_date, to_date, [])
+			elif list(raw_tokens) == ["__none__"]:
+				imported = []
+			else:
+				token_list = [t for t in raw_tokens if t and t != "__none__"]
+				imported = imported_online_rows(from_date, to_date, token_list)
+			out.extend(imported)
+		except Exception:
+			frappe.log_error(frappe.get_traceback(), "online_workshop_import_drilldown")
+
 	if metric == "enrolment":
 		count = len(participants)
 	elif metric == "volunteers":
 		count = len(participants) or len(out)
 	elif metric == "workshop_registration":
+		count = sum(cint(v.get("participants")) for v in out)
+	elif metric == "online_participants":
+		# Card counts heads (participants), not workshop documents.
 		count = sum(cint(v.get("participants")) for v in out)
 	elif metric in school_metrics:
 		# Distinct schools (normalized), not visit rows — matches KPI cards.

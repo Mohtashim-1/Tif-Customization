@@ -516,7 +516,7 @@ def _registered_model_split(from_date, to_date, tokens):
 
 
 def _online_workshop_stats(from_date, to_date, tokens):
-	"""Online workshops and their participants (training_mode contains Online)."""
+	"""Online workshops and their participants (Field Visits + imported card data)."""
 	visit_day = visit_day_sql("fv")
 	params = _staff_params(from_date, to_date, tokens)
 	row = frappe.db.sql(
@@ -535,9 +535,21 @@ def _online_workshop_stats(from_date, to_date, tokens):
 		as_dict=True,
 	)
 	found = row[0] if row else {}
+	workshops = cint(found.get("workshops") or 0)
+	participants = cint(found.get("participants") or 0)
+	try:
+		from tif_customization.tif_customization.api.online_workshop_import import (
+			imported_online_stats,
+		)
+
+		imported = imported_online_stats(from_date, to_date, tokens)
+		workshops += cint(imported.get("workshops") or 0)
+		participants += cint(imported.get("participants") or 0)
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "online_workshop_import_stats")
 	return {
-		"workshops": cint(found.get("workshops") or 0),
-		"participants": cint(found.get("participants") or 0),
+		"workshops": workshops,
+		"participants": participants,
 	}
 
 

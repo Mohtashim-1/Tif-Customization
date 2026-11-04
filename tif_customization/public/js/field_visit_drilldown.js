@@ -599,6 +599,7 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 		}`.replace(/\s+/g, "-");
 		frappe.tif_customization.export_rows_excel(fname, headers, exportRows);
 	};
+	const allowImport = data.metric === "online_participants";
 	const d = new frappe.ui.Dialog({
 		title: visitTitle,
 		size: "extra-large",
@@ -608,6 +609,17 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 		secondary_action_label: __("Export Excel"),
 		secondary_action: () => exportVisitList(),
 	});
+	const importBar = allowImport
+		? `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 10px;">
+			<button type="button" class="btn btn-default btn-sm tif-ow-import">${__("Import")}</button>
+			<button type="button" class="btn btn-link btn-sm tif-ow-template" style="padding-left:0;">${__(
+				"Download template"
+			)}</button>
+			<span class="text-muted" style="font-size:12px;">${__(
+				"Upload CSV/Excel to add Online Workshop Participants for this card."
+			)}</span>
+		</div>`
+		: "";
 	d.fields_dict.html.$wrapper.html(`
 		${
 			breakdown
@@ -615,6 +627,7 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 				: ""
 		}
 		${categoryHint}
+		${importBar}
 		<p class="text-muted" style="font-size:12px;">${__("Click a Document No to open that Field Visit. Click a school image to enlarge.")}</p>
 		<div class="table-responsive" style="max-height:420px;overflow:auto;">
 			<table class="table table-bordered table-hover" style="font-size:12px;margin:0;">
@@ -646,7 +659,98 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 		const row = (rows || []).find((r) => r.name === name);
 		if (row) frappe.tif_customization.show_visit_photo_dialog(row);
 	});
+	if (allowImport) {
+		d.$wrapper.on("click", ".tif-ow-import", (e) => {
+			e.preventDefault();
+			frappe.tif_customization.open_online_workshop_import({
+				onDone: () => {
+					d.hide();
+					frappe.tif_customization.open_visit_drilldown(opts);
+					if (typeof opts.onImported === "function") opts.onImported();
+				},
+			});
+		});
+		d.$wrapper.on("click", ".tif-ow-template", (e) => {
+			e.preventDefault();
+			frappe.tif_customization.download_online_workshop_template();
+		});
+	}
 	d.show();
+};
+
+frappe.tif_customization.download_online_workshop_template = function () {
+	frappe.call({
+		method: "tif_customization.tif_customization.api.online_workshop_import.download_online_workshop_template",
+		freeze: true,
+		callback: (r) => {
+			const msg = r.message || {};
+			const content = msg.content || "";
+			const filename = msg.filename || "online_workshop_participants_template.csv";
+			const blob = new Blob(["\ufeff" + content], { type: "text/csv;charset=utf-8;" });
+			const a = document.createElement("a");
+			a.href = URL.createObjectURL(blob);
+			a.download = filename;
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			URL.revokeObjectURL(a.href);
+			frappe.show_alert({ message: __("Template downloaded"), indicator: "green" });
+		},
+	});
+};
+
+frappe.tif_customization.open_online_workshop_import = function (opts) {
+	opts = opts || {};
+	const dlg = new frappe.ui.Dialog({
+		title: __("Import Online Workshop Participants"),
+		fields: [
+			{
+				fieldtype: "HTML",
+				fieldname: "help",
+				options: `<p class="text-muted" style="margin:0 0 8px;">
+					${__(
+						"Upload a CSV or Excel file with columns: Visit Date, School / Venue, Officer, Employee ID, Participants, Category, Visit Summary."
+					)}
+				</p>
+				<p><a href="#" class="tif-ow-template-link">${__("Download template")}</a></p>`,
+			},
+			{
+				fieldname: "import_file",
+				fieldtype: "Attach",
+				label: __("CSV / Excel file"),
+				reqd: 1,
+			},
+		],
+		primary_action_label: __("Import"),
+		primary_action: (values) => {
+			const file_url = values.import_file;
+			if (!file_url) {
+				frappe.msgprint(__("Please attach a file."));
+				return;
+			}
+			frappe.call({
+				method: "tif_customization.tif_customization.api.online_workshop_import.import_online_workshop_participants",
+				args: { file_url },
+				freeze: true,
+				freeze_message: __("Importing..."),
+				callback: (r) => {
+					const msg = r.message || {};
+					frappe.msgprint({
+						title: __("Import complete"),
+						indicator: "green",
+						message: msg.message || __("Import finished."),
+					});
+					dlg.hide();
+					if (typeof opts.onDone === "function") opts.onDone(msg);
+				},
+			});
+		},
+	});
+	dlg.$wrapper.on("click", ".tif-ow-template-link", (e) => {
+		e.preventDefault();
+		frappe.tif_customization.download_online_workshop_template();
+	});
+	dlg.show();
 };
 
 frappe.tif_customization.show_workshop_participant_dialog = function (data, opts) {
