@@ -99,6 +99,13 @@ ONBOARDED_SCHOOL_SQL = """(
 # Model 0: school field visits only (not Internal Meeting / Meeting / HO / academic).
 SCHOOL_FIELD_VISIT_SQL = school_field_visit_type_sql("fv")
 MODEL_0_SQL = f"NOT ({ACTIVE_SCHOOL_SQL}) AND ({SCHOOL_FIELD_VISIT_SQL})"
+# Inactive Schools: explicitly marked In-Active on the visit (not the same as Model 0).
+# Model 0 = no program running; Inactive = activity / school status set to Inactive.
+_INACTIVE_STATUS_SQL = """(
+	LOWER(REPLACE(REPLACE(IFNULL(fv.me_activity_status, ''), '-', ' '), '  ', ' ')) IN ('inactive', 'in active')
+	OR LOWER(REPLACE(REPLACE(IFNULL(fv.me_mqh_book_status, ''), '-', ' '), '  ', ' ')) IN ('inactive', 'in active')
+)"""
+INACTIVE_SCHOOL_SQL = f"({SCHOOL_FIELD_VISIT_SQL}) AND ({_INACTIVE_STATUS_SQL})"
 # Total Schools = Active ∪ New Registered ∪ Model 0 (matches province dialog).
 TOTAL_SCHOOLS_SQL = f"(({ACTIVE_SCHOOL_SQL}) OR ({MODEL_0_SQL}) OR ({ONBOARDED_SCHOOL_SQL}))"
 
@@ -379,7 +386,10 @@ def _enriched_actuals(from_date, to_date, staff, tokens):
 	actuals["model_school_c"] = models["model_c"]
 	actuals["active_schools"] = _distinct_schools(from_date, to_date, tokens, ACTIVE_SCHOOL_SQL)
 	actuals["model_school_0"] = _distinct_schools(from_date, to_date, tokens, MODEL_0_SQL)
-	actuals["inactive_schools"] = actuals["model_school_0"]
+	# Distinct from Model 0: only schools marked Inactive on the Field Visit.
+	actuals["inactive_schools"] = _distinct_schools(
+		from_date, to_date, tokens, INACTIVE_SCHOOL_SQL
+	)
 	actuals["total_schools"] = _distinct_schools(from_date, to_date, tokens, TOTAL_SCHOOLS_SQL)
 	sum_participants = _training_participants(from_date, to_date, tokens)
 	actuals["workshop_registration"] = max(workshop_children, sum_participants)

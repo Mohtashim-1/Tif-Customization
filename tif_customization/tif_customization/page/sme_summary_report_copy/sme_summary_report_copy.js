@@ -922,7 +922,9 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 							style: "me",
 							metric: "inactive_schools",
 							outcomeFy: true,
-							hint: __("Visited schools where no program is running."),
+							hint: __(
+								"Visited schools marked Inactive on the Field Visit (activity or school status). Different from Model 0 (no program selected)."
+							),
 						},
 					],
 					[

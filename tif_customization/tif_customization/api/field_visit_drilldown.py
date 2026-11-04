@@ -65,7 +65,7 @@ METRIC_LABELS = {
 	"model_school_c": _("Model School C"),
 	"model_school_0": _("Model 0 (No Program Selected)"),
 	"model_0": _("Model 0 (No Program Selected)"),
-	"inactive_schools": _("Inactive Schools / Model 0"),
+	"inactive_schools": _("Inactive Schools"),
 	"total_schools": _("Total Schools"),
 	"model_a": _("Model A (3 departments)"),
 	"model_b": _("Model B (2 departments)"),
@@ -272,11 +272,23 @@ def _metric_condition(metric: str, alias: str = "fv") -> str:
 	if m == "active_schools":
 		# Schools with any book / workshop / program running.
 		return f"({registered_school_sql(a)}) AND ({named})"
-	if m in ("inactive_schools", "model_school_0", "model_0"):
+	if m in ("model_school_0", "model_0"):
 		# Field-staff school visits only: school name + no program (exclude meetings / admin).
 		return (
 			f"NOT ({registered_school_sql(a)}) AND ({named})"
 			f" AND ({school_field_visit_type_sql(a)})"
+		)
+	if m == "inactive_schools":
+		# Explicitly marked Inactive on the visit (activity or school/book status).
+		# Not the same as Model 0 (no program selected).
+		inactive_status = f"""(
+			LOWER(REPLACE(REPLACE(IFNULL({a}.me_activity_status, ''), '-', ' '), '  ', ' '))
+				IN ('inactive', 'in active')
+			OR LOWER(REPLACE(REPLACE(IFNULL({a}.me_mqh_book_status, ''), '-', ' '), '  ', ' '))
+				IN ('inactive', 'in active')
+		)"""
+		return (
+			f"({named}) AND ({school_field_visit_type_sql(a)}) AND ({inactive_status})"
 		)
 	if m == "total_schools":
 		# Same school set as Total Schools by Province:
