@@ -537,7 +537,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			metric: "online_participants",
 		};
 		const fallback = [
-			{ key: "outcome_enrolment", label: __("Enrollment of Participants in Mutal e quran Course"), short_label: __("Enrollment of Participants in Multi-media Course"), metric: "enrolment" },
+			{ key: "outcome_enrolment", label: __("Enrollment of Participants in Online Course through SME"), short_label: __("Enrollment of Participants in Online Course through SME"), metric: "enrolment" },
 			{ key: "outcome_quiz", label: __("Quiz Arranged"), short_label: __("Quiz Arranged"), metric: "quiz" },
 			{ key: "outcome_co_curricular", label: __("Staff Activity / Exhibition / Demo Class"), short_label: __("Staff Activity / Exhibition / Demo Class"), metric: "co_curricular" },
 			{

@@ -1461,7 +1461,7 @@ frappe.tif_customization.show_enrolment_officer_dialog = function (data) {
 	);
 	const total = people.length;
 	const enrolTitle = frappe.tif_customization.drilldown_title(
-		data.label || __("Enrollment of Participants"),
+		data.label || __("Enrollment of Participants in Online Course through SME"),
 		data.count != null ? data.count : total
 	);
 	const d = new frappe.ui.Dialog({

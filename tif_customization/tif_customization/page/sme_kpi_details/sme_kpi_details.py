@@ -48,7 +48,7 @@ OUTCOME_WEIGHT = 0.30
 
 # Yearly compulsory mins from KPI Details policy (all areas)
 OUTCOME_TARGETS = (
-	{"key": "enrolment", "label": _("Enrollment of Participants in Online Course"), "short_label": _("Enrollment of Participants in Online Course"), "target": 50, "metric": "enrolment"},
+	{"key": "enrolment", "label": _("Enrollment of Participants in Online Course through SME"), "short_label": _("Enrollment of Participants in Online Course through SME"), "target": 50, "metric": "enrolment"},
 	{"key": "quiz", "label": _("Quiz Arranged"), "short_label": _("Quiz Arranged"), "target": 1, "metric": "quiz"},
 	{"key": "co_curricular", "label": _("Staff Activity / Exhibition / Demo Class"), "short_label": _("Staff Activity / Exhibition / Demo Class"), "target": 1, "metric": "co_curricular"},
 	{

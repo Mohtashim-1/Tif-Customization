@@ -55,7 +55,7 @@ METRIC_LABELS = {
 	"workshop_registration": _("Workshop Participants"),
 	"online_participants": _("Online Workshop Participants through SME"),
 	"online_workshop": _("Online Workshop"),
-	"enrolment": _("Enrollment of Participants in Online Course"),
+	"enrolment": _("Enrollment of Participants in Online Course through SME"),
 	"volunteers": _("Volunteers enrolled through SME"),
 	"schools": _("Training visits (schools attended)"),
 	"participants": _("Training visits (participants)"),
