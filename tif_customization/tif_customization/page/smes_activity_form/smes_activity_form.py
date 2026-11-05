@@ -24,6 +24,7 @@ from tif_customization.tif_customization.model_school import sync_model_school_f
 from tif_customization.tif_customization.api.school_opening_form import (
 	CONTACT_ROLES,
 	create_school_opening_application,
+	find_existing_school_opening,
 )
 
 BULK_IMPORT_TEMPLATE = "Field_Visit_Bulk_Import_Template.xlsx"
@@ -1101,8 +1102,8 @@ def _school_opening_link_options(txt="", city="", limit=50, exclude_values=None)
 	return out
 
 
-def _find_school_opening_by_name(value):
-	"""Match School Opening Application by doc name or exact school_name."""
+def _find_school_opening_by_name(value, city=None):
+	"""Match School Opening Application by doc name or school_name (case/space tolerant)."""
 	val = cstr(value).strip()
 	if not val or not frappe.db.exists("DocType", "School Opening Application"):
 		return None
@@ -1113,23 +1114,7 @@ def _find_school_opening_by_name(value):
 			["name", "school_name", "customer", "city", "province", "address", "docstatus"],
 			as_dict=True,
 		)
-	rows = frappe.db.sql(
-		"""
-		SELECT name, school_name, IFNULL(customer, '') AS customer,
-			IFNULL(city, '') AS city, IFNULL(province, '') AS province,
-			IFNULL(address, '') AS address, docstatus
-		FROM `tabSchool Opening Application`
-		WHERE TRIM(school_name) = %(val)s
-		ORDER BY
-			CASE WHEN IFNULL(customer, '') != '' THEN 0 ELSE 1 END,
-			docstatus DESC,
-			modified DESC
-		LIMIT 1
-		""",
-		{"val": val},
-		as_dict=True,
-	)
-	return rows[0] if rows else None
+	return find_existing_school_opening(val, city=city)
 
 
 @frappe.whitelist()
@@ -2067,7 +2052,7 @@ def submit_smes_activity(data):
 	resolved_school = _resolve_customer_link(raw_school)
 	existing_soa = None
 	if not resolved_school and raw_school:
-		existing_soa = _find_school_opening_by_name(raw_school)
+		existing_soa = _find_school_opening_by_name(raw_school, city=data.get("city"))
 		soa_customer = cstr((existing_soa or {}).get("customer") or "").strip()
 		if soa_customer:
 			resolved_school = _resolve_customer_link(soa_customer) or (
@@ -2090,7 +2075,15 @@ def submit_smes_activity(data):
 			school_opening_data["province"] = data.get("province")
 		if not (school_opening_data.get("form_date") or "").strip():
 			school_opening_data["form_date"] = data.get("visit_date")
-		soa_doc = create_school_opening_application(school_opening_data)
+		# Reuse pending/existing School Opening for the same school — do not insert again.
+		reuse = existing_soa or _find_school_opening_by_name(
+			school_opening_data.get("school_name") or raw_school,
+			city=school_opening_data.get("city") or data.get("city"),
+		)
+		if reuse:
+			soa_doc = frappe.get_doc("School Opening Application", reuse.name)
+		else:
+			soa_doc = create_school_opening_application(school_opening_data)
 		if doc_type == "Books Demand (Quantity)":
 			return {
 				"name": None,

@@ -73,8 +73,57 @@ def submit_school_opening_application():
 	}
 
 
+def _normalize_school_name(value):
+	"""Collapse whitespace / case for duplicate school matching."""
+	return " ".join(cstr(value or "").strip().lower().split())
+
+
+def find_existing_school_opening(school_name, city=None):
+	"""Return an existing School Opening Application for this school (avoid duplicates)."""
+	key = _normalize_school_name(school_name)
+	if not key or not frappe.db.exists("DocType", "School Opening Application"):
+		return None
+	city = cstr(city or "").strip()
+	# Pull a tight candidate set (exact lower/trim + loose LIKE), then normalize in Python
+	# so "ABC  School" still matches "ABC School".
+	rows = frappe.db.sql(
+		"""
+		SELECT name, school_name, IFNULL(customer, '') AS customer,
+			IFNULL(city, '') AS city, IFNULL(province, '') AS province,
+			IFNULL(address, '') AS address, docstatus, modified
+		FROM `tabSchool Opening Application`
+		WHERE IFNULL(school_name, '') != ''
+		  AND (
+				LOWER(TRIM(school_name)) = %(key)s
+				OR LOWER(TRIM(school_name)) LIKE %(like)s
+		  )
+		ORDER BY
+			CASE WHEN IFNULL(customer, '') != '' THEN 0 ELSE 1 END,
+			docstatus DESC,
+			modified DESC
+		LIMIT 80
+		""",
+		{"key": key, "like": f"%{key}%"},
+		as_dict=True,
+	)
+	city_matched = []
+	name_matched = []
+	for row in rows:
+		if _normalize_school_name(row.get("school_name")) != key:
+			continue
+		name_matched.append(row)
+		row_city = cstr(row.get("city") or "").strip()
+		if not city or not row_city or row_city.lower() == city.lower():
+			city_matched.append(row)
+	return (city_matched or name_matched or [None])[0]
+
+
 def create_school_opening_application(data):
-	"""Insert a School Opening Application from portal / guest payload."""
+	"""Insert a School Opening Application from portal / guest payload.
+
+	Reuses an existing application for the same school name (and city when set)
+	so repeat field visits do not spawn duplicate School Opening Applications.
+	"""
 	if isinstance(data, str):
 		data = json.loads(data)
 	data = data or {}
@@ -85,6 +134,10 @@ def create_school_opening_application(data):
 	visit_type = (data.get("visit_type") or "").strip() or "Visit with enrollment"
 	if visit_type not in ("Visit without enrollment", "Visit with enrollment"):
 		frappe.throw(_("Please select Visit without enrollment or Visit with enrollment."))
+
+	existing = find_existing_school_opening(school_name, city=data.get("city"))
+	if existing:
+		return frappe.get_doc("School Opening Application", existing.name)
 
 	doc = frappe.new_doc("School Opening Application")
 	doc.form_date = data.get("form_date") or getdate()

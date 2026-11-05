@@ -1004,9 +1004,39 @@ function pickCard(card) {
 	}, 500);
 }
 
-function startCreateSchool(name) {
+async function startCreateSchool(name) {
 	const school = (name || "").trim();
 	if (!school) return;
+	// If this school already exists as Customer or pending School Opening, select it —
+	// do not open another Create School form (avoids duplicate SOA on repeat visits).
+	try {
+		const rows = await searchSchools(school);
+		const needle = school.toLowerCase().replace(/\s+/g, " ");
+		const existing = (Array.isArray(rows) ? rows : []).find((r) => {
+			const label = String(r.label || "")
+				.trim()
+				.toLowerCase()
+				.replace(/\s+/g, " ");
+			const value = String(r.value || "")
+				.trim()
+				.toLowerCase()
+				.replace(/\s+/g, " ");
+			return label === needle || value === needle;
+		});
+		if (existing?.value) {
+			creatingSchool.value = false;
+			if (selected.value?.group === "meeting") {
+				meeting.institute = existing.value;
+				meeting.instituteLabel = existing.label || existing.value;
+			} else {
+				visit.schoolName = existing.value;
+				visit.schoolNameLabel = existing.label || existing.value;
+			}
+			return;
+		}
+	} catch {
+		/* fall through to create form */
+	}
 	creatingSchool.value = true;
 	Object.assign(schoolOpening, emptySchoolOpening());
 	schoolOpening.school_name = school;

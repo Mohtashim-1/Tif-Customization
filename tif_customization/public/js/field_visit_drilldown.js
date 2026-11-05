@@ -468,7 +468,7 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 		return;
 	}
 	if (data.metric === "volunteers") {
-		frappe.tif_customization.show_volunteer_enrolment_dialog(data);
+		frappe.tif_customization.show_volunteer_enrolment_dialog(data, opts);
 		return;
 	}
 	if (data.metric === "workshop_registration") {
@@ -1325,7 +1325,8 @@ frappe.tif_customization.show_workshop_participant_dialog = function (data, opts
 	d.show();
 };
 
-frappe.tif_customization.show_volunteer_enrolment_dialog = function (data) {
+frappe.tif_customization.show_volunteer_enrolment_dialog = function (data, opts) {
+	opts = opts || {};
 	const people = data.participants || [];
 	const byOfficer = {};
 	people.forEach((row) => {
@@ -1348,6 +1349,13 @@ frappe.tif_customization.show_volunteer_enrolment_dialog = function (data) {
 		primary_action_label: __("Close"),
 		primary_action: () => d.hide(),
 	});
+	const importBar = `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 10px;">
+		<button type="button" class="btn btn-default btn-sm tif-vol-import">${__("Import Volunteers")}</button>
+		<button type="button" class="btn btn-default btn-sm tif-vol-template">${__("Download Template")}</button>
+		<span class="text-muted" style="font-size:11px;">${__(
+			"CSV/Excel → creates Enrolment of Volunteers visits"
+		)}</span>
+	</div>`;
 	const volunteerTable = (rows) => {
 		if (!rows.length) {
 			return `<tr><td colspan="7" class="text-muted text-center">${__("No volunteers")}</td></tr>`;
@@ -1385,6 +1393,7 @@ frappe.tif_customization.show_volunteer_enrolment_dialog = function (data) {
 					.join("")
 			: `<tr><td colspan="2" class="text-muted text-center">${__("No volunteers in this period.")}</td></tr>`;
 		d.fields_dict.html.$wrapper.html(`
+			${importBar}
 			<p class="text-muted" style="font-size:12px;margin-bottom:10px;">
 				${__("Field officer and how many volunteers they enrolled. Click the number for volunteer details.")}
 				&nbsp;·&nbsp; ${__("Total")}: <strong>${cint(total).toLocaleString()}</strong>
@@ -1455,7 +1464,102 @@ frappe.tif_customization.show_volunteer_enrolment_dialog = function (data) {
 		if (!name) return;
 		frappe.tif_customization.open_field_visit_easy(name);
 	});
+	d.$wrapper.on("click", ".tif-vol-import", (e) => {
+		e.preventDefault();
+		frappe.tif_customization.open_volunteer_import({
+			onDone: () => {
+				d.hide();
+				if (typeof opts.onImported === "function") opts.onImported();
+			},
+		});
+	});
+	d.$wrapper.on("click", ".tif-vol-template", (e) => {
+		e.preventDefault();
+		frappe.tif_customization.download_volunteer_template();
+	});
 	d.show();
+};
+
+frappe.tif_customization.download_volunteer_template = function () {
+	frappe.call({
+		method: "tif_customization.tif_customization.api.volunteer_import.download_volunteer_template",
+		freeze: true,
+		callback: (r) => {
+			const msg = r.message || {};
+			const content = msg.content || "";
+			const filename = msg.filename || "volunteer_registration_template.csv";
+			const blob = new Blob(["\ufeff" + content], { type: "text/csv;charset=utf-8;" });
+			const a = document.createElement("a");
+			a.href = URL.createObjectURL(blob);
+			a.download = filename;
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			URL.revokeObjectURL(a.href);
+			frappe.show_alert({ message: __("Template downloaded"), indicator: "green" });
+		},
+	});
+};
+
+frappe.tif_customization.open_volunteer_import = function (opts) {
+	opts = opts || {};
+	const dlg = new frappe.ui.Dialog({
+		title: __("Import Volunteer Registration"),
+		fields: [
+			{
+				fieldtype: "HTML",
+				fieldname: "help",
+				options: `<p class="text-muted" style="margin:0 0 8px;">
+					${__(
+						"Upload CSV/Excel with: Volunteer Name, Contact Number, Email, Profession, Contribution / Role, Province, City, Area, Address, School, Volunteer Form Submitted, Remarks, TIF Representative, Visit Date."
+					)}
+				</p>
+				<p><a href="#" class="tif-vol-template-link">${__("Download template")}</a></p>`,
+			},
+			{
+				fieldname: "import_file",
+				fieldtype: "Attach",
+				label: __("CSV / Excel file"),
+				reqd: 1,
+			},
+		],
+		primary_action_label: __("Import"),
+		primary_action: (values) => {
+			const file_url = values.import_file;
+			if (!file_url) {
+				frappe.msgprint(__("Please attach a file."));
+				return;
+			}
+			frappe.call({
+				method: "tif_customization.tif_customization.api.volunteer_import.import_volunteers",
+				args: { file_url },
+				freeze: true,
+				freeze_message: __("Importing volunteers…"),
+				callback: (r) => {
+					const msg = r.message || {};
+					const errs = (msg.errors || []).slice(0, 8);
+					frappe.msgprint({
+						title: __("Import complete"),
+						indicator: "green",
+						message:
+							(msg.message || __("Import finished.")) +
+							(errs.length
+								? "<br><br><small>" +
+								  errs.map((e) => frappe.utils.escape_html(e)).join("<br>") +
+								  "</small>"
+								: ""),
+					});
+					dlg.hide();
+					if (typeof opts.onDone === "function") opts.onDone(msg);
+				},
+			});
+		},
+	});
+	dlg.$wrapper.on("click", ".tif-vol-template-link", (e) => {
+		e.preventDefault();
+		frappe.tif_customization.download_volunteer_template();
+	});
+	dlg.show();
 };
 
 frappe.tif_customization.show_enrolment_officer_dialog = function (data) {

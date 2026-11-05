@@ -66,9 +66,17 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "School Database With Books (UAT)",
+   "label": "School",
+   "link_count": 1,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "School Dashboard",
    "link_count": 0,
-   "link_to": "school-location-report",
+   "link_to": "school-dashboard",
    "link_type": "Page",
    "onboard": 0,
    "type": "Link"
@@ -220,7 +228,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Organization Chart ",
+   "label": "Organization Chart",
    "link_count": 0,
    "link_to": "organogram-2026",
    "link_type": "Page",
@@ -270,7 +278,7 @@
   {
    "hidden": 0,
    "is_query_report": 1,
-   "label": "Leave Summary ",
+   "label": "Leave Summary",
    "link_count": 0,
    "link_to": "Leave Summary",
    "link_type": "Report",
@@ -280,7 +288,7 @@
   {
    "hidden": 0,
    "is_query_report": 1,
-   "label": "Leave Encashment ",
+   "label": "Leave Encashment",
    "link_count": 0,
    "link_to": "Leave Encashment Bulk",
    "link_type": "DocType",
@@ -340,7 +348,7 @@
   {
    "hidden": 0,
    "is_query_report": 1,
-   "label": "Leave Application ",
+   "label": "Leave Application",
    "link_count": 0,
    "link_to": "Leave Application",
    "link_type": "DocType",
@@ -378,7 +386,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Expense Report and Dashboard ",
+   "label": "Expense Report and Dashboard",
    "link_count": 0,
    "link_to": "procurement-expense",
    "link_type": "Page",
@@ -428,7 +436,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Donation Analytics ",
+   "label": "Donation Analytics",
    "link_count": 0,
    "link_to": "donation-analytics",
    "link_type": "Page",
@@ -438,7 +446,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Donation Report ",
+   "label": "Donation Report",
    "link_count": 0,
    "link_to": "donation-report",
    "link_type": "Page",
@@ -513,7 +521,6 @@
    "link_to": "Donor Ledger Statement",
    "link_type": "Report",
    "onboard": 0,
-   "report_ref_doctype": "Donor",
    "type": "Link"
   },
   {
@@ -527,7 +534,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "SME KPI Details",
+   "label": "SME KPI Details (UAT)",
    "link_count": 0,
    "link_to": "sme-kpi-details",
    "link_type": "Page",
@@ -537,9 +544,9 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "SME Daily Reporting ",
+   "label": "Volunteer Dashboard (UAT)",
    "link_count": 0,
-   "link_to": "field-staff-report",
+   "link_to": "volunteer-ambassador-dashboard",
    "link_type": "Page",
    "onboard": 0,
    "type": "Link"
@@ -547,27 +554,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Volunteer Dashboard  (UAT)",
-   "link_count": 0,
-   "link_to": "volunteer-dashboard",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Ambassador Dashboard (UAT)",
-   "link_count": 0,
-   "link_to": "ambassador-dashboard",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "SME Summary Report (UAT)",
+   "label": "SME Summary Report",
    "link_count": 0,
    "link_to": "sme-summary-report-copy",
    "link_type": "Page",
@@ -577,26 +564,16 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Supervisor KPI Detail (UAT)",
+   "label": "Supervisor KPI Detail",
    "link_count": 0,
    "link_to": "supervisor-target-ba",
    "link_type": "Page",
    "onboard": 0,
    "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "SME ERP Summary",
-   "link_count": 0,
-   "link_to": "sme-erp-summary",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
   }
  ],
- "modified": "2026-11-04 13:42:48.263542",
- "modified_by": "farhan.hussain@tif.edu.pk",
+ "modified": "2026-11-05 17:38:06.705623",
+ "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Reports",
  "number_cards": [],

@@ -79,14 +79,8 @@ def get_item_wise_dispatch(filters=None):
 		FROM `tabDelivery Note` dn
 		INNER JOIN `tabDelivery Note Item` dni ON dni.parent = dn.name
 		LEFT JOIN `tabCustomer` cust ON cust.name = dn.customer
-		LEFT JOIN `tabAddress` addr ON (
-			addr.name = dn.shipping_address_name
-			OR addr.name = dn.customer_address
-		)
-		LEFT JOIN `tabSchool` s ON (
-			s.school_name = dn.customer_name
-			OR s.name = dn.customer
-		)
+		{_address_join_sql()}
+		{_school_join_sql()}
 		WHERE {where_clause}
 		GROUP BY
 			dni.item_code,
@@ -135,19 +129,13 @@ def _apply_page_filters_for_items(where, params, filters):
 			customer_name_field="dn.customer_name",
 		)
 	if filters.get("city"):
-		where.append(
-			"LOWER(TRIM(COALESCE(s.city, addr.city, dn.custom_city, ''))) = LOWER(%(city)s)"
-		)
+		where.append(f"LOWER(TRIM({_city_expr()})) = LOWER(%(city)s)")
 		params["city"] = filters["city"]
 	if filters.get("province"):
-		where.append(
-			"LOWER(TRIM(COALESCE(s.province, addr.state, ''))) = LOWER(%(province)s)"
-		)
+		where.append(f"LOWER(TRIM({_province_expr()})) = LOWER(%(province)s)")
 		params["province"] = filters["province"]
 	if filters.get("area"):
-		where.append(
-			"LOWER(TRIM(COALESCE(s.area, addr.custom_area, dn.custom_area, ''))) = LOWER(%(area)s)"
-		)
+		where.append(f"LOWER(TRIM({_area_expr()})) = LOWER(%(area)s)")
 		params["area"] = filters["area"]
 	if filters.get("school_status"):
 		where.append("s.status = %(school_status)s")
@@ -164,6 +152,48 @@ def _apply_page_filters_for_items(where, params, filters):
 		where.append(
 			f"(IFNULL(cust.customer_type, '') IN ('School', 'Company') OR ({name_is_school}))"
 		)
+
+
+def _address_join_sql():
+	"""One address only — OR on shipping/billing duplicates every DN item row."""
+	return """
+		LEFT JOIN `tabAddress` addr ON addr.name = COALESCE(
+			NULLIF(dn.shipping_address_name, ''),
+			NULLIF(dn.customer_address, '')
+		)
+	"""
+
+
+def _school_join_sql():
+	"""Prefer School linked by customer id; else one row by school_name."""
+	return """
+		LEFT JOIN `tabSchool` s ON s.name = COALESCE(
+			(
+				SELECT s_id.name FROM `tabSchool` s_id
+				WHERE s_id.name = dn.customer
+				LIMIT 1
+			),
+			(
+				SELECT s_nm.name FROM `tabSchool` s_nm
+				WHERE s_nm.school_name = dn.customer_name
+				ORDER BY s_nm.creation
+				LIMIT 1
+			)
+		)
+	"""
+
+
+def _city_expr():
+	# Dispatch destination first; school master city is often wrong / outdated
+	return "COALESCE(NULLIF(TRIM(addr.city), ''), NULLIF(TRIM(dn.custom_city), ''), NULLIF(TRIM(s.city), ''), '')"
+
+
+def _province_expr():
+	return "COALESCE(NULLIF(TRIM(addr.state), ''), NULLIF(TRIM(s.province), ''), '')"
+
+
+def _area_expr():
+	return "COALESCE(NULLIF(TRIM(addr.custom_area), ''), NULLIF(TRIM(dn.custom_area), ''), NULLIF(TRIM(s.area), ''), '')"
 
 
 def _parse_filters(filters):
@@ -196,21 +226,15 @@ def _get_school_dispatch_rows(filters):
 		_apply_school_name_filter(where, params, filters, customer_field="dn.customer", customer_name_field="dn.customer_name")
 
 	if filters.get("city"):
-		where.append(
-			"LOWER(TRIM(COALESCE(s.city, addr.city, dn.custom_city, ''))) = LOWER(%(city)s)"
-		)
+		where.append(f"LOWER(TRIM({_city_expr()})) = LOWER(%(city)s)")
 		params["city"] = filters["city"]
 
 	if filters.get("province"):
-		where.append(
-			"LOWER(TRIM(COALESCE(s.province, addr.state, ''))) = LOWER(%(province)s)"
-		)
+		where.append(f"LOWER(TRIM({_province_expr()})) = LOWER(%(province)s)")
 		params["province"] = filters["province"]
 
 	if filters.get("area"):
-		where.append(
-			"LOWER(TRIM(COALESCE(s.area, addr.custom_area, dn.custom_area, ''))) = LOWER(%(area)s)"
-		)
+		where.append(f"LOWER(TRIM({_area_expr()})) = LOWER(%(area)s)")
 		params["area"] = filters["area"]
 
 	if filters.get("school_status"):
@@ -236,6 +260,9 @@ def _get_school_dispatch_rows(filters):
 	_apply_book_type_filter(where, book_type)
 
 	where_clause = " AND ".join(where)
+	city_expr = _city_expr()
+	province_expr = _province_expr()
+	area_expr = _area_expr()
 	rows = frappe.db.sql(
 		f"""
 		SELECT
@@ -245,9 +272,9 @@ def _get_school_dispatch_rows(filters):
 			dn.customer AS customer,
 			COALESCE(cust.customer_type, '') AS customer_type,
 			COALESCE(s.status, '') AS school_status,
-			COALESCE(s.city, addr.city, dn.custom_city, '') AS city,
-			COALESCE(s.province, addr.state, '') AS province,
-			COALESCE(s.area, addr.custom_area, dn.custom_area, '') AS area,
+			{city_expr} AS city,
+			{province_expr} AS province,
+			{area_expr} AS area,
 			COUNT(DISTINCT dn.name) AS delivery_notes,
 			SUM(COALESCE(dni.qty, 0)) AS total_qty,
 			SUM(
@@ -284,14 +311,8 @@ def _get_school_dispatch_rows(filters):
 		FROM `tabDelivery Note` dn
 		INNER JOIN `tabDelivery Note Item` dni ON dni.parent = dn.name
 		LEFT JOIN `tabCustomer` cust ON cust.name = dn.customer
-		LEFT JOIN `tabAddress` addr ON (
-			addr.name = dn.shipping_address_name
-			OR addr.name = dn.customer_address
-		)
-		LEFT JOIN `tabSchool` s ON (
-			s.school_name = dn.customer_name
-			OR s.name = dn.customer
-		)
+		{_address_join_sql()}
+		{_school_join_sql()}
 		WHERE {where_clause}
 		GROUP BY
 			COALESCE(s.name, ''),
@@ -299,9 +320,9 @@ def _get_school_dispatch_rows(filters):
 			dn.customer,
 			COALESCE(cust.customer_type, ''),
 			COALESCE(s.status, ''),
-			COALESCE(s.city, addr.city, dn.custom_city, ''),
-			COALESCE(s.province, addr.state, ''),
-			COALESCE(s.area, addr.custom_area, dn.custom_area, '')
+			{city_expr},
+			{province_expr},
+			{area_expr}
 		ORDER BY total_qty DESC, school_name ASC
 		""",
 		params,

@@ -9,7 +9,7 @@ frappe.tif_customization.VolunteerAmbassadorDashboard = class VolunteerAmbassado
 	constructor(wrapper) {
 		this.page = frappe.ui.make_app_page({
 			parent: wrapper,
-			title: __("Volunteer & Ambassador Dashboard"),
+			title: __("Volunteer Dashboard (UAT)"),
 			single_column: true,
 		});
 		this.data = null;
@@ -21,10 +21,28 @@ frappe.tif_customization.VolunteerAmbassadorDashboard = class VolunteerAmbassado
 		this.make_layout();
 		this.make_filters();
 		this.page.set_primary_action(__("Refresh"), () => this.load(), "refresh");
+		this.page.add_inner_button(__("Import Volunteers"), () => this.open_volunteer_import());
 		this.page.add_action_item(__("Open Field Visit Easy"), () => {
 			window.open("/field-visit-easy", "_blank");
 		});
 		this.load();
+	}
+
+	open_volunteer_import() {
+		const run = () => {
+			if (!frappe.tif_customization || !frappe.tif_customization.open_volunteer_import) {
+				frappe.msgprint(__("Import module is still loading. Please try again."));
+				return;
+			}
+			frappe.tif_customization.open_volunteer_import({
+				onDone: () => this.load(),
+			});
+		};
+		if (frappe.tif_customization && frappe.tif_customization.open_volunteer_import) {
+			run();
+			return;
+		}
+		frappe.require("/assets/tif_customization/js/field_visit_drilldown.js", run);
 	}
 
 	fy_start() {

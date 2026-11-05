@@ -3,7 +3,17 @@ import json
 import frappe
 
 
-CARD_ORDER = ["HR", "Supply Chain", "Purchase", "Accounts", "Program", "SME", "School Impact", "Book Purchase and Printing"]
+CARD_ORDER = [
+	"HR",
+	"Supply Chain",
+	"Purchase",
+	"Accounts",
+	"Program",
+	"School",
+	"SME",
+	"School Impact",
+	"Book Purchase and Printing",
+]
 
 # Website routes that are not Frappe Desk Pages (Dynamic Link cannot store these).
 PORTAL_LINKS = {
@@ -16,13 +26,6 @@ PORTAL_LINKS = {
 			"highlight": False,
 		},
 		{
-			"label": "Training Report and Dashboard (UAT)",
-			"link_type": "URL",
-			"link_to": "/app/training-card",
-			"is_query_report": 0,
-			"highlight": False,
-		},
-		{
 			"label": "Teacher Training Dashboard (UAT)",
 			"link_type": "URL",
 			"link_to": "/app/teacher-training-dashboard",
@@ -30,7 +33,26 @@ PORTAL_LINKS = {
 			"highlight": False,
 		},
 	],
+	"School": [
+		{
+			"label": "School Dashboard",
+			"link_type": "Page",
+			"link_to": "school-dashboard",
+			"is_query_report": 0,
+			"highlight": True,
+		},
+	],
 }
+
+# Program card should only show these; drop anything else (e.g. School Database, training-card).
+PROGRAM_ALLOWED_LINK_NEEDLES = (
+	"training-schedule",
+	"teacher-training-dashboard",
+)
+PROGRAM_ALLOWED_LABEL_NEEDLES = (
+	"training schedule",
+	"teacher training dashboard",
+)
 
 
 @frappe.whitelist()
@@ -59,6 +81,7 @@ def get_reports_workspace_menu():
 			)
 
 	_inject_portal_links(sections)
+	_filter_program_links(sections)
 
 	order = _get_card_order(workspace) or CARD_ORDER
 	result = []
@@ -88,6 +111,29 @@ def _inject_portal_links(sections):
 			if (extra.get("label") or "").strip().lower() in existing:
 				continue
 			sections[title]["links"].insert(0, extra)
+
+
+def _filter_program_links(sections):
+	"""Keep only Teacher Training Dashboard + Training Schedule on Program card."""
+	program = sections.get("Program")
+	if not program:
+		return
+	kept = []
+	seen = set()
+	for link in program.get("links") or []:
+		label = (link.get("label") or "").strip().lower()
+		target = str(link.get("link_to") or "").strip().lower()
+		allowed = any(n in target for n in PROGRAM_ALLOWED_LINK_NEEDLES) or any(
+			n in label for n in PROGRAM_ALLOWED_LABEL_NEEDLES
+		)
+		if not allowed:
+			continue
+		key = target or label
+		if key in seen:
+			continue
+		seen.add(key)
+		kept.append(link)
+	program["links"] = kept
 
 
 def _sort_links_by_color(links):

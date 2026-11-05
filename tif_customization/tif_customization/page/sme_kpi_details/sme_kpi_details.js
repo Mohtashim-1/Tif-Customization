@@ -2,7 +2,7 @@ frappe.pages["sme-kpi-details"].on_page_load = function (wrapper) {
 	frappe.require("/assets/tif_customization/js/field_visit_drilldown.js", () => {
 		const page = frappe.ui.make_app_page({
 			parent: wrapper,
-			title: __("SME KPI Details"),
+			title: __("SME KPI Details (UAT)"),
 			single_column: true,
 		});
 		wrapper.page = page;
@@ -76,7 +76,7 @@ frappe.tif_customization.SmeKpiDetails = class SmeKpiDetails {
 				</style>
 				<div class="skd-filters no-print">
 					<div class="d-flex justify-content-between align-items-center mb-2">
-						<strong>${__("SME KPI Details")}</strong>
+						<strong>${__("SME KPI Details (UAT)")}</strong>
 						<div>
 							<button class="btn btn-sm btn-primary skd-apply">${__("Apply")}</button>
 							<button class="btn btn-sm btn-default skd-reset">${__("Reset")}</button>

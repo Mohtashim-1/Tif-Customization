@@ -177,9 +177,9 @@ def get_dispatch_data(filters):
 				dn.creation
 			FROM `tabDelivery Note` dn
 			JOIN `tabDelivery Note Item` dni ON dni.parent = dn.name
-			LEFT JOIN `tabAddress` addr ON (
-				addr.name = dn.shipping_address_name 
-				OR addr.name = dn.customer_address
+			LEFT JOIN `tabAddress` addr ON addr.name = COALESCE(
+				NULLIF(dn.shipping_address_name, ''),
+				NULLIF(dn.customer_address, '')
 			)
 			WHERE {where_clause}
 		"""
