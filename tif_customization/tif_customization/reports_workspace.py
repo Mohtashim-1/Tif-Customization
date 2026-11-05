@@ -35,11 +35,11 @@ PORTAL_LINKS = {
 	],
 	"School": [
 		{
-			"label": "School Dashboard",
+			"label": "School Dashboard (UAT)",
 			"link_type": "Page",
 			"link_to": "school-dashboard",
 			"is_query_report": 0,
-			"highlight": True,
+			"highlight": False,
 		},
 	],
 }

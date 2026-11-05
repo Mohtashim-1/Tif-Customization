@@ -1,7 +1,7 @@
 frappe.pages["school-dashboard"].on_page_load = function (wrapper) {
 	const page = frappe.ui.make_app_page({
 		parent: wrapper,
-		title: "School Dashboard",
+		title: __("School Dashboard (UAT)"),
 		single_column: true,
 	});
 

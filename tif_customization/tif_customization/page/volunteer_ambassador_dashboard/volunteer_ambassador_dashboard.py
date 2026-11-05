@@ -236,7 +236,7 @@ def _rows(child_doctype, parentfield, visit_type, from_date, to_date, province, 
 
 	out = []
 	for r in rows:
-		officer = (r.visit_by or r.me_visit_by or r.owner or "").strip()
+		officer = _field_officer_label(r.visit_by, r.me_visit_by)
 		out.append(
 			{
 				"row_name": r.row_name,
@@ -264,11 +264,55 @@ def _rows(child_doctype, parentfield, visit_type, from_date, to_date, province, 
 	return out
 
 
+_SYSTEM_USER_LABELS = frozenset(
+	{
+		"administrator",
+		"guest",
+		"admin",
+		"system manager",
+	}
+)
+
+
+def _is_system_user_label(value):
+	text = (value or "").strip().lower()
+	if not text:
+		return True
+	if text in _SYSTEM_USER_LABELS:
+		return True
+	if "@" in text and text.endswith((".localhost", "@example.com")):
+		return True
+	return False
+
+
+def _field_officer_label(visit_by=None, me_visit_by=None):
+	"""Only return a real Field Officer display name — never Administrator / random users."""
+	from tif_customization.tif_customization.api.online_workshop_import import (
+		_resolve_field_officer,
+	)
+	from tif_customization.tif_customization.api.volunteer_import import _officer_display
+
+	for raw in (visit_by, me_visit_by):
+		text = (raw or "").strip()
+		if not text or _is_system_user_label(text):
+			continue
+		fo = _resolve_field_officer(text)
+		if fo:
+			return _officer_display(fo) or fo
+	return ""
+
+
 def _group_counts(volunteers, ambassadors, key):
 	bucket = {}
 	for kind, rows in (("volunteers", volunteers), ("ambassadors", ambassadors)):
 		for r in rows:
-			label = (r.get(key) or "—").strip() or "—"
+			label = (r.get(key) or "").strip()
+			# By Field Officer: skip blank / non-FO (Administrator, Mohtashim, schools, etc.)
+			if key == "officer":
+				if not label or _is_system_user_label(label):
+					continue
+			else:
+				label = label or "—"
 			slot = bucket.setdefault(label, {"label": label, "volunteers": 0, "ambassadors": 0})
 			slot[kind] += 1
 	rows = list(bucket.values())

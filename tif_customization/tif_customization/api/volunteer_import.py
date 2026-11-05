@@ -546,7 +546,8 @@ def import_volunteers(
 			continue
 
 		first = unique_people[0]
-		visit_by = _officer_display(first["officer"]) or first["officer_raw"] or frappe.session.user
+		# Never fall back to session user (Administrator) — only real Field Officer / sheet text
+		visit_by = _officer_display(first["officer"]) or first["officer_raw"] or ""
 		province = first["province"] or ""
 		city = first["city"] or ""
 		# Prefer a common city/province from the group if first blank.
