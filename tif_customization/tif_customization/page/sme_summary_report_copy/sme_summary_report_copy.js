@@ -1833,25 +1833,31 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			<p class="text-muted" style="font-size:12px;margin-bottom:10px;">
 				${__("Officer-wise Total, Marketing, Monitoring and Follow up. Click a name for full KPI detail, or a number for documents.")}
 			</p>
+			<style>
+				.sme-field-emp-table th,
+				.sme-field-emp-table td.num{
+					text-align:center !important;
+				}
+			</style>
 			<div class="table-responsive" style="max-height:420px;overflow:auto;">
-				<table class="table table-bordered table-hover" style="font-size:12px;margin:0;min-width:560px;">
+				<table class="table table-bordered table-hover sme-field-emp-table" style="font-size:12px;margin:0;min-width:560px;">
 					<thead>
 						<tr>
-							<th style="position:sticky;left:0;background:#f8fafc;z-index:2;">${__("Field Officer / SME")}</th>
-							<th class="text-right">${__("Total")}</th>
-							<th class="text-right">${__("Marketing")}</th>
-							<th class="text-right">${__("Monitoring")}</th>
-							<th class="text-right">${__("Follow up")}</th>
+							<th style="text-align:center !important;position:sticky;left:0;background:#f8fafc;z-index:2;">${__("Field Officer / SME")}</th>
+							<th style="text-align:center !important;">${__("Total")}</th>
+							<th style="text-align:center !important;">${__("Marketing")}</th>
+							<th style="text-align:center !important;">${__("Monitoring")}</th>
+							<th style="text-align:center !important;">${__("Follow up")}</th>
 						</tr>
 					</thead>
 					<tbody>${body}</tbody>
 					<tfoot>
 						<tr>
-							<th style="position:sticky;left:0;background:#f8fafc;">${__("Total")}</th>
-							<th class="text-right">${this.fmt(sumTotal)}</th>
-							<th class="text-right">${this.fmt(sumMarketing)}</th>
-							<th class="text-right">${this.fmt(sumMon)}</th>
-							<th class="text-right">${this.fmt(sumFollow)}</th>
+							<th style="text-align:center !important;position:sticky;left:0;background:#f8fafc;">${__("Total")}</th>
+							<th style="text-align:center !important;">${this.fmt(sumTotal)}</th>
+							<th style="text-align:center !important;">${this.fmt(sumMarketing)}</th>
+							<th style="text-align:center !important;">${this.fmt(sumMon)}</th>
+							<th style="text-align:center !important;">${this.fmt(sumFollow)}</th>
 						</tr>
 					</tfoot>
 				</table>
@@ -2047,18 +2053,15 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			);
 		const body = rows.length
 			? rows
-					.map((r) => {
-						const key = r.employee || r.user_id || r.employee_name || "";
-						return `<tr class="sme-school-count-row" data-officer-key="${frappe.utils.escape_html(
-							key,
-						)}" title="${__("Click for school visit detail")}" style="cursor:pointer;">
+					.map(
+						(r) => `<tr>
 				<td>${frappe.utils.escape_html(r.label || r.employee_name || "")}</td>
 				<td>${frappe.utils.escape_html(r.employment_type || "—")}</td>
 				<td>${frappe.utils.escape_html(r.province || "—")}</td>
 				<td>${frappe.utils.escape_html(r.city || "—")}</td>
 				<td>${frappe.utils.escape_html(r.area || "—")}</td>
-			</tr>`;
-					})
+			</tr>`,
+					)
 					.join("")
 			: `<tr><td colspan="5" class="text-muted text-center">${__("No SMEs found")}</td></tr>`;
 
@@ -2076,10 +2079,10 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				– ${frappe.utils.escape_html(frappe.datetime.str_to_user(data.to_date || ""))}
 				&nbsp;·&nbsp; ${__("SMEs")}: <strong>${rows.length}</strong>
 				&nbsp;·&nbsp; ${__("Total school visits")}: <strong>${this.fmt(sumSchools)}</strong>
-				<br>${__("Province / City / Area from Field Officer document. Click a row for school visit detail.")}
+				<br>${__("Province / City / Area from Field Officer document.")}
 			</p>
 			<div class="table-responsive" style="max-height:420px;overflow:auto;">
-				<table class="table table-bordered table-hover" style="font-size:12px;margin:0;">
+				<table class="table table-bordered" style="font-size:12px;margin:0;">
 					<thead>
 						<tr>
 							<th>${__("Name of SME")}</th>
@@ -2093,11 +2096,6 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				</table>
 			</div>
 		`);
-		d.$wrapper.on("click", ".sme-school-count-row", (e) => {
-			e.preventDefault();
-			const key = $(e.currentTarget).attr("data-officer-key");
-			if (key) this.show_officer_school_detail(key);
-		});
 		d.show();
 	}
 

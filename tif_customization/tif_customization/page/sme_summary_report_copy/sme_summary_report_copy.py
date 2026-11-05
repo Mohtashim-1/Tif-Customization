@@ -18,6 +18,7 @@ from tif_customization.tif_customization.field_visit_permissions import (
 	expand_staff_tokens,
 	get_team_employee_rows,
 	get_team_match_values,
+	staff_match_sql,
 	visit_day_sql as _visit_day_sql,
 )
 from tif_customization.tif_customization.model_school import count_tif_departments
@@ -90,6 +91,17 @@ KPI_COLUMNS = (
 	{"key": "other_official", "label": "Other Official Tasks", "metric": "other_official"},
 )
 KPI_KEYS = tuple(c["key"] for c in KPI_COLUMNS)
+
+# Card / footer totals for these must be DISTINCT Field Visits (same as drilldown).
+# Per-SME `_count_actuals` can credit one visit to more than one officer; summing
+# those rows inflates the card (e.g. Teachers Training 25 vs details 23).
+DISTINCT_VISIT_CARD_METRICS = (
+	"meeting_ulama",
+	"teachers_training_meeting",
+	"headoffice_visit",
+	"academic_task",
+	"other_official",
+)
 
 OUTCOME_COLUMNS = tuple(
 	{
@@ -628,6 +640,20 @@ def get_report_data(filters=None):
 	expense_total = flt(sum(flt(r.get("expenses") or 0) for r in rows), 2)
 	totals_out["expenses"] = expense_total
 
+	# Align Activity card / footer totals with drilldown (distinct visits).
+	filter_province = (filters.get("province") or "").strip()
+	filter_city = (filters.get("city") or "").strip()
+	for key, n in _distinct_visit_metric_counts(
+		from_date,
+		to_date,
+		staff_rows,
+		DISTINCT_VISIT_CARD_METRICS,
+		city=filter_city,
+		province=filter_province,
+	).items():
+		totals[key] = n
+		totals_out[key] = n
+
 	period_outcome = _report_outcome_fy_totals(staff_rows, ytd_from, to_date)
 	# Distinct new schools strictly inside Visit From → Visit To (Overview card).
 	period_filter_outcome = _report_outcome_fy_totals(staff_rows, from_date, to_date)
@@ -787,6 +813,66 @@ def _staff_token_list(staff_rows):
 		if staff.get("employee"):
 			tokens.update(expand_staff_tokens(staff["employee"]))
 	return list(tokens)
+
+
+def _distinct_visit_metric_counts(
+	from_date, to_date, staff_rows, metrics, city=None, province=None
+):
+	"""COUNT(DISTINCT fv.name) per metric — same filters as visit drilldown + sme_roster."""
+	from tif_customization.tif_customization.api.field_visit_drilldown import _metric_condition
+
+	out = {m: 0 for m in metrics}
+	if not staff_rows or not metrics:
+		return out
+
+	tokens = _staff_token_list(staff_rows)
+	if not tokens:
+		return out
+
+	visit_day = _visit_day_sql("fv")
+	params = {
+		"from_date": from_date,
+		"to_date": to_date,
+		"staff_tokens": tuple(t.lower() for t in tokens) or ("__none__",),
+	}
+	base = [
+		"fv.docstatus = 1",
+		f"{visit_day} BETWEEN %(from_date)s AND %(to_date)s",
+		staff_match_sql("fv", "staff_tokens"),
+	]
+	province = (province or "").strip()
+	city = (city or "").strip()
+	if province:
+		base.append(
+			"""COALESCE(
+				NULLIF(TRIM(fv.province), ''),
+				NULLIF(TRIM(fv.me_province), ''),
+				NULLIF(TRIM(fv.training_province), '')
+			) = %(province)s"""
+		)
+		params["province"] = province
+	if city:
+		base.append(
+			"""COALESCE(
+				NULLIF(TRIM(fv.city), ''),
+				NULLIF(TRIM(fv.me_city), ''),
+				NULLIF(TRIM(fv.training_city), ''),
+				NULLIF(TRIM(fv.mt_city), '')
+			) = %(city)s"""
+		)
+		params["city"] = city
+
+	for metric in metrics:
+		conds = list(base) + [_metric_condition(metric, "fv")]
+		where_sql = " AND ".join(f"({c})" for c in conds)
+		out[metric] = cint(
+			frappe.db.sql(
+				f"SELECT COUNT(*) FROM `tabField Visit` fv WHERE {where_sql}",
+				params,
+			)[0][0]
+			or 0
+		)
+	return out
 
 
 def _report_outcome_fy_totals(staff_rows, ytd_from, to_date):

@@ -167,9 +167,19 @@ frappe.tif_customization.open_visit_drilldown = function (opts) {
 					"active_schools",
 					"total_schools",
 				]);
-				// Prefer live API count after import (and for headcount metrics).
+				// Prefer live API count after import (and for headcount / distinct-visit metrics).
+				// Visit-document cards can briefly disagree with the row list when the card
+				// was summed per-SME; API count is the same distinct set as the table.
+				const distinctVisitMetrics = new Set([
+					"teachers_training_meeting",
+					"meeting_ulama",
+					"headoffice_visit",
+					"academic_task",
+					"other_official",
+				]);
 				const preferApiCount =
 					schoolMetrics.has(metric) ||
+					distinctVisitMetrics.has(metric) ||
 					metric === "online_participants" ||
 					metric === "workshop_registration" ||
 					opts.preferApiCount;
