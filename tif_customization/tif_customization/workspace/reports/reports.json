@@ -84,6 +84,16 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "Volunteer Dashboard (UAT)",
+   "link_count": 0,
+   "link_to": "volunteer-ambassador-dashboard",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "Supply Chain",
    "link_count": 6,
    "onboard": 0,
@@ -544,16 +554,6 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Volunteer Dashboard (UAT)",
-   "link_count": 0,
-   "link_to": "volunteer-ambassador-dashboard",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
    "label": "SME Summary Report",
    "link_count": 0,
    "link_to": "sme-summary-report-copy",
@@ -572,7 +572,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-11-05 17:38:06.705623",
+ "modified": "2026-11-05 18:24:42.753311",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Reports",
