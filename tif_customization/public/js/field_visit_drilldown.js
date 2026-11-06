@@ -730,7 +730,7 @@ frappe.tif_customization.show_online_workshop_officer_dialog = function (data, o
 	const totalHeads = rows.reduce((sum, row) => sum + (cint(row.participants) || 1), 0);
 	const totalCount = data.count != null ? cint(data.count) : totalHeads;
 	const owTitle = frappe.tif_customization.drilldown_title(
-		data.label || __("Online Workshop Participants through SME"),
+		data.label || __("Online Workshop Participants SME"),
 		totalCount
 	);
 
@@ -2258,17 +2258,33 @@ frappe.tif_customization.render_school_activity_html = function (data) {
 				padding:14px 16px !important; letter-spacing:.02em; color:#0f172a !important;
 			}
 			.school-act-panel .body { max-height:280px; overflow:auto; }
-			.school-act-panel.wide .body { max-height:480px; }
+			.school-act-panel.wide .body { max-height:560px; overflow:auto; }
 			.school-act table { width:100%; border-collapse:collapse; margin:0; }
+			.school-act-panel.wide table.school-act-visits {
+				table-layout:fixed; width:100%;
+			}
 			.school-act th, .school-act td {
 				padding:6px 10px; border-bottom:1px solid var(--border-color,#e5e7eb);
 				text-align:left; vertical-align:top;
 			}
 			.school-act th { font-size:11px; text-transform:uppercase; color:var(--text-muted,#6b7280); background:var(--control-bg,#f8fafc); position:sticky; top:0; }
-			.school-act-remarks { min-width:240px; max-width:420px; white-space:normal; }
+			.school-act-panel.wide table.school-act-visits th:nth-child(1),
+			.school-act-panel.wide table.school-act-visits td:nth-child(1) { width:12%; }
+			.school-act-panel.wide table.school-act-visits th:nth-child(2),
+			.school-act-panel.wide table.school-act-visits td:nth-child(2) { width:9%; white-space:nowrap; }
+			.school-act-panel.wide table.school-act-visits th:nth-child(3),
+			.school-act-panel.wide table.school-act-visits td:nth-child(3) { width:7%; white-space:nowrap; }
+			.school-act-panel.wide table.school-act-visits th:nth-child(4),
+			.school-act-panel.wide table.school-act-visits td:nth-child(4) { width:10%; }
+			.school-act-panel.wide table.school-act-visits th:nth-child(5),
+			.school-act-panel.wide table.school-act-visits td:nth-child(5) { width:62%; }
+			.school-act-remarks {
+				min-width:0; max-width:none; width:62%;
+				white-space:normal; word-break:break-word;
+			}
 			.school-act-remarks-clip {
-				max-height:4.8em; overflow:auto; line-height:1.35; font-size:11px;
-				padding-right:4px;
+				max-height:9.5em; overflow:auto; line-height:1.4; font-size:12px;
+				padding-right:6px;
 			}
 			.school-act-remarks .blk { margin:0 0 3px; }
 			.school-act-remarks .blk strong { color:#0f766e; }
@@ -2337,7 +2353,7 @@ frappe.tif_customization.render_school_activity_html = function (data) {
 			<div class="school-act-panel wide">
 				<h4 class="school-act-visits-title" style="font-size:22px !important;font-weight:800 !important;line-height:1.3;padding:14px 16px;color:#0f172a;">${__("Field Visits & Remarks")} (${visits.length})</h4>
 				<div class="body">
-					<table>
+					<table class="school-act-visits">
 						<thead><tr>
 							<th>${__("Document No")}</th>
 							<th>${__("Visit Date")}</th>

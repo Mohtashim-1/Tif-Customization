@@ -421,6 +421,17 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		return empId;
 	}
 
+	/**
+	 * Staff for visit drilldowns: card attr wins, else page SME filter.
+	 * Never fall back to org-wide SME roster when an SME is selected.
+	 */
+	resolve_visit_staff(attrStaff) {
+		const fromCard = String(attrStaff || "").trim();
+		if (fromCard) return fromCard;
+		const f = this.get_filters();
+		return String(f.staff || f.employee || "").trim();
+	}
+
 	get_filters() {
 		const month = this.get_current_month_range();
 		const employee = this.employee.get_value() || "";
@@ -538,8 +549,8 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 	outcome_columns(data) {
 		const onlineCol = {
 			key: "outcome_online_participants",
-			label: __("Online Workshop Participants through SME"),
-			short_label: __("Online Workshop Participants through SME"),
+			label: __("Online Workshop Participants SME"),
+			short_label: __("Online Workshop Participants SME"),
 			metric: "online_participants",
 		};
 		const fallback = [
@@ -581,7 +592,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				if (col.metric === "workshop_registration") {
 					label = __("Onsite Workshop Participants");
 				} else if (col.metric === "online_participants") {
-					label = __("Online Workshop Participants through SME");
+					label = __("Online Workshop Participants SME");
 				}
 				const isNewReg = col.metric === "new_schools";
 				return {
@@ -1297,7 +1308,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			e.stopPropagation();
 			const metric = $(this).attr("data-visit-metric");
 			if (!metric) return;
-			const staff = $(this).attr("data-visit-staff") || "";
+			const staff = me.resolve_visit_staff($(this).attr("data-visit-staff"));
 			const cardLabel =
 				$(this).attr("data-card-label") ||
 				$(this).find(".sme-sum-kpi__label").first().text().trim() ||
@@ -1322,22 +1333,24 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			const to_date = outcomeFy
 				? (me.data && me.data.outcome_fy_to) || ctx.to_date
 				: ctx.to_date;
-			const supervisor =
-				ctx.supervisor ||
-				(me.data && me.data.supervisor) ||
-				(me.supervisor && me.supervisor.get_value && me.supervisor.get_value()) ||
-				"";
+			// When an SME is selected, never broaden to supervisor/org roster.
+			const supervisor = staff
+				? ""
+				: ctx.supervisor ||
+					(me.data && me.data.supervisor) ||
+					(me.supervisor && me.supervisor.get_value && me.supervisor.get_value()) ||
+					"";
 			frappe.tif_customization.open_visit_drilldown({
 				from_date,
 				to_date,
-				staff: staff || "",
+				staff,
 				supervisor: String(supervisor || "").trim(),
 				metric,
 				province: ctx.province || "",
 				city: ctx.city || "",
 				submitted_only: ctx.submitted_only || 1,
-				// Same SME/FO roster as outcome KPI cards (avoids 56 vs 55 mismatches).
-				sme_roster: staff ? 0 : 1,
+				// Roster-wide only when no SME and no supervisor filter on the page.
+				sme_roster: staff || supervisor ? 0 : 1,
 				hideUnapproved: true,
 				cardLabel,
 				cardCount,
@@ -2806,15 +2819,18 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			const useYtd = $(this).attr("data-use-ytd");
 			const from_date =
 				useYtd && me.data && me.data.ytd_from ? me.data.ytd_from : ctx.from_date;
+			const resolvedStaff =
+				me.resolve_visit_staff($(this).attr("data-visit-staff") || staff);
 			frappe.tif_customization.open_visit_drilldown({
 				from_date,
 				to_date: ctx.to_date,
-				staff: $(this).attr("data-visit-staff") || staff,
-				supervisor: ctx.supervisor || "",
+				staff: resolvedStaff,
+				supervisor: resolvedStaff ? "" : ctx.supervisor || "",
 				metric,
 				province: ctx.province || "",
 				city: ctx.city || "",
 				submitted_only: ctx.submitted_only || 1,
+				sme_roster: 0,
 				hideUnapproved: true,
 				cardLabel:
 					$(this).attr("data-card-label") ||

@@ -8,19 +8,41 @@ frappe.ui.form.on("Customer", {
 });
 
 function mount_customer_school_activity(frm) {
-	if (!frm.dashboard) return;
+	if (!frappe.tif_customization || !frappe.tif_customization.mount_school_activity) return;
+
 	const wrap_id = "customer-school-activity";
-	frm.dashboard.wrapper.find(`#${wrap_id}`).remove();
-	const $section = $(
-		`<div id="${wrap_id}" class="form-dashboard-section" style="margin-top:12px;">
-			<div class="section-head">${__("Field Visit Activity")}</div>
-			<div class="customer-school-activity-body" style="padding:4px 0 12px;"></div>
-		</div>`
-	);
-	frm.dashboard.wrapper.append($section);
-	frappe.tif_customization.mount_school_activity(
-		$section.find(".customer-school-activity-body"),
-		frm.doc.customer_name || frm.doc.name,
-		frm.doc.name
-	);
+	const body_cls = "customer-school-activity-body";
+	const schoolKey = frm.doc.customer_name || frm.doc.name;
+
+	// Remove prior mounts (refresh / soft reload).
+	frm.$wrapper.find(`#${wrap_id}`).remove();
+	if (frm.dashboard && frm.dashboard.wrapper) {
+		frm.dashboard.wrapper.find(`#${wrap_id}`).remove();
+	}
+
+	const $section = $(`
+		<div id="${wrap_id}" class="form-dashboard-section" style="margin: 8px 0 16px;">
+			<div class="section-head" style="font-weight:600;margin-bottom:6px;">
+				${__("Field Visit Activity")}
+			</div>
+			<div class="${body_cls}" style="padding:4px 0 8px;"></div>
+		</div>
+	`);
+
+	// Details tab first — that is where users land (School form shows activity inline too).
+	const $detailsPage = frm.layout && frm.layout.wrapper
+		? frm.layout.wrapper.find(".form-page").first()
+		: $();
+	if ($detailsPage.length) {
+		$detailsPage.prepend($section);
+	} else if (frm.dashboard && frm.dashboard.add_section) {
+		frm.dashboard.add_section($section.prop("outerHTML"), __("Field Visit Activity"));
+	} else if (frm.dashboard && frm.dashboard.wrapper) {
+		frm.dashboard.wrapper.prepend($section);
+	} else {
+		return;
+	}
+
+	const $body = frm.$wrapper.find(`#${wrap_id} .${body_cls}`).first();
+	frappe.tif_customization.mount_school_activity($body, schoolKey, frm.doc.name);
 }

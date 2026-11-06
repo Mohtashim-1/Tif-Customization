@@ -143,8 +143,8 @@ def _summary_outcome_columns():
 	)
 	online_participants_col = {
 		"key": "outcome_online_participants",
-		"label": _("Online Workshop Participants through SME"),
-		"short_label": _("Online Workshop Participants through SME"),
+		"label": _("Online Workshop Participants SME"),
+		"short_label": _("Online Workshop Participants SME"),
 		"metric": "online_participants",
 		"yearly_min": 0,
 	}
@@ -745,11 +745,26 @@ def get_report_data(filters=None):
 				"submitted_only": 1,
 			}
 		)
+		prov_totals = prov.get("totals") or {}
+		# Cards + province dialog must share the same disjoint buckets:
+		# Active / Active New / Model 0 (a school in Active is not also Model 0).
 		outcome_fy["total_schools"] = {
-			"actual": cint((prov.get("totals") or {}).get("total") or 0),
+			"actual": cint(prov_totals.get("total") or 0),
 			"yearly_min": 0,
 			"metric": "total_schools",
 			"label": _("Total Schools"),
+		}
+		outcome_fy["active_schools"] = {
+			"actual": cint(prov_totals.get("active") or 0),
+			"yearly_min": 0,
+			"metric": "active_schools",
+			"label": _("Active Schools"),
+		}
+		outcome_fy["model_school_0"] = {
+			"actual": cint(prov_totals.get("model_0") or 0),
+			"yearly_min": 0,
+			"metric": "model_school_0",
+			"label": _("Model 0 (No Program Selected)"),
 		}
 	except Exception:
 		frappe.log_error(frappe.get_traceback(), "SME Total Schools Align Error")
