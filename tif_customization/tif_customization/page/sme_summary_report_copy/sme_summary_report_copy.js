@@ -1809,12 +1809,12 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				<td class="num sme-click" data-visit-metric="marketing" data-visit-staff="${frappe.utils.escape_html(
 					staff,
 				)}">${this.fmt(r.marketing_count)}</td>
-				<td class="num sme-click" data-visit-metric="monitoring" data-visit-staff="${frappe.utils.escape_html(
-					staff,
-				)}">${this.fmt(r.monitoring_count)}</td>
 				<td class="num sme-click" data-visit-metric="followup" data-visit-staff="${frappe.utils.escape_html(
 					staff,
 				)}">${this.fmt(r.followup_count)}</td>
+				<td class="num sme-click" data-visit-metric="monitoring" data-visit-staff="${frappe.utils.escape_html(
+					staff,
+				)}">${this.fmt(r.monitoring_count)}</td>
 			</tr>`;
 					})
 					.join("")
@@ -1837,23 +1837,23 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				<div style="border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;min-width:110px;">
 					<div style="font-size:11px;color:#64748b;">${__("Total")}</div>
 					<div style="font-size:18px;font-weight:700;">${this.fmt(sumTotal)}</div>
-					<div style="font-size:10px;color:#94a3b8;">${__("Marketing + Follow up + Monitoring")}</div>
+					<div style="font-size:10px;color:#94a3b8;">${__("Marketing · Follow up · Monitoring")}</div>
 				</div>
 				<div style="border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;min-width:110px;">
 					<div style="font-size:11px;color:#64748b;">${__("Marketing")}</div>
 					<div style="font-size:18px;font-weight:700;">${this.fmt(sumMarketing)}</div>
 				</div>
 				<div style="border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;min-width:110px;">
-					<div style="font-size:11px;color:#64748b;">${__("Monitoring")}</div>
-					<div style="font-size:18px;font-weight:700;">${this.fmt(sumMon)}</div>
-				</div>
-				<div style="border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;min-width:110px;">
 					<div style="font-size:11px;color:#64748b;">${__("Follow up")}</div>
 					<div style="font-size:18px;font-weight:700;">${this.fmt(sumFollow)}</div>
 				</div>
+				<div style="border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;min-width:110px;">
+					<div style="font-size:11px;color:#64748b;">${__("Monitoring")}</div>
+					<div style="font-size:18px;font-weight:700;">${this.fmt(sumMon)}</div>
+				</div>
 			</div>
 			<p class="text-muted" style="font-size:12px;margin-bottom:10px;">
-				${__("Officer-wise Total, Marketing, Monitoring and Follow up. Click a name for full KPI detail, or a number for documents.")}
+				${__("Officer-wise Total, Marketing, Follow up and Monitoring. Click a name for full KPI detail, or a number for documents.")}
 			</p>
 			<style>
 				.sme-field-emp-table th,
@@ -1868,8 +1868,8 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 							<th style="text-align:center !important;position:sticky;left:0;background:#f8fafc;z-index:2;">${__("Field Officer / SME")}</th>
 							<th style="text-align:center !important;">${__("Total")}</th>
 							<th style="text-align:center !important;">${__("Marketing")}</th>
-							<th style="text-align:center !important;">${__("Monitoring")}</th>
 							<th style="text-align:center !important;">${__("Follow up")}</th>
+							<th style="text-align:center !important;">${__("Monitoring")}</th>
 						</tr>
 					</thead>
 					<tbody>${body}</tbody>
@@ -1878,8 +1878,8 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 							<th style="text-align:center !important;position:sticky;left:0;background:#f8fafc;">${__("Total")}</th>
 							<th style="text-align:center !important;">${this.fmt(sumTotal)}</th>
 							<th style="text-align:center !important;">${this.fmt(sumMarketing)}</th>
-							<th style="text-align:center !important;">${this.fmt(sumMon)}</th>
 							<th style="text-align:center !important;">${this.fmt(sumFollow)}</th>
+							<th style="text-align:center !important;">${this.fmt(sumMon)}</th>
 						</tr>
 					</tfoot>
 				</table>
@@ -2243,32 +2243,36 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						<td>${frappe.utils.escape_html(s.area || "—")}</td>
 						<td class="num">${this.fmt(s.total)}</td>
 						<td class="num">${this.fmt(s.new)}</td>
-						<td class="num">${this.fmt(s.monitoring)}</td>
 						<td class="num">${this.fmt(s.followup)}</td>
+						<td class="num">${this.fmt(s.monitoring)}</td>
 					</tr>`,
 							)
 							.join("")
 					: `<tr><td colspan="7" class="text-muted text-center">${__("No school visits")}</td></tr>`;
 
+				const visitColCount =
+					frappe.tif_customization && frappe.tif_customization.visit_detail_headers
+						? frappe.tif_customization.visit_detail_headers().length
+						: 7;
 				const visitBody = visits.length
 					? visits
-							.map(
-								(v) => `<tr>
+							.map((v) =>
+								frappe.tif_customization && frappe.tif_customization.render_visit_detail_row
+									? frappe.tif_customization.render_visit_detail_row(v, {
+											hideUnapproved: true,
+										})
+									: `<tr>
 						<td><a href="${frappe.utils.escape_html(v.url)}">${frappe.utils.escape_html(v.name)}</a></td>
 						<td>${frappe.utils.escape_html(v.visit_date || "")}</td>
 						<td>${frappe.utils.escape_html(v.type_label || v.type || "")}</td>
 						<td>${schoolCell(v.school, cint(v.school_unapproved), cint(v.school_missing))}</td>
 						<td>${frappe.utils.escape_html(v.officer || "")}</td>
 						<td>${frappe.utils.escape_html(v.category || "")}</td>
-						<td style="max-width:320px;white-space:normal;">${
-							frappe.tif_customization && frappe.tif_customization.format_visit_remarks
-								? frappe.tif_customization.format_visit_remarks(v.remarks)
-								: frappe.utils.escape_html(v.remarks || "—")
-						}</td>
-					</tr>`,
+						<td style="max-width:320px;white-space:normal;">${frappe.utils.escape_html(v.remarks || "—")}</td>
+					</tr>`
 							)
 							.join("")
-					: `<tr><td colspan="7" class="text-muted text-center">${__("No documents")}</td></tr>`;
+					: `<tr><td colspan="${visitColCount}" class="text-muted text-center">${__("No documents")}</td></tr>`;
 
 				const d = new frappe.ui.Dialog({
 					title: __("School visits — {0}", [row.label || row.employee_name || ""]),
@@ -2281,8 +2285,8 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					<p class="text-muted" style="font-size:12px;margin-bottom:10px;">
 						${__("Total school visits")}: <strong>${this.fmt(total)}</strong>
 						&nbsp;·&nbsp; ${__("New")}: <strong>${this.fmt(neu)}</strong>
-						&nbsp;·&nbsp; ${__("Monitoring")}: <strong>${this.fmt(monitoring)}</strong>
 						&nbsp;·&nbsp; ${__("Follow up")}: <strong>${this.fmt(followup)}</strong>
+						&nbsp;·&nbsp; ${__("Monitoring")}: <strong>${this.fmt(monitoring)}</strong>
 						&nbsp;·&nbsp; ${__("Distinct schools")}: <strong>${schoolRows.length}</strong>
 						${
 							row.province
@@ -2304,13 +2308,13 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 							<span class="sme-visit-kpi-label">${__("New")}</span>
 							<span class="sme-visit-kpi-count">${this.fmt(neu)}</span>
 						</button>
-						<button type="button" class="btn btn-default sme-open-metric sme-visit-kpi-chip" data-metric="monitoring">
-							<span class="sme-visit-kpi-label">${__("Monitoring")}</span>
-							<span class="sme-visit-kpi-count">${this.fmt(monitoring)}</span>
-						</button>
 						<button type="button" class="btn btn-default sme-open-metric sme-visit-kpi-chip" data-metric="followup">
 							<span class="sme-visit-kpi-label">${__("Follow up")}</span>
 							<span class="sme-visit-kpi-count">${this.fmt(followup)}</span>
+						</button>
+						<button type="button" class="btn btn-default sme-open-metric sme-visit-kpi-chip" data-metric="monitoring">
+							<span class="sme-visit-kpi-label">${__("Monitoring")}</span>
+							<span class="sme-visit-kpi-count">${this.fmt(monitoring)}</span>
 						</button>
 					</div>
 					<style>
@@ -2353,8 +2357,8 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 									<th>${__("Area")}</th>
 									<th class="text-right">${__("Total")}</th>
 									<th class="text-right">${__("New")}</th>
-									<th class="text-right">${__("Monitoring")}</th>
 									<th class="text-right">${__("Follow up")}</th>
+									<th class="text-right">${__("Monitoring")}</th>
 								</tr>
 							</thead>
 							<tbody>${schoolBody}</tbody>
@@ -2365,8 +2369,8 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 									<th></th>
 									<th class="text-right">${this.fmt(sumSchool.total)}</th>
 									<th class="text-right">${this.fmt(sumSchool.new)}</th>
-									<th class="text-right">${this.fmt(sumSchool.monitoring)}</th>
 									<th class="text-right">${this.fmt(sumSchool.followup)}</th>
+									<th class="text-right">${this.fmt(sumSchool.monitoring)}</th>
 								</tr>
 							</tfoot>
 						</table>
@@ -2377,8 +2381,10 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					)}</p>
 					<div class="table-responsive" style="max-height:240px;overflow:auto;">
 						<table class="table table-bordered table-hover" style="font-size:12px;margin:0;">
-							<thead>
-								<tr>
+							<thead>${
+								frappe.tif_customization && frappe.tif_customization.render_visit_detail_thead
+									? frappe.tif_customization.render_visit_detail_thead()
+									: `<tr>
 									<th>${__("Document No")}</th>
 									<th>${__("Visit Date")}</th>
 									<th>${__("Type / Task")}</th>
@@ -2386,12 +2392,20 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 									<th>${__("SME")}</th>
 									<th>${__("Category")}</th>
 									<th>${__("Visit Summary")}</th>
-								</tr>
-							</thead>
+								</tr>`
+							}</thead>
 							<tbody>${visitBody}</tbody>
 						</table>
 					</div>
 				`);
+				d.$wrapper.on("click", ".tif-visit-photo-card, .visit-photo", (e) => {
+					e.preventDefault();
+					const name = $(e.currentTarget).attr("data-visit");
+					const row = (visits || []).find((r) => r.name === name);
+					if (row && frappe.tif_customization.show_visit_photo_dialog) {
+						frappe.tif_customization.show_visit_photo_dialog(row);
+					}
+				});
 				d.$wrapper.on("click", ".sme-open-metric", (e) => {
 					e.preventDefault();
 					const $btn = $(e.currentTarget);
