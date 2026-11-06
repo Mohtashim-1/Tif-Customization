@@ -1,0 +1,240 @@
+{
+ "actions": [],
+ "allow_import": 1,
+ "allow_rename": 1,
+ "autoname": "naming_series:",
+ "creation": "2026-11-06 10:00:00.000000",
+ "default_view": "List",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "volunteer_name",
+  "contact_number",
+  "email",
+  "profession",
+  "contribution",
+  "column_break_main",
+  "visit_date",
+  "field_officer",
+  "volunteer_form_submitted",
+  "school",
+  "section_location",
+  "province",
+  "city",
+  "area",
+  "column_break_loc",
+  "address",
+  "section_links",
+  "field_visit",
+  "source_row",
+  "remarks"
+ ],
+ "fields": [
+  {
+   "default": "VOL-.YYYY.-.#####",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Series",
+   "options": "VOL-.YYYY.-.#####",
+   "reqd": 1
+  },
+  {
+   "fieldname": "volunteer_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Volunteer Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "contact_number",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Contact Number"
+  },
+  {
+   "fieldname": "email",
+   "fieldtype": "Data",
+   "label": "Email",
+   "options": "Email"
+  },
+  {
+   "fieldname": "profession",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Profession"
+  },
+  {
+   "fieldname": "contribution",
+   "fieldtype": "Small Text",
+   "in_list_view": 1,
+   "label": "Service Offered"
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "visit_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Visit / Enrolment Date"
+  },
+  {
+   "fieldname": "field_officer",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Field Officer / TIF Representative"
+  },
+  {
+   "default": "No",
+   "fieldname": "volunteer_form_submitted",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Volunteer Form Submitted",
+   "options": "Yes\nNo"
+  },
+  {
+   "fieldname": "school",
+   "fieldtype": "Link",
+   "label": "School (optional)",
+   "options": "Customer"
+  },
+  {
+   "fieldname": "section_location",
+   "fieldtype": "Section Break",
+   "label": "Location"
+  },
+  {
+   "fieldname": "province",
+   "fieldtype": "Select",
+   "in_standard_filter": 1,
+   "label": "Province",
+   "options": "\nPunjab\nSindh\nKhyber Pakhtunkhwa\nBalochistan\nAzad Jammu & Kashmir\nGilgit-Baltistan\nIslamabad Capital Territory"
+  },
+  {
+   "fieldname": "city",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "City",
+   "options": "City"
+  },
+  {
+   "fieldname": "area",
+   "fieldtype": "Data",
+   "label": "Area / Locality"
+  },
+  {
+   "fieldname": "column_break_loc",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "address",
+   "fieldtype": "Small Text",
+   "label": "Address"
+  },
+  {
+   "fieldname": "section_links",
+   "fieldtype": "Section Break",
+   "label": "Source"
+  },
+  {
+   "fieldname": "field_visit",
+   "fieldtype": "Link",
+   "label": "Field Visit",
+   "options": "Field Visit",
+   "read_only": 1
+  },
+  {
+   "description": "Field Visit Volunteer child row id (used for sync)",
+   "fieldname": "source_row",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Source Row",
+   "read_only": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Other / Remarks"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-11-06 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Tif Customization",
+ "name": "Volunteer Registration",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Field Staff Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Field Staff",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "SME Manager",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "SME User",
+   "write": 1
+  }
+ ],
+ "quick_entry": 0,
+ "search_fields": "volunteer_name,contact_number,email,city,field_officer",
+ "show_title_field_in_link": 1,
+ "sort_field": "visit_date",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "volunteer_name",
+ "track_changes": 1
+}

@@ -183,6 +183,22 @@ class FieldVisit(Document):
 		if self.type in ("Training", "Workshop", "Teachers Training Meeting"):
 			self.send_training_feedback_invitations()
 		self._assign_field_officer_to_school()
+		self._sync_volunteer_registration()
+
+	def on_update_after_submit(self):
+		self._sync_volunteer_registration()
+
+	def _sync_volunteer_registration(self):
+		if (self.type or "").strip() != "Enrolment of Volunteers":
+			return
+		try:
+			from tif_customization.tif_customization.doctype.volunteer_registration.volunteer_registration import (
+				sync_volunteer_from_field_visit,
+			)
+
+			sync_volunteer_from_field_visit(self)
+		except Exception:
+			frappe.log_error(frappe.get_traceback(), "sync_volunteer_registration")
 
 	def _clear_date_typed_as_officer(self):
 		"""Visit By is a free-text name field — reject dates typed by mistake."""
