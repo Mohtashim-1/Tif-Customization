@@ -101,6 +101,7 @@ def get_dashboard_data(filters=None, kind=None):
 			"by_province": _group_counts(volunteers, ambassadors, "province"),
 			"by_city": _group_counts(volunteers, ambassadors, "city"),
 			"by_officer": _group_counts(volunteers, ambassadors, "officer"),
+			"by_service": _group_counts(volunteers, ambassadors, "contribution"),
 			"volunteers": volunteers[:200],
 			"ambassadors": ambassadors[:200],
 		}
@@ -127,6 +128,7 @@ def get_dashboard_data(filters=None, kind=None):
 		"by_city": _group_single(rows, "city"),
 		"by_officer": _group_single(rows, "officer"),
 		"by_school": _group_single(rows, "school"),
+		"by_service": _group_single(rows, "contribution"),
 		"rows": rows[:500],
 	}
 

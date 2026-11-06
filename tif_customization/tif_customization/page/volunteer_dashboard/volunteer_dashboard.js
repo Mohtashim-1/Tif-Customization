@@ -301,7 +301,7 @@ frappe.tif_customization.EnrolmentKindDashboard = class EnrolmentKindDashboard {
 				<thead><tr>
 					<th>${__("Person")}</th>
 					<th>${__("Profession")}</th>
-					<th>${__("Contribution")}</th>
+					<th>${__("Service Offered")}</th>
 					<th>${__("Location")}</th>
 					<th>${__("School")}</th>
 					<th>${__("Form")}</th>

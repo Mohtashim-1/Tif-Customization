@@ -93,6 +93,9 @@ frappe.tif_customization.VolunteerAmbassadorDashboard = class VolunteerAmbassado
 					<div class="vad-card"><h3>${__("By Field Officer")} <small>${__("Top 25")}</small></h3><div class="body vad-by-officer"></div></div>
 				</div>
 				<div class="vad-grid">
+					<div class="vad-card"><h3>${__("By Service Offered")} <small>${__("Top 25")}</small></h3><div class="body vad-by-service"></div></div>
+				</div>
+				<div class="vad-grid">
 					<div class="vad-card"><h3>${__("Volunteers")} <small class="vad-vol-count"></small></h3><div class="body vad-vol-table"></div></div>
 					<div class="vad-card"><h3>${__("Ambassadors")} <small class="vad-amb-count"></small></h3><div class="body vad-amb-table"></div></div>
 				</div>
@@ -227,6 +230,7 @@ frappe.tif_customization.VolunteerAmbassadorDashboard = class VolunteerAmbassado
 
 		this.render_group(".vad-by-province", d.by_province || []);
 		this.render_group(".vad-by-officer", d.by_officer || []);
+		this.render_group(".vad-by-service", d.by_service || []);
 		this.$root.find(".vad-vol-count").text(`${(d.volunteers || []).length}`);
 		this.$root.find(".vad-amb-count").text(`${(d.ambassadors || []).length}`);
 		this.render_people(".vad-vol-table", d.volunteers || [], "volunteer");
@@ -274,8 +278,8 @@ frappe.tif_customization.VolunteerAmbassadorDashboard = class VolunteerAmbassado
 						<div style="font-weight:650">${this.esc(r.name)}</div>
 						<div style="color:#64748b;font-size:11px">${this.esc(r.contact)}${r.profession ? " · " + this.esc(r.profession) : ""}</div>
 						${r.school ? `<div style="color:#64748b;font-size:11px">🏫 ${this.esc(r.school)}</div>` : ""}
-						${r.contribution ? `<div style="color:#52525b;font-size:11px;margin-top:2px">${this.esc(r.contribution)}</div>` : ""}
 					</td>
+					<td style="max-width:220px;font-size:11px;line-height:1.35">${this.esc(r.contribution || "—")}</td>
 					<td>${this.esc(r.city)}${r.area ? ", " + this.esc(r.area) : ""}<div style="color:#94a3b8;font-size:11px">${this.esc(r.province)}</div></td>
 					<td>
 						<a href="${this.esc(r.url)}" target="_blank">${this.esc(r.visit)}</a>
@@ -289,6 +293,7 @@ frappe.tif_customization.VolunteerAmbassadorDashboard = class VolunteerAmbassado
 			<table class="vad-table">
 				<thead><tr>
 					<th>${__("Person")}</th>
+					<th>${__("Service Offered")}</th>
 					<th>${__("Location")}</th>
 					<th>${__("Visit")}</th>
 					<th>${__("Form")}</th>

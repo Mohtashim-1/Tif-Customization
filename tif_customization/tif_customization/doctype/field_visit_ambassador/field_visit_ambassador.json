@@ -58,7 +58,7 @@
   {
    "fieldname": "contribution",
    "fieldtype": "Small Text",
-   "label": "What is he/she doing (role / contribution)",
+   "label": "Service Offered",
    "allow_on_submit": 1
   },
   {
