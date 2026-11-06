@@ -13,6 +13,12 @@ frappe.ui.form.on("School Opening Application", {
 				"blue"
 			);
 		}
+		if (!frm.is_new()) {
+			frm.add_custom_button(__("Print SC-1.2 Form"), () => {
+				const q = new URLSearchParams({ application: frm.doc.name });
+				window.open(`/school-opening-print?${q.toString()}`, "_blank");
+			});
+		}
 		sync_soa_attach_fields(frm);
 	},
 });
@@ -21,7 +27,7 @@ function sync_soa_attach_fields(frm) {
 	if (!frm || frm.is_new() || frm.doc.docstatus === 2) {
 		return;
 	}
-	const attach_fields = ["visiting_card", "school_picture", "meeting_picture"];
+	const attach_fields = ["visiting_card", "school_picture"];
 	const missing = attach_fields.filter((f) => !frm.doc[f]);
 	if (!missing.length) {
 		return;

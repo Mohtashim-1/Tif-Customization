@@ -1,0 +1,418 @@
+/* School Opening SC-1.2 V2 — paper-matched print (green / gold) */
+
+#school-opening-portal.soa-v2 {
+	--v2-green: #0d4f3f;
+	--v2-green-dark: #0a3d31;
+	--v2-gold: #c4a35a;
+	--v2-gold-bg: #d4b56a;
+	--v2-label-bg: #d9e6e2;
+	--v2-field-bg: #ececec;
+	--v2-attach-bg: #f3efe4;
+	--v2-ink: #1a1a1a;
+	--v2-muted: #666666;
+	box-sizing: border-box;
+	background: #d0d0d0 !important;
+	padding: 16px !important;
+	margin: 0 !important;
+	font-family: "Times New Roman", Times, Georgia, serif !important;
+	font-size: 12px;
+	color: var(--v2-ink) !important;
+	line-height: 1.35;
+}
+
+#school-opening-portal.soa-v2 *,
+#school-opening-portal.soa-v2 *::before,
+#school-opening-portal.soa-v2 *::after {
+	box-sizing: border-box;
+}
+
+#school-opening-portal.soa-v2 .soa-sheet {
+	max-width: 780px;
+	margin: 0 auto;
+	background: #fff;
+	padding: 18px 22px 28px;
+	border: 1px solid #888;
+	box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* Letterhead */
+#school-opening-portal.soa-v2 .v2-letterhead {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 12px;
+	text-align: center;
+	margin-bottom: 4px;
+	position: relative;
+}
+
+#school-opening-portal.soa-v2 .v2-logo {
+	width: 52px;
+	height: 52px;
+	object-fit: contain;
+	flex: 0 0 52px;
+}
+
+#school-opening-portal.soa-v2 .v2-letterhead-text {
+	flex: 1;
+	text-align: center;
+}
+
+#school-opening-portal.soa-v2 .v2-org {
+	font-size: 20px;
+	font-weight: 700;
+	letter-spacing: 0.4px;
+	color: var(--v2-green);
+	margin: 0;
+	font-family: "Times New Roman", Times, serif;
+}
+
+#school-opening-portal.soa-v2 .v2-addr {
+	font-size: 9.5px;
+	color: #444;
+	margin-top: 2px;
+	font-family: Arial, Helvetica, sans-serif;
+}
+
+#school-opening-portal.soa-v2 .v2-erp-note {
+	position: absolute;
+	right: 0;
+	top: 0;
+	font-size: 9px;
+	font-style: italic;
+	color: var(--v2-muted);
+	font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Title bar + gold meta */
+#school-opening-portal.soa-v2 .v2-title-row {
+	display: flex;
+	align-items: stretch;
+	gap: 0;
+	margin: 10px 0 14px;
+}
+
+#school-opening-portal.soa-v2 .v2-title-bar {
+	flex: 1;
+	background: var(--v2-green);
+	color: #fff !important;
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: 13px;
+	font-weight: 700;
+	letter-spacing: 0.6px;
+	text-transform: uppercase;
+	padding: 10px 14px;
+	display: flex;
+	align-items: center;
+}
+
+#school-opening-portal.soa-v2 .v2-meta-box {
+	flex: 0 0 148px;
+	background: var(--v2-gold-bg);
+	border: 1px solid #b89540;
+	padding: 6px 10px;
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: 11px;
+	color: #1a1a1a;
+	line-height: 1.45;
+}
+
+#school-opening-portal.soa-v2 .v2-meta-box strong {
+	font-weight: 700;
+}
+
+/* Section header */
+#school-opening-portal.soa-v2 .v2-section {
+	margin-bottom: 12px;
+}
+
+#school-opening-portal.soa-v2 .v2-section-head {
+	display: flex;
+	align-items: stretch;
+	margin-bottom: 8px;
+}
+
+#school-opening-portal.soa-v2 .v2-num {
+	flex: 0 0 26px;
+	background: var(--v2-gold-bg);
+	color: #1a1a1a;
+	font-family: Arial, Helvetica, sans-serif;
+	font-weight: 700;
+	font-size: 13px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border: 1px solid #b89540;
+	border-right: none;
+}
+
+#school-opening-portal.soa-v2 .v2-section-title {
+	flex: 1;
+	background: var(--v2-green);
+	color: #fff !important;
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: 12px;
+	font-weight: 700;
+	letter-spacing: 0.5px;
+	text-transform: uppercase;
+	padding: 7px 12px;
+}
+
+#school-opening-portal.soa-v2 .v2-label {
+	font-family: "Times New Roman", Times, serif;
+	font-weight: 700;
+	font-size: 12px;
+	margin: 8px 0 4px;
+	color: var(--v2-ink);
+}
+
+#school-opening-portal.soa-v2 .v2-row {
+	display: table;
+	width: 100%;
+	table-layout: fixed;
+	border-collapse: separate;
+	border-spacing: 8px 0;
+	margin: 0 -8px 8px;
+}
+
+#school-opening-portal.soa-v2 .v2-col {
+	display: table-cell;
+	vertical-align: top;
+	width: 50%;
+}
+
+#school-opening-portal.soa-v2 .v2-field-label {
+	font-family: "Times New Roman", Times, serif;
+	font-weight: 700;
+	font-size: 12px;
+	margin-bottom: 3px;
+}
+
+#school-opening-portal.soa-v2 .v2-input {
+	background: var(--v2-field-bg);
+	border: 1px solid #c0c0c0;
+	min-height: 28px;
+	padding: 5px 8px;
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: 12px;
+	color: var(--v2-ink);
+	width: 100%;
+}
+
+#school-opening-portal.soa-v2 .v2-input.tall {
+	min-height: 42px;
+}
+
+/* Check grids */
+#school-opening-portal.soa-v2 .v2-checks {
+	display: block;
+	overflow: hidden;
+	margin: 0 0 4px;
+}
+
+#school-opening-portal.soa-v2 .v2-checks.cols-2 .v2-check {
+	width: 50%;
+}
+
+#school-opening-portal.soa-v2 .v2-checks.cols-3 .v2-check {
+	width: 33.33%;
+}
+
+#school-opening-portal.soa-v2 .v2-checks.cols-4 .v2-check {
+	width: 25%;
+}
+
+#school-opening-portal.soa-v2 .v2-check {
+	float: left;
+	padding: 2px 4px 2px 0;
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: 11px;
+	line-height: 1.3;
+}
+
+#school-opening-portal.soa-v2 .v2-box {
+	display: inline-block;
+	width: 11px;
+	height: 11px;
+	border: 1.5px solid #222;
+	margin-right: 5px;
+	vertical-align: -1px;
+	background: #fff;
+	position: relative;
+}
+
+#school-opening-portal.soa-v2 .v2-check.on .v2-box {
+	background: var(--v2-green);
+	border-color: var(--v2-green);
+}
+
+#school-opening-portal.soa-v2 .v2-check.on .v2-box::after {
+	content: "";
+	position: absolute;
+	left: 3px;
+	top: 0px;
+	width: 3px;
+	height: 7px;
+	border: solid #fff;
+	border-width: 0 2px 2px 0;
+	transform: rotate(45deg);
+}
+
+#school-opening-portal.soa-v2 .v2-others-line {
+	display: inline-block;
+	border-bottom: 1px solid #444;
+	min-width: 120px;
+	margin-left: 4px;
+	padding: 0 4px;
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: 11px;
+}
+
+/* Online / location field tables */
+#school-opening-portal.soa-v2 .v2-grid {
+	width: 100%;
+	border-collapse: collapse;
+	margin-bottom: 6px;
+}
+
+#school-opening-portal.soa-v2 .v2-grid td {
+	border: 1px solid #b8c9c3;
+	padding: 0;
+	vertical-align: middle;
+}
+
+#school-opening-portal.soa-v2 .v2-grid .v2-k {
+	background: var(--v2-label-bg);
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: 11px;
+	font-weight: 700;
+	padding: 6px 8px;
+	width: 18%;
+	white-space: nowrap;
+}
+
+#school-opening-portal.soa-v2 .v2-grid .v2-v {
+	background: #fff;
+	padding: 6px 8px;
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: 11px;
+	min-width: 28%;
+}
+
+/* Contacts table */
+#school-opening-portal.soa-v2 .v2-contacts {
+	width: 100%;
+	border-collapse: collapse;
+	margin-bottom: 8px;
+}
+
+#school-opening-portal.soa-v2 .v2-contacts th {
+	background: var(--v2-green);
+	color: #fff !important;
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: 11px;
+	font-weight: 700;
+	padding: 6px 8px;
+	text-align: left;
+	border: 1px solid var(--v2-green-dark);
+}
+
+#school-opening-portal.soa-v2 .v2-contacts td {
+	border: 1px solid #b8c9c3;
+	padding: 5px 8px;
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: 11px;
+	vertical-align: middle;
+}
+
+#school-opening-portal.soa-v2 .v2-contacts td.role {
+	background: var(--v2-label-bg);
+	font-weight: 700;
+	width: 32%;
+}
+
+#school-opening-portal.soa-v2 .v2-contacts td.name {
+	width: 38%;
+}
+
+#school-opening-portal.soa-v2 .v2-contacts td.cell {
+	width: 30%;
+}
+
+/* Attachments */
+#school-opening-portal.soa-v2 .v2-attach-row {
+	display: table;
+	width: 100%;
+	table-layout: fixed;
+	border: 1px solid #cfc6b0;
+	background: var(--v2-attach-bg);
+}
+
+#school-opening-portal.soa-v2 .v2-attach {
+	display: table-cell;
+	width: 50%;
+	padding: 18px 14px;
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: 12px;
+	font-weight: 700;
+	border-right: 1px solid #cfc6b0;
+	vertical-align: middle;
+}
+
+#school-opening-portal.soa-v2 .v2-attach:last-child {
+	border-right: none;
+}
+
+#school-opening-portal.soa-v2 .v2-page {
+	text-align: center;
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: 10px;
+	color: #999;
+	margin-top: 14px;
+}
+
+#school-opening-portal.soa-v2 .v2-ho-note {
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: 10px;
+	color: #555;
+	margin-top: 10px;
+	padding-top: 8px;
+	border-top: 1px solid #ddd;
+}
+
+#school-opening-portal.soa-v2 .page-break {
+	page-break-before: always;
+	break-before: page;
+	height: 0;
+	margin: 0;
+	padding: 0;
+	border: 0;
+}
+
+/* Hide interactive controls in print body */
+#school-opening-portal.soa-v2 .soa-print-toolbar {
+	display: none !important;
+}
+
+#school-opening-portal.soa-v2 input,
+#school-opening-portal.soa-v2 textarea,
+#school-opening-portal.soa-v2 select,
+#school-opening-portal.soa-v2 button {
+	/* print view uses static spans; keep editable mode usable if present */
+}
+
+@media print {
+	#school-opening-portal.soa-v2 {
+		background: #fff !important;
+		padding: 0 !important;
+	}
+	#school-opening-portal.soa-v2 .soa-sheet {
+		box-shadow: none !important;
+		border: none !important;
+		max-width: 100% !important;
+		padding: 0 !important;
+	}
+	.no-print {
+		display: none !important;
+	}
+}

@@ -14,23 +14,19 @@
   "tif_representative",
   "institution_category",
   "educational_system",
+  "structure",
   "type_of_school",
   "no_of_campuses",
   "no_of_students",
-  "structure",
   "academic_shift",
   "section_services",
   "teacher_training_services",
-  "tilawat_services",
   "quran_program_services",
+  "tilawat_services",
   "section_engagement",
   "running_tif_services",
   "curriculum_in_use",
   "curriculum_others",
-  "section_attachments",
-  "visiting_card",
-  "school_picture",
-  "meeting_picture",
   "fee_structure",
   "section_online",
   "website",
@@ -45,13 +41,17 @@
   "city",
   "country",
   "marketing_sample_provided",
+  "section_contacts",
+  "key_contacts",
   "section_channels",
   "school_ptcl",
   "school_mobile",
-  "school_whatsapp",
   "school_email",
-  "section_contacts",
-  "key_contacts",
+  "school_whatsapp",
+  "section_attachments",
+  "visiting_card",
+  "school_picture",
+  "meeting_picture",
   "section_approval",
   "customer",
   "erp_school_code",
@@ -120,7 +120,8 @@
   {
    "fieldname": "type_of_school",
    "fieldtype": "Data",
-   "label": "Type of School"
+   "hidden": 1,
+   "label": "Type of School (legacy)"
   },
   {
    "fieldname": "no_of_campuses",
@@ -129,13 +130,13 @@
   },
   {
    "fieldname": "no_of_students",
-   "fieldtype": "Int",
+   "fieldtype": "Data",
    "label": "No. of Students"
   },
   {
    "fieldname": "structure",
    "fieldtype": "Select",
-   "label": "Structure",
+   "label": "Type of School",
    "options": "\nSingle Campus\nChain"
   },
   {
@@ -152,17 +153,18 @@
   {
    "fieldname": "teacher_training_services",
    "fieldtype": "Small Text",
-   "label": "Teacher Training Services"
+   "label": "Courses & Workshops"
   },
   {
    "fieldname": "tilawat_services",
    "fieldtype": "Small Text",
-   "label": "Tilawat Program Services"
+   "hidden": 1,
+   "label": "Tilawat Program Services (legacy)"
   },
   {
    "fieldname": "quran_program_services",
    "fieldtype": "Small Text",
-   "label": "Quran Program for Student Services"
+   "label": "Services Onboard"
   },
   {
    "fieldname": "section_engagement",
@@ -187,7 +189,7 @@
   {
    "fieldname": "section_attachments",
    "fieldtype": "Section Break",
-   "label": "4 Attachments"
+   "label": "Attachments"
   },
   {
    "fieldname": "visiting_card",
@@ -202,7 +204,8 @@
   {
    "fieldname": "meeting_picture",
    "fieldtype": "Attach",
-   "label": "Meeting Picture"
+   "hidden": 1,
+   "label": "Meeting Picture (legacy)"
   },
   {
    "fieldname": "fee_structure",
@@ -274,33 +277,9 @@
   {
    "fieldname": "marketing_sample_provided",
    "fieldtype": "Select",
-   "label": "Marketing Sample Provided",
+   "hidden": 1,
+   "label": "Marketing Sample Provided (legacy)",
    "options": "\nYes\nNo"
-  },
-  {
-   "fieldname": "section_channels",
-   "fieldtype": "Section Break",
-   "label": "8 School Communication Channels"
-  },
-  {
-   "fieldname": "school_ptcl",
-   "fieldtype": "Data",
-   "label": "School PTCL"
-  },
-  {
-   "fieldname": "school_mobile",
-   "fieldtype": "Data",
-   "label": "School Mobile"
-  },
-  {
-   "fieldname": "school_whatsapp",
-   "fieldtype": "Data",
-   "label": "School WhatsApp"
-  },
-  {
-   "fieldname": "school_email",
-   "fieldtype": "Data",
-   "label": "School Email"
   },
   {
    "fieldname": "section_contacts",
@@ -312,6 +291,32 @@
    "fieldtype": "Table",
    "label": "Key Contacts",
    "options": "School Opening Contact"
+  },
+  {
+   "fieldname": "section_channels",
+   "fieldtype": "Section Break",
+   "label": "School Communication Channels"
+  },
+  {
+   "fieldname": "school_ptcl",
+   "fieldtype": "Data",
+   "label": "School PTCL / Mobile Number"
+  },
+  {
+   "fieldname": "school_mobile",
+   "fieldtype": "Data",
+   "label": "School Mobile"
+  },
+  {
+   "fieldname": "school_whatsapp",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "School WhatsApp (legacy)"
+  },
+  {
+   "fieldname": "school_email",
+   "fieldtype": "Data",
+   "label": "School Email"
   },
   {
    "fieldname": "section_approval",
@@ -365,6 +370,7 @@
  "module": "Tif Customization",
  "name": "School Opening Application",
  "naming_rule": "By \"Naming Series\" field",
+ "default_print_format": "School Opening SC-1.2",
  "owner": "Administrator",
  "permissions": [
   {

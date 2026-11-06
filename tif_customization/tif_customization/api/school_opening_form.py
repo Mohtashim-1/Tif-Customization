@@ -7,18 +7,10 @@ import frappe
 from frappe import _
 from frappe.utils import cstr, getdate, now_datetime
 
-CONTACT_ROLES = [
-	"Director",
-	"Administrator",
-	"Principal",
-	"Vice Principal",
-	"Academic Manager",
-	"Academic Coordinator",
-	"Admin Person",
-	"Receptionist",
-	"Coordinator",
-	"Ambassador",
-]
+from tif_customization.tif_customization.api.school_opening_options import (
+	CONTACT_ROLES,
+	school_opening_form_options,
+)
 
 FILE_FIELD_MAP = {
 	"visiting_card": "visiting_card",
@@ -39,10 +31,7 @@ def _list_to_csv(value):
 
 @frappe.whitelist(allow_guest=True)
 def get_school_opening_form_context():
-	return {
-		"contact_roles": CONTACT_ROLES,
-		"form_no": "SC-1.2",
-	}
+	return school_opening_form_options()
 
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])
@@ -147,14 +136,23 @@ def create_school_opening_application(data):
 	doc.institution_types = _list_to_csv(data.get("institution_types"))
 	doc.institution_category = data.get("institution_category")
 	doc.educational_system = _list_to_csv(data.get("educational_system"))
-	doc.type_of_school = data.get("type_of_school")
+	# V2: Type of School = Single Campus / Chain (structure). Keep type_of_school in sync.
+	structure = data.get("structure") or data.get("type_of_school")
+	doc.structure = structure if structure in ("Single Campus", "Chain") else data.get("structure")
+	doc.type_of_school = doc.structure or data.get("type_of_school")
 	doc.no_of_campuses = data.get("no_of_campuses")
 	doc.no_of_students = data.get("no_of_students")
-	doc.structure = data.get("structure")
 	doc.academic_shift = data.get("academic_shift")
-	doc.teacher_training_services = _list_to_csv(data.get("teacher_training_services"))
+	# V2: Courses & Workshops → teacher_training_services
+	doc.teacher_training_services = _list_to_csv(
+		data.get("courses_workshops") or data.get("teacher_training_services")
+	)
+	# Legacy tilawat kept if sent; V2 no longer collects it
 	doc.tilawat_services = _list_to_csv(data.get("tilawat_services"))
-	doc.quran_program_services = _list_to_csv(data.get("quran_program_services"))
+	# V2: Services Onboard → quran_program_services
+	doc.quran_program_services = _list_to_csv(
+		data.get("services_onboard") or data.get("quran_program_services")
+	)
 	doc.running_tif_services = _list_to_csv(data.get("running_tif_services"))
 	doc.curriculum_in_use = _list_to_csv(data.get("curriculum_in_use"))
 	doc.curriculum_others = data.get("curriculum_others")

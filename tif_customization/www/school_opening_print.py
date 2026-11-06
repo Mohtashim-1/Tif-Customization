@@ -6,6 +6,7 @@ from frappe import _
 from tif_customization.tif_customization.api.school_opening_registry import (
 	build_school_opening_view,
 	build_school_opening_view_from_application,
+	render_school_opening_form_body,
 	resolve_customer_name,
 )
 
@@ -50,7 +51,4 @@ def get_context(context):
 	context.customer = view.get("customer") or customer
 	context.application = view.get("application") or raw_application
 	context.print_mode = False
-	context.form_print_body = frappe.render_template(
-		"templates/school_opening_form_print.html",
-		{"data": view, "print_mode": False},
-	)
+	context.form_print_body = render_school_opening_form_body(view, print_mode=False)

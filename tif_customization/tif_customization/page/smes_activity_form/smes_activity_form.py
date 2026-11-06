@@ -548,7 +548,7 @@ def get_form_meta():
 	if staff_province in PROVINCE_MAP:
 		staff_province = PROVINCE_MAP[staff_province]
 
-	return {
+	ctx = {
 		"customers": _customer_link_options(limit=5000),
 		"staff_name": staff_name,
 		"staff_employee": staff_employee,
@@ -856,98 +856,14 @@ def get_form_meta():
 		"me_nazra_books": ["Noorani Qaida", "Noorani Qaida Workbook"],
 		"sme_name_options": _sme_display_names(staff_list),
 		"training_conducted_by_options": _training_conducted_by_options(staff_list),
-		"school_opening_contact_roles": CONTACT_ROLES,
-		"school_opening_visit_types": [
-			"Visit without enrollment",
-			"Visit with enrollment",
-		],
-		"school_opening_institution_types": [
-			"School",
-			"College",
-			"University",
-			"Madaris",
-			"Library",
-			"Special School",
-		],
-		"school_opening_categories": ["Provincial Govt.", "Private"],
-		"school_opening_educational_system": [
-			"Pre-Primary",
-			"Primary",
-			"Matric",
-			"Intermediate",
-			"Hifz-o-Nazra",
-			"Cambridge",
-			"O / A Levels",
-		],
-		"school_opening_structure": ["Single Campus", "Chain"],
-		"school_opening_shifts": ["Morning", "Evening", "Both"],
-		"school_opening_teacher_training": [
-			"ELP",
-			"One Day Workshop (Intro of Tajweed)",
-			"TECC Professional",
-			"TECC Foundation",
-			"V-Campers",
-			"Effective Teaching of the Holy Qur'an Workshop",
-			"PEF Pakistan",
-			"Intro to Tajweed — One Day Workshop",
-			"Tajweed Training Course",
-		],
-		"school_opening_tilawat": [
-			"Noorani Qaida — NQ Teachers Guide",
-			"Tajweed Workshop for Kids",
-			"Teachers Training (Online)",
-			"Teachers Training (On-site)",
-			"Noorani Qaida — NQ Workbook",
-		],
-		"school_opening_quran": [
-			"MQH Part-1 + Part-1 (Sample)",
-			"MQH Part-1 (MQH T.G Part-1)",
-			"MQH Part-2 (MQH T.G Part-2)",
-			"MQH Part-3 (MQH T.G Part-3)",
-			"MQH Part-4 (MQH T.G Part-4)",
-			"MQH Part-5 (MQH T.G Part-5)",
-			"MQH Part-6",
-			"MQH Part-7",
-			"MQH Part-1 — English Version",
-			"MQH Part-2 — English Version",
-			"MQH Part-1 — Sindhi Version",
-			"MQH Part-2 — Sindhi Version",
-			"MQH Part-3 — Sindhi Version",
-			"Intro Workshops",
-		],
-		"school_opening_running_tif": [
-			"Quran Program for Student",
-			"Tilawat Program for School",
-			"Teacher Training",
-		],
-		"school_opening_curriculum": [
-			"Oral Nazra",
-			"Qaida",
-			"Afaq",
-			"National Book Foundation",
-			"Noorani Qaida (Not TPS)",
-			"Iqra Qaida",
-			"Spectrum",
-			"Rehmani Qaida",
-			"Madni Qaida",
-			"Gaba",
-			"Jamiat Qaida",
-			"Qurani Qaida",
-			"Moonlight",
-			"Islamic Values",
-			"CEF",
-			"Zia ul Quran",
-		],
-		"school_opening_fee": ["Above 15K", "Between 5K – 15K", "Below 5K"],
-		"school_opening_provinces": [
-			"Sindh",
-			"Punjab",
-			"KPK",
-			"Balochistan",
-			"Gilgit-Baltistan",
-			"Azad Jammu & Kashmir",
-		],
 	}
+	# School Opening V2 (SC-1.2) options — shared with guest form / DocType
+	from tif_customization.tif_customization.api.school_opening_options import (
+		school_opening_form_options,
+	)
+
+	ctx.update(school_opening_form_options())
+	return ctx
 
 
 def _customer_link_options(txt="", city="", limit=4000):

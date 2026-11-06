@@ -10,103 +10,56 @@ from frappe.utils import escape_html, formatdate, getdate, cstr
 
 from tif_customization.tif_customization.api.school_opening_form import CONTACT_ROLES
 
-# Same overrides as www/school-opening-print.html (wkhtmltopdf does not load /assets/ CSS reliably)
+# SC-1.2 V2 print — wkhtmltopdf does not load /assets CSS reliably
+_SOA_CSS_VAR_VALUES = {
+	"--v2-green": "#0d4f3f",
+	"--v2-green-dark": "#0a3d31",
+	"--v2-gold": "#c4a35a",
+	"--v2-gold-bg": "#d4b56a",
+	"--v2-label-bg": "#d9e6e2",
+	"--v2-field-bg": "#ececec",
+	"--v2-attach-bg": "#f3efe4",
+	"--v2-ink": "#1a1a1a",
+	"--v2-muted": "#666666",
+}
+
 _SCHOOL_OPENING_PDF_STYLE_OVERRIDES = """
-body { margin: 0; padding: 0; background: #c8c8c8 !important; }
-.soa-print-toolbar { display: none !important; }
-/* wkhtmltopdf uses print-media-type; keep the same look as /school-opening-print on screen */
-#school-opening-portal.school-opening-portal {
-	background: #c8c8c8 !important;
-	padding: 20px 16px 48px !important;
-	color: #1a1a1a !important;
-	font-family: "Segoe UI", system-ui, Arial, sans-serif !important;
+body { margin: 0; padding: 0; background: #d0d0d0 !important; }
+.soa-print-toolbar, .no-print { display: none !important; }
+#school-opening-portal.soa-v2 {
+	background: #d0d0d0 !important;
+	padding: 12px !important;
 }
-#school-opening-portal .soa-sheet {
-	max-width: 820px !important;
+#school-opening-portal.soa-v2 .soa-sheet {
+	max-width: 780px !important;
 	margin: 0 auto !important;
-	background: #ffffff !important;
-	padding: 28px 32px 36px !important;
-	border: 1px solid #4a4a4a !important;
-	box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12) !important;
-}
-#school-opening-portal .soa-field input:not([type=checkbox]):not([type=radio]),
-#school-opening-portal .soa-field textarea,
-#school-opening-portal .soa-control {
-	background: #ebebeb !important;
-	border: 1px solid #a8a8a8 !important;
-	min-height: 38px;
-	padding: 8px 10px !important;
-	border-radius: 2px !important;
 	box-shadow: none !important;
-	color: #1a1a1a !important;
 }
-#school-opening-portal .soa-section-title {
-	background: none !important;
-	color: #1a1a1a !important;
-	padding: 0 !important;
+#school-opening-portal.soa-v2 .v2-section-title,
+#school-opening-portal.soa-v2 .v2-title-bar,
+#school-opening-portal.soa-v2 .v2-contacts th {
+	color: #ffffff !important;
+	-webkit-text-fill-color: #ffffff !important;
 }
-#school-opening-portal .soa-block {
-	border: 1px solid #333333 !important;
-	background: #fafafa !important;
+#school-opening-portal.soa-v2 .page-break {
+	page-break-before: always;
+	height: 18px;
 }
 """
 
-# wkhtmltopdf 0.12.6 often ignores custom properties — inline literal replacements
-_SOA_CSS_VAR_VALUES = {
-	"--soa-ink": "#1a1a1a",
-	"--soa-border": "#4a4a4a",
-	"--soa-box-border": "#333333",
-	"--soa-fill": "#ebebeb",
-	"--soa-fill-focus": "#ffffff",
-	"--soa-page": "#c8c8c8",
-	"--soa-sheet": "#ffffff",
-	"--soa-font": '"Segoe UI", Arial, sans-serif',
-	"--soa-font-doc": 'Georgia, "Times New Roman", Times, serif',
-}
-
 _SCHOOL_OPENING_WKHTML_LAYOUT_CSS = """
-/* wkhtmltopdf layout + visibility fallbacks */
 body, #school-opening-portal, #school-opening-portal * {
 	visibility: visible !important;
 	opacity: 1 !important;
 }
-#school-opening-portal,
-#school-opening-portal .soa-sheet,
-#school-opening-portal .soa-field,
-#school-opening-portal label,
-#school-opening-portal h1,
-#school-opening-portal th,
-#school-opening-portal td {
-	color: #1a1a1a !important;
-	-webkit-text-fill-color: #1a1a1a !important;
-}
-#school-opening-portal .soa-title-row,
-#school-opening-portal .soa-meta-inline,
-#school-opening-portal .soa-date-picker-input-wrap {
-	display: block !important;
-}
-#school-opening-portal .soa-row-2 .soa-field,
-#school-opening-portal .soa-row-3 .soa-field {
-	display: inline-block !important;
-	vertical-align: top !important;
-	width: 48% !important;
-	margin-bottom: 10px !important;
-}
-#school-opening-portal .soa-check-grid {
-	display: block !important;
-}
-#school-opening-portal .soa-check-grid label {
-	display: block !important;
-	width: 32% !important;
-	float: left !important;
-}
-#school-opening-portal .soa-check-grid::after {
+#school-opening-portal.soa-v2 .v2-checks::after {
 	content: "";
 	display: block;
 	clear: both;
 }
-#school-opening-portal .soa-date-popup {
-	display: none !important;
+#school-opening-portal.soa-v2 .v2-logo {
+	width: 48px !important;
+	height: 48px !important;
 }
 """
 
@@ -114,27 +67,42 @@ body, #school-opening-portal, #school-opening-portal * {
 def _pdf_safe_css(css: str) -> str:
 	for var, value in _SOA_CSS_VAR_VALUES.items():
 		css = css.replace(f"var({var})", value)
-	# Selectors like :has() break Frappe's cssutils pass and some wkhtmltopdf builds
 	css = re.sub(r"[^{}]*:has\([^)]*\)[^{]*\{[^}]*\}", "", css, flags=re.MULTILINE)
 	return css
 
 
 def _school_opening_embedded_css():
-	"""Read form + print CSS from disk for PDF (avoid broken external asset URLs in wkhtmltopdf)."""
+	"""Embed V2 print CSS for PDF / Desk Print Format."""
 	app_path = frappe.get_app_path("tif_customization", "public", "css")
 	parts = []
-	with open(os.path.join(app_path, "school_opening_form.css"), encoding="utf-8") as f:
-		parts.append(f.read())
-	# Screen-only rules from print.css (skip @media print — wkhtmltopdf enables print-media-type)
-	with open(os.path.join(app_path, "school_opening_print.css"), encoding="utf-8") as f:
-		print_css = f.read()
-	if "@media print" in print_css:
-		print_css = print_css.split("@media print", 1)[0]
-	parts.append(print_css)
+	with open(os.path.join(app_path, "school_opening_v2_print.css"), encoding="utf-8") as f:
+		v2_css = f.read()
+	if "@media print" in v2_css:
+		v2_css = v2_css.split("@media print", 1)[0]
+	parts.append(v2_css)
+	# toolbar helpers from print.css (nav only)
+	print_css_path = os.path.join(app_path, "school_opening_print.css")
+	if os.path.exists(print_css_path):
+		with open(print_css_path, encoding="utf-8") as f:
+			print_css = f.read()
+		if "@media print" in print_css:
+			print_css = print_css.split("@media print", 1)[0]
+		parts.append(print_css)
 	parts.append(_SCHOOL_OPENING_PDF_STYLE_OVERRIDES)
 	parts.append(_SCHOOL_OPENING_WKHTML_LAYOUT_CSS)
 	return _pdf_safe_css("\n".join(parts))
 
+
+def _school_opening_logo_data_uri():
+	"""Inline logo so wkhtmltopdf / desk PDF do not depend on HTTP asset URLs."""
+	import base64
+
+	path = frappe.get_app_path("tif_customization", "public", "images", "tif_logo.png")
+	if not os.path.exists(path):
+		return "/assets/tif_customization/images/tif_logo.png"
+	with open(path, "rb") as f:
+		b64 = base64.b64encode(f.read()).decode("ascii")
+	return f"data:image/png;base64,{b64}"
 
 def _csv_to_list(value):
 	if not value:
@@ -1845,15 +1813,32 @@ def _customer_contacts(customer):
 	return contacts
 
 
-def render_school_opening_pdf_html(data):
-	"""Build PDF HTML in Python so wkhtmltopdf never receives unreplaced Jinja placeholders."""
+def render_school_opening_form_body(data, print_mode=True):
+	"""SC-1.2 V2 form body (same template for screen print + PDF + Desk Print Format)."""
+	# Inject absolute/data logo so print & PDF always show letterhead mark
+	data = dict(data or {})
+	data.setdefault("logo_url", _school_opening_logo_data_uri())
 	form_print_body = frappe.render_template(
 		"templates/school_opening_form_print.html",
-		{"data": data, "print_mode": True},
+		{
+			"data": data,
+			"print_mode": print_mode,
+			"logo_url": data.get("logo_url"),
+		},
+	)
+	# Template uses logo_url variable — rewrite asset path to data URI for PDF
+	logo = data.get("logo_url") or _school_opening_logo_data_uri()
+	form_print_body = form_print_body.replace(
+		"/assets/tif_customization/images/tif_logo.png", logo
 	)
 	if not form_print_body or "school-opening-portal" not in form_print_body:
 		frappe.throw(_("Could not build school opening form for PDF."))
+	return form_print_body
 
+
+def render_school_opening_pdf_html(data):
+	"""Build PDF HTML in Python so wkhtmltopdf never receives unreplaced Jinja placeholders."""
+	form_print_body = render_school_opening_form_body(data, print_mode=True)
 	css = _school_opening_embedded_css()
 	title = escape_html(data.get("school_name") or data.get("customer") or "")
 	return (
@@ -1868,6 +1853,26 @@ def render_school_opening_pdf_html(data):
 		"</div>\n</body>\n</html>"
 	)
 
+
+def get_school_opening_print_format_html(docname):
+	"""HTML fragment for Desk Print Format — same V2 SC-1.2 layout as /school-opening-print."""
+	data = build_school_opening_view_from_application(docname)
+	body = render_school_opening_form_body(data, print_mode=True)
+	css = _school_opening_embedded_css()
+	desk_overrides = """
+	#school-opening-portal.soa-v2 {
+		background: #fff !important;
+		padding: 0 !important;
+	}
+	#school-opening-portal.soa-v2 .soa-sheet {
+		max-width: 100% !important;
+		margin: 0 !important;
+		box-shadow: none !important;
+		border: none !important;
+		padding: 0 !important;
+	}
+	"""
+	return f"<style>\n{css}\n{desk_overrides}\n</style>\n{body}"
 
 def _safe_pdf_filename(customer):
 	name = re.sub(r'[\\/:*?"<>|]+', "-", cstr(customer)).strip() or "school"

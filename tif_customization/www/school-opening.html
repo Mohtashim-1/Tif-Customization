@@ -4,7 +4,7 @@
 {% block header %}{% endblock %}
 
 {% block head_include %}
-<link rel="stylesheet" href="/assets/tif_customization/css/school_opening_form.css?v=20260912c">
+<link rel="stylesheet" href="/assets/tif_customization/css/school_opening_form.css?v=20261106v2">
 <style>
 	/* Fallback if asset cache is stale — must match school_opening_form.css */
 	#school-opening-portal .soa-field input:not([type=checkbox]):not([type=radio]):not([type=file]),
@@ -85,8 +85,8 @@
 					<label><input type="checkbox" value="School"> School</label>
 					<label><input type="checkbox" value="College"> College</label>
 					<label><input type="checkbox" value="University"> University</label>
-					<label><input type="checkbox" value="Madaris"> Madaris</label>
-					<label><input type="checkbox" value="Library"> Library</label>
+					<label><input type="checkbox" value="Madrasa"> Madrasa</label>
+					<label><input type="checkbox" value="Fahm-Ul-Quran Group"> Fahm-Ul-Quran Group</label>
 					<label><input type="checkbox" value="Special School"> Special School</label>
 				</div>
 			</div>
@@ -106,6 +106,7 @@
 				<div class="soa-check-grid" data-group="educational_system">
 					<label><input type="checkbox" value="Pre-Primary"> Pre-Primary</label>
 					<label><input type="checkbox" value="Primary"> Primary</label>
+					<label><input type="checkbox" value="Secondary"> Secondary</label>
 					<label><input type="checkbox" value="Matric"> Matric</label>
 					<label><input type="checkbox" value="Intermediate"> Intermediate</label>
 					<label><input type="checkbox" value="Hifz-o-Nazra"> Hifz-o-Nazra</label>
@@ -114,7 +115,13 @@
 				</div>
 			</div>
 			<div class="soa-row-3">
-				<div class="soa-field"><label>Type of School</label><input type="text" name="type_of_school"></div>
+				<div class="soa-block">
+					<div class="soa-label">Type of School</div>
+					<div class="soa-check-grid" data-group="structure" data-single="1">
+						<label><input type="radio" name="structure" value="Single Campus"> Single Campus</label>
+						<label><input type="radio" name="structure" value="Chain"> Chain</label>
+					</div>
+				</div>
 				<div class="soa-field"><label>No. of Campuses</label><input type="number" name="no_of_campuses" min="0"></div>
 				<div class="soa-field">
 					<label>No. of Students</label>
@@ -129,21 +136,12 @@
 					</select>
 				</div>
 			</div>
-			<div class="soa-row-2">
-				<div class="soa-block">
-					<div class="soa-label">Structure</div>
-					<div class="soa-check-grid" data-group="structure" data-single="1">
-						<label><input type="radio" name="structure" value="Single Campus"> Single Campus</label>
-						<label><input type="radio" name="structure" value="Chain"> Chain</label>
-					</div>
-				</div>
-				<div class="soa-block">
-					<div class="soa-label">Academic Session — Shift</div>
-					<div class="soa-check-grid" data-group="academic_shift" data-single="1">
-						<label><input type="radio" name="academic_shift" value="Morning"> Morning</label>
-						<label><input type="radio" name="academic_shift" value="Evening"> Evening</label>
-						<label><input type="radio" name="academic_shift" value="Both"> Both</label>
-					</div>
+			<div class="soa-block">
+				<div class="soa-label">Academic Session — Shift</div>
+				<div class="soa-check-grid" data-group="academic_shift" data-single="1">
+					<label><input type="radio" name="academic_shift" value="Morning"> Morning</label>
+					<label><input type="radio" name="academic_shift" value="Evening"> Evening</label>
+					<label><input type="radio" name="academic_shift" value="Both"> Both</label>
 				</div>
 			</div>
 		</section>
@@ -151,46 +149,36 @@
 		<section class="soa-section soa-section-enrollment-only" id="soa-section-services">
 			<div class="soa-section-title">2 Services of Interest</div>
 			<div class="soa-block">
-				<div class="soa-label">Teacher Training Services</div>
+				<div class="soa-label">Courses &amp; Workshops</div>
 				<div class="soa-check-grid" data-group="teacher_training_services">
 					<label><input type="checkbox" value="ELP"> ELP</label>
-					<label><input type="checkbox" value="One Day Workshop (Intro of Tajweed)"> One Day Workshop (Intro of Tajweed)</label>
+					<label><input type="checkbox" value="Workshop"> Workshop</label>
 					<label><input type="checkbox" value="TECC Professional"> TECC Professional</label>
+					<label><input type="checkbox" value="PEF Pakistan Workshop"> PEF Pakistan Workshop</label>
 					<label><input type="checkbox" value="TECC Foundation"> TECC Foundation</label>
-					<label><input type="checkbox" value="V-Campers"> V-Campers</label>
-					<label><input type="checkbox" value="Effective Teaching of the Holy Qur'an Workshop"> Effective Teaching of the Holy Qur'an Workshop</label>
-					<label><input type="checkbox" value="PEF Pakistan"> PEF Pakistan</label>
-					<label><input type="checkbox" value="Intro to Tajweed — One Day Workshop"> Intro to Tajweed — One Day Workshop</label>
-					<label><input type="checkbox" value="Tajweed Training Course"> Tajweed Training Course</label>
+					<label><input type="checkbox" value="Workshop Value Driven Teaching"> Workshop Value Driven Teaching</label>
+					<label><input type="checkbox" value="Customize Tajweed online Course"> Customize Tajweed online Course</label>
+					<label><input type="checkbox" value="Intro to Tajweed"> Intro to Tajweed</label>
+					<label><input type="checkbox" value="Tajweed Training Course (TTC)"> Tajweed Training Course (TTC)</label>
+					<label><input type="checkbox" value="Kids Workshop"> Kids Workshop</label>
+					<label><input type="checkbox" value="Workshop Art of Storytelling"> Workshop Art of Storytelling</label>
 				</div>
 			</div>
+		</section>
+
+		<section class="soa-section soa-section-enrollment-only" id="soa-section-services-onboard">
+			<div class="soa-section-title">2 Services Onboard</div>
 			<div class="soa-block">
-				<div class="soa-label">Tilawat Program for School Services — Workshops &amp; Trainings</div>
-				<div class="soa-check-grid" data-group="tilawat_services">
-					<label><input type="checkbox" value="Noorani Qaida — NQ Teachers Guide"> Noorani Qaida — NQ Teachers Guide</label>
-					<label><input type="checkbox" value="Tajweed Workshop for Kids"> Tajweed Workshop for Kids</label>
-					<label><input type="checkbox" value="Teachers Training (Online)"> Teachers Training (Online)</label>
-					<label><input type="checkbox" value="Teachers Training (On-site)"> Teachers Training (On-site)</label>
-					<label><input type="checkbox" value="Noorani Qaida — NQ Workbook"> Noorani Qaida — NQ Workbook</label>
-				</div>
-			</div>
-			<div class="soa-block">
-				<div class="soa-label">Quran Program for Student Services</div>
+				<div class="soa-label">Services onboard</div>
 				<div class="soa-check-grid" data-group="quran_program_services">
-					<label><input type="checkbox" value="MQH Part-1 + Part-1 (Sample)"> MQH Part-1 + Part-1 (Sample)</label>
-					<label><input type="checkbox" value="MQH Part-1 (MQH T.G Part-1)"> MQH Part-1 (MQH T.G Part-1)</label>
-					<label><input type="checkbox" value="MQH Part-2 (MQH T.G Part-2)"> MQH Part-2 (MQH T.G Part-2)</label>
-					<label><input type="checkbox" value="MQH Part-3 (MQH T.G Part-3)"> MQH Part-3 (MQH T.G Part-3)</label>
-					<label><input type="checkbox" value="MQH Part-4 (MQH T.G Part-4)"> MQH Part-4 (MQH T.G Part-4)</label>
-					<label><input type="checkbox" value="MQH Part-5 (MQH T.G Part-5)"> MQH Part-5 (MQH T.G Part-5)</label>
-					<label><input type="checkbox" value="MQH Part-6"> MQH Part-6</label>
-					<label><input type="checkbox" value="MQH Part-7"> MQH Part-7</label>
-					<label><input type="checkbox" value="MQH Part-1 — English Version"> MQH Part-1 — English Version</label>
-					<label><input type="checkbox" value="MQH Part-2 — English Version"> MQH Part-2 — English Version</label>
-					<label><input type="checkbox" value="MQH Part-1 — Sindhi Version"> MQH Part-1 — Sindhi Version</label>
-					<label><input type="checkbox" value="MQH Part-2 — Sindhi Version"> MQH Part-2 — Sindhi Version</label>
-					<label><input type="checkbox" value="MQH Part-3 — Sindhi Version"> MQH Part-3 — Sindhi Version</label>
-					<label><input type="checkbox" value="Intro Workshops"> Intro Workshops</label>
+					<label><input type="checkbox" value="MQH Green Version Part-1 to 7"> MQH Green Version Part-1 to 7</label>
+					<label><input type="checkbox" value="Noorani Qaida"> Noorani Qaida</label>
+					<label><input type="checkbox" value="MQH Green Version Teacher Guide 1 to 5"> MQH Green Version Teacher Guide 1 to 5</label>
+					<label><input type="checkbox" value="Noorani Qaida — NQ Workbook"> Noorani Qaida — NQ Workbook</label>
+					<label><input type="checkbox" value="MQH English Version Part-1 – 2"> MQH English Version Part-1 – 2</label>
+					<label><input type="checkbox" value="MQH Sindhi Version Part-1 – 3"> MQH Sindhi Version Part-1 – 3</label>
+					<label><input type="checkbox" value="Noorani Qaida — NQ Teachers Guide"> Noorani Qaida — NQ Teachers Guide</label>
+					<label><input type="checkbox" value="MQH KP Edition Part-1 to 7"> MQH KP Edition Part-1 to 7</label>
 				</div>
 			</div>
 		</section>
@@ -225,16 +213,7 @@
 					<label><input type="checkbox" value="CEF"> CEF</label>
 					<label><input type="checkbox" value="Zia ul Quran"> Zia ul Quran</label>
 				</div>
-				<div class="soa-field mt-2"><label>Others</label><input type="text" name="curriculum_others"></div>
-			</div>
-		</section>
-
-		<section class="soa-section">
-			<div class="soa-section-title">4 Attachments</div>
-			<div class="soa-row-3">
-				<div class="soa-field"><label>Visiting Card</label><input type="file" name="visiting_card" accept="image/*,.pdf" class="soa-file"></div>
-				<div class="soa-field"><label>School Picture</label><input type="file" name="school_picture" accept="image/*" class="soa-file"></div>
-				<div class="soa-field"><label>Meeting Picture</label><input type="file" name="meeting_picture" accept="image/*" class="soa-file"></div>
+				<div class="soa-field mt-2"><label>Others</label><input type="text" name="curriculum_others" placeholder="____________________"></div>
 			</div>
 			<div class="soa-block">
 				<div class="soa-label">Fee Structure</div>
@@ -275,16 +254,7 @@
 					<label><input type="radio" name="province" value="Azad Jammu & Kashmir"> Azad Jammu &amp; Kashmir</label>
 				</div>
 			</div>
-			<div class="soa-row-2">
-				<div class="soa-field"><label>Country</label><input type="text" name="country" value="Pakistan"></div>
-				<div class="soa-block">
-					<div class="soa-label">Marketing Sample Provided</div>
-					<div class="soa-check-grid" data-group="marketing_sample_provided" data-single="1">
-						<label><input type="radio" name="marketing_sample_provided" value="Yes"> Yes</label>
-						<label><input type="radio" name="marketing_sample_provided" value="No"> No</label>
-					</div>
-				</div>
-			</div>
+			<div class="soa-field"><label>Other Country</label><input type="text" name="country" value="Pakistan"></div>
 		</section>
 
 		<section class="soa-section">
@@ -292,7 +262,7 @@
 			<table class="soa-contacts-table">
 				<thead><tr><th>Role</th><th>Name</th><th>Cell No.</th></tr></thead>
 				<tbody>
-					{% for role in ["Director", "Administrator", "Principal", "Vice Principal", "Academic Manager", "Academic Coordinator", "Admin Person", "Receptionist", "Coordinator", "Ambassador"] %}
+					{% for role in ["Director", "Administrator", "Principal", "Vice Principal", "Academic Manager", "Academic Coordinator", "Coordinator", "Receptionist", "Ambassador"] %}
 					<tr>
 						<td>{{ role }}</td>
 						<td><input type="text" data-contact-role="{{ role }}" data-contact-field="name"></td>
@@ -301,15 +271,18 @@
 					{% endfor %}
 				</tbody>
 			</table>
+			<div class="soa-row-2" style="margin-top:12px">
+				<div class="soa-field"><label>School PTCL / Mobile Number</label><input type="text" name="school_ptcl"></div>
+				<div class="soa-field"><label>School Mobile</label><input type="text" name="school_mobile"></div>
+				<div class="soa-field"><label>School Email</label><input type="email" name="school_email"></div>
+			</div>
 		</section>
 
 		<section class="soa-section">
-			<div class="soa-section-title">8 School Communication Channels</div>
+			<div class="soa-section-title">4 Attachments</div>
 			<div class="soa-row-2">
-				<div class="soa-field"><label>School PTCL</label><input type="text" name="school_ptcl"></div>
-				<div class="soa-field"><label>School Mobile</label><input type="text" name="school_mobile"></div>
-				<div class="soa-field"><label>School WhatsApp</label><input type="text" name="school_whatsapp"></div>
-				<div class="soa-field"><label>School Email</label><input type="email" name="school_email"></div>
+				<div class="soa-field"><label>Visiting Card</label><input type="file" name="visiting_card" accept="image/*,.pdf" class="soa-file"></div>
+				<div class="soa-field"><label>School Picture</label><input type="file" name="school_picture" accept="image/*" class="soa-file"></div>
 			</div>
 		</section>
 
@@ -369,14 +342,15 @@
 			institution_types: checkedValues("institution_types"),
 			institution_category: checkedValues("institution_category"),
 			educational_system: checkedValues("educational_system"),
-			type_of_school: fd.get("type_of_school"),
 			no_of_campuses: fd.get("no_of_campuses"),
 			no_of_students: fd.get("no_of_students"),
 			structure: checkedValues("structure"),
+			type_of_school: checkedValues("structure"),
 			academic_shift: checkedValues("academic_shift"),
 			teacher_training_services: checkedValues("teacher_training_services"),
-			tilawat_services: checkedValues("tilawat_services"),
+			courses_workshops: checkedValues("teacher_training_services"),
 			quran_program_services: checkedValues("quran_program_services"),
+			services_onboard: checkedValues("quran_program_services"),
 			running_tif_services: checkedValues("running_tif_services"),
 			curriculum_in_use: checkedValues("curriculum_in_use"),
 			curriculum_others: fd.get("curriculum_others"),
@@ -391,10 +365,8 @@
 			province: checkedValues("province"),
 			city: fd.get("city"),
 			country: fd.get("country"),
-			marketing_sample_provided: checkedValues("marketing_sample_provided"),
 			school_ptcl: fd.get("school_ptcl"),
 			school_mobile: fd.get("school_mobile"),
-			school_whatsapp: fd.get("school_whatsapp"),
 			school_email: fd.get("school_email"),
 			key_contacts: collectContacts(),
 		};
@@ -410,7 +382,7 @@
 
 		const body = new FormData();
 		body.append("payload", JSON.stringify(buildPayload()));
-		["visiting_card", "school_picture", "meeting_picture"].forEach((name) => {
+		["visiting_card", "school_picture"].forEach((name) => {
 			const fileInput = form.querySelector('input[type="file"][name="' + name + '"]');
 			if (fileInput && fileInput.files && fileInput.files[0]) {
 				body.append(name, fileInput.files[0]);

@@ -198,9 +198,8 @@ const SOA_CONTACT_ROLES = [
 	"Vice Principal",
 	"Academic Manager",
 	"Academic Coordinator",
-	"Admin Person",
-	"Receptionist",
 	"Coordinator",
+	"Receptionist",
 	"Ambassador",
 ];
 const SOA_PROVINCE_FROM_VISIT = {
