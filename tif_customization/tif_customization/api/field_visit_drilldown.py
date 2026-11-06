@@ -624,19 +624,34 @@ def _me_status_note(row) -> tuple[str, str]:
 
 
 def _type_task_label(row) -> str:
-	"""Human Type / Task cell: visit type plus category or task detail."""
+	"""Human Type / Task cell: report-card style name plus category/task detail."""
 	vtype = cstr(row.get("type") or "").strip() or "Other"
 	mvc = _clean(row.get("marketing_visit_category"))
-	if vtype in ("Visits", "Marketing") and mvc:
-		return f"{vtype} · {mvc}"
+
+	# Field Visit stores type as "Visits" / "Marketing" — show card names instead.
+	if vtype in ("Visits", "Marketing") or vtype == "Registration of New Schools":
+		if vtype == "Registration of New Schools":
+			return "Marketing Visit · Registration of New Schools"
+		is_new = (mvc or "").strip().lower() == "new" or vtype == "Marketing"
+		if is_new:
+			return f"Marketing Visit · {mvc or 'New'}"
+		if mvc:
+			return f"Follow up Visit · {mvc}"
+		return "Follow up Visit" if vtype == "Visits" else "Marketing Visit"
 
 	if vtype == "Academic Task":
 		detail = _clean(row.get("ot_academic_task_other"))
-		return f"{vtype} · {detail}" if detail else vtype
+		return f"Academic Task · {detail}" if detail else "Academic Task"
 
 	if vtype == "Other Official Tasks":
 		detail = _clean(row.get("ot_other_official_task_detail"))
-		return f"{vtype} · {detail}" if detail else vtype
+		return f"Other Official Tasks · {detail}" if detail else "Other Official Tasks"
+
+	if vtype == "M&E":
+		status, _why = _me_status_note(row)
+		if status and status not in ("Status not filled",):
+			return f"Monitoring Visit (M&E) · {status}"
+		return "Monitoring Visit (M&E)"
 
 	workshop_types = {
 		"Workshop Conducted",
@@ -647,16 +662,23 @@ def _type_task_label(row) -> str:
 	}
 	if vtype in workshop_types:
 		detail = _workshop_heading(row)
-		if detail and detail != vtype:
-			# Avoid "Workshop Conducted · Conducted"
-			if detail.lower().startswith(vtype.lower()):
-				return detail
-			return f"{vtype} · {detail}"
+		pretty = {
+			"Workshop Conducted": "Workshop Conducted through SME (Onsite)",
+			"Workshop": "Workshop Conducted through SME (Onsite)",
+			"Workshop Arranged": "Workshop Arranged",
+			"Teachers Training Meeting": "Teachers Training Meeting (Onsite School)",
+		}.get(vtype, vtype)
+		if detail and detail != vtype and not detail.lower().startswith(vtype.lower()):
+			return f"{pretty} · {detail}"
+		if detail and detail.lower().startswith(vtype.lower()):
+			return detail.replace(vtype, pretty, 1) if detail.startswith(vtype) else detail
+		return pretty
 
-	if vtype == "M&E":
-		status, _why = _me_status_note(row)
-		if status and status not in ("Status not filled",):
-			return f"{vtype} · {status}"
+	if vtype in ("Meeting", "Meeting with Ulama and Educationist"):
+		return "Meeting / Ulama and Educationist"
+
+	if vtype == "Headoffice/ Regional Office/ Out of Station Visit":
+		return "Head Office / Regional Office / Out of Station Visit"
 
 	return vtype
 
