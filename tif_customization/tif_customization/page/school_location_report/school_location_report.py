@@ -377,14 +377,15 @@ def get_school_visits(school=None):
 	"""Field visits for one school (School DocType, Customer, or school display name).
 
 	Returns Document Name, Date, Field Officer, Remarks — same shape as School Location Report dialog.
+	Never throws for unknown master records: report school names are often free text / Customer titles.
 	"""
 	school = cstr(school).strip()
 	if not school:
-		frappe.throw(_("School is required"))
+		return {"school": "", "school_name": "", "visits": []}
 
 	customer, school_name, doc = _resolve_school_lookup(school)
-	if not customer and not school_name:
-		frappe.throw(_("School not found"))
+	# Always keep the clicked label so visit matching still runs for free-text names.
+	school_name = school_name or school
 
 	from tif_customization.tif_customization.field_visit_permissions import visit_day_sql
 
@@ -413,20 +414,20 @@ def get_school_visits(school=None):
 			OR (
 				%(school_name)s != ''
 				AND (
-					LOWER(TRIM(c.customer_name)) = LOWER(%(school_name)s)
-					OR LOWER(TRIM(mc.customer_name)) = LOWER(%(school_name)s)
-					OR LOWER(TRIM(fv.pending_school_name)) = LOWER(%(school_name)s)
-					OR LOWER(TRIM(fv.school_name)) = LOWER(%(school_name)s)
-					OR LOWER(TRIM(fv.me_school_name)) = LOWER(%(school_name)s)
-					OR LOWER(TRIM(fv.mt_institute_or_organization_name)) = LOWER(%(school_name)s)
-					OR LOWER(TRIM(fv.training_venue_name)) = LOWER(%(school_name)s)
+					LOWER(TRIM(IFNULL(c.customer_name, ''))) = LOWER(%(school_name)s)
+					OR LOWER(TRIM(IFNULL(mc.customer_name, ''))) = LOWER(%(school_name)s)
+					OR LOWER(TRIM(IFNULL(fv.pending_school_name, ''))) = LOWER(%(school_name)s)
+					OR LOWER(TRIM(IFNULL(fv.school_name, ''))) = LOWER(%(school_name)s)
+					OR LOWER(TRIM(IFNULL(fv.me_school_name, ''))) = LOWER(%(school_name)s)
+					OR LOWER(TRIM(IFNULL(fv.mt_institute_or_organization_name, ''))) = LOWER(%(school_name)s)
+					OR LOWER(TRIM(IFNULL(fv.training_venue_name, ''))) = LOWER(%(school_name)s)
 				)
 			)
 		  )
 		ORDER BY visit_date DESC, fv.creation DESC
 		LIMIT 200
 		""",
-		{"customer": customer, "school_name": school_name},
+		{"customer": customer or "", "school_name": school_name},
 		as_dict=True,
 	)
 

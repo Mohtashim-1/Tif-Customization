@@ -2319,7 +2319,8 @@ def submit_smes_activity(data):
 		else:
 			status_message = _(
 				"Visit {0} saved as Draft and sent to your supervisor for approval.\n{1}"
-			).format(doc.name, "\n".join(approval.get("reasons") or []))	elif soa_doc:
+			).format(doc.name, "\n".join(approval.get("reasons") or []))
+	elif soa_doc:
 		status_message += _(" School Opening request {0} was also saved.").format(soa_doc.name)
 
 	out = {

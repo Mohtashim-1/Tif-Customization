@@ -52,77 +52,79 @@ frappe.tif_customization.school_link_html = function (school, extraHtml) {
 frappe.tif_customization.open_school_visits_dialog = function (school) {
 	const key = String(school || "").trim();
 	if (!key || key === "—" || key === "-") return;
+	const showDialog = (data) => {
+		data = data || {};
+		const visits = data.visits || [];
+		const body = visits.length
+			? visits
+					.map((row) => {
+						const date = row.visit_date
+							? frappe.datetime.str_to_user(row.visit_date)
+							: "—";
+						const doctype = row.doctype || "Field Visit";
+						return `<tr>
+							<td><a href="#" class="tif-school-visit-doc" data-doctype="${frappe.utils.escape_html(
+								doctype
+							)}" data-name="${frappe.utils.escape_html(row.name || "")}">${frappe.utils.escape_html(
+							row.name || "—"
+						)}</a></td>
+							<td>${frappe.utils.escape_html(date)}</td>
+							<td>${frappe.utils.escape_html(row.field_officer || "—")}</td>
+							<td style="min-width:220px;max-width:420px;white-space:pre-wrap;line-height:1.4;">${frappe.utils.escape_html(
+								row.remarks || "—"
+							)}</td>
+						</tr>`;
+					})
+					.join("")
+			: `<tr><td colspan="4" class="text-muted text-center">${__(
+					"No field visits for this school"
+			  )}</td></tr>`;
+		const dialog = new frappe.ui.Dialog({
+			title: data.school_name || key,
+			size: "extra-large",
+			fields: [{ fieldtype: "HTML", fieldname: "html" }],
+			primary_action_label: __("Close"),
+			primary_action: () => dialog.hide(),
+		});
+		dialog.fields_dict.html.$wrapper.html(`
+			<p class="text-muted" style="font-size:12px;margin-bottom:10px;">
+				${__("Visits")}: <strong>${visits.length}</strong>
+			</p>
+			<div class="table-responsive" style="max-height:460px;overflow:auto;">
+				<table class="table table-bordered" style="font-size:12px;margin:0;">
+					<thead>
+						<tr>
+							<th>${__("Document Name")}</th>
+							<th>${__("Date")}</th>
+							<th>${__("Field Officer")}</th>
+							<th>${__("Remarks")}</th>
+						</tr>
+					</thead>
+					<tbody>${body}</tbody>
+				</table>
+			</div>
+		`);
+		dialog.$wrapper.on("click", ".tif-school-visit-doc", function (e) {
+			e.preventDefault();
+			const doctype = this.getAttribute("data-doctype") || "Field Visit";
+			const name = this.getAttribute("data-name");
+			if (!name) return;
+			if (doctype === "Field Visit" && frappe.tif_customization.open_field_visit_easy) {
+				frappe.tif_customization.open_field_visit_easy(name);
+			} else {
+				frappe.set_route("Form", doctype, name);
+			}
+		});
+		dialog.show();
+	};
 	frappe.call({
 		method:
 			"tif_customization.tif_customization.page.school_location_report.school_location_report.get_school_visits",
 		args: { school: key },
 		freeze: true,
 		freeze_message: __("Loading school visits…"),
-		callback: (response) => {
-			const data = response.message || {};
-			const visits = data.visits || [];
-			const body = visits.length
-				? visits
-						.map((row) => {
-							const date = row.visit_date
-								? frappe.datetime.str_to_user(row.visit_date)
-								: "—";
-							const doctype = row.doctype || "Field Visit";
-							return `<tr>
-								<td><a href="#" class="tif-school-visit-doc" data-doctype="${frappe.utils.escape_html(
-									doctype
-								)}" data-name="${frappe.utils.escape_html(row.name || "")}">${frappe.utils.escape_html(
-								row.name || "—"
-							)}</a></td>
-								<td>${frappe.utils.escape_html(date)}</td>
-								<td>${frappe.utils.escape_html(row.field_officer || "—")}</td>
-								<td style="min-width:220px;max-width:420px;white-space:pre-wrap;line-height:1.4;">${frappe.utils.escape_html(
-									row.remarks || "—"
-								)}</td>
-							</tr>`;
-						})
-						.join("")
-				: `<tr><td colspan="4" class="text-muted text-center">${__(
-						"No field visits for this school"
-				  )}</td></tr>`;
-			const dialog = new frappe.ui.Dialog({
-				title: data.school_name || key,
-				size: "extra-large",
-				fields: [{ fieldtype: "HTML", fieldname: "html" }],
-				primary_action_label: __("Close"),
-				primary_action: () => dialog.hide(),
-			});
-			dialog.fields_dict.html.$wrapper.html(`
-				<p class="text-muted" style="font-size:12px;margin-bottom:10px;">
-					${__("Visits")}: <strong>${visits.length}</strong>
-				</p>
-				<div class="table-responsive" style="max-height:460px;overflow:auto;">
-					<table class="table table-bordered" style="font-size:12px;margin:0;">
-						<thead>
-							<tr>
-								<th>${__("Document Name")}</th>
-								<th>${__("Date")}</th>
-								<th>${__("Field Officer")}</th>
-								<th>${__("Remarks")}</th>
-							</tr>
-						</thead>
-						<tbody>${body}</tbody>
-					</table>
-				</div>
-			`);
-			dialog.$wrapper.on("click", ".tif-school-visit-doc", function (e) {
-				e.preventDefault();
-				const doctype = this.getAttribute("data-doctype") || "Field Visit";
-				const name = this.getAttribute("data-name");
-				if (!name) return;
-				if (doctype === "Field Visit" && frappe.tif_customization.open_field_visit_easy) {
-					frappe.tif_customization.open_field_visit_easy(name);
-				} else {
-					frappe.set_route("Form", doctype, name);
-				}
-			});
-			dialog.show();
-		},
+		callback: (response) => showDialog(response.message || { school_name: key, visits: [] }),
+		error: () => showDialog({ school_name: key, visits: [] }),
 	});
 };
 
