@@ -812,18 +812,18 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						hint: __("Marketing Visit + Follow up Visit + Monitoring Visit (M&E)"),
 					},
 					{
-						label: __("New School Visit (Marketing Visit)"),
-						value: this.fmt(k.new),
+						label: __("Marketing Visit"),
+						value: this.fmt(k.marketing != null ? k.marketing : k.new),
 						style: "new",
-						metric: "new",
-						hint: __("Marketing or Visits with category New, plus Registration of New Schools"),
+						metric: "marketing",
+						hint: __("New marketing / registration visits (same as Activity → Marketing Visit)"),
 					},
 					{
 						label: __("Number of School"),
 						value: this.fmt(cint(k.followup) + cint(k.new)),
 						style: "followup",
 						cardKind: "school_visit_officers",
-						hint: __("Follow up Visit + New School Visit in this period."),
+						hint: __("Follow up Visit + Marketing Visit schools in this period."),
 					},
 					{
 						label: __("New Active Registered School"),
