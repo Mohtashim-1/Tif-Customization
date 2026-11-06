@@ -92,9 +92,10 @@ def _get_zakat_purchases(date_sql, date_params, supplier=None):
 		supplier_sql = " AND pe.party = %s"
 		params.append(supplier)
 
-	# Include payments that are Zakat-tagged via:
-	# - PE remarks / paid_from / cost_center mentioning Zakat, OR
-	# - linked Purchase Invoice cost center on Zakat (e.g. 2101 - Zakat - TIF)
+	# Any cost center / account / remark whose name contains "zakat"
+	# (e.g. 2101 - Zakat - TIF, 1101 - Zakat CEE - TIF, 613 - Zakat Expense - TIF)
+	zakat_cc = "LOWER(COALESCE({field}, '')) LIKE '%%zakat%%'"
+
 	return frappe.db.sql(
 		f"""
 		SELECT
@@ -106,10 +107,22 @@ def _get_zakat_purchases(date_sql, date_params, supplier=None):
 			per.reference_name AS purchase_invoice,
 			pi.bill_no AS supplier_invoice_no,
 			pi.posting_date AS invoice_date,
-			pi.cost_center AS invoice_cost_center,
+			COALESCE(
+				NULLIF(TRIM(pi.cost_center), ''),
+				NULLIF(TRIM(pe.cost_center), ''),
+				(
+					SELECT pii.cost_center
+					FROM `tabPurchase Invoice Item` pii
+					WHERE pii.parent = pi.name
+					  AND {zakat_cc.format(field="pii.cost_center")}
+					ORDER BY pii.idx
+					LIMIT 1
+				)
+			) AS cost_center,
 			COALESCE(per.allocated_amount, pe.base_paid_amount, pe.paid_amount, 0) AS amount,
 			pe.mode_of_payment,
-			pe.reference_no,
+			pe.reference_no AS voucher_ref,
+			pe.reference_date AS voucher_ref_date,
 			pe.remarks
 		FROM `tabPayment Entry` pe
 		LEFT JOIN `tabPayment Entry Reference` per
@@ -123,8 +136,14 @@ def _get_zakat_purchases(date_sql, date_params, supplier=None):
 		  AND (
 			LOWER(COALESCE(pe.remarks, '')) LIKE '%%zakat%%'
 			OR LOWER(COALESCE(pe.paid_from, '')) LIKE '%%zakat%%'
-			OR LOWER(COALESCE(pe.cost_center, '')) LIKE '%%zakat%%'
-			OR LOWER(COALESCE(pi.cost_center, '')) LIKE '%%zakat%%'
+			OR {zakat_cc.format(field="pe.cost_center")}
+			OR {zakat_cc.format(field="pi.cost_center")}
+			OR EXISTS (
+				SELECT 1
+				FROM `tabPurchase Invoice Item` pii
+				WHERE pii.parent = pi.name
+				  AND {zakat_cc.format(field="pii.cost_center")}
+			)
 		  )
 		  {date_sql}
 		  {supplier_sql}

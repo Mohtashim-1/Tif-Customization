@@ -93,7 +93,7 @@ frappe.pages["expense-from-zakat-a"].on_page_load = function (wrapper) {
 								<div>
 									<h3>${__("Purchase Details")}</h3>
 									<p>${__(
-										"Submitted supplier Payment Entries linked to Purchase Invoices tagged as Zakat (remarks, paid-from / cost center, or invoice cost center)"
+										"Submitted supplier Payment Entries for Zakat: remarks, paid-from, or any Cost Center whose name contains Zakat (invoice / payment / item)"
 									)}</p>
 								</div>
 							</div>
@@ -268,9 +268,11 @@ frappe.pages["expense-from-zakat-a"].on_page_load = function (wrapper) {
 					[
 						{ key: "posting_date", label: __("Date") },
 						{ key: "payment_entry", label: __("Payment Entry"), link: "Payment Entry" },
+						{ key: "voucher_ref", label: __("Voucher Ref") },
 						{ key: "supplier", label: __("Supplier"), link: "Supplier" },
 						{ key: "purchase_invoice", label: __("Purchase Invoice"), link: "Purchase Invoice" },
 						{ key: "supplier_invoice_no", label: __("Supplier Inv #") },
+						{ key: "cost_center", label: __("Cost Center"), link: "Cost Center" },
 						{ key: "amount", label: __("Zakat Used"), fmt: "money", align: "right" },
 						{ key: "remarks", label: __("Remarks"), cls: "zakat-remarks" },
 					],
