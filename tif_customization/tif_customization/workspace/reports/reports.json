@@ -181,7 +181,7 @@
    "hidden": 0,
    "is_query_report": 0,
    "label": "HR",
-   "link_count": 12,
+   "link_count": 13,
    "onboard": 0,
    "type": "Card Break"
   },
@@ -570,9 +570,19 @@
    "link_type": "Page",
    "onboard": 0,
    "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Staff Appraisal Status (UAT)",
+   "link_count": 0,
+   "link_to": "staff-appraisal-status",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
   }
  ],
- "modified": "2026-11-06 10:32:16.623391",
+ "modified": "2026-11-06 11:12:32.281088",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Reports",
