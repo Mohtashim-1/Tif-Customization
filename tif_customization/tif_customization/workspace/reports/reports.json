@@ -544,7 +544,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "SME KPI Details (UAT)",
+   "label": "SME KPI Details",
    "link_count": 0,
    "link_to": "sme-kpi-details",
    "link_type": "Page",
@@ -572,7 +572,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-11-06 10:25:07.221295",
+ "modified": "2026-11-06 10:27:52.930534",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Reports",
