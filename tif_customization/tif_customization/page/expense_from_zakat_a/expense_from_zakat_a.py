@@ -1,7 +1,7 @@
 import json
 
 import frappe
-from frappe.utils import cint, flt, getdate
+from frappe.utils import flt, getdate
 
 
 ZAKAT_INCOME_ACCOUNTS = (
@@ -13,9 +13,7 @@ ZAKAT_INCOME_ACCOUNTS = (
 
 @frappe.whitelist()
 def get_report_data(filters=None):
-	if isinstance(filters, str):
-		filters = json.loads(filters or "{}")
-	filters = filters or {}
+	filters = _parse_filters(filters)
 
 	from_date = filters.get("from_date")
 	to_date = filters.get("to_date")
@@ -50,6 +48,139 @@ def get_report_data(filters=None):
 		"supplier_summary": supplier_rows,
 		"monthly": _get_monthly_summary(received_rows, purchase_rows),
 	}
+
+
+@frappe.whitelist()
+def download_report_excel(filters=None):
+	"""Multi-sheet Excel: Summary, Monthly, Suppliers, Purchases, Received."""
+	from io import BytesIO
+
+	from openpyxl import Workbook
+	from openpyxl.styles import Font
+
+	report = get_report_data(filters=filters)
+	filters = report.get("filters") or {}
+	summary = report.get("summary") or {}
+
+	sheet_data = [
+		(
+			"Summary",
+			[
+				["Purchase from Zakat"],
+				["From Date", filters.get("from_date") or "All time"],
+				["To Date", filters.get("to_date") or "All time"],
+				["Supplier", filters.get("supplier") or "All"],
+				[],
+				["Metric", "Value"],
+				["Zakat Received", flt(summary.get("zakat_received"))],
+				["Used for Purchases", flt(summary.get("purchase_used"))],
+				["Remaining Zakat", flt(summary.get("remaining_amount"))],
+				["Payments", summary.get("purchase_count") or 0],
+				["Invoices", summary.get("invoice_count") or 0],
+				["Suppliers", summary.get("supplier_count") or 0],
+			],
+		),
+		(
+			"Monthly",
+			_sheet_rows(
+				[
+					("month", "Month"),
+					("received", "Zakat Received"),
+					("used", "Used for Purchase"),
+					("balance", "Running Balance"),
+				],
+				report.get("monthly") or [],
+			),
+		),
+		(
+			"Suppliers",
+			_sheet_rows(
+				[
+					("supplier", "Supplier"),
+					("payment_count", "Payments"),
+					("invoice_count", "Invoices"),
+					("amount", "Amount"),
+				],
+				report.get("supplier_summary") or [],
+			),
+		),
+		(
+			"Purchases",
+			_sheet_rows(
+				[
+					("posting_date", "Date"),
+					("payment_entry", "Payment Entry"),
+					("voucher_ref", "Voucher Ref"),
+					("supplier", "Supplier"),
+					("purchase_invoice", "Purchase Invoice"),
+					("supplier_invoice_no", "Supplier Inv #"),
+					("cost_center", "Cost Center"),
+					("amount", "Zakat Used"),
+					("remarks", "Remarks"),
+				],
+				report.get("purchases") or [],
+			),
+		),
+		(
+			"Received",
+			_sheet_rows(
+				[
+					("posting_date", "Date"),
+					("voucher_type", "Voucher Type"),
+					("voucher_no", "Voucher"),
+					("account", "Zakat Account"),
+					("amount", "Received"),
+					("remarks", "Remarks"),
+				],
+				report.get("received") or [],
+			),
+		),
+	]
+
+	wb = Workbook()
+	wb.remove(wb.active)
+	bold = Font(bold=True)
+	for title, rows in sheet_data:
+		ws = wb.create_sheet(title)
+		for row_idx, row in enumerate(rows, start=1):
+			ws.append([_excel_value(cell) for cell in row])
+			if row_idx == 1:
+				for cell in ws[row_idx]:
+					cell.font = bold
+
+	xlsx_file = BytesIO()
+	wb.save(xlsx_file)
+
+	frappe.response["filename"] = "purchase_from_zakat.xlsx"
+	frappe.response["filecontent"] = xlsx_file.getvalue()
+	frappe.response["type"] = "binary"
+
+
+def _parse_filters(filters):
+	if isinstance(filters, str):
+		filters = json.loads(filters or "{}")
+	return filters or {}
+
+
+def _sheet_rows(columns, rows):
+	header = [label for _key, label in columns]
+	data = [header]
+	for row in rows:
+		data.append([_excel_value(row.get(key)) for key, _label in columns])
+	if len(data) == 1:
+		data.append([""] * len(columns))
+	return data
+
+
+def _excel_value(value):
+	if value is None:
+		return ""
+	if hasattr(value, "isoformat"):
+		try:
+			return value.isoformat()
+		except Exception:
+			return str(value)
+	return value
 
 
 def _date_clause(field, from_date, to_date):

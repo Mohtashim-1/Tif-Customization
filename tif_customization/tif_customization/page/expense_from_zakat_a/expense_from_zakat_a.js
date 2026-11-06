@@ -59,6 +59,9 @@ frappe.pages["expense-from-zakat-a"].on_page_load = function (wrapper) {
 								<div class="zakat-button-row">
 									<button class="btn btn-primary btn-sm btn-refresh">${__("Refresh")}</button>
 									<button class="btn btn-default btn-sm btn-clear">${__("All Time")}</button>
+									<button class="btn btn-success btn-sm btn-export-excel">
+										<i class="fa fa-file-excel-o"></i> ${__("Export Excel")}
+									</button>
 									<button class="btn btn-default btn-sm btn-print">${__("Print")}</button>
 								</div>
 							</div>
@@ -117,6 +120,7 @@ frappe.pages["expense-from-zakat-a"].on_page_load = function (wrapper) {
 			bind_events() {
 				this.page.main.find(".btn-refresh").on("click", () => this.refresh());
 				this.page.main.find(".btn-print").on("click", () => window.print());
+				this.page.main.find(".btn-export-excel").on("click", () => this.export_excel());
 				this.page.main.find(".btn-clear").on("click", () => {
 					this.filters = { from_date: "", to_date: "", supplier: "" };
 					this.page.main.find(".input-from-date, .input-to-date, .input-supplier").val("");
@@ -131,6 +135,14 @@ frappe.pages["expense-from-zakat-a"].on_page_load = function (wrapper) {
 				this.page.main.find(".input-supplier").on("change", (event) => {
 					this.filters.supplier = (event.target.value || "").trim();
 				});
+			}
+
+			export_excel() {
+				const filters = encodeURIComponent(JSON.stringify(this.filters || {}));
+				const url =
+					"/api/method/tif_customization.tif_customization.page.expense_from_zakat_a.expense_from_zakat_a.download_report_excel" +
+					`?filters=${filters}`;
+				window.open(url, "_blank");
 			}
 
 			async refresh() {
@@ -728,7 +740,7 @@ frappe.pages["expense-from-zakat-a"].on_page_load = function (wrapper) {
 						}
 
 						@media print {
-							.page-head, .zakat-toolbar, .zakat-actions { display: none !important; }
+							.page-head, .zakat-toolbar, .zakat-actions, .btn-export-excel { display: none !important; }
 							.zakat-hero, .zakat-kpi, .zakat-usage, .zakat-panel { box-shadow: none; }
 							.zakat-table-wrap { max-height: none; overflow: visible; }
 						}
