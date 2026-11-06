@@ -9,8 +9,9 @@ CONTACT_ROLES = [
 	"Vice Principal",
 	"Academic Manager",
 	"Academic Coordinator",
-	"Coordinator",
+	"Admin Person",
 	"Receptionist",
+	"Coordinator",
 	"Ambassador",
 ]
 

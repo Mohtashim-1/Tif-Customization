@@ -267,30 +267,39 @@
 				<div class="v2-num">7</div>
 				<div class="v2-section-title">Key Contacts</div>
 			</div>
+			{% set contacts = data.key_contacts or {} %}
+			{% set roles = data.contact_roles or [
+				"Director", "Administrator", "Principal", "Vice Principal",
+				"Academic Manager", "Academic Coordinator", "Admin Person",
+				"Receptionist", "Coordinator", "Ambassador"
+			] %}
 			<table class="v2-contacts">
 				<thead>
 					<tr>
-						<th>Role</th>
-						<th>Name</th>
-						<th>Cell No.</th>
+						<th style="width:32%">Role</th>
+						<th style="width:38%">Name</th>
+						<th style="width:30%">Cell No.</th>
 					</tr>
 				</thead>
 				<tbody>
-				{% for role in data.contact_roles %}
-					{% set row = data.key_contacts.get(role, {}) %}
+				{% for role in roles %}
+					{% set row = contacts.get(role) if contacts else none %}
+					{% if not row %}{% set row = {} %}{% endif %}
 					<tr>
 						<td class="role">{{ role }}</td>
-						<td class="name">{{ row.get("name", "") }}</td>
-						<td class="cell">{{ row.get("cell", "") }}</td>
+						<td class="name">{{ row.get("name") or row.get("contact_name") or "" }}</td>
+						<td class="cell">{{ row.get("cell") or row.get("cell_no") or "" }}</td>
 					</tr>
 				{% endfor %}
 					<tr>
 						<td class="role">School PTCL / Mobile Number</td>
-						<td class="name" colspan="2">{{ data.school_ptcl or data.school_mobile or "" }}{% if data.school_ptcl and data.school_mobile and data.school_ptcl != data.school_mobile %} / {{ data.school_mobile }}{% endif %}</td>
+						<td class="name">{% if data.school_ptcl %}{{ data.school_ptcl }}{% elif data.school_mobile %}{{ data.school_mobile }}{% endif %}{% if data.school_ptcl and data.school_mobile and data.school_ptcl != data.school_mobile %} / {{ data.school_mobile }}{% endif %}</td>
+						<td class="cell"></td>
 					</tr>
 					<tr>
 						<td class="role">School Email</td>
-						<td class="name" colspan="2">{{ data.school_email or "" }}</td>
+						<td class="name">{{ data.school_email or "" }}</td>
+						<td class="cell"></td>
 					</tr>
 				</tbody>
 			</table>

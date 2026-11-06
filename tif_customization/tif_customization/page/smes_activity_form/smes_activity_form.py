@@ -2295,6 +2295,7 @@ def submit_smes_activity(data):
 		frappe.db.set_value("Field Visit", doc.name, "owner", for_officer["user"], update_modified=False)
 		doc.owner = for_officer["user"]
 	submitted = False
+	sup_user = ""
 	if needs_approval:
 		sup_user = get_supervisor_user_for_employee(
 			employee=(staff_meta or {}).get("employee"),
@@ -2309,10 +2310,16 @@ def submit_smes_activity(data):
 
 	status_message = _("Activity saved as {0}").format(doc.name)
 	if needs_approval:
-		status_message = _(
-			"Visit {0} saved as Draft and sent to your supervisor for approval.\n{1}"
-		).format(doc.name, "\n".join(approval.get("reasons") or []))
-	elif soa_doc:
+		from tif_customization.tif_customization.field_visit_approval import get_escalation_approver_user
+
+		if sup_user and sup_user == get_escalation_approver_user():
+			status_message = _(
+				"Visit {0} saved as Draft and sent to Shahid Khan for approval.\n{1}"
+			).format(doc.name, "\n".join(approval.get("reasons") or []))
+		else:
+			status_message = _(
+				"Visit {0} saved as Draft and sent to your supervisor for approval.\n{1}"
+			).format(doc.name, "\n".join(approval.get("reasons") or []))	elif soa_doc:
 		status_message += _(" School Opening request {0} was also saved.").format(soa_doc.name)
 
 	out = {

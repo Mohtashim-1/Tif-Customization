@@ -43,6 +43,11 @@ BACKDATE_HOURS = 72
 SAME_SCHOOL_FREE_VISITS = 2
 APPROVAL_DT = "Field Visit Approval Request"
 
+# When a Field Supervisor (or any officer with no parent) needs approval,
+# escalate to Shahid Khan instead of leaving supervisor_user blank / self.
+ESCALATION_APPROVER_USER = "shahid.khan@tif.edu.pk"
+ESCALATION_APPROVER_FULL_NAME = "Shahid Khan"
+
 
 def _activity_date(doc_or_data):
 	if hasattr(doc_or_data, "get_visit_date"):
@@ -224,28 +229,89 @@ def evaluate_approval_requirements(
 	}
 
 
+def get_escalation_approver_user():
+	"""Shahid Khan — approves supervisor-created / no-parent escalation visits."""
+	uid = cstr(ESCALATION_APPROVER_USER).strip()
+	if uid and frappe.db.exists("User", uid) and cint(frappe.db.get_value("User", uid, "enabled")):
+		return uid
+	found = frappe.db.get_value(
+		"User",
+		{"full_name": ESCALATION_APPROVER_FULL_NAME, "enabled": 1},
+		"name",
+	)
+	return cstr(found or "").strip()
+
+
+def _is_field_supervisor_user(user: str | None = None) -> bool:
+	"""Active Field Officer marked is_group, or parent of other active officers."""
+	user = cstr(user or frappe.session.user).strip()
+	if not user or not frappe.db.exists("DocType", "Field Officer"):
+		return False
+	fo = frappe.db.get_value(
+		"Field Officer",
+		{"user": user, "status": "Active"},
+		["name", "is_group"],
+		as_dict=True,
+	)
+	if not fo:
+		return False
+	if cint(fo.get("is_group")):
+		return True
+	return bool(
+		frappe.db.count(
+			"Field Officer",
+			{"parent_field_officer": fo.name, "status": "Active"},
+		)
+	)
+
+
 def get_supervisor_user_for_employee(employee=None, user=None):
-	user = user or frappe.session.user
+	"""Return the User who should approve this officer's pending visits.
+
+	Normal FO → parent Field Officer's user.
+	Supervisor (no parent) / missing parent / would self-approve → Shahid Khan.
+	"""
+	user = cstr(user or frappe.session.user).strip()
 	emp = cstr(employee or "").strip()
 	fo = None
 	if emp and frappe.db.exists("DocType", "Field Officer"):
 		fo = frappe.db.get_value(
 			"Field Officer",
 			{"employee": emp, "status": "Active"},
-			["name", "parent_field_officer", "user"],
+			["name", "parent_field_officer", "user", "is_group"],
 			as_dict=True,
 		)
 	if not fo and frappe.db.exists("DocType", "Field Officer"):
 		fo = frappe.db.get_value(
 			"Field Officer",
 			{"user": user, "status": "Active"},
-			["name", "parent_field_officer", "user"],
+			["name", "parent_field_officer", "user", "is_group"],
 			as_dict=True,
 		)
+
 	parent = cstr((fo or {}).get("parent_field_officer") or "").strip()
-	if not parent:
-		return ""
-	return cstr(frappe.db.get_value("Field Officer", parent, "user") or "").strip()
+	sup = ""
+	if parent:
+		sup = cstr(frappe.db.get_value("Field Officer", parent, "user") or "").strip()
+
+	requester = user
+	fo_user = cstr((fo or {}).get("user") or "").strip() or requester
+	needs_escalation = (
+		not sup
+		or sup == requester
+		or sup == fo_user
+		or _is_field_supervisor_user(requester)
+		or cint((fo or {}).get("is_group") or 0)
+	)
+	if needs_escalation:
+		escalation = get_escalation_approver_user()
+		# Never assign approval to the same person who created the visit
+		if escalation and escalation not in (requester, fo_user):
+			return escalation
+		# If Shahid somehow is the requester, leave empty (System Manager can still approve)
+		return escalation if escalation != requester else ""
+
+	return sup
 
 
 def get_approval_request(field_visit):
@@ -519,7 +585,12 @@ def list_pending_approvals(limit=50):
 	if not frappe.db.exists("DocType", APPROVAL_DT):
 		return empty
 
-	is_supervisor = can_manage_supervisor_only_field_visits(user) or can_view_all_field_visits(user)
+	escalation_user = get_escalation_approver_user()
+	is_supervisor = (
+		can_manage_supervisor_only_field_visits(user)
+		or can_view_all_field_visits(user)
+		or (escalation_user and user == escalation_user)
+	)
 	rows = frappe.get_all(
 		APPROVAL_DT,
 		filters={"status": "Pending"},

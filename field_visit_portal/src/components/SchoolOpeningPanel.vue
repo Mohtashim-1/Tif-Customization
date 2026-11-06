@@ -101,8 +101,9 @@ const roles = list("school_opening_contact_roles", [
 	"Vice Principal",
 	"Academic Manager",
 	"Academic Coordinator",
-	"Coordinator",
+	"Admin Person",
 	"Receptionist",
+	"Coordinator",
 	"Ambassador",
 ]);
 
