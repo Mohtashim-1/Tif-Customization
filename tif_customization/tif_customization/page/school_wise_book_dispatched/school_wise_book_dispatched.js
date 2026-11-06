@@ -22,6 +22,7 @@ frappe.tif_customization.SchoolWiseBookDispatched = class SchoolWiseBookDispatch
 		this.make_filters();
 		this.page.set_primary_action(__("Refresh"), () => this.load_data(), "refresh");
 		this.page.add_action_item(__("Export CSV"), () => this.export_csv());
+		this.page.add_action_item(__("Import CSV"), () => this.import_csv());
 		this.page.add_action_item(__("Print"), () => this.print_report());
 		this.load_data();
 	}
@@ -462,6 +463,18 @@ frappe.tif_customization.SchoolWiseBookDispatched = class SchoolWiseBookDispatch
 		];
 	}
 
+	export_columns() {
+		// Include stable IDs + raw Customer Type so re-import does not rewrite derived Type labels.
+		const cols = this.columns().filter((c) => c.key !== "customer_type_group");
+		return [
+			{ key: "customer", label: "Customer ID" },
+			{ key: "school", label: "School ID" },
+			{ key: "school_name", label: "School / Customer" },
+			{ key: "customer_type", label: "Customer Type" },
+			...cols.filter((c) => c.key !== "school_name"),
+		];
+	}
+
 	type_badge(group, raw) {
 		const label = group || raw || "—";
 		const cls =
@@ -655,23 +668,213 @@ frappe.tif_customization.SchoolWiseBookDispatched = class SchoolWiseBookDispatch
 			frappe.msgprint(__("No data to export"));
 			return;
 		}
-		const cols = this.columns();
-		const lines = [cols.map((c) => c.label).join(",")];
+		const cols = this.export_columns();
+		const lines = [cols.map((c) => this.csv_escape(c.label)).join(",")];
 		this.rows.forEach((row) => {
 			lines.push(
 				cols
-					.map((c) => {
-						const v = row[c.key] == null ? "" : String(row[c.key]);
-						return `"${v.replace(/"/g, '""')}"`;
-					})
+					.map((c) => this.csv_escape(row[c.key] == null ? "" : String(row[c.key])))
 					.join(",")
 			);
 		});
-		const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+		const blob = new Blob(["\ufeff" + lines.join("\n")], { type: "text/csv;charset=utf-8;" });
 		const a = document.createElement("a");
 		a.href = URL.createObjectURL(blob);
 		a.download = `school_wise_book_dispatched_${frappe.datetime.get_today()}.csv`;
 		a.click();
+	}
+
+	csv_escape(value) {
+		const v = String(value == null ? "" : value);
+		return `"${v.replace(/"/g, '""')}"`;
+	}
+
+	import_csv() {
+		const d = new frappe.ui.Dialog({
+			title: __("Import School Meta from CSV"),
+			size: "large",
+			fields: [
+				{
+					fieldtype: "HTML",
+					fieldname: "help",
+					options: `
+						<div class="text-muted" style="font-size:13px;line-height:1.5;margin-bottom:8px;">
+							<ol style="padding-left:18px;margin:0 0 8px;">
+								<li>${__("Export CSV from this page (includes Customer ID / School ID).")}</li>
+								<li>${__("Edit Status, Type, City, Province, or Area in Excel, then save as CSV.")}</li>
+								<li>${__("Upload the file here. Qty / DN columns are ignored.")}</li>
+							</ol>
+							<div>${__("Updates School master, Customer Type, and the linked Address used on dispatch.")}</div>
+						</div>
+					`,
+				},
+				{
+					label: __("CSV File"),
+					fieldname: "csv_file",
+					fieldtype: "Attach",
+					reqd: 0,
+					hidden: 1,
+				},
+				{
+					fieldtype: "HTML",
+					fieldname: "file_picker",
+				},
+				{
+					fieldtype: "HTML",
+					fieldname: "preview",
+				},
+			],
+			primary_action_label: __("Import"),
+			primary_action: () => {
+				if (!this._import_rows || !this._import_rows.length) {
+					frappe.msgprint(__("Choose a CSV file first."));
+					return;
+				}
+				d.get_primary_btn().prop("disabled", true);
+				frappe.call({
+					method:
+						"tif_customization.tif_customization.page.school_wise_book_dispatched.school_wise_book_dispatched.import_school_meta",
+					args: { rows: this._import_rows },
+					freeze: true,
+					freeze_message: __("Importing…"),
+					callback: (r) => {
+						d.get_primary_btn().prop("disabled", false);
+						const res = r.message || {};
+						this.show_import_result(res);
+						d.hide();
+						this.load_data();
+					},
+					error: () => {
+						d.get_primary_btn().prop("disabled", false);
+					},
+				});
+			},
+		});
+		this._import_rows = [];
+		const $picker = d.fields_dict.file_picker.$wrapper;
+		$picker.html(`
+			<input type="file" accept=".csv,text/csv" class="swbd-import-file form-control" style="padding:6px;">
+		`);
+		$picker.find(".swbd-import-file").on("change", (e) => {
+			const file = e.target.files && e.target.files[0];
+			if (!file) return;
+			const reader = new FileReader();
+			reader.onload = () => {
+				try {
+					const parsed = this.parse_csv(String(reader.result || ""));
+					this._import_rows = parsed.rows;
+					const $prev = d.fields_dict.preview.$wrapper;
+					$prev.html(`
+						<div style="margin-top:10px;font-size:13px;">
+							<strong>${__("Ready")}:</strong> ${parsed.rows.length} ${__("rows")}
+							· ${__("Columns")}: ${frappe.utils.escape_html(parsed.headers.join(", "))}
+						</div>
+					`);
+				} catch (err) {
+					this._import_rows = [];
+					frappe.msgprint(err.message || __("Could not read CSV"));
+				}
+			};
+			reader.readAsText(file);
+		});
+		d.show();
+	}
+
+	parse_csv(text) {
+		const rows = this.split_csv(text);
+		if (!rows.length) {
+			throw new Error(__("CSV is empty"));
+		}
+		const headers = rows[0].map((h) => String(h || "").trim());
+		if (!headers.length) {
+			throw new Error(__("CSV has no headers"));
+		}
+		const needed = ["Customer ID", "School ID", "customer", "school"];
+		const hasKey = headers.some((h) => needed.includes(h));
+		if (!hasKey) {
+			throw new Error(
+				__("CSV must include Customer ID or School ID. Export from this page, then edit and re-import.")
+			);
+		}
+		const out = [];
+		for (let i = 1; i < rows.length; i++) {
+			const cells = rows[i];
+			if (!cells.length || cells.every((c) => !String(c || "").trim())) continue;
+			const obj = {};
+			headers.forEach((h, idx) => {
+				obj[h] = cells[idx] == null ? "" : String(cells[idx]).trim();
+			});
+			out.push(obj);
+		}
+		return { headers, rows: out };
+	}
+
+	split_csv(text) {
+		const normalized = String(text || "").replace(/^\ufeff/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+		const lines = normalized.split("\n");
+		const rows = [];
+		for (const line of lines) {
+			if (!line.trim()) continue;
+			const cells = [];
+			let cur = "";
+			let inQuotes = false;
+			for (let i = 0; i < line.length; i++) {
+				const ch = line[i];
+				if (inQuotes) {
+					if (ch === '"' && line[i + 1] === '"') {
+						cur += '"';
+						i += 1;
+					} else if (ch === '"') {
+						inQuotes = false;
+					} else {
+						cur += ch;
+					}
+				} else if (ch === '"') {
+					inQuotes = true;
+				} else if (ch === ",") {
+					cells.push(cur);
+					cur = "";
+				} else {
+					cur += ch;
+				}
+			}
+			cells.push(cur);
+			rows.push(cells);
+		}
+		return rows;
+	}
+
+	show_import_result(res) {
+		const errors = res.errors || [];
+		const errHtml = errors.length
+			? `<div style="max-height:180px;overflow:auto;margin-top:8px;">
+				<table class="table table-bordered" style="font-size:12px;margin:0;">
+					<thead><tr><th>${__("Row")}</th><th>${__("Message")}</th></tr></thead>
+					<tbody>
+						${errors
+							.map(
+								(e) =>
+									`<tr><td>${cint(e.row)}</td><td>${frappe.utils.escape_html(
+										e.message || ""
+									)}</td></tr>`
+							)
+							.join("")}
+					</tbody>
+				</table>
+			</div>`
+			: "";
+		frappe.msgprint({
+			title: __("Import complete"),
+			indicator: res.updated ? "green" : errors.length ? "orange" : "blue",
+			message: `
+				<div>
+					<div><strong>${__("Updated")}:</strong> ${cint(res.updated)}</div>
+					<div><strong>${__("Unchanged")}:</strong> ${cint(res.unchanged)}</div>
+					<div><strong>${__("Skipped / errors")}:</strong> ${cint(res.error_count || errors.length)}</div>
+					${errHtml}
+				</div>
+			`,
+		});
 	}
 
 	print_report() {

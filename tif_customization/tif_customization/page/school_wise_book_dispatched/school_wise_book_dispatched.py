@@ -620,3 +620,241 @@ def _apply_school_name_filter(where, params, filters, customer_field, customer_n
 	if clauses:
 		# AND across different filter inputs; each input expands with OR internally
 		where.extend(clauses)
+
+
+_SCHOOL_STATUS = {
+	"Active",
+	"Inactive",
+	"In Process",
+	"Closed",
+	"Not Interested",
+	"Direct Requirement Received",
+}
+_CUSTOMER_TYPES = {"School", "Individual", "Company", "Partnership"}
+_IMPORT_TYPE_MAP = {
+	"school": "School",
+	"individual": "Individual",
+	"company": "Company",
+	"partnership": "Partnership",
+}
+
+
+@frappe.whitelist()
+def import_school_meta(rows=None):
+	"""Update School / Customer / Address fields from exported CSV rows.
+
+	Qty and Delivery Note columns are ignored — those come from submitted Delivery Notes.
+	"""
+	if isinstance(rows, str):
+		rows = json.loads(rows or "[]")
+	rows = rows or []
+	if not isinstance(rows, list):
+		frappe.throw(frappe._("Invalid import rows."))
+	if len(rows) > 5000:
+		frappe.throw(frappe._("Import is limited to 5,000 rows at a time."))
+
+	can_school = frappe.has_permission("School", "write")
+	can_customer = frappe.has_permission("Customer", "write")
+	can_address = frappe.has_permission("Address", "write")
+	if not (can_school or can_customer or can_address):
+		frappe.throw(frappe._("Not permitted to update School / Customer / Address."), frappe.PermissionError)
+
+	updated = 0
+	unchanged = 0
+	skipped = 0
+	errors = []
+	details = []
+
+	for idx, raw in enumerate(rows, start=2):
+		if not isinstance(raw, dict):
+			skipped += 1
+			continue
+		try:
+			result = _import_one_row(raw, can_school, can_customer, can_address)
+		except Exception as exc:
+			errors.append({"row": idx, "message": cstr(exc)[:240]})
+			continue
+		if result["status"] == "updated":
+			updated += 1
+			details.append({"row": idx, "label": result.get("label"), "changes": result.get("changes")})
+		elif result["status"] == "unchanged":
+			unchanged += 1
+		else:
+			skipped += 1
+			errors.append({"row": idx, "message": result.get("message") or frappe._("Skipped")})
+
+	return {
+		"updated": updated,
+		"unchanged": unchanged,
+		"skipped": skipped,
+		"errors": errors[:100],
+		"details": details[:100],
+		"error_count": len(errors),
+	}
+
+
+def _import_one_row(raw, can_school, can_customer, can_address):
+	customer = cstr(raw.get("customer") or raw.get("Customer ID") or "").strip()
+	school = cstr(raw.get("school") or raw.get("School ID") or "").strip()
+	school_name = cstr(
+		raw.get("school_name") or raw.get("School / Customer") or raw.get("School Name") or ""
+	).strip()
+	status = cstr(raw.get("school_status") or raw.get("Status") or "").strip()
+	city = cstr(raw.get("city") or raw.get("City") or "").strip()
+	province = cstr(raw.get("province") or raw.get("Province") or "").strip()
+	area = cstr(raw.get("area") or raw.get("Area") or "").strip()
+	type_raw = cstr(
+		raw.get("customer_type")
+		or raw.get("Customer Type")
+		or raw.get("customer_type_group")
+		or raw.get("Type")
+		or ""
+	).strip()
+
+	school = _resolve_school(school, customer, school_name)
+	if not customer and school:
+		customer = frappe.db.get_value("School", school, "customer") or ""
+		if not customer and frappe.db.exists("Customer", school):
+			customer = school
+
+	if not school and not customer:
+		return {
+			"status": "skipped",
+			"message": frappe._("No matching School or Customer (need Customer ID or School ID)."),
+		}
+
+	label = school_name or school or customer
+	changes = []
+
+	if school and can_school and frappe.db.exists("School", school):
+		school_updates = {}
+		if status:
+			if status not in _SCHOOL_STATUS:
+				frappe.throw(frappe._("Invalid Status '{0}' for {1}").format(status, label))
+			if cstr(frappe.db.get_value("School", school, "status") or "") != status:
+				school_updates["status"] = status
+				changes.append(f"status→{status}")
+		if city:
+			city_name = _resolve_city(city)
+			if city_name and cstr(frappe.db.get_value("School", school, "city") or "") != city_name:
+				school_updates["city"] = city_name
+				changes.append(f"city→{city_name}")
+		if _has_col(raw, "province", "Province"):
+			current = cstr(frappe.db.get_value("School", school, "province") or "")
+			if current != province:
+				school_updates["province"] = province
+				changes.append(f"province→{province or '(blank)'}")
+		if _has_col(raw, "area", "Area"):
+			current = cstr(frappe.db.get_value("School", school, "area") or "")
+			if current != area:
+				school_updates["area"] = area
+				changes.append(f"area→{area or '(blank)'}")
+		if school_updates:
+			frappe.db.set_value("School", school, school_updates, update_modified=True)
+
+	if customer and can_customer and frappe.db.exists("Customer", customer) and type_raw:
+		mapped = _IMPORT_TYPE_MAP.get(type_raw.lower())
+		if mapped and mapped in _CUSTOMER_TYPES:
+			current = cstr(frappe.db.get_value("Customer", customer, "customer_type") or "")
+			if current != mapped:
+				frappe.db.set_value("Customer", customer, "customer_type", mapped, update_modified=True)
+				changes.append(f"customer_type→{mapped}")
+
+	if customer and can_address and (
+		_has_col(raw, "city", "City")
+		or _has_col(raw, "province", "Province")
+		or _has_col(raw, "area", "Area")
+	):
+		address = _customer_address(customer)
+		if address:
+			addr_updates = {}
+			if _has_col(raw, "city", "City"):
+				current = cstr(frappe.db.get_value("Address", address, "city") or "")
+				if current != city:
+					addr_updates["city"] = city
+					changes.append(f"address.city→{city or '(blank)'}")
+			if _has_col(raw, "province", "Province"):
+				current = cstr(frappe.db.get_value("Address", address, "state") or "")
+				if current != province:
+					addr_updates["state"] = province
+					changes.append(f"address.state→{province or '(blank)'}")
+			if _has_col(raw, "area", "Area") and frappe.get_meta("Address").has_field("custom_area"):
+				current = cstr(frappe.db.get_value("Address", address, "custom_area") or "")
+				if current != area:
+					addr_updates["custom_area"] = area
+					changes.append(f"address.area→{area or '(blank)'}")
+			if addr_updates:
+				frappe.db.set_value("Address", address, addr_updates, update_modified=True)
+
+	if not changes:
+		return {"status": "unchanged", "label": label}
+	return {"status": "updated", "label": label, "changes": changes}
+
+
+def _has_col(raw, *keys):
+	return any(k in raw for k in keys)
+
+
+def _resolve_school(school, customer, school_name):
+	if school and frappe.db.exists("School", school):
+		return school
+	if customer:
+		by_customer = frappe.db.get_value("School", {"customer": customer}, "name")
+		if by_customer:
+			return by_customer
+		if frappe.db.exists("School", customer):
+			return customer
+	if school_name:
+		by_name = frappe.db.get_value("School", {"school_name": school_name}, "name")
+		if by_name:
+			return by_name
+	return ""
+
+
+def _resolve_city(city):
+	if not city:
+		return ""
+	if frappe.db.exists("City", city):
+		return city
+	found = frappe.db.get_value("City", {"name": city}, "name")
+	if found:
+		return found
+	# Case-insensitive match
+	rows = frappe.db.sql(
+		"SELECT name FROM `tabCity` WHERE LOWER(TRIM(name)) = LOWER(%(city)s) LIMIT 1",
+		{"city": city},
+	)
+	return rows[0][0] if rows else ""
+
+
+def _customer_address(customer):
+	"""Prefer address used on the latest Delivery Note, else Dynamic Link primary."""
+	dn_addr = frappe.db.sql(
+		"""
+		SELECT COALESCE(NULLIF(shipping_address_name, ''), NULLIF(customer_address, '')) AS addr
+		FROM `tabDelivery Note`
+		WHERE customer = %(customer)s
+			AND docstatus = 1
+			AND COALESCE(NULLIF(shipping_address_name, ''), NULLIF(customer_address, '')) IS NOT NULL
+		ORDER BY posting_date DESC, modified DESC
+		LIMIT 1
+		""",
+		{"customer": customer},
+	)
+	if dn_addr and dn_addr[0][0] and frappe.db.exists("Address", dn_addr[0][0]):
+		return dn_addr[0][0]
+
+	linked = frappe.db.sql(
+		"""
+		SELECT parent FROM `tabDynamic Link`
+		WHERE parenttype = 'Address'
+			AND link_doctype = 'Customer'
+			AND link_name = %(customer)s
+		ORDER BY modified DESC
+		LIMIT 1
+		""",
+		{"customer": customer},
+	)
+	if linked and linked[0][0]:
+		return linked[0][0]
+	return ""
