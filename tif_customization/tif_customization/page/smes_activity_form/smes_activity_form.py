@@ -1885,13 +1885,12 @@ def submit_smes_activity(data):
 	activity_label = data.get("activity_type")
 	doc_type = ACTIVITY_TYPE_MAP.get(activity_label, activity_label)
 
-	# School visits: address + at least one contact (name + phone) required.
+	# School visits / books: address + at least one contact (name + phone) required.
+	# Volunteer / Ambassador enrolment use their own child rows — not school address/contacts.
 	_school_contact_types = {
 		"Visits",
 		"Marketing",
 		"Registration of New Schools",
-		"Enrolment of Volunteers",
-		"Enrolment of Ambassadors",
 		"Model School A",
 		"Model School B",
 		"Books Demand (Quantity)",
@@ -1922,6 +1921,31 @@ def submit_smes_activity(data):
 				valid_contacts = [{"person_name": single_name, "contact_number": single_phone}]
 		if not valid_contacts:
 			frappe.throw(_("Add at least one Contact Person with name and phone number."))
+	elif doc_type == "Enrolment of Volunteers":
+		vol_rows = data.get("volunteer_enrolments") or data.get("volunteers") or []
+		if isinstance(vol_rows, str):
+			try:
+				vol_rows = frappe.parse_json(vol_rows) or []
+			except Exception:
+				vol_rows = []
+		if not any(
+			isinstance(r, dict) and cstr(r.get("volunteer_name") or r.get("name") or "").strip()
+			for r in vol_rows
+		):
+			frappe.throw(_("Add at least one volunteer."))
+	elif doc_type == "Enrolment of Ambassadors":
+		amb_rows = data.get("ambassador_enrolments") or data.get("ambassadors") or []
+		if isinstance(amb_rows, str):
+			try:
+				amb_rows = frappe.parse_json(amb_rows) or []
+			except Exception:
+				amb_rows = []
+		if not any(
+			isinstance(r, dict)
+			and cstr(r.get("ambassador_name") or r.get("volunteer_name") or r.get("name") or "").strip()
+			for r in amb_rows
+		):
+			frappe.throw(_("Add at least one ambassador."))
 	for_officer = _officer_for_academic_card(doc_type, data)
 
 	if not data.get("visit_by") and not data.get("staff_employee"):
