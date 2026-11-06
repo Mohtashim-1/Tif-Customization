@@ -317,16 +317,6 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Volunteer Registration",
-   "link_count": 0,
-   "link_to": "Volunteer Registration",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
    "label": "Volunteer Dashboard",
    "link_count": 0,
    "link_to": "volunteer-dashboard",
@@ -524,6 +514,16 @@
    "label": "Designation",
    "link_count": 0,
    "link_to": "Designation",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Volunteer Registration",
+   "link_count": 0,
+   "link_to": "Volunteer Registration",
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
@@ -729,7 +729,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-10-21 20:41:43.634238",
+ "modified": "2026-11-06 10:02:04.226551",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Forms",
