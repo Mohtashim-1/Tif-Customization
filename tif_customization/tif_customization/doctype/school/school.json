@@ -6,8 +6,9 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "section_break_activity_dashboard",
+  "tab_dashboard",
   "activity_dashboard_html",
+  "tab_details",
   "school_as",
   "naming_series",
   "customer",
@@ -67,19 +68,24 @@
   "column_break_tplq",
   "academic_session_month",
   "section_break_books",
-  "books_curriculum_information"
+  "books_curriculum_information",
+  "amended_from"
  ],
  "fields": [
   {
-   "fieldname": "section_break_activity_dashboard",
-   "fieldtype": "Section Break",
-   "label": "Field Visit Activity"
+   "fieldname": "tab_dashboard",
+   "fieldtype": "Tab Break",
+   "label": "Dashboard"
   },
   {
    "fieldname": "activity_dashboard_html",
    "fieldtype": "HTML",
-   "label": "Activity Dashboard",
-   "options": ""
+   "label": "Activity Dashboard"
+  },
+  {
+   "fieldname": "tab_details",
+   "fieldtype": "Tab Break",
+   "label": "Details"
   },
   {
    "fieldname": "school_as",
@@ -428,7 +434,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-06-26 21:34:34.723912",
+ "modified": "2026-11-06 16:50:00.794036",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "School",
@@ -471,7 +477,9 @@
  ],
  "row_format": "Dynamic",
  "rows_threshold_for_grid_search": 20,
+ "show_title_field_in_link": 1,
  "sort_field": "modified",
  "sort_order": "DESC",
- "states": []
+ "states": [],
+ "title_field": "school_name"
 }

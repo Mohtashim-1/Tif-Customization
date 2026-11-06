@@ -48,9 +48,9 @@ METRIC_LABELS = {
 	"other_official": _("Other Official Tasks"),
 	"co_curricular": _("Staff Activity / Exhibition / Demo Class"),
 	"quiz": _("Quiz Arranged"),
-	"new_school_registration": _("New Registered Schools"),
-	"new_schools": _("New Registered Schools"),
-	"new_school": _("New Registered Schools"),
+	"new_school_registration": _("New Active Registered School"),
+	"new_schools": _("New Active Registered School"),
+	"new_school": _("New Active Registered School"),
 	"active_schools": _("Active Schools"),
 	"workshop_registration": _("Workshop Participants"),
 	"online_participants": _("Online Workshop Participants through SME"),
@@ -266,11 +266,11 @@ def _metric_condition(metric: str, alias: str = "fv") -> str:
 		)"""
 	named = _has_named_school_sql(a)
 	if m in ("new_schools", "new_school"):
-		# Onboarded schools: Registration of New Schools / New marketing visits.
+		# New + active: Registration / New visits where books, workshops or programs are running.
 		return f"""(
 			{a}.type = 'Registration of New Schools'
 			OR ({a}.type IN ('Marketing', 'Visits') AND IFNULL({a}.marketing_visit_category, '') = 'New')
-		) AND ({named})"""
+		) AND ({registered_school_sql(a)}) AND ({named})"""
 	if m == "active_schools":
 		# Schools with any book / workshop / program running.
 		return f"({registered_school_sql(a)}) AND ({named})"
@@ -621,6 +621,44 @@ def _me_status_note(row) -> tuple[str, str]:
 			why = f"School status is In-Active while activity status is Active. {why}"
 		return "In-Active", why
 	return "Status not filled", "Active / Inactive was left blank, so this visit is not counted as In-Active"
+
+
+def _type_task_label(row) -> str:
+	"""Human Type / Task cell: visit type plus category or task detail."""
+	vtype = cstr(row.get("type") or "").strip() or "Other"
+	mvc = _clean(row.get("marketing_visit_category"))
+	if vtype in ("Visits", "Marketing") and mvc:
+		return f"{vtype} · {mvc}"
+
+	if vtype == "Academic Task":
+		detail = _clean(row.get("ot_academic_task_other"))
+		return f"{vtype} · {detail}" if detail else vtype
+
+	if vtype == "Other Official Tasks":
+		detail = _clean(row.get("ot_other_official_task_detail"))
+		return f"{vtype} · {detail}" if detail else vtype
+
+	workshop_types = {
+		"Workshop Conducted",
+		"Workshop",
+		"Workshop Arranged",
+		"Training",
+		"Teachers Training Meeting",
+	}
+	if vtype in workshop_types:
+		detail = _workshop_heading(row)
+		if detail and detail != vtype:
+			# Avoid "Workshop Conducted · Conducted"
+			if detail.lower().startswith(vtype.lower()):
+				return detail
+			return f"{vtype} · {detail}"
+
+	if vtype == "M&E":
+		status, _why = _me_status_note(row)
+		if status and status not in ("Status not filled",):
+			return f"{vtype} · {status}"
+
+	return vtype
 
 
 def _category_active_inactive(row) -> str:
@@ -1530,6 +1568,7 @@ def get_visit_drilldown(filters=None, metric=None, staff=None):
 			{
 				"name": r.name,
 				"type": vtype,
+				"type_label": _type_task_label(r),
 				"visit_date": str(r.visit_date) if r.visit_date else "",
 				"doc_created": str(r.doc_created)[:19] if r.doc_created else "",
 				"school": school,

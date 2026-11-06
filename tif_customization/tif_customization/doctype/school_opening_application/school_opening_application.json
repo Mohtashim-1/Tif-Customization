@@ -5,6 +5,9 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "tab_dashboard",
+  "activity_dashboard_html",
+  "tab_application",
   "naming_series",
   "form_date",
   "visit_type",
@@ -60,6 +63,22 @@
   "amended_from"
  ],
  "fields": [
+  {
+   "fieldname": "tab_dashboard",
+   "fieldtype": "Tab Break",
+   "label": "Dashboard"
+  },
+  {
+   "fieldname": "activity_dashboard_html",
+   "fieldtype": "HTML",
+   "label": "Activity Dashboard",
+   "options": ""
+  },
+  {
+   "fieldname": "tab_application",
+   "fieldtype": "Tab Break",
+   "label": "Application"
+  },
   {
    "default": "SOA-.YYYY.-",
    "fieldname": "naming_series",

@@ -542,11 +542,11 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			{ key: "outcome_co_curricular", label: __("Staff Activity / Exhibition / Demo Class"), short_label: __("Staff Activity / Exhibition / Demo Class"), metric: "co_curricular" },
 			{
 				key: "outcome_new_schools",
-				label: __("New Registered School"),
-				short_label: __("New Registered School"),
+				label: __("New Active Registered School"),
+				short_label: __("New Active Registered School"),
 				metric: "new_schools",
 			},
-			{ key: "outcome_workshop_registration", label: __("Onsite Workshop Participants through SME"), short_label: __("Onsite Workshop Participants through SME"), metric: "workshop_registration" },
+			{ key: "outcome_workshop_registration", label: __("Onsite Workshop Participants"), short_label: __("Onsite Workshop Participants"), metric: "workshop_registration" },
 			onlineCol,
 			{ key: "outcome_volunteers", 
 				label: __("Volunteers enrolled through SME"), 
@@ -573,7 +573,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				// Keep (Onsite)/(Online) in the label; do not strip at first "(".
 				let label = (col.short_label || col.shortLabel || col.label || "").trim();
 				if (col.metric === "workshop_registration") {
-					label = __("Onsite Workshop Participants through SME");
+					label = __("Onsite Workshop Participants");
 				} else if (col.metric === "online_participants") {
 					label = __("Online Workshop Participants through SME");
 				}
@@ -820,7 +820,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						hint: __("Follow up Visit + New School Visit in this period."),
 					},
 					{
-						label: __("New Registered School"),
+						label: __("New Active Registered School"),
 						count: cint(
 							k.new_schools_period != null
 								? k.new_schools_period
@@ -834,7 +834,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						style: "outcome",
 						metric: "new_schools",
 						hint: __(
-							"Visit From–To only: distinct onboarded schools (Registration of New Schools / New visits). Not fiscal year."
+							"Visit From–To only: new schools with TIF services running (Registration of New Schools / New visits with books, workshops or programs). Not fiscal year."
 						),
 					},
 					{
@@ -897,7 +897,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						{ spacer: true },
 						{ spacer: true },
 						{
-							label: __("New Registered School"),
+							label: __("New Active Registered School"),
 							count: cint(
 								(
 									(data.outcome_fy || {}).new_schools_ytd ||
@@ -916,7 +916,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 							cardKind: "active_school_by_staff",
 							outcomeFy: true,
 							hint: __(
-								"Fiscal year only ({0}): onboarded schools from 1 July to date. Not Visit From–To.",
+								"Fiscal year only ({0}): new schools with TIF services running from 1 July to date. Not Visit From–To.",
 								[data.outcome_fy_label || __("1 July to date")]
 							),
 						},
@@ -962,6 +962,27 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		];
 	}
 
+	kpi_style_for_metric(metric, group) {
+		const m = String(metric || "").toLowerCase();
+		if (m.includes("followup")) return "followup";
+		if (m === "new" || m.includes("new_school") || m.includes("marketing")) return "new";
+		if (m.includes("monitor") || m === "me") return "me";
+		if (m.includes("workshop_registration") || m.includes("participant")) return "workshop-participants";
+		if (m.includes("workshop")) return "workshop";
+		if (m.includes("meeting") || m.includes("ulama")) return "meeting";
+		if (m.includes("teacher")) return "teachers";
+		if (m.includes("headoffice")) return "headoffice";
+		if (m.includes("academic")) return "academic-task";
+		if (m.includes("other_official") || m.includes("other-official")) return "other-official";
+		if (m.includes("quiz")) return "quiz";
+		if (m.includes("co_curricular") || m.includes("co-curricular")) return "co_curricular";
+		if (m.includes("volunteer") || m.includes("enrol")) return "enrolment";
+		if (m.includes("visited") || m.includes("present")) return "visited";
+		if (m.includes("school_visit") || m.includes("visits")) return "visits";
+		if (String(group || "").toLowerCase().includes("outcome")) return "outcome";
+		return "sme";
+	}
+
 	render_kpi_card(card) {
 		if (card && card.spacer) {
 			return `<div class="sme-sum-kpi sme-sum-kpi--spacer" aria-hidden="true"></div>`;
@@ -973,6 +994,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		if (card.highlightTargets) {
 			attrs.push(`data-highlight-targets="${frappe.utils.escape_html(card.highlightTargets)}"`);
 		}
+		if (card.staff) attrs.push(`data-visit-staff="${frappe.utils.escape_html(card.staff)}"`);
 		if (card.useYtd) attrs.push(`data-use-ytd="1"`);
 		if (card.outcomeFy) attrs.push(`data-outcome-fy="1"`);
 		if (card.pointsKind) attrs.push(`data-points-kind="${frappe.utils.escape_html(card.pointsKind)}"`);
@@ -1623,11 +1645,11 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		this._pending_card_title = {
 			label:
 				(this._pending_card_title && this._pending_card_title.label) ||
-				__("New Registered School"),
+				__("New Active Registered School"),
 			count: cardTotal,
 		};
 		const d = new frappe.ui.Dialog({
-			title: this.card_dialog_title(__("New Registered School"), cardTotal),
+			title: this.card_dialog_title(__("New Active Registered School"), cardTotal),
 			size: "large",
 			fields: [{ fieldtype: "HTML", fieldname: "html" }],
 			primary_action_label: __("Close"),
@@ -2234,7 +2256,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 								(v) => `<tr>
 						<td><a href="${frappe.utils.escape_html(v.url)}">${frappe.utils.escape_html(v.name)}</a></td>
 						<td>${frappe.utils.escape_html(v.visit_date || "")}</td>
-						<td>${frappe.utils.escape_html(v.type || "")}</td>
+						<td>${frappe.utils.escape_html(v.type_label || v.type || "")}</td>
 						<td>${schoolCell(v.school, cint(v.school_unapproved), cint(v.school_missing))}</td>
 						<td>${frappe.utils.escape_html(v.officer || "")}</td>
 						<td>${frappe.utils.escape_html(v.category || "")}</td>
@@ -2361,7 +2383,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 									<th>${__("Visit Date")}</th>
 									<th>${__("Type / Task")}</th>
 									<th>${__("School / Venue")}</th>
-									<th>${__("Officer")}</th>
+									<th>${__("SME")}</th>
 									<th>${__("Category")}</th>
 									<th>${__("Visit Summary")}</th>
 								</tr>
@@ -2454,29 +2476,46 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				String(r.employee_name || "") === key,
 		);
 		if (!row) {
-			frappe.msgprint(__("No KPI row found for this field officer."));
+			frappe.msgprint(__("No KPI row found for this SME."));
 			return;
 		}
+		const staff = row.user_id || row.employee_name || row.employee || "";
 		const items = this.officer_kpi_rows(row, data);
-		const body = items
-			.map((item) => {
-				const shown = item.display != null ? item.display : this.fmt(item.value);
-				const clickable = !!item.metric;
-				return `<tr>
-				<td>${frappe.utils.escape_html(item.group)}</td>
-				<td>${frappe.utils.escape_html(item.label)}</td>
-				<td class="num${clickable ? " sme-click" : ""}" ${
-					clickable
-						? `data-visit-metric="${frappe.utils.escape_html(item.metric)}" data-visit-staff="${frappe.utils.escape_html(item.staff || "")}" ${item.useYtd ? 'data-use-ytd="1"' : ""} title="${__("Click to see Field Visits")}"`
-						: ""
-				}>${shown}</td>
-			</tr>`;
-			})
-			.join("");
+		const groups = [];
+		const byGroup = {};
+		items.forEach((item) => {
+			const title = item.group || __("KPI");
+			if (!byGroup[title]) {
+				byGroup[title] = [];
+				groups.push({ title, cards: byGroup[title] });
+			}
+			const shown = item.display != null ? item.display : this.fmt(item.value);
+			byGroup[title].push({
+				label: item.label,
+				value: shown,
+				count: item.value,
+				style: this.kpi_style_for_metric(item.metric, item.group),
+				metric: item.metric || "",
+				staff,
+				useYtd: !!item.useYtd,
+				hint: item.metric ? __("Click to see Field Visits") : __("Period total"),
+			});
+		});
+
+		const cardsHtml = `<div class="sme-sum-kpi-groups">${groups
+			.map(
+				(group, idx) => `
+			${idx ? `<hr class="sme-sum-kpi-sep">` : ""}
+			<div class="sme-sum-kpi-group">
+				<div class="sme-sum-kpi-group__title">${frappe.utils.escape_html(group.title)}</div>
+				<div class="sme-sum-kpis">${group.cards.map((c) => this.render_kpi_card(c)).join("")}</div>
+			</div>`
+			)
+			.join("")}</div>`;
 
 		const d = new frappe.ui.Dialog({
-			title: row.label || row.employee_name || __("Field Officer KPI"),
-			size: "large",
+			title: row.label || row.employee_name || __("SME KPI"),
+			size: "extra-large",
 			fields: [{ fieldtype: "HTML", fieldname: "html" }],
 			primary_action_label: __("Close"),
 			primary_action: () => d.hide(),
@@ -2490,27 +2529,39 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				&nbsp;·&nbsp; ${__("Percentage")}: <strong>${this.fmt_pct(row.percentage)}</strong>
 			</p>
 			<p class="text-muted" style="font-size:12px;margin-bottom:10px;">
-				${__("KPI labels match the report cards. Click a count to open that officer’s Field Visits.")}
+				${__("Same KPI cards as the report. Click a card to open that SME’s Field Visits.")}
 			</p>
-			<div class="table-responsive" style="max-height:480px;overflow:auto;">
-				<table class="table table-bordered table-hover" style="font-size:12px;margin:0;">
-					<thead>
-						<tr>
-							<th>${__("Section")}</th>
-							<th>${__("KPI")}</th>
-							<th class="text-right">${__("Count")}</th>
-						</tr>
-					</thead>
-					<tbody>${body}</tbody>
-				</table>
+			<div style="max-height:70vh;overflow:auto;padding-right:4px;">
+				${cardsHtml}
 			</div>
 		`);
-		if (frappe.tif_customization && frappe.tif_customization.bind_clickable_numbers) {
-			frappe.tif_customization.bind_clickable_numbers(d.$wrapper, () => {
-				const f = this.get_filters();
-				return { ...f, staff: row.user_id || row.employee_name || row.employee || f.staff || "" };
+		const me = this;
+		d.$wrapper.off("click.smeOfficerKpi").on("click.smeOfficerKpi", "[data-visit-metric]", function (e) {
+			e.preventDefault();
+			e.stopPropagation();
+			const metric = $(this).attr("data-visit-metric");
+			if (!metric || !frappe.tif_customization || !frappe.tif_customization.open_visit_drilldown) return;
+			const ctx = me.get_filters();
+			const useYtd = $(this).attr("data-use-ytd");
+			const from_date =
+				useYtd && me.data && me.data.ytd_from ? me.data.ytd_from : ctx.from_date;
+			frappe.tif_customization.open_visit_drilldown({
+				from_date,
+				to_date: ctx.to_date,
+				staff: $(this).attr("data-visit-staff") || staff,
+				supervisor: ctx.supervisor || "",
+				metric,
+				province: ctx.province || "",
+				city: ctx.city || "",
+				submitted_only: ctx.submitted_only || 1,
+				hideUnapproved: true,
+				cardLabel:
+					$(this).attr("data-card-label") ||
+					$(this).find(".sme-sum-kpi__label").first().text().trim() ||
+					"",
+				cardCount: $(this).attr("data-card-count") || "",
 			});
-		}
+		});
 		d.show();
 	}
 

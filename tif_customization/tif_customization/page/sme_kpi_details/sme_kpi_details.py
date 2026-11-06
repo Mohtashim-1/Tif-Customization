@@ -53,8 +53,8 @@ OUTCOME_TARGETS = (
 	{"key": "co_curricular", "label": _("Staff Activity / Exhibition / Demo Class"), "short_label": _("Staff Activity / Exhibition / Demo Class"), "target": 1, "metric": "co_curricular"},
 	{
 		"key": "new_schools",
-		"label": _("New Registered School"),
-		"short_label": _("New Registered School"),
+		"label": _("New Active Registered School"),
+		"short_label": _("New Active Registered School"),
 		"target": 24,
 		"metric": "new_schools",
 	},
@@ -91,10 +91,13 @@ VISIT_DETAIL_PARTS = (
 ACTIVE_SCHOOL_SQL = registered_school_sql("fv")
 # Kept for model A/B/C split (same as Active Schools).
 NEW_SCHOOL_SQL = ACTIVE_SCHOOL_SQL
-# New Registered: onboarded schools (Registration of New Schools / New marketing visits).
-ONBOARDED_SCHOOL_SQL = """(
-	fv.type = 'Registration of New Schools'
-	OR (fv.type IN ('Marketing', 'Visits') AND IFNULL(fv.marketing_visit_category, '') = 'New')
+# New Active Registered: new onboarded schools where TIF services are running.
+ONBOARDED_SCHOOL_SQL = f"""(
+	(
+		fv.type = 'Registration of New Schools'
+		OR (fv.type IN ('Marketing', 'Visits') AND IFNULL(fv.marketing_visit_category, '') = 'New')
+	)
+	AND ({ACTIVE_SCHOOL_SQL})
 )"""
 # Model 0: school field visits only (not Internal Meeting / Meeting / HO / academic).
 SCHOOL_FIELD_VISIT_SQL = school_field_visit_type_sql("fv")
@@ -377,7 +380,7 @@ def _enriched_actuals(from_date, to_date, staff, tokens):
 	)
 	actuals["quiz"] = _visit_count(from_date, to_date, tokens, QUIZ_SQL)
 	actuals["co_curricular"] = _visit_count(from_date, to_date, tokens, CO_CURRICULAR_SQL)
-	# New Registered = onboarded schools; Active = any program running (Model A+B+C).
+	# New Active Registered = new + services running; Active = any program (Model A+B+C).
 	actuals["new_schools"] = _distinct_schools(from_date, to_date, tokens, ONBOARDED_SCHOOL_SQL)
 	actuals["new_school_registration"] = actuals["new_schools"]
 	models = _registered_model_split(from_date, to_date, tokens)

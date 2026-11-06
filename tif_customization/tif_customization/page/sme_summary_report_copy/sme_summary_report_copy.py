@@ -155,8 +155,8 @@ def _summary_outcome_columns():
 			continue
 		item = dict(col)
 		if item.get("metric") == "workshop_registration":
-			item["label"] = _("Onsite Workshop Participants through SME")
-			item["short_label"] = _("Onsite Workshop Participants through SME")
+			item["label"] = _("Onsite Workshop Participants")
+			item["short_label"] = _("Onsite Workshop Participants")
 		if item.get("metric") == "enrolment":
 			item["label"] = _("Enrollment of Participants in Online Course through SME")
 			item["short_label"] = _("Enrollment of Participants in Online Course through SME")
@@ -560,7 +560,7 @@ def get_report_data(filters=None):
 			else:
 				row[col["key"]] = cint(actuals.get(col["key"]) or 0)
 		row.update(_outcome_row_fields(staff, ytd_from, to_date))
-		# Visit From→To onboarded schools (matches Overview / Outcomes New Registered cards).
+		# Visit From→To new active registered schools (services running).
 		period_tokens = list(
 			{
 				*(staff.get("match_values") or []),
@@ -790,9 +790,9 @@ def get_report_data(filters=None):
 			"model_c": cint(model_counts.get("model_c") or 0),
 			"model_school_a": cint(totals_out.get("outcome_model_school_a") or 0),
 			"model_school_b": cint(totals_out.get("outcome_model_school_b") or 0),
-			# Distinct onboarded schools (FY YTD Jul→to_date via period_outcome totals).
+			# Distinct new active registered schools (FY YTD Jul→to_date).
 			"new_schools": cint(totals_out.get("outcome_new_schools") or 0),
-			# Distinct onboarded schools inside Visit From → Visit To only.
+			# Distinct new active registered schools inside Visit From → Visit To only.
 			"new_schools_period": period_new_schools,
 		},
 		"regions": [{"key": rk, "label": REGION_LABELS[rk]} for rk in REGION_KEYS],

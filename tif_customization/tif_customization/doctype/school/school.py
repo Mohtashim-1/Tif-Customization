@@ -19,6 +19,17 @@ class School(Document):
 	def validate(self):
 		self.validate_contact_details()
 		self.validate_school_details()
+		self.sync_status_from_programs()
+
+	def sync_status_from_programs(self):
+		"""School Status follows QPS/TPS/CEE: Active only if a program is Active."""
+		derived = overall_status_from_programs(self.qps, self.tps, self.cee)
+		if not derived:
+			return
+		# Do not override lifecycle statuses set by process / management.
+		if cstr(self.status).strip() in ("Closed", "Not Interested", "In Process"):
+			return
+		self.status = derived
 
 	def validate_contact_details(self):
 		"""Validate contact details"""
@@ -46,7 +57,8 @@ class School(Document):
 		if not self.customer:
 			create_customer_from_school(self)
 		if self.status == "In Process":
-			self.db_set("status", "Active", update_modified=False)
+			derived = overall_status_from_programs(self.qps, self.tps, self.cee) or "Active"
+			self.db_set("status", derived, update_modified=False)
 
 	def on_cancel(self):
 		frappe.msgprint(_("School opening request cancelled. No customer was created or removed."))
@@ -170,22 +182,25 @@ def get_school_activity_dashboard(school=None, customer=None):
 		school_name = route.get("school_name") or school_name
 		status = cstr(frappe.db.get_value("Customer", customer_id, "disabled") and "Inactive" or "Active")
 	elif route.get("doctype") == "School Opening Application" and route.get("name"):
-		soa_doc = frappe.db.get_value(
-			"School Opening Application",
-			route["name"],
-			["name", "school_name", "customer", "docstatus"],
-			as_dict=True,
-		)
+		soa_doc = _load_soa_activity_source(route["name"])
 		if soa_doc:
-			customer_id = customer_id or cstr(soa_doc.customer).strip()
-			school_name = cstr(soa_doc.school_name).strip() or school_name
-			status = "Submitted" if cint(soa_doc.docstatus) == 1 else "Draft"
+			customer_id = customer_id or cstr(soa_doc.get("customer")).strip()
+			school_name = cstr(soa_doc.get("school_name")).strip() or school_name
+			status = "Submitted" if cint(soa_doc.get("docstatus")) == 1 else "Draft"
 	elif customer_id:
 		school_name = (
 			cstr(frappe.db.get_value("Customer", customer_id, "customer_name") or "").strip()
 			or school_name
 			or customer_id
 		)
+
+	# Prefer explicit SOA id when caller opens an application form (school = SOA-…).
+	if key.startswith("SOA-") and frappe.db.exists("School Opening Application", key):
+		soa_doc = soa_doc or _load_soa_activity_source(key)
+		if soa_doc:
+			customer_id = customer_id or cstr(soa_doc.get("customer")).strip()
+			school_name = cstr(soa_doc.get("school_name")).strip() or school_name
+			status = status or ("Submitted" if cint(soa_doc.get("docstatus")) == 1 else "Draft")
 
 	# Free-text / pending school: still load visits by display name.
 	if not customer_id:
@@ -195,8 +210,24 @@ def get_school_activity_dashboard(school=None, customer=None):
 
 	visits = _school_field_visits(customer=customer_id, school_name=school_name or key)
 	representatives = _school_representatives(school_doc, visits, soa=soa_doc)
-	programs = _school_programs(school_doc, visits, customer=customer_id)
-	books = _school_books(school_doc, visits, customer=customer_id)
+	programs = _school_programs(school_doc, visits, customer=customer_id, soa=soa_doc)
+	books = _school_books(school_doc, visits, customer=customer_id, soa=soa_doc)
+	program_flags = _program_flags(school_doc)
+	overall = overall_status_from_programs(
+		*(getattr(school_doc, f, None) for f in ("qps", "tps", "cee"))
+	) if school_doc else None
+	# Prefer program-based overall status for the hero (what stakeholders expect).
+	display_status = overall or status or "—"
+	if overall and school_doc and cstr(school_doc.status).strip() not in (
+		"Closed",
+		"Not Interested",
+		"In Process",
+	):
+		# Keep master in sync when dashboard loads an out-of-date Active school.
+		if cstr(school_doc.status).strip() != overall:
+			frappe.db.set_value("School", school_doc.name, "status", overall, update_modified=False)
+			status = overall
+			display_status = overall
 
 	return {
 		"school": (school_doc.name if school_doc else "") or "",
@@ -204,13 +235,64 @@ def get_school_activity_dashboard(school=None, customer=None):
 		"customer": customer_id or "",
 		"source_doctype": route.get("doctype") or "",
 		"source_name": route.get("name") or "",
-		"status": status or "—",
+		"status": display_status,
+		"status_label": _("Overall Status"),
+		"status_hint": _(
+			"Overall Status = Active only if QPS, TPS or CEE is Active. "
+			"If programs are Inactive / Not running, Overall Status is Inactive."
+		),
+		"record_status": status or "—",
+		"program_flags": program_flags,
 		"visit_count": len(visits),
 		"visits": visits,
 		"representatives": representatives,
 		"programs": programs,
 		"books": books,
 	}
+
+
+def _normalize_program_status(value):
+	raw = cstr(value).strip()
+	if not raw:
+		return {"raw": "—", "label": "—", "tone": "neutral"}
+	key = raw.lower().replace("-", " ").replace("_", " ")
+	key = " ".join(key.split())
+	if key in ("active",):
+		return {"raw": raw, "label": _("Active"), "tone": "active"}
+	if key in ("in active", "inactive", "in-active"):
+		return {"raw": raw, "label": _("Inactive"), "tone": "inactive"}
+	if key in ("no", "none", "n/a"):
+		return {"raw": raw, "label": _("Not running"), "tone": "none"}
+	return {"raw": raw, "label": raw, "tone": "neutral"}
+
+
+def overall_status_from_programs(qps=None, tps=None, cee=None):
+	"""Active if any program Active; otherwise Inactive when programs are set."""
+	tones = [_normalize_program_status(v)["tone"] for v in (qps, tps, cee)]
+	if any(t == "active" for t in tones):
+		return "Active"
+	# Any inactive / not-running / blank mix with no Active program → Inactive
+	if any(t in ("inactive", "none") for t in tones):
+		return "Inactive"
+	return None
+
+
+def _program_flags(school_doc):
+	"""QPS / TPS / CEE from School master."""
+	if not school_doc:
+		return []
+	out = []
+	for code, fieldname in (("QPS", "qps"), ("TPS", "tps"), ("CEE", "cee")):
+		norm = _normalize_program_status(getattr(school_doc, fieldname, None))
+		out.append(
+			{
+				"code": code,
+				"raw": norm["raw"],
+				"label": norm["label"],
+				"tone": norm["tone"],
+			}
+		)
+	return out
 
 
 def _resolve_school_doc(school):
@@ -489,6 +571,32 @@ def _visit_contacts_map(visit_names):
 	return out
 
 
+def _load_soa_activity_source(name):
+	if not name or not frappe.db.exists("School Opening Application", name):
+		return None
+	fields = [
+		"name",
+		"school_name",
+		"customer",
+		"docstatus",
+		"tif_representative",
+		"running_tif_services",
+		"teacher_training_services",
+		"quran_program_services",
+		"tilawat_services",
+		"curriculum_in_use",
+		"curriculum_others",
+		"school_ptcl",
+		"school_mobile",
+		"school_email",
+		"school_whatsapp",
+	]
+	meta = frappe.get_meta("School Opening Application")
+	fields = [f for f in fields if meta.has_field(f) or f in ("name", "docstatus")]
+	soa = frappe.db.get_value("School Opening Application", name, fields, as_dict=True)
+	return soa
+
+
 def _school_representatives(doc, visits, soa=None):
 	reps = []
 	seen = set()
@@ -517,14 +625,27 @@ def _school_representatives(doc, visits, soa=None):
 		add(doc.incharge, "", "Incharge")
 		add(doc.contact_person, doc.contact_number, "Contact Person")
 
-	if soa and soa.get("name") and frappe.db.exists("DocType", "School Opening Contact"):
-		for row in frappe.get_all(
-			"School Opening Contact",
-			filters={"parent": soa.name},
-			fields=["contact_name", "cell_no", "role"],
-			order_by="idx",
+	if soa and soa.get("name"):
+		add(soa.get("tif_representative"), "", "TIF Representative", "School Opening")
+		channels = []
+		for label, val in (
+			("PTCL", soa.get("school_ptcl")),
+			("Mobile", soa.get("school_mobile")),
+			("WhatsApp", soa.get("school_whatsapp")),
+			("Email", soa.get("school_email")),
 		):
-			add(row.contact_name, row.cell_no, row.role, "School Opening")
+			if cstr(val).strip():
+				channels.append(f"{label}: {cstr(val).strip()}")
+		if channels:
+			add("School Channels", " · ".join(channels), "Contact Channels", "School Opening")
+		if frappe.db.exists("DocType", "School Opening Contact"):
+			for row in frappe.get_all(
+				"School Opening Contact",
+				filters={"parent": soa.name},
+				fields=["contact_name", "cell_no", "role"],
+				order_by="idx",
+			):
+				add(row.contact_name, row.cell_no, row.role, "School Opening")
 
 	for visit in visits:
 		add(visit.get("meeting_with"), visit.get("contact_number"), visit.get("designation"), "Field Visit")
@@ -538,22 +659,34 @@ def _school_representatives(doc, visits, soa=None):
 	return reps
 
 
-def _school_programs(doc, visits, customer=None):
+def _school_programs(doc, visits, customer=None, soa=None):
 	programs = []
 	if doc:
-		programs.extend(
-			[
-				{"name": "QPS", "status": cstr(doc.qps).strip() or "—", "source": "School"},
-				{"name": "TPS", "status": cstr(doc.tps).strip() or "—", "source": "School"},
-				{"name": "CEE", "status": cstr(doc.cee).strip() or "—", "source": "School"},
-			]
-		)
+		for code, fieldname in (("QPS", "qps"), ("TPS", "tps"), ("CEE", "cee")):
+			norm = _normalize_program_status(getattr(doc, fieldname, None))
+			programs.append(
+				{
+					"name": code,
+					"status": norm["label"],
+					"raw_status": norm["raw"],
+					"tone": norm["tone"],
+					"source": "School",
+				}
+			)
 		allowed = cstr(doc.allowed_program).strip()
 		if allowed:
 			programs.append({"name": "Allowed Program", "status": allowed, "source": "School"})
-	elif customer and frappe.get_meta("Customer").has_field("custom_books"):
-		# custom_books sometimes stores program/services summary on Customer
-		pass
+
+	if soa:
+		for label, val in (
+			("Running TIF Services", soa.get("running_tif_services")),
+			("Teacher Training", soa.get("teacher_training_services")),
+			("Quran Program", soa.get("quran_program_services")),
+			("Tilawat", soa.get("tilawat_services")),
+		):
+			detail = cstr(val).strip()
+			if detail:
+				programs.append({"name": label, "status": detail, "source": "School Opening"})
 
 	latest_bits = []
 	for visit in visits[:5]:
@@ -573,7 +706,7 @@ def _school_programs(doc, visits, customer=None):
 	return programs
 
 
-def _school_books(doc, visits, customer=None):
+def _school_books(doc, visits, customer=None, soa=None):
 	books = []
 	if doc:
 		school_books = cstr(doc.books).strip()
@@ -592,6 +725,14 @@ def _school_books(doc, visits, customer=None):
 				detail = f"{detail} ({students} students)" if detail else f"{students} students"
 			if detail:
 				books.append({"label": "Curriculum", "detail": detail, "source": "School"})
+
+	if soa:
+		curriculum = cstr(soa.get("curriculum_in_use")).strip()
+		others = cstr(soa.get("curriculum_others")).strip()
+		if curriculum:
+			books.append({"label": "Curriculum In Use", "detail": curriculum, "source": "School Opening"})
+		if others:
+			books.append({"label": "Curriculum (Others)", "detail": others, "source": "School Opening"})
 
 	if customer and frappe.get_meta("Customer").has_field("custom_books"):
 		cust_books = cstr(frappe.db.get_value("Customer", customer, "custom_books") or "").strip()

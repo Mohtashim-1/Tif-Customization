@@ -60,9 +60,11 @@ frappe.tif_customization.open_school_document = function (school) {
 		callback: (r) => {
 			const data = r.message || {};
 			if (data.found && data.doctype && data.name) {
-				frappe.route_options = frappe.route_options || {};
-				frappe.route_options.school_activity_key = data.school_name || key;
-				frappe.set_route("Form", data.doctype, data.name);
+				const link =
+					(frappe.utils.get_form_link &&
+						frappe.utils.get_form_link(data.doctype, data.name)) ||
+					`/app/${frappe.router.slug(data.doctype)}/${encodeURIComponent(data.name)}`;
+				window.open(link, "_blank");
 				return;
 			}
 			// Last resort: full activity dialog (not the visits-only popup).
@@ -423,7 +425,7 @@ frappe.tif_customization.show_school_metric_drilldown_dialog = function (data, o
 			__("Visits"),
 			__("Latest Document"),
 			__("Visit Date"),
-			__("Officer"),
+			__("SME"),
 		];
 		const exportRows = schoolRows.map((s) => {
 			const latest = s.docs[0] || {};
@@ -499,7 +501,7 @@ frappe.tif_customization.show_school_metric_drilldown_dialog = function (data, o
 							<th class="text-right">${__("Visits")}</th>
 							<th>${__("Latest Document")}</th>
 							<th>${__("Visit Date")}</th>
-							<th>${__("Officer")}</th>
+							<th>${__("SME")}</th>
 						</tr>
 					</thead>
 					<tbody>${body}</tbody>
@@ -657,7 +659,11 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 					(row) => `<tr>
 				<td>${docCell(row)}</td>
 				<td>${frappe.utils.escape_html(row.visit_date || "")}</td>
-				${hideType ? "" : `<td>${frappe.utils.escape_html(row.type || "")}</td>`}
+				${
+					hideType
+						? ""
+						: `<td>${frappe.utils.escape_html(row.type_label || row.type || "")}</td>`
+				}
 				${hideSchool ? "" : `<td>${schoolCell(row)}</td>`}
 				<td>${frappe.utils.escape_html(row.officer || "")}</td>
 				<td>${frappe.utils.escape_html(row.category || "")}</td>
@@ -680,12 +686,12 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 		const headers = [__("Document No"), __("Visit Date")];
 		if (!hideType) headers.push(__("Type / Task"));
 		if (!hideSchool) headers.push(__("School / Venue"));
-		headers.push(__("Officer"), __("Category"));
+		headers.push(__("SME"), __("Category"));
 		if (showRemarks) headers.push(__("Visit Summary"));
 		if (showImages) headers.push(__("School Images"));
 		const exportRows = rows.map((row) => {
 			const r = [row.name || "", row.visit_date || ""];
-			if (!hideType) r.push(row.type || "");
+			if (!hideType) r.push(row.type_label || row.type || "");
 			if (!hideSchool) r.push(row.school || "");
 			r.push(row.officer || "", row.category || "");
 			if (showRemarks) r.push((row.remarks || "").replace(/\s+/g, " ").trim());
@@ -744,7 +750,7 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 						<th>${__("Visit Date")}</th>
 						${hideType ? "" : `<th>${__("Type / Task")}</th>`}
 						${hideSchool ? "" : `<th>${__("School / Venue")}</th>`}
-						<th>${__("Officer")}</th>
+						<th>${__("SME")}</th>
 						<th>${__("Category")}</th>
 						${showRemarks ? `<th>${__("Visit Summary")}</th>` : ""}
 						${showImages ? `<th>${__("School Images")}</th>` : ""}
@@ -1307,7 +1313,7 @@ frappe.tif_customization.show_workshop_participant_dialog = function (data, opts
 						return `<tr>
 					<td><a href="${frappe.utils.escape_html(row.url)}">${frappe.utils.escape_html(row.name)}</a></td>
 					<td>${frappe.utils.escape_html(row.visit_date || "")}</td>
-					<td>${frappe.utils.escape_html(row.type || "")}</td>
+					<td>${frappe.utils.escape_html(row.type_label || row.type || "")}</td>
 					<td>${schoolCell(row)}</td>
 					<td>${frappe.utils.escape_html(row.officer || "")}</td>
 					<td class="text-right">${link}</td>
@@ -1330,9 +1336,9 @@ frappe.tif_customization.show_workshop_participant_dialog = function (data, opts
 						<tr>
 							<th>${__("Document No")}</th>
 							<th>${__("Visit Date")}</th>
-							<th>${__("Type")}</th>
+							<th>${__("Type / Task")}</th>
 							<th>${__("School / Venue")}</th>
-							<th>${__("Officer")}</th>
+							<th>${__("SME")}</th>
 							<th class="text-right">${__("Participants")}</th>
 							<th>${__("Visit Summary")}</th>
 						</tr>
@@ -2051,7 +2057,7 @@ frappe.tif_customization.show_monitoring_officer_dialog = function (data, rows, 
 							row.name || ""
 						)}</a></td>
 					<td>${frappe.utils.escape_html(row.visit_date || "")}</td>
-					<td>${frappe.utils.escape_html(row.type || "")}</td>
+					<td>${frappe.utils.escape_html(row.type_label || row.type || "")}</td>
 					<td>${frappe.tif_customization.school_link_html(row.school)}</td>
 					<td>${frappe.utils.escape_html(approvalLabel(row))}</td>
 					<td>${frappe.utils.escape_html(row.officer || "")}</td>
@@ -2082,7 +2088,7 @@ frappe.tif_customization.show_monitoring_officer_dialog = function (data, rows, 
 							<th>${__("Type / Task")}</th>
 							<th>${__("School")}</th>
 							<th>${__("Approval")}</th>
-							<th>${__("Officer")}</th>
+							<th>${__("SME")}</th>
 							<th>${__("Status")}</th>
 							<th>${__("School Status")}</th>
 							<th>${__("Image")}</th>
@@ -2189,10 +2195,18 @@ frappe.tif_customization.render_school_activity_html = function (data) {
 				.join("")
 		: `<tr><td colspan="4" class="text-muted text-center">${__("No school representatives found")}</td></tr>`;
 
+	const programTone = (tone) => {
+		const t = (tone || "").toLowerCase();
+		if (t === "active") return "is-active";
+		if (t === "inactive") return "is-inactive";
+		if (t === "none") return "is-none";
+		return "is-neutral";
+	};
+
 	const programCards = programs.length
 		? programs
 				.map(
-					(p) => `<div class="school-act-chip">
+					(p) => `<div class="school-act-chip ${programTone(p.tone)}">
 				<strong>${esc(p.name || "")}</strong>
 				<span>${esc(p.status || "—")}</span>
 				<small>${esc(p.source || "")}</small>
@@ -2213,6 +2227,36 @@ frappe.tif_customization.render_school_activity_html = function (data) {
 				.join("")
 		: `<tr><td colspan="3" class="text-muted text-center">${__("No books data")}</td></tr>`;
 
+	const flags = data.program_flags || [];
+	const programKpis = flags.length
+		? flags
+				.map(
+					(f) => `<div class="school-act-kpi school-act-kpi--prog ${programTone(f.tone)}" title="${esc(
+						__("Program status for {0}", [f.code || ""])
+					)}">
+				<span>${esc(f.code || "")}</span>
+				<strong>${esc(f.label || "—")}</strong>
+			</div>`
+				)
+				.join("")
+		: "";
+
+	const schoolStatusLabel = data.status_label || __("Overall Status");
+	const schoolStatusHint =
+		data.status_hint ||
+		__(
+			"Overall Status = Active only if QPS, TPS or CEE is Active. Otherwise Inactive."
+		);
+	const overallTone = (() => {
+		const s = String(data.status || "")
+			.toLowerCase()
+			.replace(/-/g, " ")
+			.trim();
+		if (s === "active") return "is-active";
+		if (s === "inactive" || s === "in active") return "is-inactive";
+		return "is-neutral";
+	})();
+
 	return `
 		<style>
 			.school-act { font-size: 12px; color: var(--text-color); }
@@ -2223,13 +2267,20 @@ frappe.tif_customization.render_school_activity_html = function (data) {
 			}
 			.school-act-hero h3 { margin:0 0 4px; font-size:16px; color:#fff; }
 			.school-act-hero p { margin:0; opacity:.9; }
-			.school-act-kpis { display:flex; gap:10px; flex-wrap:wrap; }
+			.school-act-kpis { display:flex; gap:10px; flex-wrap:wrap; align-items:stretch; }
 			.school-act-kpi {
 				min-width:88px; padding:8px 10px; border-radius:10px;
 				background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.22);
 			}
 			.school-act-kpi span { display:block; font-size:10px; text-transform:uppercase; letter-spacing:.04em; opacity:.8; }
-			.school-act-kpi strong { font-size:16px; }
+			.school-act-kpi strong { font-size:15px; line-height:1.2; }
+			.school-act-kpi--prog.is-active { background:rgba(22,163,74,.35); border-color:rgba(187,247,208,.7); }
+			.school-act-kpi--prog.is-inactive { background:rgba(220,38,38,.35); border-color:rgba(254,202,202,.75); }
+			.school-act-kpi--prog.is-none { background:rgba(100,116,139,.28); border-color:rgba(226,232,240,.35); }
+			.school-act-hint {
+				margin:0 0 12px; padding:8px 12px; border-radius:8px; font-size:11px; line-height:1.4;
+				background:#fff7ed; border:1px solid #fed7aa; color:#9a3412;
+			}
 			.school-act-grid {
 				display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr); gap:12px; margin-bottom:12px;
 			}
@@ -2257,6 +2308,12 @@ frappe.tif_customization.render_school_activity_html = function (data) {
 				display:flex; flex-direction:column; gap:2px; min-width:140px; padding:10px 12px;
 				border-radius:10px; border:1px solid var(--border-color,#e5e7eb); background:#f0fdfa;
 			}
+			.school-act-chip.is-active { background:#ecfdf5; border-color:#86efac; }
+			.school-act-chip.is-active span { color:#166534; font-weight:700; }
+			.school-act-chip.is-inactive { background:#fef2f2; border-color:#fca5a5; }
+			.school-act-chip.is-inactive span { color:#991b1b; font-weight:700; }
+			.school-act-chip.is-none { background:#f8fafc; border-color:#cbd5e1; }
+			.school-act-chip.is-none span { color:#64748b; }
 			.school-act-chip small { color:var(--text-muted,#6b7280); }
 			@media (max-width: 900px) { .school-act-grid { grid-template-columns:1fr; } }
 		</style>
@@ -2269,9 +2326,14 @@ frappe.tif_customization.render_school_activity_html = function (data) {
 				<div class="school-act-kpis">
 					<div class="school-act-kpi"><span>${__("Visits")}</span><strong>${cint(data.visit_count)}</strong></div>
 					<div class="school-act-kpi"><span>${__("Representatives")}</span><strong>${reps.length}</strong></div>
-					<div class="school-act-kpi"><span>${__("Status")}</span><strong>${esc(data.status || "—")}</strong></div>
+					<div class="school-act-kpi school-act-kpi--prog ${overallTone}" title="${esc(schoolStatusHint)}">
+						<span>${esc(schoolStatusLabel)}</span>
+						<strong>${esc(data.status || "—")}</strong>
+					</div>
+					${programKpis}
 				</div>
 			</div>
+			<div class="school-act-hint">${esc(schoolStatusHint)}</div>
 			<div class="school-act-grid">
 				<div class="school-act-panel">
 					<h4>${__("School Representatives")}</h4>
@@ -2286,7 +2348,9 @@ frappe.tif_customization.render_school_activity_html = function (data) {
 					</div>
 				</div>
 				<div class="school-act-panel">
-					<h4>${__("Programs Running")}</h4>
+					<h4>${__("Programs Running")} <small style="font-weight:500;color:#64748b;">(${__(
+						"QPS / TPS / CEE"
+					)})</small></h4>
 					<div class="school-act-chips">${programCards}</div>
 				</div>
 			</div>
