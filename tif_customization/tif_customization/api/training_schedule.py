@@ -9,7 +9,18 @@ import re
 
 import frappe
 from frappe import _
-from frappe.utils import add_days, cint, get_first_day, get_last_day, get_quarter_ending, get_quarter_start, getdate, now_datetime, nowdate
+from frappe.utils import (
+	add_days,
+	cint,
+	cstr,
+	get_first_day,
+	get_last_day,
+	get_quarter_ending,
+	get_quarter_start,
+	getdate,
+	now_datetime,
+	nowdate,
+)
 
 DOCTYPE = "Upcoming Training"
 
@@ -262,9 +273,14 @@ def _truthy_flag(value) -> int:
 
 
 def _as_row_dict(row) -> frappe._dict:
-	if hasattr(row, "as_dict"):
+	# frappe._dict.__getattr__ returns None for missing keys, so hasattr(row, "as_dict")
+	# is True even when as_dict is not a real method — only call it on Document-like objects.
+	as_dict = getattr(type(row), "as_dict", None)
+	if callable(as_dict):
 		return frappe._dict(row.as_dict())
-	return frappe._dict(row)
+	if isinstance(row, dict):
+		return frappe._dict(row)
+	return frappe._dict(row or {})
 
 
 def _attendance_row_dict(row) -> dict:
@@ -1182,6 +1198,35 @@ def get_form_options():
 	}
 
 
+def _session_institute(doc) -> str:
+	"""School / institute label for a training session."""
+	school_name = cstr(getattr(doc, "school_name", None) or "").strip()
+	if school_name:
+		return school_name
+	tag = cstr(getattr(doc, "tag_school", None) or "").strip()
+	if tag:
+		label = ""
+		if frappe.db.exists("Customer", tag):
+			label = cstr(frappe.db.get_value("Customer", tag, "customer_name") or "").strip()
+		return label or tag
+	workshop_for = cstr(getattr(doc, "workshop_for", None) or "").strip()
+	if workshop_for:
+		return workshop_for
+	return ""
+
+
+def _validate_optional_contact(row, idx):
+	"""Cell / email optional; if filled must look valid."""
+	phone = cstr(row.get("phone") or row.get("cell_no") or "").strip()
+	email = cstr(row.get("email") or "").strip()
+	if phone:
+		digits = re.sub(r"\D", "", phone)
+		if len(digits) < 7 or len(digits) > 15:
+			frappe.throw(_("Row {0}: enter a proper Cell No (or leave blank).").format(idx))
+	if email and not re.match(r"^[^\s@]+@[^\s@]+\.[^\s@]+$", email):
+		frappe.throw(_("Row {0}: enter a proper Email (or leave blank).").format(idx))
+
+
 @frappe.whitelist()
 def save_attendance(name=None, attendance=None):
 	"""Replace attendance rows on one Upcoming Training (Excel-style portal dialog)."""
@@ -1197,10 +1242,20 @@ def save_attendance(name=None, attendance=None):
 	doc = frappe.get_doc(DOCTYPE, name)
 	if not frappe.get_meta(DOCTYPE).has_field("attendance"):
 		frappe.throw(_("Attendance table is not available on Upcoming Training."))
+	institute = _session_institute(doc)
+
 	doc.set("attendance", [])
+	n = 0
 	for row in attendance or []:
 		if isinstance(row, str):
 			continue
+		row = _as_row_dict(row)
+		if not cstr(row.get("participant_name") or "").strip():
+			continue
+		n += 1
+		_validate_optional_contact(row, n)
+		# Prefer session school; otherwise keep whatever the sheet sent.
+		row["institute"] = institute or cstr(row.get("institute") or "").strip()
 		payload = _attendance_append_values(row)
 		if payload:
 			doc.append("attendance", payload)
@@ -1211,6 +1266,7 @@ def save_attendance(name=None, attendance=None):
 	return {
 		"ok": 1,
 		"name": doc.name,
+		"institute": institute,
 		"attendance": rows,
 		"attendance_present": present,
 		"attendance_total": len(rows),
@@ -1231,6 +1287,8 @@ def get_session(name):
 		for row in doc.attendance or []:
 			attendance.append(_attendance_row_dict(row))
 	present = sum(1 for a in attendance if a["attendance_status"] == "Present")
+	institute = _session_institute(doc)
+	tag_school, school_label = _resolve_school_link(doc.tag_school, doc.school_name)
 	return {
 		"name": doc.name,
 		"type": doc.type,
@@ -1242,7 +1300,7 @@ def get_session(name):
 		"workshop_topic": doc.workshop_topic or "",
 		"mode_of_training": doc.mode_of_training or "",
 		"participants_category": doc.participants_category or "",
-		"school_name": doc.school_name or "",
+		"school_name": doc.school_name or school_label or "",
 		"school_type": doc.school_type or "",
 		"department_training": doc.department_training or "",
 		"city": doc.city or "",
@@ -1250,7 +1308,8 @@ def get_session(name):
 		"trainer_name": doc.trainer_name or "",
 		"program": doc.program or "",
 		"workshop_for": doc.workshop_for or "",
-		"tag_school": _resolve_school_link(doc.tag_school, doc.school_name)[0],
+		"tag_school": tag_school,
+		"institute": institute or school_label or "",
 		"schedule_status": getattr(doc, "schedule_status", None) or "",
 		"zoom_id": getattr(doc, "zoom_id", None) or "",
 		"zoom_link": getattr(doc, "zoom_link", None) or "",

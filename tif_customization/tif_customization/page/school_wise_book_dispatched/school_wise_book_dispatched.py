@@ -23,6 +23,38 @@ def get_report_data(filters=None):
 
 
 @frappe.whitelist()
+def get_so_wise_dispatch(filters=None):
+	"""One row per Sales Order (plus unlinked DN lines) for sample-file reconciliation.
+
+	City-wise report totals by Customer/School across all Delivery Notes in the
+	date range. Sample files are usually Sales Order–wise, so multi-SO schools
+	look high and free DN lines (no against_sales_order) also inflate the school total.
+	"""
+	filters = _parse_filters(filters)
+	return {"rows": _get_so_dispatch_rows(filters)}
+
+
+@frappe.whitelist()
+def get_customer_so_breakdown(filters=None):
+	"""Sales Order contribution for one customer/school (row drill-down)."""
+	filters = _parse_filters(filters)
+	customer = cstr(filters.get("customer") or "").strip()
+	if not customer:
+		frappe.throw(frappe._("Customer is required."))
+	rows = _get_so_dispatch_rows(filters)
+	total = sum(flt(r.get("total_qty")) for r in rows)
+	return {
+		"customer": customer,
+		"label": rows[0]["school_name"] if rows else customer,
+		"from_date": str(filters["from_date"]),
+		"to_date": str(filters["to_date"]),
+		"rows": rows,
+		"total_qty": total,
+		"so_count": len(rows),
+	}
+
+
+@frappe.whitelist()
 def get_item_wise_dispatch(filters=None):
 	"""Item-wise outgoing qty (one school/customer, or all under current filters / card)."""
 	filters = _parse_filters(filters)
@@ -185,6 +217,7 @@ def _school_join_sql():
 
 def _city_expr():
 	# Dispatch destination first; school master city is often wrong / outdated
+	# TRIM avoids trailing-space splits (e.g. "karachi ").
 	return "COALESCE(NULLIF(TRIM(addr.city), ''), NULLIF(TRIM(dn.custom_city), ''), NULLIF(TRIM(s.city), ''), '')"
 
 
@@ -194,6 +227,166 @@ def _province_expr():
 
 def _area_expr():
 	return "COALESCE(NULLIF(TRIM(addr.custom_area), ''), NULLIF(TRIM(dn.custom_area), ''), NULLIF(TRIM(s.area), ''), '')"
+
+
+def _get_so_dispatch_rows(filters):
+	"""DN book qty grouped by Sales Order (against_sales_order), same filters as city report."""
+	where = [
+		"dn.docstatus = 1",
+		"IFNULL(dn.is_return, 0) = 0",
+		"dn.posting_date BETWEEN %(from_date)s AND %(to_date)s",
+		sql_book_item_filter("dni.item_code").lstrip("AND ").strip(),
+	]
+	params = with_book_item_params(
+		{
+			"from_date": filters["from_date"],
+			"to_date": filters["to_date"],
+		}
+	)
+
+	if filters.get("school") or filters.get("school_name") or filters.get("customer"):
+		_apply_school_name_filter(
+			where,
+			params,
+			filters,
+			customer_field="dn.customer",
+			customer_name_field="dn.customer_name",
+		)
+
+	if filters.get("city"):
+		where.append(f"LOWER(TRIM({_city_expr()})) = LOWER(%(city)s)")
+		params["city"] = filters["city"]
+	if filters.get("province"):
+		where.append(f"LOWER(TRIM({_province_expr()})) = LOWER(%(province)s)")
+		params["province"] = filters["province"]
+	if filters.get("area"):
+		where.append(f"LOWER(TRIM({_area_expr()})) = LOWER(%(area)s)")
+		params["area"] = filters["area"]
+	if filters.get("school_status"):
+		where.append("s.status = %(school_status)s")
+		params["school_status"] = filters["school_status"]
+
+	customer_type = (filters.get("customer_type") or "").strip()
+	name_is_school = _school_name_sql(
+		"CONCAT_WS(' ', COALESCE(dn.customer_name, ''), COALESCE(dn.customer, ''), COALESCE(s.school_name, ''))"
+	)
+	if customer_type == "Individual":
+		where.append("IFNULL(cust.customer_type, '') = 'Individual'")
+		where.append(f"NOT ({name_is_school})")
+	elif customer_type == "School":
+		where.append(
+			f"(IFNULL(cust.customer_type, '') IN ('School', 'Company') OR ({name_is_school}))"
+		)
+
+	book_type = (filters.get("book_type") or "").strip()
+	_apply_book_type_filter(where, book_type)
+
+	sales_order = cstr(filters.get("sales_order") or "").strip()
+	if sales_order:
+		where.append("dni.against_sales_order = %(sales_order)s")
+		params["sales_order"] = sales_order
+
+	where_clause = " AND ".join(where)
+	city_expr = _city_expr()
+	province_expr = _province_expr()
+	area_expr = _area_expr()
+	rows = frappe.db.sql(
+		f"""
+		SELECT
+			IFNULL(NULLIF(dni.against_sales_order, ''), '') AS sales_order,
+			COALESCE(s.name, '') AS school,
+			COALESCE(NULLIF(s.school_name, ''), dn.customer_name, dn.customer) AS school_name,
+			COALESCE(dn.customer_name, '') AS customer_name,
+			dn.customer AS customer,
+			COALESCE(cust.customer_type, '') AS customer_type,
+			{city_expr} AS city,
+			{province_expr} AS province,
+			{area_expr} AS area,
+			COUNT(DISTINCT dn.name) AS delivery_notes,
+			SUM(COALESCE(dni.qty, 0)) AS total_qty,
+			SUM(CASE WHEN {_mqh_case()} THEN COALESCE(dni.qty, 0) ELSE 0 END) AS mqh_qty,
+			SUM(CASE WHEN {_qaida_case()} THEN COALESCE(dni.qty, 0) ELSE 0 END) AS qaida_qty,
+			SUM(CASE WHEN {_guide_case()} THEN COALESCE(dni.qty, 0) ELSE 0 END) AS guide_qty,
+			SUM(CASE WHEN {_kpk_edition_case()} THEN COALESCE(dni.qty, 0) ELSE 0 END) AS kpk_qty,
+			SUM(CASE WHEN {_balouchistan_edition_case()} THEN COALESCE(dni.qty, 0) ELSE 0 END) AS bal_qty,
+			MIN(dn.posting_date) AS first_dispatch_date,
+			MAX(dn.posting_date) AS last_dispatch_date,
+			GROUP_CONCAT(DISTINCT dn.name ORDER BY dn.posting_date SEPARATOR ', ') AS delivery_note_list
+		FROM `tabDelivery Note` dn
+		INNER JOIN `tabDelivery Note Item` dni ON dni.parent = dn.name
+		LEFT JOIN `tabCustomer` cust ON cust.name = dn.customer
+		{_address_join_sql()}
+		{_school_join_sql()}
+		WHERE {where_clause}
+		GROUP BY
+			IFNULL(NULLIF(dni.against_sales_order, ''), ''),
+			COALESCE(s.name, ''),
+			COALESCE(NULLIF(s.school_name, ''), dn.customer_name, dn.customer),
+			dn.customer,
+			COALESCE(cust.customer_type, ''),
+			{city_expr},
+			{province_expr},
+			{area_expr}
+		ORDER BY last_dispatch_date ASC, sales_order ASC
+		""",
+		params,
+		as_dict=True,
+	)
+
+	so_names = [r.sales_order for r in rows if r.sales_order]
+	so_meta = {}
+	if so_names:
+		for so in frappe.db.get_all(
+			"Sales Order",
+			filters={"name": ["in", so_names]},
+			fields=["name", "transaction_date", "po_no", "status"],
+		):
+			so_meta[so.name] = so
+
+	for row in rows:
+		row["total_qty"] = flt(row.get("total_qty"))
+		row["mqh_qty"] = flt(row.get("mqh_qty"))
+		row["qaida_qty"] = flt(row.get("qaida_qty"))
+		row["guide_qty"] = flt(row.get("guide_qty"))
+		row["kpk_qty"] = flt(row.get("kpk_qty"))
+		row["bal_qty"] = flt(row.get("bal_qty"))
+		row["other_qty"] = max(
+			0.0,
+			flt(
+				row["total_qty"]
+				- row["mqh_qty"]
+				- row["qaida_qty"]
+				- row["guide_qty"]
+				- row["kpk_qty"]
+				- row["bal_qty"]
+			),
+		)
+		row["delivery_notes"] = int(row.get("delivery_notes") or 0)
+		if row.get("first_dispatch_date"):
+			row["first_dispatch_date"] = str(getdate(row["first_dispatch_date"]))
+		if row.get("last_dispatch_date"):
+			row["last_dispatch_date"] = str(getdate(row["last_dispatch_date"]))
+		meta = so_meta.get(row.get("sales_order")) or {}
+		row["so_date"] = str(getdate(meta.transaction_date)) if meta.get("transaction_date") else ""
+		row["so_status"] = meta.get("status") or ""
+		if not row.get("sales_order"):
+			row["sales_order"] = ""
+			row["so_label"] = frappe._("No Sales Order (free DN lines)")
+		else:
+			row["so_label"] = row["sales_order"]
+		row["customer_type_group"] = _customer_type_group(
+			row.get("customer_type"),
+			" ".join(
+				[
+					cstr(row.get("school_name") or ""),
+					cstr(row.get("customer_name") or ""),
+					cstr(row.get("customer") or ""),
+				]
+			),
+		)
+
+	_attach_location_links(rows)
+	return rows
 
 
 def _parse_filters(filters):

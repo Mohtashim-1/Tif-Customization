@@ -60,6 +60,7 @@ const editingName = ref("");
 const formDefaults = ref({});
 const attendanceOpen = ref(false);
 const attendanceName = ref("");
+const attendanceInstitute = ref("");
 const activeCard = ref(null);
 const customRange = ref(false);
 
@@ -391,9 +392,12 @@ function openEdit(name) {
 	formOpen.value = true;
 }
 
-function openAttendance(name) {
+function openAttendance(payload) {
+	const name = typeof payload === "string" ? payload : payload?.name;
+	const institute = typeof payload === "string" ? "" : payload?.institute || "";
 	if (!name) return;
 	attendanceName.value = name;
+	attendanceInstitute.value = String(institute || "").trim();
 	attendanceOpen.value = true;
 }
 
@@ -642,6 +646,7 @@ watch(plannerView, () => {
 			<AttendanceDialog
 				:open="attendanceOpen"
 				:session-name="attendanceName"
+				:institute-hint="attendanceInstitute"
 				@close="attendanceOpen = false"
 				@saved="onAttendanceSaved"
 			/>

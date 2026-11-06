@@ -22,6 +22,7 @@ frappe.tif_customization.SchoolWiseBookDispatched = class SchoolWiseBookDispatch
 		this.make_filters();
 		this.page.set_primary_action(__("Refresh"), () => this.load_data(), "refresh");
 		this.page.add_action_item(__("Export CSV"), () => this.export_csv());
+		this.page.add_action_item(__("Export SO-wise CSV"), () => this.export_so_wise_csv());
 		this.page.add_action_item(__("Import CSV"), () => this.import_csv());
 		this.page.add_action_item(__("Print"), () => this.print_report());
 		this.load_data();
@@ -564,7 +565,7 @@ frappe.tif_customization.SchoolWiseBookDispatched = class SchoolWiseBookDispatch
 			e.stopPropagation();
 			const idx = cint($(e.currentTarget).closest("tr").attr("data-row-idx"));
 			const row = this.rows[idx];
-			if (row) this.show_item_wise_qty(row);
+			if (row) this.show_customer_breakdown(row);
 		});
 		$wrap.find("tr.swbd-row").on("click", (e) => {
 			if ($(e.target).closest("a").length && !$(e.target).closest(".swbd-item-drill").length) {
@@ -572,7 +573,7 @@ frappe.tif_customization.SchoolWiseBookDispatched = class SchoolWiseBookDispatch
 			}
 			const idx = cint($(e.currentTarget).attr("data-row-idx"));
 			const row = this.rows[idx];
-			if (row) this.show_item_wise_qty(row);
+			if (row) this.show_customer_breakdown(row);
 		});
 	}
 
@@ -584,6 +585,91 @@ frappe.tif_customization.SchoolWiseBookDispatched = class SchoolWiseBookDispatch
 			card_scope: 0,
 		});
 		this._open_item_wise_dialog(filters, row.school_name || row.customer || "");
+	}
+
+	show_customer_breakdown(row) {
+		const filters = Object.assign({}, this.get_filters(), {
+			customer: row.customer || "",
+			school: row.school || "",
+			school_name: "",
+			card_scope: 0,
+		});
+		const fmt = (n) => frappe.format(n || 0, { fieldtype: "Float", precision: 0 });
+		frappe.call({
+			method:
+				"tif_customization.tif_customization.page.school_wise_book_dispatched.school_wise_book_dispatched.get_customer_so_breakdown",
+			args: { filters },
+			freeze: true,
+			freeze_message: __("Loading Sales Order breakdown..."),
+			callback: (r) => {
+				const res = r.message || {};
+				const sos = res.rows || [];
+				let soBody;
+				if (!sos.length) {
+					soBody = `<p class="text-muted">${__("No Sales Order / DN lines found.")}</p>`;
+				} else {
+					soBody = `
+						<p class="text-muted" style="margin:0 0 10px;font-size:12px;">
+							${__("This city-wise total combines every Delivery Note for the school in the date range — not one Sales Order.")}
+							${__("School total")}: <strong>${fmt(res.total_qty)}</strong>
+							· ${__("Sales Orders / groups")}: <strong>${cint(res.so_count)}</strong>
+						</p>
+						<div style="max-height:360px;overflow:auto;margin-bottom:12px;">
+							<table class="table table-bordered table-hover" style="font-size:12px;margin:0;">
+								<thead>
+									<tr>
+										<th>${__("Sales Order")}</th>
+										<th>${__("SO Date")}</th>
+										<th>${__("Dispatch")}</th>
+										<th class="text-right">${__("Qty")}</th>
+										<th>${__("Delivery Notes")}</th>
+									</tr>
+								</thead>
+								<tbody>
+									${sos
+										.map((s) => {
+											const so = s.sales_order
+												? `<a href="/app/sales-order/${encodeURIComponent(
+														s.sales_order
+													)}" target="_blank">${frappe.utils.escape_html(
+														s.sales_order
+													)}</a>`
+												: `<span class="text-muted">${frappe.utils.escape_html(
+														s.so_label || __("No Sales Order")
+													)}</span>`;
+											return `<tr>
+												<td>${so}</td>
+												<td>${s.so_date ? frappe.datetime.str_to_user(s.so_date) : "—"}</td>
+												<td>${
+													s.last_dispatch_date
+														? frappe.datetime.str_to_user(s.last_dispatch_date)
+														: "—"
+												}</td>
+												<td class="text-right"><strong>${fmt(s.total_qty)}</strong></td>
+												<td style="font-size:11px;">${frappe.utils.escape_html(s.delivery_note_list || "")}</td>
+											</tr>`;
+										})
+										.join("")}
+								</tbody>
+							</table>
+						</div>`;
+				}
+				const d = new frappe.ui.Dialog({
+					title: __("Sales Order breakdown: {0}", [res.label || row.school_name || ""]),
+					size: "extra-large",
+					fields: [{ fieldtype: "HTML", fieldname: "html" }],
+					primary_action_label: __("Item-wise qty"),
+					primary_action: () => {
+						d.hide();
+						this.show_item_wise_qty(row);
+					},
+					secondary_action_label: __("Close"),
+					secondary_action: () => d.hide(),
+				});
+				d.fields_dict.html.$wrapper.html(soBody);
+				d.show();
+			},
+		});
 	}
 
 	_open_item_wise_dialog(filters, fallbackLabel) {
@@ -682,6 +768,66 @@ frappe.tif_customization.SchoolWiseBookDispatched = class SchoolWiseBookDispatch
 		a.href = URL.createObjectURL(blob);
 		a.download = `school_wise_book_dispatched_${frappe.datetime.get_today()}.csv`;
 		a.click();
+	}
+
+	export_so_wise_csv() {
+		frappe.call({
+			method:
+				"tif_customization.tif_customization.page.school_wise_book_dispatched.school_wise_book_dispatched.get_so_wise_dispatch",
+			args: { filters: this.get_filters() },
+			freeze: true,
+			freeze_message: __("Building SO-wise export..."),
+			callback: (r) => {
+				const rows = (r.message && r.message.rows) || [];
+				if (!rows.length) {
+					frappe.msgprint(__("No data to export"));
+					return;
+				}
+				const cols = [
+					{ key: "sales_order", label: "Sales Order" },
+					{ key: "so_date", label: "SO Date" },
+					{ key: "customer", label: "Customer ID" },
+					{ key: "school", label: "School ID" },
+					{ key: "school_name", label: "School / Customer" },
+					{ key: "customer_type", label: "Customer Type" },
+					{ key: "city", label: "City" },
+					{ key: "province", label: "Province" },
+					{ key: "area", label: "Area" },
+					{ key: "delivery_notes", label: "DNs" },
+					{ key: "total_qty", label: "Total Qty" },
+					{ key: "mqh_qty", label: "MQH" },
+					{ key: "qaida_qty", label: "Qaida" },
+					{ key: "guide_qty", label: "Guide" },
+					{ key: "kpk_qty", label: "KP Edition" },
+					{ key: "bal_qty", label: "Balouchistan Edition" },
+					{ key: "other_qty", label: "Other" },
+					{ key: "first_dispatch_date", label: "First Dispatch" },
+					{ key: "last_dispatch_date", label: "Last Dispatch" },
+					{ key: "delivery_note_list", label: "Delivery Notes" },
+				];
+				const lines = [cols.map((c) => this.csv_escape(c.label)).join(",")];
+				rows.forEach((row) => {
+					lines.push(
+						cols
+							.map((c) => this.csv_escape(row[c.key] == null ? "" : String(row[c.key])))
+							.join(",")
+					);
+				});
+				const blob = new Blob(["\ufeff" + lines.join("\n")], {
+					type: "text/csv;charset=utf-8;",
+				});
+				const a = document.createElement("a");
+				a.href = URL.createObjectURL(blob);
+				a.download = `school_wise_dispatch_SO_wise_${frappe.datetime.get_today()}.csv`;
+				a.click();
+				frappe.show_alert({
+					message: __(
+						"SO-wise export ready. Use this file to match Sales Order sample qty (city-wise screen totals by school)."
+					),
+					indicator: "green",
+				});
+			},
+		});
 	}
 
 	csv_escape(value) {

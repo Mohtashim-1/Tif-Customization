@@ -5,6 +5,7 @@ import { apiGet, apiPost, METHOD } from "../lib/api";
 const props = defineProps({
 	open: { type: Boolean, default: false },
 	sessionName: { type: String, default: "" },
+	instituteHint: { type: String, default: "" },
 });
 const emit = defineEmits(["close", "saved"]);
 
@@ -16,10 +17,13 @@ const COLS = [
 	{ key: "signed", label: "Sign", type: "sign" },
 ];
 
-function blankRow() {
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_RE = /^(\+?\d[\d\s\-()]{6,18}\d)$/;
+
+function blankRow(institute = "") {
 	return {
 		participant_name: "",
-		institute: "",
+		institute: institute || "",
 		phone: "",
 		email: "",
 		signed: "Yes",
@@ -27,22 +31,35 @@ function blankRow() {
 	};
 }
 
-function ensureMinRows(list, min = 5) {
+function sessionInstitute(doc) {
+	return String(
+		doc?.institute ||
+			doc?.school_name ||
+			doc?.tag_school_label ||
+			doc?.tag_school ||
+			doc?.workshop_for ||
+			""
+	).trim();
+}
+
+function ensureMinRows(list, institute = "", min = 5) {
 	const rows = (list || []).map((r) => ({
-		...blankRow(),
+		...blankRow(institute),
 		...r,
+		institute: (r.institute || "").trim() || institute,
 		signed: r.signed || (r.attendance_status === "Absent" ? "No" : "Yes"),
 	}));
-	while (rows.length < min) rows.push(blankRow());
+	while (rows.length < min) rows.push(blankRow(institute));
 	return rows;
 }
 
 const loading = ref(false);
 const saving = ref(false);
 const error = ref("");
-const meta = ref({ title: "", date: "", trainer: "" });
+const meta = ref({ title: "", date: "", trainer: "", institute: "" });
 const rows = ref(ensureMinRows([]));
 const tableRef = ref(null);
+const instituteLocked = computed(() => Boolean((meta.value.institute || "").trim()));
 
 const filledCount = computed(
 	() => rows.value.filter((r) => (r.participant_name || "").trim()).length
@@ -60,17 +77,22 @@ async function load() {
 	error.value = "";
 	try {
 		const doc = await apiGet(`${METHOD}.get_session`, { name: props.sessionName });
+		const institute = sessionInstitute(doc) || String(props.instituteHint || "").trim();
 		meta.value = {
 			title: doc.workshop_topic || doc.training_type || doc.name || "Session",
 			date: doc.training_date || "",
 			trainer: doc.trainer_name || "",
+			institute,
 		};
-		rows.value = ensureMinRows(doc.attendance || []);
+		rows.value = ensureMinRows(doc.attendance || [], institute).map((r) => ({
+			...r,
+			institute: institute || (r.institute || "").trim(),
+		}));
 		await nextTick();
 		focusCell(0, 0);
 	} catch (e) {
 		error.value = e.message || String(e);
-		rows.value = ensureMinRows([]);
+		rows.value = ensureMinRows([], meta.value.institute || "");
 	} finally {
 		loading.value = false;
 	}
@@ -99,12 +121,42 @@ function focusCell(rowIdx, colIdx) {
 }
 
 function addRows(count = 1) {
-	for (let i = 0; i < count; i++) rows.value.push(blankRow());
+	const institute = meta.value.institute || "";
+	for (let i = 0; i < count; i++) rows.value.push(blankRow(institute));
 }
 
 function removeRow(idx) {
 	rows.value.splice(idx, 1);
-	if (rows.value.length < 5) rows.value = ensureMinRows(rows.value);
+	if (rows.value.length < 5) rows.value = ensureMinRows(rows.value, meta.value.institute || "");
+}
+
+function isValidPhone(value) {
+	const v = String(value || "").trim();
+	if (!v) return true;
+	const digits = v.replace(/\D/g, "");
+	return digits.length >= 7 && digits.length <= 15 && PHONE_RE.test(v);
+}
+
+function isValidEmail(value) {
+	const v = String(value || "").trim();
+	if (!v) return true;
+	return EMAIL_RE.test(v);
+}
+
+function validateRows() {
+	const filled = rows.value.filter((r) => (r.participant_name || "").trim());
+	for (let i = 0; i < filled.length; i++) {
+		const r = filled[i];
+		const phone = (r.phone || "").trim();
+		const email = (r.email || "").trim();
+		if (phone && !isValidPhone(phone)) {
+			return `Row ${i + 1}: enter a proper Cell No (or leave blank).`;
+		}
+		if (email && !isValidEmail(email)) {
+			return `Row ${i + 1}: enter a proper Email (or leave blank).`;
+		}
+	}
+	return "";
 }
 
 function onSignChange(row) {
@@ -180,14 +232,20 @@ function onKeydown(e, rowIdx, colIdx) {
 }
 
 async function save() {
+	const validationError = validateRows();
+	if (validationError) {
+		error.value = validationError;
+		return;
+	}
 	saving.value = true;
 	error.value = "";
 	try {
+		const institute = meta.value.institute || "";
 		const payload = rows.value
 			.filter((r) => (r.participant_name || "").trim())
 			.map((r) => ({
 				participant_name: (r.participant_name || "").trim(),
-				institute: (r.institute || "").trim(),
+				institute: institute || (r.institute || "").trim(),
 				phone: (r.phone || "").trim(),
 				email: (r.email || "").trim(),
 				signed: r.signed === "No" ? "No" : "Yes",
@@ -224,8 +282,15 @@ async function save() {
 				<button type="button" class="close" @click="$emit('close')">✕</button>
 			</header>
 
+			<div class="institute-banner" :class="{ missing: !meta.institute }">
+				<span class="label">Institute</span>
+				<strong v-if="meta.institute">{{ meta.institute }}</strong>
+				<span v-else class="warn">
+					No school on this training — set School on the session, or type institute in the table.
+				</span>
+			</div>
 			<p class="hint">
-				Excel-style entry · Tab / Shift+Tab move cells · Enter / ↑↓ move rows · type in the last row to add more
+				Cell No / Email optional, but must be valid if filled · Tab / Enter / ↑↓ to move
 			</p>
 
 			<p v-if="error" class="err">{{ error }}</p>
@@ -258,10 +323,16 @@ async function save() {
 								<input
 									v-else
 									v-model="row[col.key]"
-									:type="col.key === 'email' ? 'email' : 'text'"
+									:type="col.key === 'email' ? 'email' : col.key === 'phone' ? 'tel' : 'text'"
 									:data-row="rIdx"
 									:data-col="cIdx"
-									:placeholder="col.label"
+									:placeholder="
+										col.key === 'institute'
+											? meta.institute || 'Type institute / school'
+											: col.label
+									"
+									:readonly="col.key === 'institute' && instituteLocked"
+									:class="{ locked: col.key === 'institute' && instituteLocked }"
 									autocomplete="off"
 									@keydown="onKeydown($event, rIdx, cIdx)"
 								/>
@@ -334,6 +405,32 @@ h2 {
 	margin: 4px 0 0;
 	font-size: 13px;
 	color: #64748b;
+}
+.institute-banner {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px 12px;
+	padding: 10px 12px;
+	border-radius: 10px;
+	background: #ecfdf5;
+	border: 1px solid #a7f3d0;
+	font-size: 14px;
+}
+.institute-banner .label {
+	font-size: 11px;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	font-weight: 700;
+	color: #0f766e;
+}
+.institute-banner.missing {
+	background: #fff7ed;
+	border-color: #fed7aa;
+}
+.institute-banner .warn {
+	color: #9a3412;
+	font-size: 13px;
 }
 .close {
 	border: 0;
@@ -413,6 +510,15 @@ h2 {
 .sheet-table select:focus {
 	background: #ecfdf5;
 	box-shadow: inset 0 0 0 2px #14b8a6;
+}
+.sheet-table input.locked {
+	background: #f8fafc;
+	color: #475569;
+	cursor: default;
+}
+.sheet-table input.locked:focus {
+	background: #f8fafc;
+	box-shadow: none;
 }
 .linkish {
 	border: 0;

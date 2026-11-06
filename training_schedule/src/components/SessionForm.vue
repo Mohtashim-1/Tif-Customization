@@ -730,7 +730,12 @@ onMounted(load);
 								v-if="form.name"
 								type="button"
 								class="primary-lite"
-								@click="emit('attendance', form.name)"
+								@click="
+									emit('attendance', {
+										name: form.name,
+										institute: (form.school_name || '').trim(),
+									})
+								"
 							>
 								Open Attendance Sheet
 							</button>
