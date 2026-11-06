@@ -481,7 +481,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 	}
 
 	fmt_score(n) {
-		return frappe.format(flt(n || 0), { fieldtype: "Float", precision: 2 });
+		return frappe.format(flt(n || 0), { fieldtype: "Float", precision: 2 }, { inline: 1 });
 	}
 
 	fmt_pct(n) {
@@ -494,23 +494,29 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		return cint(row.active) + cint(row.inactive);
 	}
 
-	/** Visits block: New School Visit, Follow up, Monitoring, then Total. */
+	/** Visits block: Marketing → Follow up → Monitoring → Total (same names as KPI cards). */
 	visit_columns() {
 		return [
 			{
-				label: __("New School Visit (Marketing Visit)"),
-				metric: "new",
-				value: (r) => r.new,
+				label: __("Marketing Visit"),
+				metric: "marketing",
+				value: (r) => (r.marketing != null && r.marketing !== "" ? r.marketing : r.new),
 			},
 			{ label: __("Follow up Visit"), metric: "followup", value: (r) => r.followup },
-			{ label: __("Monitoring Visit (M&E)"), metric: "monitoring", value: (r) => this.me_visits(r), cellClass: "visit-mon-col" },
 			{
-				label: __("Total Visit"),
+				label: __("Monitoring Visit (M&E)"),
+				metric: "monitoring",
+				value: (r) => this.me_visits(r),
+				cellClass: "visit-mon-col",
+			},
+			{
+				label: __("Total School Visits"),
 				metric: "school_visits",
-				value: (r) => cint(r.new) + cint(r.followup) + this.me_visits(r),
-				hint: __(
-					"New School Visit + Follow up Visit + Monitoring Visit (M&E)"
-				),
+				value: (r) =>
+					cint(r.marketing != null && r.marketing !== "" ? r.marketing : r.new) +
+					cint(r.followup) +
+					this.me_visits(r),
+				hint: __("Marketing Visit + Follow up Visit + Monitoring Visit (M&E)"),
 			},
 		];
 	}
@@ -2445,37 +2451,84 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 
 	officer_kpi_rows(row, data) {
 		const staff = row.user_id || row.employee_name || row.employee || "";
+		const marketing = cint(row.marketing != null && row.marketing !== "" ? row.marketing : row.new);
+		const followup = cint(row.followup);
+		const monitoring = this.me_visits(row);
+		const totalVisits = marketing + followup + monitoring;
+
+		// One clear set — no duplicate New/Total cards across Overview + Activity.
 		const items = [
-			{ group: __("Overview"), label: __("Total School Visits"), value: cint(row.marketing) + cint(row.followup) + this.me_visits(row), metric: "school_visits" },
-			{ group: __("Overview"), label: __("New School Visit"), value: row.new, metric: "new" },
-			{ group: __("Overview"), label: __("Number of School Visit"), value: row.followup, metric: "followup" },
-			{ group: __("Overview"), label: __("Visited Days"), value: row.visited_days, metric: "visited_days" },
-			{ group: __("Overview"), label: __("Present Days"), value: row.present_days, display: this.fmt_days(row.present_days) },
-			...this.visit_columns().map((col) => ({
+			{
+				group: __("Overview"),
+				label: __("Total School Visits"),
+				value: totalVisits,
+				metric: "school_visits",
+				hint: __("Marketing + Follow up + Monitoring"),
+			},
+			{
+				group: __("Overview"),
+				label: __("Visited Days"),
+				value: row.visited_days,
+				metric: "visited_days",
+			},
+			{
+				group: __("Overview"),
+				label: __("Present Days"),
+				value: row.present_days,
+				display: this.fmt_days(row.present_days),
+			},
+			{
+				group: __("Overview"),
+				label: __("Earned Points"),
+				value: row.earned_points,
+				display: this.fmt_score(row.earned_points),
+			},
+			{
+				group: __("Overview"),
+				label: __("Percentage"),
+				value: row.percentage,
+				display: this.fmt_pct(row.percentage),
+			},
+			{
 				group: __("Activity (period)"),
-				label: col.label,
-				value: col.value ? col.value(row) : row[col.key],
-				metric: col.metric,
-			})),
+				label: __("Marketing Visit"),
+				value: marketing,
+				metric: "marketing",
+				hint: __("New marketing / registration visits"),
+			},
+			{
+				group: __("Activity (period)"),
+				label: __("Follow up Visit"),
+				value: followup,
+				metric: "followup",
+			},
+			{
+				group: __("Activity (period)"),
+				label: __("Monitoring Visit (M&E)"),
+				value: monitoring,
+				metric: "monitoring",
+			},
 			...this.activity_extra_columns(data).map((col) => ({
 				group: __("Activity (period)"),
 				label: col.label,
 				value: col.key === "workshop" ? cint(row.workshop) : row[col.key],
 				metric: col.metric || col.key,
 			})),
-			...this.outcome_period_columns(data).map((col) => ({
-				group: __("Outcomes"),
-				label: col.label,
-				value: row[col.key],
-				metric: col.metric || col.key,
-			})),
-			...this.outcome_ytd_columns(data).map((col) => ({
-				group: __("Outcomes (1 July to date)"),
-				label: col.label,
-				value: row[col.key],
-				metric: col.metric,
-				useYtd: true,
-			})),
+			...this.outcome_ytd_columns(data).map((col) => {
+				let label = col.label;
+				if (col.metric === "workshop_registration") {
+					label = __("Onsite Workshop Participants");
+				} else if (col.metric === "online_participants") {
+					label = __("Online Workshop Participants");
+				}
+				return {
+					group: __("Outcomes (1 July to date)"),
+					label,
+					value: row[col.key],
+					metric: col.metric,
+					useYtd: true,
+				};
+			}),
 		];
 		return items.map((item) => ({ ...item, staff }));
 	}
@@ -2512,7 +2565,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				metric: item.metric || "",
 				staff,
 				useYtd: !!item.useYtd,
-				hint: item.metric ? __("Click to see Field Visits") : __("Period total"),
+				hint: item.hint || (item.metric ? __("Click to see Field Visits") : __("Period total")),
 			});
 		});
 
@@ -2536,14 +2589,12 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		});
 		d.fields_dict.html.$wrapper.html(`
 			<p class="text-muted" style="font-size:12px;margin-bottom:10px;">
-				${__("Visit Date")}: ${frappe.utils.escape_html(frappe.datetime.str_to_user(data.from_date || ""))}
-				– ${frappe.utils.escape_html(frappe.datetime.str_to_user(data.to_date || ""))}
+				${__("Visit Date")}: <strong>${frappe.utils.escape_html(frappe.datetime.str_to_user(data.from_date || ""))}
+				– ${frappe.utils.escape_html(frappe.datetime.str_to_user(data.to_date || ""))}</strong>
 				&nbsp;·&nbsp; ${__("Type / Division")}: <strong>${frappe.utils.escape_html(row.division || row.region_label || "—")}</strong>
-				&nbsp;·&nbsp; ${__("Earned")}: <strong>${this.fmt_score(row.earned_points)}</strong>
-				&nbsp;·&nbsp; ${__("Percentage")}: <strong>${this.fmt_pct(row.percentage)}</strong>
 			</p>
 			<p class="text-muted" style="font-size:12px;margin-bottom:10px;">
-				${__("Same KPI cards as the report. Click a card to open that SME’s Field Visits.")}
+				${__("Click a visit card to open documents. Labels match the main report (Marketing → Follow up → Monitoring).")}
 			</p>
 			<div style="max-height:70vh;overflow:auto;padding-right:4px;">
 				${cardsHtml}
