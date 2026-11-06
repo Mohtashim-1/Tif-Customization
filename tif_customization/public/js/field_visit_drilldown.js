@@ -2171,7 +2171,6 @@ frappe.tif_customization.render_school_activity_html = function (data) {
 					(p) => `<div class="school-act-chip ${programTone(p.tone)}">
 				<strong>${esc(p.name || "")}</strong>
 				<span>${esc(p.status || "—")}</span>
-				<small>${esc(p.source || "")}</small>
 			</div>`
 				)
 				.join("")
@@ -2254,6 +2253,9 @@ frappe.tif_customization.render_school_activity_html = function (data) {
 				margin:0; padding:10px 12px; font-size:13px; border-bottom:1px solid var(--border-color,#e5e7eb);
 				background:var(--control-bg,#f8fafc);
 			}
+			.school-act-panel.wide > h4 {
+				font-size:16px; font-weight:700; padding:12px 14px;
+			}
 			.school-act-panel .body { max-height:280px; overflow:auto; }
 			.school-act-panel.wide .body { max-height:420px; }
 			.school-act table { width:100%; border-collapse:collapse; margin:0; }
@@ -2335,7 +2337,7 @@ frappe.tif_customization.render_school_activity_html = function (data) {
 							<th>${__("Document No")}</th>
 							<th>${__("Visit Date")}</th>
 							<th>${__("Type")}</th>
-							<th>${__("Officer")}</th>
+							<th>${__("SME")}</th>
 							<th>${__("Visit Summary / Remarks")}</th>
 						</tr></thead>
 						<tbody>${visitRows}</tbody>
