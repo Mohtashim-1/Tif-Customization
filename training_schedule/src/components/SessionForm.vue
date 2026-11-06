@@ -10,7 +10,7 @@ const props = defineProps({
 	sessionName: { type: String, default: "" },
 	defaults: { type: Object, default: () => ({}) },
 });
-const emit = defineEmits(["close", "saved"]);
+const emit = defineEmits(["close", "saved", "attendance"]);
 
 const loading = ref(false);
 const saving = ref(false);
@@ -726,6 +726,14 @@ onMounted(load);
 							</p>
 						</div>
 						<div class="attend-actions">
+							<button
+								v-if="form.name"
+								type="button"
+								class="primary-lite"
+								@click="emit('attendance', form.name)"
+							>
+								Open Attendance Sheet
+							</button>
 							<label class="mode-pick">
 								Import mode
 								<select v-model="importMode">
@@ -1174,6 +1182,15 @@ select:focus {
 .primary {
 	background: #4f46e5;
 	color: #fff;
+}
+.primary-lite {
+	border-radius: 10px;
+	padding: 8px 12px;
+	font-weight: 700;
+	border: 1px solid #0f766e;
+	background: #ecfdf5;
+	color: #0f766e;
+	cursor: pointer;
 }
 .ghost {
 	background: #fff;

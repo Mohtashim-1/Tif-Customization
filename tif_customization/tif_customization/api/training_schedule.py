@@ -269,9 +269,11 @@ def _as_row_dict(row) -> frappe._dict:
 
 def _attendance_row_dict(row) -> dict:
 	row = _as_row_dict(row)
+	status = (row.attendance_status or "Present").strip() or "Present"
 	return {
 		"name": row.name or "",
 		"participant_name": row.participant_name or "",
+		"institute": (row.get("institute") if hasattr(row, "get") else getattr(row, "institute", None)) or "",
 		"email": row.email or "",
 		"join_time": row.join_time or "",
 		"leave_time": row.leave_time or "",
@@ -279,7 +281,8 @@ def _attendance_row_dict(row) -> dict:
 		"is_guest": cint(row.is_guest),
 		"recording_disclaimer_response": row.recording_disclaimer_response or "",
 		"in_waiting_room": cint(row.in_waiting_room),
-		"attendance_status": row.attendance_status or "Present",
+		"attendance_status": status,
+		"signed": "Yes" if status == "Present" else "No",
 		"phone": row.phone or "",
 		"zoom_participant_id": row.zoom_participant_id or "",
 		"check_in_time": _format_time(row.check_in_time) if row.get("check_in_time") else "",
@@ -307,12 +310,24 @@ def _duration_to_minutes(value) -> int:
 		return cint(text)
 
 
+def _attendance_status_from_row(row) -> str:
+	signed = str(row.get("signed") or "").strip().lower()
+	if signed in ("yes", "y", "1", "true", "present", "signed"):
+		return "Present"
+	if signed in ("no", "n", "0", "false", "absent"):
+		return "Absent"
+	status = (row.get("attendance_status") or "").strip()
+	if status in ("Present", "Absent", "Late"):
+		return status
+	return "Present"
+
+
 def _attendance_append_values(row) -> dict | None:
 	row = _as_row_dict(row)
-	name = (row.get("participant_name") or "").strip()
+	name = (row.get("participant_name") or row.get("name_label") or "").strip()
 	if not name:
 		return None
-	return {
+	payload = {
 		"participant_name": name,
 		"email": (row.email or "").strip() or None,
 		"join_time": (row.join_time or "").strip() or None,
@@ -321,12 +336,15 @@ def _attendance_append_values(row) -> dict | None:
 		"is_guest": _truthy_flag(row.is_guest),
 		"recording_disclaimer_response": (row.recording_disclaimer_response or "").strip() or None,
 		"in_waiting_room": _truthy_flag(row.in_waiting_room),
-		"attendance_status": row.attendance_status or "Present",
-		"phone": (row.phone or "").strip() or None,
+		"attendance_status": _attendance_status_from_row(row),
+		"phone": (row.phone or row.cell_no or "").strip() or None,
 		"zoom_participant_id": (row.zoom_participant_id or "").strip() or None,
 		"check_in_time": row.check_in_time or None,
 		"remarks": (row.remarks or "").strip() or None,
 	}
+	if frappe.get_meta("Upcoming Training Attendance").has_field("institute"):
+		payload["institute"] = (row.get("institute") or "").strip() or None
+	return payload
 
 
 def _normalize_header(value: str) -> str:
@@ -1161,6 +1179,42 @@ def get_form_options():
 		"modes": ["In-person", "Online", "Onsite"],
 		"participant_categories": ["School Kids", "Trainees", "Teachers"],
 		"school_types": ["Private", "Government"],
+	}
+
+
+@frappe.whitelist()
+def save_attendance(name=None, attendance=None):
+	"""Replace attendance rows on one Upcoming Training (Excel-style portal dialog)."""
+	_require_login()
+	if not name:
+		frappe.throw(_("Upcoming Training name is required."))
+	if not frappe.has_permission(DOCTYPE, "write"):
+		frappe.throw(_("You are not permitted to update Upcoming Training."), frappe.PermissionError)
+	if isinstance(attendance, str):
+		import json
+
+		attendance = json.loads(attendance)
+	doc = frappe.get_doc(DOCTYPE, name)
+	if not frappe.get_meta(DOCTYPE).has_field("attendance"):
+		frappe.throw(_("Attendance table is not available on Upcoming Training."))
+	doc.set("attendance", [])
+	for row in attendance or []:
+		if isinstance(row, str):
+			continue
+		payload = _attendance_append_values(row)
+		if payload:
+			doc.append("attendance", payload)
+	doc.save(ignore_permissions=False)
+	frappe.db.commit()
+	rows = [_attendance_row_dict(r) for r in doc.attendance or []]
+	present = sum(1 for a in rows if a["attendance_status"] == "Present")
+	return {
+		"ok": 1,
+		"name": doc.name,
+		"attendance": rows,
+		"attendance_present": present,
+		"attendance_total": len(rows),
+		"message": _("Attendance saved ({0} present / {1} total).").format(present, len(rows)),
 	}
 
 

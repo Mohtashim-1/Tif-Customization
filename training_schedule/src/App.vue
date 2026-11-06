@@ -11,6 +11,7 @@ import ScheduleLegend from "./components/ScheduleLegend.vue";
 import CalendarBoard from "./components/CalendarBoard.vue";
 import DirectoryView from "./components/DirectoryView.vue";
 import SessionForm from "./components/SessionForm.vue";
+import AttendanceDialog from "./components/AttendanceDialog.vue";
 import CardStudio from "./components/CardStudio.vue";
 
 const activeNav = ref("dashboard");
@@ -57,6 +58,8 @@ const dashboardLoading = ref(false);
 const formOpen = ref(false);
 const editingName = ref("");
 const formDefaults = ref({});
+const attendanceOpen = ref(false);
+const attendanceName = ref("");
 const activeCard = ref(null);
 const customRange = ref(false);
 
@@ -388,6 +391,18 @@ function openEdit(name) {
 	formOpen.value = true;
 }
 
+function openAttendance(name) {
+	if (!name) return;
+	attendanceName.value = name;
+	attendanceOpen.value = true;
+}
+
+function onAttendanceSaved(result) {
+	showToast(result?.message || "Attendance saved");
+	if (activeNav.value === "dashboard" || activeNav.value === "schedule") loadRange();
+	else if (activeNav.value !== "settings" && activeNav.value !== "cards") loadDirectory(activeNav.value);
+}
+
 function onSaved(result) {
 	// After auto-save during CSV import, bind the open form to the new doc name
 	// without closing — and without clearing import UI via a full remount race.
@@ -565,6 +580,7 @@ watch(plannerView, () => {
 					:trainer-filter="trainerFilter"
 					@close="activeCard = null"
 					@open="openEdit"
+					@attendance="openAttendance"
 				/>
 				<div v-if="loading" class="ts-loading">Loading planner…</div>
 				<template v-else>
@@ -608,6 +624,7 @@ watch(plannerView, () => {
 				@refresh="loadDirectory(activeNav)"
 				@add="onAddSession"
 				@edit="openEdit"
+				@attendance="openAttendance"
 				@filter-trainer="onFilterTrainer"
 				@filter-program="onFilterProgram"
 				@filter-room="onFilterRoom"
@@ -619,6 +636,14 @@ watch(plannerView, () => {
 				:defaults="formDefaults"
 				@close="formOpen = false"
 				@saved="onSaved"
+				@attendance="openAttendance"
+			/>
+
+			<AttendanceDialog
+				:open="attendanceOpen"
+				:session-name="attendanceName"
+				@close="attendanceOpen = false"
+				@saved="onAttendanceSaved"
 			/>
 
 			<div v-if="toast" class="ts-toast">{{ toast }}</div>

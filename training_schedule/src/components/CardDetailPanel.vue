@@ -9,7 +9,7 @@ const props = defineProps({
 	periodEnd: { type: String, default: "" },
 	trainerFilter: { type: String, default: "all" },
 });
-defineEmits(["close", "open"]);
+defineEmits(["close", "open", "attendance"]);
 
 const fromDate = ref(props.periodStart || "");
 const toDate = ref(props.periodEnd || "");
@@ -107,7 +107,12 @@ function statusLabel(s) {
 						<strong>{{ s.title }}</strong>
 						<span class="pill" :data-status="s.status">{{ statusLabel(s.status) }}</span>
 					</div>
-					<button type="button" class="open" @click="$emit('open', s.name || s.id)">Open / Edit</button>
+					<div class="session-acts">
+						<button type="button" class="open attend" @click="$emit('attendance', s.name || s.id)">
+							Attendance
+						</button>
+						<button type="button" class="open" @click="$emit('open', s.name || s.id)">Open / Edit</button>
+					</div>
 				</div>
 				<dl>
 					<div><dt>Date</dt><dd>{{ fmtDate(s.date) }}</dd></div>
@@ -177,6 +182,16 @@ h3 {
 	background: #4f46e5;
 	border-color: #4f46e5;
 	color: #fff;
+}
+.session-acts {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	justify-content: flex-end;
+}
+.open.attend {
+	background: #0f766e;
+	border-color: #0f766e;
 }
 .filters {
 	display: flex;

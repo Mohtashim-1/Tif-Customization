@@ -6,7 +6,15 @@ const props = defineProps({
 	payload: { type: Object, default: () => ({ view: "", rows: [] }) },
 	search: { type: String, default: "" },
 });
-const emit = defineEmits(["refresh", "add", "edit", "filter-trainer", "filter-program", "filter-room"]);
+const emit = defineEmits([
+	"refresh",
+	"add",
+	"edit",
+	"attendance",
+	"filter-trainer",
+	"filter-program",
+	"filter-room",
+]);
 
 const view = computed(() => (props.payload?.view || "").toLowerCase());
 const rows = computed(() => {
@@ -243,8 +251,15 @@ function openRow(row) {
 							{{ r.attendance_present || 0 }}/{{ r.attendance_total || 0 }}
 						</td>
 						<td><span class="pill" :data-status="r.status">{{ r.status }}</span></td>
-						<td>
-							<button type="button" class="linkish" @click="openRow(r)">Edit / Attendance</button>
+						<td class="acts">
+							<button type="button" class="linkish" @click="openRow(r)">Edit</button>
+							<button
+								type="button"
+								class="linkish attend"
+								@click="$emit('attendance', r.name || r.id)"
+							>
+								Attendance
+							</button>
 						</td>
 					</tr>
 				</tbody>
@@ -346,7 +361,9 @@ th { background: #f8fafc; }
 .pill[data-status="completed"] { color: #059669; }
 .pill[data-status="in_progress"] { color: #d97706; }
 .pill[data-status="upcoming"] { color: #7c3aed; }
-.linkish { border: 0; background: none; color: #4f46e5; font-weight: 700; }
+.linkish { border: 0; background: none; color: #4f46e5; font-weight: 700; cursor: pointer; }
+.linkish.attend { color: #0f766e; }
+.acts { display: flex; flex-wrap: wrap; gap: 8px; }
 .report-grid {
 	display: grid;
 	grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));

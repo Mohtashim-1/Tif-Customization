@@ -6,6 +6,8 @@
  "engine": "InnoDB",
  "field_order": [
   "participant_name",
+  "institute",
+  "phone",
   "email",
   "join_time",
   "leave_time",
@@ -14,7 +16,6 @@
   "recording_disclaimer_response",
   "in_waiting_room",
   "attendance_status",
-  "phone",
   "zoom_participant_id",
   "check_in_time",
   "remarks"
@@ -25,8 +26,15 @@
    "fieldname": "participant_name",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Name (Original Name)",
+   "label": "Name",
    "reqd": 1
+  },
+  {
+   "columns": 2,
+   "fieldname": "institute",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Institute"
   },
   {
    "columns": 2,
@@ -86,9 +94,11 @@
    "options": "Present\nAbsent\nLate"
   },
   {
+   "columns": 1,
    "fieldname": "phone",
    "fieldtype": "Data",
-   "label": "Phone"
+   "in_list_view": 1,
+   "label": "Cell No"
   },
   {
    "fieldname": "zoom_participant_id",
