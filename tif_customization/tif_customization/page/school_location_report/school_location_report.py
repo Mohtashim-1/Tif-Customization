@@ -318,21 +318,73 @@ def _norm(value):
 	return (value or "").strip().lower()
 
 
+def _resolve_school_lookup(school):
+	"""Map School name / Customer / free-text school title → (customer_id, display_name, school_doc)."""
+	school = cstr(school).strip()
+	if not school:
+		return "", "", None
+
+	doc = None
+	if frappe.db.exists("DocType", "School") and frappe.db.exists("School", school):
+		doc = frappe.db.get_value(
+			"School",
+			school,
+			["name", "school_name", "customer", "field_officer", "remarks", "creation"],
+			as_dict=True,
+		) or {}
+	elif frappe.db.exists("DocType", "School"):
+		sid = frappe.db.get_value("School", {"school_name": school}, "name")
+		if sid:
+			doc = frappe.db.get_value(
+				"School",
+				sid,
+				["name", "school_name", "customer", "field_officer", "remarks", "creation"],
+				as_dict=True,
+			) or {}
+
+	if doc:
+		return (
+			cstr(doc.get("customer")).strip(),
+			cstr(doc.get("school_name")).strip() or school,
+			doc,
+		)
+
+	customer = ""
+	school_name = school
+	if frappe.db.exists("Customer", school):
+		customer = school
+		school_name = cstr(frappe.db.get_value("Customer", school, "customer_name") or school).strip()
+	else:
+		found = frappe.db.get_value("Customer", {"customer_name": school}, "name")
+		if not found:
+			found = frappe.db.sql(
+				"""
+				SELECT name FROM `tabCustomer`
+				WHERE LOWER(TRIM(customer_name)) = LOWER(%s)
+				LIMIT 1
+				""",
+				school,
+			)
+			found = found[0][0] if found else None
+		if found:
+			customer = found
+			school_name = school
+	return customer, school_name, None
+
+
 @frappe.whitelist()
 def get_school_visits(school=None):
-	"""Field visits for one School: officer, remarks, document name, and date."""
-	school = cstr(school).strip()
-	if not school or not frappe.db.exists("School", school):
-		frappe.throw(_("School not found"))
+	"""Field visits for one school (School DocType, Customer, or school display name).
 
-	doc = frappe.db.get_value(
-		"School",
-		school,
-		["name", "school_name", "customer", "field_officer", "remarks", "creation"],
-		as_dict=True,
-	) or {}
-	school_name = cstr(doc.get("school_name")).strip()
-	customer = cstr(doc.get("customer")).strip()
+	Returns Document Name, Date, Field Officer, Remarks — same shape as School Location Report dialog.
+	"""
+	school = cstr(school).strip()
+	if not school:
+		frappe.throw(_("School is required"))
+
+	customer, school_name, doc = _resolve_school_lookup(school)
+	if not customer and not school_name:
+		frappe.throw(_("School not found"))
 
 	from tif_customization.tif_customization.field_visit_permissions import visit_day_sql
 
@@ -379,7 +431,7 @@ def get_school_visits(school=None):
 	)
 
 	owners = [row.owner for row in rows if row.owner]
-	if doc.get("field_officer"):
+	if doc and doc.get("field_officer"):
 		owners.append(doc.field_officer)
 	owner_names = _user_display_names(owners)
 
@@ -398,10 +450,11 @@ def get_school_visits(school=None):
 				"visit_date": str(row.visit_date) if row.visit_date else "",
 				"field_officer": officer,
 				"remarks": _visit_notes(row),
+				"doctype": "Field Visit",
 			}
 		)
 
-	if not visits and (cstr(doc.get("field_officer")).strip() or cstr(doc.get("remarks")).strip()):
+	if not visits and doc and (cstr(doc.get("field_officer")).strip() or cstr(doc.get("remarks")).strip()):
 		created = doc.get("creation")
 		visits.append(
 			{
@@ -414,8 +467,8 @@ def get_school_visits(school=None):
 		)
 
 	return {
-		"school": doc.get("name"),
-		"school_name": school_name or doc.get("name"),
+		"school": (doc or {}).get("name") or customer or school,
+		"school_name": school_name or school,
 		"visits": visits,
 	}
 

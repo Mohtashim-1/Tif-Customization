@@ -2142,8 +2142,13 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					`<span style="display:inline-block;margin-left:6px;padding:1px 6px;border:1px solid #dc2626;border-radius:999px;background:#fef2f2;color:#b91c1c;font-size:11px;font-weight:700;white-space:nowrap;">${label}</span>`;
 				const schoolCell = (school, _unapproved, missing) => {
 					// Do not show Un Approved on this report; keep missing-school hint only.
+					const raw = String(school || "").trim();
 					const badge = missing ? schoolBadge(__("School Detail Missing")) : "";
-					return `${frappe.utils.escape_html(school || "—")}${badge}`;
+					const label = frappe.utils.escape_html(raw || "—");
+					if (!raw || raw === __("— No school name —")) return `${label}${badge}`;
+					return `<a href="#" class="tif-open-school" data-school="${frappe.utils.escape_html(
+						raw
+					)}" style="font-weight:600;color:#0f766e;text-decoration:underline;">${label}</a>${badge}`;
 				};
 				const bySchool = {};
 				visits.forEach((v) => {
@@ -2324,7 +2329,9 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						</table>
 					</div>
 					<h5 style="margin:8px 0;">${__("Visit documents")}</h5>
-					<p class="text-muted" style="font-size:12px;margin:0 0 8px;">${__("Click a Document No to open that Field Visit.")}</p>
+					<p class="text-muted" style="font-size:12px;margin:0 0 8px;">${__(
+						"Click a Document No to open that Field Visit. Click a school name for visits."
+					)}</p>
 					<div class="table-responsive" style="max-height:240px;overflow:auto;">
 						<table class="table table-bordered table-hover" style="font-size:12px;margin:0;">
 							<thead>
@@ -2362,6 +2369,14 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						cardLabel,
 						cardCount,
 					});
+				});
+				d.$wrapper.on("click", ".tif-open-school", (e) => {
+					e.preventDefault();
+					e.stopPropagation();
+					const school = $(e.currentTarget).attr("data-school");
+					if (school && frappe.tif_customization.open_school_visits_dialog) {
+						frappe.tif_customization.open_school_visits_dialog(school);
+					}
 				});
 				d.show();
 			},
