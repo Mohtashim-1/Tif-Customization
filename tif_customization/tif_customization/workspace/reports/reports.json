@@ -76,7 +76,7 @@
    "is_query_report": 0,
    "label": "School Dashboard (UAT)",
    "link_count": 0,
-   "link_to": "school-dashboard",
+   "link_to": "school-location-report",
    "link_type": "Page",
    "onboard": 0,
    "type": "Link"
@@ -564,7 +564,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Supervisor KPI Detail",
+   "label": "Supervisor KPI Detail (UAT)",
    "link_count": 0,
    "link_to": "supervisor-target-ba",
    "link_type": "Page",
@@ -572,7 +572,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-11-06 02:43:46.771047",
+ "modified": "2026-11-06 10:25:07.221295",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Reports",
