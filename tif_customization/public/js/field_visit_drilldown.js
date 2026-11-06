@@ -170,7 +170,7 @@ frappe.tif_customization.open_school_visits_dialog = function (school, skipRoute
 						<tr>
 							<th>${__("Document Name")}</th>
 							<th>${__("Date")}</th>
-							<th>${__("Field Officer")}</th>
+							<th>${__("SME")}</th>
 							<th>${__("Remarks")}</th>
 						</tr>
 					</thead>
@@ -735,7 +735,7 @@ frappe.tif_customization.show_online_workshop_officer_dialog = function (data, o
 	);
 
 	const exportOfficerList = () => {
-		const headers = [__("Field Officer"), __("Participants"), __("Entries"), __("Programs")];
+		const headers = [__("SME"), __("Participants"), __("Entries"), __("Programs")];
 		const exportRows = officers.map((o) => [
 			o.officer,
 			o.participants,
@@ -755,7 +755,7 @@ frappe.tif_customization.show_online_workshop_officer_dialog = function (data, o
 				b.rows.length - a.rows.length ||
 				a.program.localeCompare(b.program)
 		);
-		const headers = [__("Field Officer"), __("Program"), __("Participants"), __("Entries")];
+		const headers = [__("SME"), __("Program"), __("Participants"), __("Entries")];
 		const exportRows = programs.map((p) => [
 			officer,
 			p.program,
@@ -870,14 +870,14 @@ frappe.tif_customization.show_online_workshop_officer_dialog = function (data, o
 		d.fields_dict.html.$wrapper.html(`
 			${importBar}
 			<p class="text-muted" style="font-size:12px;margin-bottom:10px;">
-				${__("Level 1 — Field Officer. Click an officer to see programs.")}
+				${__("Level 1 — SME. Click an SME to see programs.")}
 				&nbsp;·&nbsp; ${__("Total")}: <strong>${cint(totalCount).toLocaleString()}</strong>
 			</p>
 			<div class="table-responsive" style="max-height:420px;overflow:auto;">
 				<table class="table table-bordered table-hover" style="font-size:12px;margin:0;">
 					<thead>
 						<tr>
-							<th>${__("Field Officer")}</th>
+							<th>${__("SME")}</th>
 							<th class="text-right">${__("Participants")}</th>
 							<th class="text-right">${__("Entries")}</th>
 							<th class="text-right">${__("Programs")}</th>
@@ -935,7 +935,7 @@ frappe.tif_customization.show_online_workshop_officer_dialog = function (data, o
 				)}</td></tr>`;
 		d.fields_dict.html.$wrapper.html(`
 			<p style="margin-bottom:10px;">
-				<a href="#" class="ow-officer-back">${__("← Field officers")}</a>
+				<a href="#" class="ow-officer-back">${__("← SMEs")}</a>
 				&nbsp;·&nbsp; ${frappe.utils.escape_html(officer || "")}
 				&nbsp;·&nbsp; ${__("Participants")}: <strong>${cint(bucket.participants).toLocaleString()}</strong>
 				&nbsp;·&nbsp; ${__("Programs")}: <strong>${programs.length}</strong>
@@ -976,7 +976,7 @@ frappe.tif_customization.show_online_workshop_officer_dialog = function (data, o
 			.on("click", () => exportProgramDetail(officer, program));
 		d.fields_dict.html.$wrapper.html(`
 			<p style="margin-bottom:10px;">
-				<a href="#" class="ow-officer-back">${__("← Field officers")}</a>
+				<a href="#" class="ow-officer-back">${__("← SMEs")}</a>
 				&nbsp;·&nbsp;
 				<a href="#" class="ow-program-back" data-officer="${frappe.utils.escape_html(
 					officer || ""
@@ -1401,7 +1401,7 @@ frappe.tif_customization.show_volunteer_enrolment_dialog = function (data, opts)
 				<table class="table table-bordered table-hover" style="font-size:12px;margin:0;">
 					<thead>
 						<tr>
-							<th>${__("Field Officer")}</th>
+							<th>${__("SME")}</th>
 							<th class="text-right">${__("Volunteers")}</th>
 						</tr>
 					</thead>
@@ -1424,7 +1424,7 @@ frappe.tif_customization.show_volunteer_enrolment_dialog = function (data, opts)
 		);
 		d.fields_dict.html.$wrapper.html(`
 			<p style="margin-bottom:10px;">
-				${data.staff ? "" : `<a href="#" class="vol-officer-back">${__("← Field officers")}</a> &nbsp;·&nbsp;`}
+				${data.staff ? "" : `<a href="#" class="vol-officer-back">${__("← SMEs")}</a> &nbsp;·&nbsp;`}
 				${frappe.utils.escape_html(officer || "")}
 				&nbsp;·&nbsp; ${__("Volunteers")}: <strong>${rows.length}</strong>
 			</p>
@@ -1631,7 +1631,7 @@ frappe.tif_customization.show_enrolment_officer_dialog = function (data) {
 				<table class="table table-bordered table-hover" style="font-size:12px;margin:0;">
 					<thead>
 						<tr>
-							<th>${__("Field Officer")}</th>
+							<th>${__("SME")}</th>
 							<th class="text-right">${__("Enrollment")}</th>
 						</tr>
 					</thead>
@@ -1654,7 +1654,7 @@ frappe.tif_customization.show_enrolment_officer_dialog = function (data) {
 		);
 		d.fields_dict.html.$wrapper.html(`
 			<p style="margin-bottom:10px;">
-				${data.staff ? "" : `<a href="#" class="enrol-officer-back">${__("← Field officers")}</a> &nbsp;·&nbsp;`}
+				${data.staff ? "" : `<a href="#" class="enrol-officer-back">${__("← SMEs")}</a> &nbsp;·&nbsp;`}
 				${frappe.utils.escape_html(officer || "")}
 				&nbsp;·&nbsp; ${__("Participants")}: <strong>${rows.length}</strong>
 			</p>
@@ -2002,7 +2002,7 @@ frappe.tif_customization.show_monitoring_officer_dialog = function (data, rows, 
 				<table class="table table-bordered table-hover" style="font-size:12px;margin:0;">
 					<thead>
 						<tr>
-							<th>${__("Field Officer")}</th>
+							<th>${__("SME")}</th>
 							<th class="text-right">${__("Total Visit")}</th>
 							<th class="text-right">${__("Active")}</th>
 							<th class="text-right">${__("In-Active")}</th>
@@ -2050,7 +2050,7 @@ frappe.tif_customization.show_monitoring_officer_dialog = function (data, rows, 
 			: `<tr><td colspan="${colCount}" class="text-muted text-center">${__("No Field Visits for this number.")}</td></tr>`;
 		d.fields_dict.html.$wrapper.html(`
 			<p style="margin-bottom:10px;">
-				<a href="#" class="me-officer-back">${__("← Field officers")}</a>
+				<a href="#" class="me-officer-back">${__("← SMEs")}</a>
 				&nbsp;·&nbsp; ${frappe.utils.escape_html(officer)}
 				&nbsp;·&nbsp; ${frappe.utils.escape_html(kindLabel)}: <strong>${filtered.length}</strong>
 			</p>

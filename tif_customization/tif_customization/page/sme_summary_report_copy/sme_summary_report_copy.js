@@ -294,7 +294,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			label: __("Fallback Region"),
 			fieldtype: "Select",
 			fieldname: "region",
-			description: __("Used only if the SME has no Field Officer Type / Division"),
+			description: __("Used only if the SME has no Type / Division"),
 			options: [
 				"",
 				"karachi",
@@ -335,7 +335,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			fieldtype: "Autocomplete",
 			fieldname: "supervisor",
 			options: [],
-			description: __("Filter by Field Supervisor on Field Officer (line manager, not HR Reports To)"),
+			description: __("Filter by Field Supervisor on SME (line manager, not HR Reports To)"),
 			change: () => {
 				this.employee.set_value("");
 				this.schedule_load();
@@ -382,12 +382,12 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		const officers = stats.total_field_officers || 0;
 		const desc =
 			total > 0
-				? __("Field supervisors: {0} · {1} field officers report to them ({2} with SMEs)", [
+				? __("Field supervisors: {0} · {1} SMEs report to them ({2} with SMEs)", [
 						total,
 						officers,
 						smeSup,
 					])
-				: __("No field supervisors found. Set Field Supervisor on each Field Officer record.");
+				: __("No field supervisors found. Set Field Supervisor on each SME record.");
 		this.supervisor.df.description = desc;
 		this.supervisor.refresh();
 	}
@@ -848,7 +848,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 						value: this.fmt(k.supervisor_count),
 						style: "supervisor",
 						cardKind: "supervisor_list",
-						hint: __("Field Officers who manage other Field Officers"),
+						hint: __("SMEs who manage other SMEs"),
 					},
 				],
 			},
@@ -1721,12 +1721,12 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		d.fields_dict.html.$wrapper.html(`
 			<p class="text-muted" style="font-size:12px;margin-bottom:10px;">
 				${__(
-					"Field supervisors are Field Officers who manage other Field Officers (Field Supervisor link on Field Officer). Example: Hammad Saleem → Field Supervisor: M. Adnan Munir."
+					"Field supervisors are SMEs who manage other SMEs (Field Supervisor link on SME). Example: Hammad Saleem → Field Supervisor: M. Adnan Munir."
 				)}
 				<br>
 				${__("Supervisors")}: <strong>${this.fmt(stats.total || rows.length)}</strong>
 				&nbsp;·&nbsp;
-				${__("Field officers under them")}: <strong>${this.fmt(stats.total_field_officers || 0)}</strong>
+				${__("SMEs under them")}: <strong>${this.fmt(stats.total_field_officers || 0)}</strong>
 				&nbsp;·&nbsp;
 				${__("SMEs under them")}: <strong>${this.fmt(stats.total_smes || 0)}</strong>
 			</p>
@@ -1737,7 +1737,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 							<th>${__("Supervisor")}</th>
 							<th>${__("Type / Division")}</th>
 							<th>${__("Designation")}</th>
-							<th class="text-right">${__("Field Officers")}</th>
+							<th class="text-right">${__("SMEs")}</th>
 							<th class="text-right">${__("SMEs")}</th>
 						</tr>
 					</thead>
@@ -1831,7 +1831,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			<p class="text-muted" style="font-size:12px;margin-bottom:10px;">
 				${__("Visit Date")}: ${frappe.utils.escape_html(frappe.datetime.str_to_user(data.from_date || ""))}
 				– ${frappe.utils.escape_html(frappe.datetime.str_to_user(data.to_date || ""))}
-				&nbsp;·&nbsp; ${__("Field officers")}: <strong>${rows.length}</strong>
+				&nbsp;·&nbsp; ${__("SMEs")}: <strong>${rows.length}</strong>
 			</p>
 			<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
 				<div style="border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;min-width:110px;">
@@ -1853,7 +1853,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				</div>
 			</div>
 			<p class="text-muted" style="font-size:12px;margin-bottom:10px;">
-				${__("Officer-wise Total, Marketing, Follow up and Monitoring. Click a name for full KPI detail, or a number for documents.")}
+				${__("SME-wise Total, Marketing, Follow up and Monitoring. Click a name for full KPI detail, or a number for documents.")}
 			</p>
 			<style>
 				.sme-field-emp-table th,
@@ -1865,7 +1865,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				<table class="table table-bordered table-hover sme-field-emp-table" style="font-size:12px;margin:0;min-width:560px;">
 					<thead>
 						<tr>
-							<th style="text-align:center !important;position:sticky;left:0;background:#f8fafc;z-index:2;">${__("Field Officer / SME")}</th>
+							<th style="text-align:center !important;position:sticky;left:0;background:#f8fafc;z-index:2;">${__("SME")}</th>
 							<th style="text-align:center !important;">${__("Total")}</th>
 							<th style="text-align:center !important;">${__("Marketing")}</th>
 							<th style="text-align:center !important;">${__("Follow up")}</th>
@@ -1941,13 +1941,13 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					<p class="text-muted" style="font-size:12px;margin-bottom:10px;">
 						${__("Visit Date")}: ${frappe.utils.escape_html(frappe.datetime.str_to_user(detail.from_date || ""))}
 						– ${frappe.utils.escape_html(frappe.datetime.str_to_user(detail.to_date || ""))}
-						<br>${__("Follow up Visit + New School Visit. Each count is how many schools that field officer visited. Click the count for school details. A school name visited more than once is highlighted.")}
+						<br>${__("Follow up Visit + New School Visit. Each count is how many schools that SME visited. Click the count for school details. A school name visited more than once is highlighted.")}
 					</p>
 					<div class="table-responsive" style="max-height:420px;overflow:auto;">
 						<table class="table table-bordered table-hover" style="font-size:12px;margin:0;">
 							<thead>
 								<tr>
-									<th>${__("Field Officer")}</th>
+									<th>${__("SME")}</th>
 									<th class="text-right">${__("Schools")}</th>
 									<th class="text-right">${__("Visits")}</th>
 								</tr>
@@ -1977,7 +1977,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 		const key = String(officerKey || "").trim();
 		const officer = (this._followup_schools || []).find((o) => String(o.key || "") === key);
 		if (!officer) {
-			frappe.msgprint(__("No school visits found for this field officer."));
+			frappe.msgprint(__("No school visits found for this SME."));
 			return;
 		}
 		const schools = officer.schools || [];
@@ -2122,7 +2122,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				– ${frappe.utils.escape_html(frappe.datetime.str_to_user(data.to_date || ""))}
 				&nbsp;·&nbsp; ${__("SMEs")}: <strong>${rows.length}</strong>
 				&nbsp;·&nbsp; ${__("Total school visits")}: <strong>${this.fmt(sumSchools)}</strong>
-				<br>${__("Province / City / Area from Field Officer document.")}
+				<br>${__("Province / City / Area from SME document.")}
 			</p>
 			<div class="table-responsive" style="max-height:420px;overflow:auto;">
 				<table class="table table-bordered" style="font-size:12px;margin:0;">
