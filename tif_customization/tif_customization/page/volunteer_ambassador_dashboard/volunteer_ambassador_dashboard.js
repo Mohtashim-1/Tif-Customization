@@ -230,11 +230,52 @@ frappe.tif_customization.VolunteerAmbassadorDashboard = class VolunteerAmbassado
 
 		this.render_group(".vad-by-province", d.by_province || []);
 		this.render_group(".vad-by-officer", d.by_officer || []);
-		this.render_group(".vad-by-service", d.by_service || []);
+		const byService =
+			d.by_service && d.by_service.length
+				? d.by_service
+				: this.build_service_groups(d.volunteers || [], d.ambassadors || []);
+		this.render_group(".vad-by-service", byService);
 		this.$root.find(".vad-vol-count").text(`${(d.volunteers || []).length}`);
 		this.$root.find(".vad-amb-count").text(`${(d.ambassadors || []).length}`);
 		this.render_people(".vad-vol-table", d.volunteers || [], "volunteer");
 		this.render_people(".vad-amb-table", d.ambassadors || [], "ambassador");
+	}
+
+	build_service_groups(volunteers, ambassadors) {
+		const bucket = {};
+		const add = (kind, rows) => {
+			(rows || []).forEach((r) => {
+				const raw = String(r.contribution || "").trim();
+				const parts = raw
+					? raw
+							.replace(/\n/g, ",")
+							.replace(/;/g, ",")
+							.split(",")
+							.map((s) => s.trim())
+							.filter(Boolean)
+					: ["—"];
+				const seen = {};
+				parts.forEach((p) => {
+					const label = p.length > 80 ? p.slice(0, 77) + "…" : p;
+					const key = label.toLowerCase();
+					if (seen[key]) return;
+					seen[key] = 1;
+					if (!bucket[key]) {
+						bucket[key] = { label, volunteers: 0, ambassadors: 0 };
+					}
+					bucket[key][kind] += 1;
+				});
+			});
+		};
+		add("volunteers", volunteers);
+		add("ambassadors", ambassadors);
+		return Object.values(bucket)
+			.sort(
+				(a, b) =>
+					b.volunteers + b.ambassadors - (a.volunteers + a.ambassadors) ||
+					a.label.localeCompare(b.label)
+			)
+			.slice(0, 25);
 	}
 
 	render_group(sel, rows) {

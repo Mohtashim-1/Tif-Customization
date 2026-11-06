@@ -101,7 +101,7 @@ def get_dashboard_data(filters=None, kind=None):
 			"by_province": _group_counts(volunteers, ambassadors, "province"),
 			"by_city": _group_counts(volunteers, ambassadors, "city"),
 			"by_officer": _group_counts(volunteers, ambassadors, "officer"),
-			"by_service": _group_counts(volunteers, ambassadors, "contribution"),
+			"by_service": _group_by_service(volunteers, ambassadors),
 			"volunteers": volunteers[:200],
 			"ambassadors": ambassadors[:200],
 		}
@@ -128,7 +128,7 @@ def get_dashboard_data(filters=None, kind=None):
 		"by_city": _group_single(rows, "city"),
 		"by_officer": _group_single(rows, "officer"),
 		"by_school": _group_single(rows, "school"),
-		"by_service": _group_single(rows, "contribution"),
+		"by_service": _group_by_service(rows, []),
 		"rows": rows[:500],
 	}
 
@@ -317,6 +317,51 @@ def _group_counts(volunteers, ambassadors, key):
 				label = label or "—"
 			slot = bucket.setdefault(label, {"label": label, "volunteers": 0, "ambassadors": 0})
 			slot[kind] += 1
+	rows = list(bucket.values())
+	rows.sort(key=lambda x: (-(x["volunteers"] + x["ambassadors"]), x["label"].lower()))
+	return rows[:25]
+
+
+def _service_tokens(raw):
+	"""Split Service Offered text into short labels for the summary table.
+
+	Google Form / import values are often multi-select joined by commas or
+	semicolons (e.g. \"Typist (Urdu), Typist (English)\").
+	"""
+	text = (raw or "").strip()
+	if not text:
+		return []
+	normalized = text.replace("\n", ",").replace(";", ",")
+	parts = []
+	for chunk in normalized.split(","):
+		bit = chunk.strip()
+		if not bit:
+			continue
+		if len(bit) > 80:
+			bit = bit[:77].rstrip() + "…"
+		parts.append(bit)
+	seen = set()
+	out = []
+	for p in parts:
+		key = p.lower()
+		if key in seen:
+			continue
+		seen.add(key)
+		out.append(p)
+	return out
+
+
+def _group_by_service(volunteers, ambassadors=None):
+	"""Aggregate by Service Offered (contribution). Count each listed service once per person."""
+	bucket = {}
+	for kind, rows in (("volunteers", volunteers or []), ("ambassadors", ambassadors or [])):
+		for r in rows:
+			tokens = _service_tokens(r.get("contribution"))
+			if not tokens:
+				tokens = ["—"]
+			for label in tokens:
+				slot = bucket.setdefault(label, {"label": label, "volunteers": 0, "ambassadors": 0})
+				slot[kind] += 1
 	rows = list(bucket.values())
 	rows.sort(key=lambda x: (-(x["volunteers"] + x["ambassadors"]), x["label"].lower()))
 	return rows[:25]
