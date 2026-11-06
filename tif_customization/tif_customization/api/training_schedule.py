@@ -273,13 +273,13 @@ def _truthy_flag(value) -> int:
 
 
 def _as_row_dict(row) -> frappe._dict:
-	# frappe._dict.__getattr__ returns None for missing keys, so hasattr(row, "as_dict")
-	# is True even when as_dict is not a real method — only call it on Document-like objects.
+	# Prefer mapping copy first. frappe._dict.__getattr__ returns None for missing keys, so
+	# hasattr(row, "as_dict") is True on plain _dict and row.as_dict() raises TypeError.
+	if isinstance(row, dict):
+		return row if isinstance(row, frappe._dict) else frappe._dict(row)
 	as_dict = getattr(type(row), "as_dict", None)
 	if callable(as_dict):
 		return frappe._dict(row.as_dict())
-	if isinstance(row, dict):
-		return frappe._dict(row)
 	return frappe._dict(row or {})
 
 
