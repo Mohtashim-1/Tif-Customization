@@ -61,6 +61,7 @@ doctype_js = {
 	"Loan Application": "tif_customization/doctype/loan_application/loan_application.js",
 	"Employee": "public/js/employee_health_provider.js",
 	"Workspace": "public/js/workspace.js",
+	"Customer": "public/js/customer_school_activity.js",
 }
 
 # include js in page

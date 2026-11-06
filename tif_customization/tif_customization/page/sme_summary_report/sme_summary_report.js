@@ -2,7 +2,7 @@ frappe.pages["sme-summary-report"].on_page_load = function (wrapper) {
 	frappe.require("/assets/tif_customization/js/field_visit_drilldown.js", () => {
 		const page = frappe.ui.make_app_page({
 			parent: wrapper,
-			title: __("SME Summary Report"),
+			title: __("SME and Supervisor Report"),
 			single_column: true,
 		});
 		new frappe.tif_customization.SMESummaryReport(page).make();

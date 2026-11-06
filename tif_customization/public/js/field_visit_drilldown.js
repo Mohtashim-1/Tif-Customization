@@ -34,7 +34,7 @@ frappe.tif_customization.drilldown_title = function (label, count) {
 	return __("{0}: {1}", [name, n.toLocaleString()]);
 };
 
-/** Clickable school name → open_school_visits_dialog. */
+/** Clickable school name → open School form (activity dashboard). */
 frappe.tif_customization.school_link_html = function (school, extraHtml) {
 	const raw = String(school || "").trim();
 	const label = frappe.utils.escape_html(raw || "—");
@@ -46,12 +46,84 @@ frappe.tif_customization.school_link_html = function (school, extraHtml) {
 };
 
 /**
- * School Location Report–style visits popup (Document Name / Date / Field Officer / Remarks).
- * Accepts School name, Customer id/name, or free-text school title.
+ * Route to School → Customer → School Opening Application (never the visits popup).
+ * Accepts School name, Customer id/name, SOA, or free-text school title.
  */
-frappe.tif_customization.open_school_visits_dialog = function (school) {
+frappe.tif_customization.open_school_document = function (school) {
 	const key = String(school || "").trim();
 	if (!key || key === "—" || key === "-") return;
+	frappe.call({
+		method: "tif_customization.tif_customization.doctype.school.school.resolve_school_route",
+		args: { school: key },
+		freeze: true,
+		freeze_message: __("Opening school…"),
+		callback: (r) => {
+			const data = r.message || {};
+			if (data.found && data.doctype && data.name) {
+				frappe.route_options = frappe.route_options || {};
+				frappe.route_options.school_activity_key = data.school_name || key;
+				frappe.set_route("Form", data.doctype, data.name);
+				return;
+			}
+			// Last resort: full activity dialog (not the visits-only popup).
+			frappe.tif_customization.open_school_activity_dialog(key);
+		},
+		error: () => frappe.tif_customization.open_school_activity_dialog(key),
+	});
+};
+
+/** Full activity dashboard dialog when no School/Customer/SOA master exists. */
+frappe.tif_customization.open_school_activity_dialog = function (school) {
+	const key = String(school || "").trim();
+	if (!key) return;
+	const dialog = new frappe.ui.Dialog({
+		title: key,
+		size: "extra-large",
+		fields: [{ fieldtype: "HTML", fieldname: "html" }],
+		primary_action_label: __("Close"),
+		primary_action: () => dialog.hide(),
+	});
+	dialog.fields_dict.html.$wrapper.html(
+		`<div class="text-muted" style="padding:12px;">${__("Loading activity…")}</div>`
+	);
+	dialog.show();
+	frappe.call({
+		method: "tif_customization.tif_customization.doctype.school.school.get_school_activity_dashboard",
+		args: { school: key },
+		callback: (r) => {
+			const html = frappe.tif_customization.render_school_activity_html(r.message || { school_name: key });
+			dialog.fields_dict.html.$wrapper.html(html);
+			dialog.fields_dict.html.$wrapper.find(".school-act-open-visit").on("click", function (e) {
+				e.preventDefault();
+				const name = this.getAttribute("data-name");
+				if (!name) return;
+				if (frappe.tif_customization.open_field_visit_easy) {
+					frappe.tif_customization.open_field_visit_easy(name);
+				} else {
+					frappe.set_route("Form", "Field Visit", name);
+				}
+			});
+		},
+		error: () => {
+			dialog.fields_dict.html.$wrapper.html(
+				`<div class="text-danger" style="padding:12px;">${__("Could not load school activity.")}</div>`
+			);
+		},
+	});
+};
+
+/**
+ * School Location Report–style visits popup (Document Name / Date / Field Officer / Remarks).
+ * Accepts School name, Customer id/name, or free-text school title.
+ * Pass skipRoute=true when already falling back from open_school_document.
+ */
+frappe.tif_customization.open_school_visits_dialog = function (school, skipRoute) {
+	const key = String(school || "").trim();
+	if (!key || key === "—" || key === "-") return;
+	if (!skipRoute) {
+		frappe.tif_customization.open_school_document(key);
+		return;
+	}
 	const showDialog = (data) => {
 		data = data || {};
 		const visits = data.visits || [];
@@ -414,7 +486,7 @@ frappe.tif_customization.show_school_metric_drilldown_dialog = function (data, o
 					<div style="font-size:20px;font-weight:700;">${cint(rows.length).toLocaleString()}</div>
 				</div>
 				<p class="text-muted" style="font-size:12px;margin:0;flex:1;min-width:200px;">
-					${__("Click a school name to open visits. Click Document No to open the Field Visit.")}
+					${__("Click a school name to open the School record. Click Document No to open the Field Visit.")}
 				</p>
 			</div>
 			<div class="table-responsive" style="max-height:480px;overflow:auto;">
@@ -662,7 +734,7 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 		${categoryHint}
 		${importBar}
 		<p class="text-muted" style="font-size:12px;">${__(
-			"Click a Document No to open that Field Visit. Click a school name for visits. Click a school image to enlarge."
+			"Click a Document No to open that Field Visit. Click a school name to open the School record. Click a school image to enlarge."
 		)}</p>
 		<div class="table-responsive" style="max-height:420px;overflow:auto;">
 			<table class="table table-bordered table-hover" style="font-size:12px;margin:0;">
@@ -2072,5 +2144,205 @@ frappe.tif_customization.bind_clickable_numbers = function ($root, get_ctx) {
 			submitted_only: ctx.submitted_only || ctx.submitted || 0,
 			hideUnapproved: !!(ctx.hideUnapproved || frappe.tif_customization.hide_school_unapproved),
 		});
+	});
+};
+
+/** Shared School / Customer / SOA activity dashboard HTML. */
+frappe.tif_customization.render_school_activity_html = function (data) {
+	data = data || {};
+	const esc = frappe.utils.escape_html;
+	const visits = data.visits || [];
+	const reps = data.representatives || [];
+	const programs = data.programs || [];
+	const books = data.books || [];
+	const remarksFn =
+		frappe.tif_customization.format_visit_remarks ||
+		((text) => esc(text || "—"));
+
+	const visitRows = visits.length
+		? visits
+				.map((v) => {
+					const remarks = remarksFn(v.remarks);
+					return `<tr>
+						<td><a href="#" class="school-act-open-visit" data-name="${esc(v.name || "")}">${esc(
+						v.name || "—"
+					)}</a></td>
+						<td>${esc(v.visit_date || "—")}</td>
+						<td>${esc(v.type || "—")}</td>
+						<td>${esc(v.field_officer || "—")}</td>
+						<td class="school-act-remarks">${remarks}</td>
+					</tr>`;
+				})
+				.join("")
+		: `<tr><td colspan="5" class="text-muted text-center">${__("No field visits found for this school")}</td></tr>`;
+
+	const repRows = reps.length
+		? reps
+				.map(
+					(r) => `<tr>
+				<td>${esc(r.person_name || "—")}</td>
+				<td>${esc(r.designation || "—")}</td>
+				<td>${esc(r.contact_number || "—")}</td>
+				<td>${esc(r.source || "—")}</td>
+			</tr>`
+				)
+				.join("")
+		: `<tr><td colspan="4" class="text-muted text-center">${__("No school representatives found")}</td></tr>`;
+
+	const programCards = programs.length
+		? programs
+				.map(
+					(p) => `<div class="school-act-chip">
+				<strong>${esc(p.name || "")}</strong>
+				<span>${esc(p.status || "—")}</span>
+				<small>${esc(p.source || "")}</small>
+			</div>`
+				)
+				.join("")
+		: `<div class="text-muted">${__("No program data")}</div>`;
+
+	const bookRows = books.length
+		? books
+				.map(
+					(b) => `<tr>
+				<td>${esc(b.label || "—")}</td>
+				<td style="white-space:normal;">${esc(b.detail || "—")}</td>
+				<td>${esc(b.source || "—")}</td>
+			</tr>`
+				)
+				.join("")
+		: `<tr><td colspan="3" class="text-muted text-center">${__("No books data")}</td></tr>`;
+
+	return `
+		<style>
+			.school-act { font-size: 12px; color: var(--text-color); }
+			.school-act-hero {
+				display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap;
+				padding:14px 16px; margin-bottom:12px; border-radius:12px;
+				background: linear-gradient(135deg, #0f766e 0%, #1d4ed8 100%); color:#fff;
+			}
+			.school-act-hero h3 { margin:0 0 4px; font-size:16px; color:#fff; }
+			.school-act-hero p { margin:0; opacity:.9; }
+			.school-act-kpis { display:flex; gap:10px; flex-wrap:wrap; }
+			.school-act-kpi {
+				min-width:88px; padding:8px 10px; border-radius:10px;
+				background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.22);
+			}
+			.school-act-kpi span { display:block; font-size:10px; text-transform:uppercase; letter-spacing:.04em; opacity:.8; }
+			.school-act-kpi strong { font-size:16px; }
+			.school-act-grid {
+				display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr); gap:12px; margin-bottom:12px;
+			}
+			.school-act-panel {
+				border:1px solid var(--border-color,#e5e7eb); border-radius:12px; background:var(--card-bg,#fff);
+				overflow:hidden;
+			}
+			.school-act-panel h4 {
+				margin:0; padding:10px 12px; font-size:13px; border-bottom:1px solid var(--border-color,#e5e7eb);
+				background:var(--control-bg,#f8fafc);
+			}
+			.school-act-panel .body { max-height:280px; overflow:auto; }
+			.school-act-panel.wide .body { max-height:420px; }
+			.school-act table { width:100%; border-collapse:collapse; margin:0; }
+			.school-act th, .school-act td {
+				padding:8px 10px; border-bottom:1px solid var(--border-color,#e5e7eb);
+				text-align:left; vertical-align:top;
+			}
+			.school-act th { font-size:11px; text-transform:uppercase; color:var(--text-muted,#6b7280); background:var(--control-bg,#f8fafc); position:sticky; top:0; }
+			.school-act-remarks { min-width:280px; max-width:520px; white-space:normal; line-height:1.45; }
+			.school-act-remarks .blk { margin:0 0 6px; }
+			.school-act-remarks .blk strong { color:#0f766e; }
+			.school-act-chips { display:flex; flex-wrap:wrap; gap:8px; padding:12px; }
+			.school-act-chip {
+				display:flex; flex-direction:column; gap:2px; min-width:140px; padding:10px 12px;
+				border-radius:10px; border:1px solid var(--border-color,#e5e7eb); background:#f0fdfa;
+			}
+			.school-act-chip small { color:var(--text-muted,#6b7280); }
+			@media (max-width: 900px) { .school-act-grid { grid-template-columns:1fr; } }
+		</style>
+		<div class="school-act">
+			<div class="school-act-hero">
+				<div>
+					<h3>${esc(data.school_name || data.school || __("School"))}</h3>
+					<p>${__("Field visits, representatives, books and programs running at this school")}</p>
+				</div>
+				<div class="school-act-kpis">
+					<div class="school-act-kpi"><span>${__("Visits")}</span><strong>${cint(data.visit_count)}</strong></div>
+					<div class="school-act-kpi"><span>${__("Representatives")}</span><strong>${reps.length}</strong></div>
+					<div class="school-act-kpi"><span>${__("Status")}</span><strong>${esc(data.status || "—")}</strong></div>
+				</div>
+			</div>
+			<div class="school-act-grid">
+				<div class="school-act-panel">
+					<h4>${__("School Representatives")}</h4>
+					<div class="body">
+						<table>
+							<thead><tr>
+								<th>${__("Name")}</th><th>${__("Designation")}</th>
+								<th>${__("Phone")}</th><th>${__("Source")}</th>
+							</tr></thead>
+							<tbody>${repRows}</tbody>
+						</table>
+					</div>
+				</div>
+				<div class="school-act-panel">
+					<h4>${__("Programs Running")}</h4>
+					<div class="school-act-chips">${programCards}</div>
+				</div>
+			</div>
+			<div class="school-act-panel" style="margin-bottom:12px;">
+				<h4>${__("Books Running")}</h4>
+				<div class="body">
+					<table>
+						<thead><tr>
+							<th>${__("Item")}</th><th>${__("Detail")}</th><th>${__("Source")}</th>
+						</tr></thead>
+						<tbody>${bookRows}</tbody>
+					</table>
+				</div>
+			</div>
+			<div class="school-act-panel wide">
+				<h4>${__("Field Visits & Remarks")} (${visits.length})</h4>
+				<div class="body">
+					<table>
+						<thead><tr>
+							<th>${__("Document No")}</th>
+							<th>${__("Visit Date")}</th>
+							<th>${__("Type")}</th>
+							<th>${__("Officer")}</th>
+							<th>${__("Visit Summary / Remarks")}</th>
+						</tr></thead>
+						<tbody>${visitRows}</tbody>
+					</table>
+				</div>
+			</div>
+		</div>
+	`;
+};
+
+frappe.tif_customization.mount_school_activity = function ($wrap, schoolKey, customer) {
+	if (!$wrap || !$wrap.length) return;
+	$wrap.html(`<div class="text-muted" style="padding:12px;">${__("Loading activity…")}</div>`);
+	frappe.call({
+		method: "tif_customization.tif_customization.doctype.school.school.get_school_activity_dashboard",
+		args: { school: schoolKey || "", customer: customer || "" },
+		callback: (r) => {
+			$wrap.html(frappe.tif_customization.render_school_activity_html(r.message || {}));
+			$wrap.find(".school-act-open-visit").on("click", function (e) {
+				e.preventDefault();
+				const name = this.getAttribute("data-name");
+				if (!name) return;
+				if (frappe.tif_customization.open_field_visit_easy) {
+					frappe.tif_customization.open_field_visit_easy(name);
+				} else {
+					frappe.set_route("Form", "Field Visit", name);
+				}
+			});
+		},
+		error: () => {
+			$wrap.html(
+				`<div class="text-danger" style="padding:12px;">${__("Could not load school activity.")}</div>`
+			);
+		},
 	});
 };

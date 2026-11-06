@@ -4,7 +4,7 @@ frappe.pages["sme-summary-report-copy"].on_page_load = function (wrapper) {
 		frappe.tif_customization.hide_school_unapproved = true;
 		const page = frappe.ui.make_app_page({
 			parent: wrapper,
-			title: __("SME Summary Report (Copy)"),
+			title: __("SME and Supervisor Report"),
 			single_column: true,
 		});
 		new frappe.tif_customization.SMESummaryReportCopy(page).make();
@@ -2021,7 +2021,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			<p class="text-muted" style="font-size:12px;margin-bottom:10px;">
 				${__("Schools")}: <strong>${this.fmt(officer.school_count)}</strong>
 				&nbsp;·&nbsp; ${__("Visits")}: <strong>${this.fmt(officer.visit_count)}</strong>
-				<br>${__("Click a school name for visits. A school name that appears more than once is highlighted.")}
+				<br>${__("Click a school name to open the School record. A school name that appears more than once is highlighted.")}
 			</p>
 			<div class="table-responsive" style="max-height:460px;overflow:auto;">
 				<table class="table table-bordered" style="font-size:12px;margin:0;">
@@ -2042,7 +2042,10 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			e.preventDefault();
 			e.stopPropagation();
 			const school = $(e.currentTarget).attr("data-school");
-			if (school && frappe.tif_customization.open_school_visits_dialog) {
+			if (!school) return;
+			if (frappe.tif_customization.open_school_document) {
+				frappe.tif_customization.open_school_document(school);
+			} else if (frappe.tif_customization.open_school_visits_dialog) {
 				frappe.tif_customization.open_school_visits_dialog(school);
 			}
 		});
@@ -2348,7 +2351,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					</div>
 					<h5 style="margin:8px 0;">${__("Visit documents")}</h5>
 					<p class="text-muted" style="font-size:12px;margin:0 0 8px;">${__(
-						"Click a Document No to open that Field Visit. Click a school name for visits."
+						"Click a Document No to open that Field Visit. Click a school name to open the School record (visits, representatives, books & programs)."
 					)}</p>
 					<div class="table-responsive" style="max-height:240px;overflow:auto;">
 						<table class="table table-bordered table-hover" style="font-size:12px;margin:0;">
@@ -2392,7 +2395,10 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					e.preventDefault();
 					e.stopPropagation();
 					const school = $(e.currentTarget).attr("data-school");
-					if (school && frappe.tif_customization.open_school_visits_dialog) {
+					if (!school) return;
+					if (frappe.tif_customization.open_school_document) {
+						frappe.tif_customization.open_school_document(school);
+					} else if (frappe.tif_customization.open_school_visits_dialog) {
 						frappe.tif_customization.open_school_visits_dialog(school);
 					}
 				});

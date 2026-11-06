@@ -18,10 +18,31 @@ frappe.ui.form.on("School Opening Application", {
 				const q = new URLSearchParams({ application: frm.doc.name });
 				window.open(`/school-opening-print?${q.toString()}`, "_blank");
 			});
+			frappe.require("/assets/tif_customization/js/field_visit_drilldown.js", () => {
+				mount_soa_school_activity(frm);
+			});
 		}
 		sync_soa_attach_fields(frm);
 	},
 });
+
+function mount_soa_school_activity(frm) {
+	if (!frm.dashboard) return;
+	const wrap_id = "soa-school-activity";
+	frm.dashboard.wrapper.find(`#${wrap_id}`).remove();
+	const $section = $(
+		`<div id="${wrap_id}" class="form-dashboard-section" style="margin-top:12px;">
+			<div class="section-head">${__("Field Visit Activity")}</div>
+			<div class="soa-school-activity-body" style="padding:4px 0 12px;"></div>
+		</div>`
+	);
+	frm.dashboard.wrapper.append($section);
+	frappe.tif_customization.mount_school_activity(
+		$section.find(".soa-school-activity-body"),
+		frm.doc.school_name || frm.doc.name,
+		frm.doc.customer
+	);
+}
 
 function sync_soa_attach_fields(frm) {
 	if (!frm || frm.is_new() || frm.doc.docstatus === 2) {

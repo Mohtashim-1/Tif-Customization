@@ -178,7 +178,7 @@ export const ACTIVITY_CARDS = [
 		emoji: "📊",
 		titleEn: "Report",
 		titleUr: "رپورٹ",
-		subEn: "SME Summary Report",
+		subEn: "SME and Supervisor Report",
 		subUr: "SME سمری رپورٹ",
 	},
 ];

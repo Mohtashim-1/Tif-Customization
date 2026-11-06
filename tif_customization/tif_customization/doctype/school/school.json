@@ -6,6 +6,8 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "section_break_activity_dashboard",
+  "activity_dashboard_html",
   "school_as",
   "naming_series",
   "customer",
@@ -68,6 +70,17 @@
   "books_curriculum_information"
  ],
  "fields": [
+  {
+   "fieldname": "section_break_activity_dashboard",
+   "fieldtype": "Section Break",
+   "label": "Field Visit Activity"
+  },
+  {
+   "fieldname": "activity_dashboard_html",
+   "fieldtype": "HTML",
+   "label": "Activity Dashboard",
+   "options": ""
+  },
   {
    "fieldname": "school_as",
    "fieldtype": "Select",
