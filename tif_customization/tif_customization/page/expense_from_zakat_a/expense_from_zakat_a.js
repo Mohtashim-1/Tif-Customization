@@ -93,7 +93,7 @@ frappe.pages["expense-from-zakat-a"].on_page_load = function (wrapper) {
 								<div>
 									<h3>${__("Purchase Details")}</h3>
 									<p>${__(
-										"Submitted supplier Payment Entries linked to Purchase Invoices where remarks or paid-from account mention Zakat"
+										"Submitted supplier Payment Entries linked to Purchase Invoices tagged as Zakat (remarks, paid-from / cost center, or invoice cost center)"
 									)}</p>
 								</div>
 							</div>

@@ -35,7 +35,7 @@ PORTAL_LINKS = {
 	],
 	"School": [
 		{
-			"label": "School Dashboard (UAT)",
+			"label": "School Database Dashboard (UAT)",
 			"link_type": "Page",
 			"link_to": "school-location-report",
 			"is_query_report": 0,

@@ -92,6 +92,9 @@ def _get_zakat_purchases(date_sql, date_params, supplier=None):
 		supplier_sql = " AND pe.party = %s"
 		params.append(supplier)
 
+	# Include payments that are Zakat-tagged via:
+	# - PE remarks / paid_from / cost_center mentioning Zakat, OR
+	# - linked Purchase Invoice cost center on Zakat (e.g. 2101 - Zakat - TIF)
 	return frappe.db.sql(
 		f"""
 		SELECT
@@ -103,6 +106,7 @@ def _get_zakat_purchases(date_sql, date_params, supplier=None):
 			per.reference_name AS purchase_invoice,
 			pi.bill_no AS supplier_invoice_no,
 			pi.posting_date AS invoice_date,
+			pi.cost_center AS invoice_cost_center,
 			COALESCE(per.allocated_amount, pe.base_paid_amount, pe.paid_amount, 0) AS amount,
 			pe.mode_of_payment,
 			pe.reference_no,
@@ -119,6 +123,8 @@ def _get_zakat_purchases(date_sql, date_params, supplier=None):
 		  AND (
 			LOWER(COALESCE(pe.remarks, '')) LIKE '%%zakat%%'
 			OR LOWER(COALESCE(pe.paid_from, '')) LIKE '%%zakat%%'
+			OR LOWER(COALESCE(pe.cost_center, '')) LIKE '%%zakat%%'
+			OR LOWER(COALESCE(pi.cost_center, '')) LIKE '%%zakat%%'
 		  )
 		  {date_sql}
 		  {supplier_sql}
