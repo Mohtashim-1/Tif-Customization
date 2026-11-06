@@ -34,6 +34,17 @@ frappe.tif_customization.drilldown_title = function (label, count) {
 	return __("{0}: {1}", [name, n.toLocaleString()]);
 };
 
+/** Clickable school name → open_school_visits_dialog. */
+frappe.tif_customization.school_link_html = function (school, extraHtml) {
+	const raw = String(school || "").trim();
+	const label = frappe.utils.escape_html(raw || "—");
+	const extra = extraHtml || "";
+	if (!raw || raw === "—" || raw === "-") return `${label}${extra}`;
+	return `<a href="#" class="tif-open-school" data-school="${frappe.utils.escape_html(
+		raw
+	)}" style="font-weight:600;color:#0f766e;text-decoration:underline;">${label}</a>${extra}`;
+};
+
 /**
  * School Location Report–style visits popup (Document Name / Date / Field Officer / Remarks).
  * Accepts School name, Customer id/name, or free-text school title.
@@ -512,8 +523,6 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 	const colCount =
 		(hideSchool ? 5 : 6) - (hideType ? 1 : 0) + (showRemarks ? 1 : 0) + (showImages ? 1 : 0);
 	const schoolCell = (row) => {
-		const raw = String(row.school || "").trim();
-		const school = frappe.utils.escape_html(raw || "—");
 		let badge = "";
 		const skipMissing = hideSchool || optionalSchoolTypes.has(row.type || "");
 		if (!hideUnapproved && cint(row.school_unapproved)) {
@@ -524,10 +533,7 @@ frappe.tif_customization.show_visit_drilldown_dialog = function (data, opts) {
 		badge = badge
 			? `<span style="display:inline-block;margin-left:6px;padding:1px 6px;border:1px solid #dc2626;border-radius:999px;background:#fef2f2;color:#b91c1c;font-size:11px;font-weight:700;white-space:nowrap;">${badge}</span>`
 			: "";
-		if (!raw) return `${school}${badge}`;
-		return `<a href="#" class="tif-open-school" data-school="${frappe.utils.escape_html(
-			raw
-		)}" style="font-weight:600;color:#0f766e;text-decoration:underline;">${school}</a>${badge}`;
+		return frappe.tif_customization.school_link_html(row.school, badge);
 	};
 	const photoWhen = (img) => {
 		const raw = (img && (img.captured || img.uploaded || img.taken_at)) || "";
@@ -850,7 +856,7 @@ frappe.tif_customization.show_online_workshop_officer_dialog = function (data, o
 				return `<tr>
 					<td>${docCell}</td>
 					<td>${frappe.utils.escape_html(row.visit_date || "")}</td>
-					<td>${frappe.utils.escape_html(row.school || "—")}</td>
+					<td>${frappe.tif_customization.school_link_html(row.school)}</td>
 					<td>${frappe.utils.escape_html(row.full_name || "—")}</td>
 					<td>${frappe.utils.escape_html(row.whatsapp_contact || row.email || "—")}</td>
 					<td class="text-right">${cint(row.participants || 1).toLocaleString()}</td>
@@ -1058,6 +1064,12 @@ frappe.tif_customization.show_online_workshop_officer_dialog = function (data, o
 		if (!name) return;
 		frappe.tif_customization.open_field_visit_easy(name);
 	});
+	d.$wrapper.on("click", ".tif-open-school", (e) => {
+		e.preventDefault();
+		e.stopPropagation();
+		const school = $(e.currentTarget).attr("data-school");
+		if (school) frappe.tif_customization.open_school_visits_dialog(school);
+	});
 	d.$wrapper.on("click", ".tif-ow-import", (e) => {
 		e.preventDefault();
 		frappe.tif_customization.open_online_workshop_import({
@@ -1199,18 +1211,13 @@ frappe.tif_customization.show_workshop_participant_dialog = function (data, opts
 		},
 	});
 	const schoolCell = (row) => {
-		const raw = String(row.school || "").trim();
-		const school = frappe.utils.escape_html(raw || "—");
 		let badge = "";
 		if (!hideUnapproved && cint(row.school_unapproved)) badge = __("Un Approved");
 		else if (cint(row.school_missing)) badge = __("School Detail Missing");
 		badge = badge
 			? `<span style="display:inline-block;margin-left:6px;padding:1px 6px;border:1px solid #dc2626;border-radius:999px;background:#fef2f2;color:#b91c1c;font-size:11px;font-weight:700;white-space:nowrap;">${badge}</span>`
 			: "";
-		if (!raw) return `${school}${badge}`;
-		return `<a href="#" class="tif-open-school" data-school="${frappe.utils.escape_html(
-			raw
-		)}" style="font-weight:600;color:#0f766e;text-decoration:underline;">${school}</a>${badge}`;
+		return frappe.tif_customization.school_link_html(row.school, badge);
 	};
 	const showVisits = () => {
 		d.set_title(wsTitle);
@@ -1277,7 +1284,7 @@ frappe.tif_customization.show_workshop_participant_dialog = function (data, opts
 						(row) => `<tr>
 					<td>${frappe.utils.escape_html(row.name || "—")}</td>
 					<td>${frappe.utils.escape_html(row.contact || "—")}</td>
-					<td>${frappe.utils.escape_html(row.school || "—")}</td>
+					<td>${frappe.tif_customization.school_link_html(row.school)}</td>
 					<td>${frappe.utils.escape_html(row.designation || "—")}</td>
 					<td>${frappe.utils.escape_html(row.date || visit.visit_date || "—")}</td>
 					<td><a href="${frappe.utils.escape_html(row.url || visit.url || "#")}" target="_blank">${frappe.utils.escape_html(
@@ -1378,7 +1385,7 @@ frappe.tif_customization.show_volunteer_enrolment_dialog = function (data, opts)
 				<td>${frappe.utils.escape_html(row.name || "—")}</td>
 				<td>${frappe.utils.escape_html(row.contact || "—")}</td>
 				<td>${frappe.utils.escape_html(row.profession || "—")}</td>
-				<td>${frappe.utils.escape_html(row.school || "—")}</td>
+				<td>${frappe.tif_customization.school_link_html(row.school)}</td>
 				<td>${frappe.utils.escape_html(row.city || "—")}${
 					row.province ? " · " + frappe.utils.escape_html(row.province) : ""
 				}</td>
@@ -1475,6 +1482,12 @@ frappe.tif_customization.show_volunteer_enrolment_dialog = function (data, opts)
 		const name = $(e.currentTarget).attr("data-visit");
 		if (!name) return;
 		frappe.tif_customization.open_field_visit_easy(name);
+	});
+	d.$wrapper.on("click", ".tif-open-school", (e) => {
+		e.preventDefault();
+		e.stopPropagation();
+		const school = $(e.currentTarget).attr("data-school");
+		if (school) frappe.tif_customization.open_school_visits_dialog(school);
 	});
 	d.$wrapper.on("click", ".tif-vol-import", (e) => {
 		e.preventDefault();
@@ -1608,7 +1621,7 @@ frappe.tif_customization.show_enrolment_officer_dialog = function (data) {
 				<td>${frappe.utils.escape_html(row.contact || "—")}</td>
 				<td>${frappe.utils.escape_html(row.course || "—")}</td>
 				<td>${frappe.utils.escape_html(row.date || "—")}</td>
-				<td>${frappe.utils.escape_html(row.school || "—")}</td>
+				<td>${frappe.tif_customization.school_link_html(row.school)}</td>
 				<td>${frappe.utils.escape_html(row.city || "—")}${row.province ? " · " + frappe.utils.escape_html(row.province) : ""}</td>
 				<td><a href="${frappe.utils.escape_html(row.url || "#")}" target="_blank">${frappe.utils.escape_html(row.visit || "")}</a></td>
 			</tr>`
@@ -1693,6 +1706,12 @@ frappe.tif_customization.show_enrolment_officer_dialog = function (data) {
 	d.$wrapper.on("click", ".enrol-officer-back", (e) => {
 		e.preventDefault();
 		showOfficers();
+	});
+	d.$wrapper.on("click", ".tif-open-school", (e) => {
+		e.preventDefault();
+		e.stopPropagation();
+		const school = $(e.currentTarget).attr("data-school");
+		if (school) frappe.tif_customization.open_school_visits_dialog(school);
 	});
 	d.show();
 };
@@ -1959,7 +1978,7 @@ frappe.tif_customization.show_monitoring_officer_dialog = function (data, rows, 
 						)}</a></td>
 					<td>${frappe.utils.escape_html(row.visit_date || "")}</td>
 					<td>${frappe.utils.escape_html(row.type || "")}</td>
-					<td>${frappe.utils.escape_html(row.school || "—")}</td>
+					<td>${frappe.tif_customization.school_link_html(row.school)}</td>
 					<td>${frappe.utils.escape_html(approvalLabel(row))}</td>
 					<td>${frappe.utils.escape_html(row.officer || "")}</td>
 					<td>${frappe.utils.escape_html(row.status || "")}</td>
@@ -2018,6 +2037,12 @@ frappe.tif_customization.show_monitoring_officer_dialog = function (data, rows, 
 	d.$wrapper.on("click", ".me-officer-back", (e) => {
 		e.preventDefault();
 		showOfficers();
+	});
+	d.$wrapper.on("click", ".tif-open-school", (e) => {
+		e.preventDefault();
+		e.stopPropagation();
+		const school = $(e.currentTarget).attr("data-school");
+		if (school) frappe.tif_customization.open_school_visits_dialog(school);
 	});
 	showOfficers();
 	d.show();

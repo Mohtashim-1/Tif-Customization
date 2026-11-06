@@ -1990,8 +1990,18 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 								</div>`;
 							})
 							.join("");
+						const schoolName = String(s.school || "").trim();
+						const schoolCell =
+							frappe.tif_customization && frappe.tif_customization.school_link_html
+								? frappe.tif_customization.school_link_html(
+										schoolName,
+										cint(s.duplicate) ? dupBadge : ""
+								  )
+								: `${frappe.utils.escape_html(schoolName || "—")}${
+										cint(s.duplicate) ? dupBadge : ""
+								  }`;
 						return `<tr style="${highlight}">
-							<td>${frappe.utils.escape_html(s.school || "—")}${cint(s.duplicate) ? dupBadge : ""}</td>
+							<td>${schoolCell}</td>
 							<td>${frappe.utils.escape_html(s.province || "—")}</td>
 							<td>${frappe.utils.escape_html(s.area || "—")}</td>
 							<td class="text-right">${this.fmt(s.visit_count)}</td>
@@ -2011,7 +2021,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			<p class="text-muted" style="font-size:12px;margin-bottom:10px;">
 				${__("Schools")}: <strong>${this.fmt(officer.school_count)}</strong>
 				&nbsp;·&nbsp; ${__("Visits")}: <strong>${this.fmt(officer.visit_count)}</strong>
-				<br>${__("A school name that appears more than once is highlighted.")}
+				<br>${__("Click a school name for visits. A school name that appears more than once is highlighted.")}
 			</p>
 			<div class="table-responsive" style="max-height:460px;overflow:auto;">
 				<table class="table table-bordered" style="font-size:12px;margin:0;">
@@ -2028,6 +2038,14 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				</table>
 			</div>
 		`);
+		d.$wrapper.on("click", ".tif-open-school", (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			const school = $(e.currentTarget).attr("data-school");
+			if (school && frappe.tif_customization.open_school_visits_dialog) {
+				frappe.tif_customization.open_school_visits_dialog(school);
+			}
+		});
 		d.show();
 	}
 
