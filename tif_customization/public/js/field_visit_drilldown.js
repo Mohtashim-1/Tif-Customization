@@ -2136,9 +2136,9 @@ frappe.tif_customization.render_school_activity_html = function (data) {
 						v.name || "—"
 					)}</a></td>
 						<td>${esc(v.visit_date || "—")}</td>
-						<td>${esc(v.type || "—")}</td>
-						<td>${esc(v.field_officer || "—")}</td>
-						<td class="school-act-remarks">${remarks}</td>
+						<td>${esc(v.type_label || v.type || "—")}</td>
+						<td>${esc(v.field_officer || v.officer || "—")}</td>
+						<td class="school-act-remarks"><div class="school-act-remarks-clip">${remarks}</div></td>
 					</tr>`;
 				})
 				.join("")
@@ -2253,19 +2253,24 @@ frappe.tif_customization.render_school_activity_html = function (data) {
 				margin:0; padding:10px 12px; font-size:13px; border-bottom:1px solid var(--border-color,#e5e7eb);
 				background:var(--control-bg,#f8fafc);
 			}
-			.school-act-panel.wide > h4 {
-				font-size:16px; font-weight:700; padding:12px 14px;
+			.school-act-panel.wide > h4.school-act-visits-title {
+				font-size:22px !important; font-weight:800 !important; line-height:1.3 !important;
+				padding:14px 16px !important; letter-spacing:.02em; color:#0f172a !important;
 			}
 			.school-act-panel .body { max-height:280px; overflow:auto; }
-			.school-act-panel.wide .body { max-height:420px; }
+			.school-act-panel.wide .body { max-height:480px; }
 			.school-act table { width:100%; border-collapse:collapse; margin:0; }
 			.school-act th, .school-act td {
-				padding:8px 10px; border-bottom:1px solid var(--border-color,#e5e7eb);
+				padding:6px 10px; border-bottom:1px solid var(--border-color,#e5e7eb);
 				text-align:left; vertical-align:top;
 			}
 			.school-act th { font-size:11px; text-transform:uppercase; color:var(--text-muted,#6b7280); background:var(--control-bg,#f8fafc); position:sticky; top:0; }
-			.school-act-remarks { min-width:280px; max-width:520px; white-space:normal; line-height:1.45; }
-			.school-act-remarks .blk { margin:0 0 6px; }
+			.school-act-remarks { min-width:240px; max-width:420px; white-space:normal; }
+			.school-act-remarks-clip {
+				max-height:4.8em; overflow:auto; line-height:1.35; font-size:11px;
+				padding-right:4px;
+			}
+			.school-act-remarks .blk { margin:0 0 3px; }
 			.school-act-remarks .blk strong { color:#0f766e; }
 			.school-act-chips { display:flex; flex-wrap:wrap; gap:8px; padding:12px; }
 			.school-act-chip {
@@ -2330,7 +2335,7 @@ frappe.tif_customization.render_school_activity_html = function (data) {
 				</div>
 			</div>
 			<div class="school-act-panel wide">
-				<h4>${__("Field Visits & Remarks")} (${visits.length})</h4>
+				<h4 class="school-act-visits-title" style="font-size:22px !important;font-weight:800 !important;line-height:1.3;padding:14px 16px;color:#0f172a;">${__("Field Visits & Remarks")} (${visits.length})</h4>
 				<div class="body">
 					<table>
 						<thead><tr>

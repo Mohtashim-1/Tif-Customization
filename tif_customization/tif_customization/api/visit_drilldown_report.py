@@ -27,3 +27,11 @@ def get_total_schools_by_province(filters=None):
 
 	importlib.reload(mod)
 	return mod.get_total_schools_by_province(filters=filters)
+
+
+@frappe.whitelist()
+def get_schools_monthly_breakup(filters=None):
+	from tif_customization.tif_customization.api import field_visit_drilldown as mod
+
+	importlib.reload(mod)
+	return mod.get_schools_monthly_breakup(filters=filters)

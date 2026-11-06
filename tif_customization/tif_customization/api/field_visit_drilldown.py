@@ -1821,3 +1821,164 @@ def get_total_schools_by_province(filters=None):
 		},
 		"title": _("Total Schools by Province"),
 	}
+
+
+@frappe.whitelist()
+def get_schools_monthly_breakup(filters=None):
+	"""Month-wise distinct school counts (Number of School + Total Schools buckets)."""
+	if not frappe.has_permission("Field Visit", "read"):
+		frappe.throw(_("You are not permitted to view Field Visit data."), frappe.PermissionError)
+
+	from calendar import month_abbr
+	from dateutil.relativedelta import relativedelta
+
+	filters = _parse(filters)
+	from_date = getdate(filters.get("from_date"))
+	to_date = getdate(filters.get("to_date"))
+	if not from_date or not to_date:
+		frappe.throw(_("From Date and To Date are required."))
+	if from_date > to_date:
+		frappe.throw(_("From Date cannot be after To Date."))
+
+	visit_day = visit_day_sql("fv")
+	submitted_only = cint(filters.get("submitted_only") or filters.get("submitted") or 0)
+	docstatus_sql = "fv.docstatus = 1" if submitted_only else "fv.docstatus < 2"
+	school_expr = _school_sql("fv")
+	active_sql = registered_school_sql("fv")
+	model0_sql = (
+		f"NOT ({registered_school_sql('fv')}) AND ({school_field_visit_type_sql('fv')})"
+	)
+	new_sql = _metric_condition("new_schools", "fv")
+	number_sql = _number_of_school_sql("fv")
+	named = _has_named_school_sql("fv")
+
+	conditions = [
+		docstatus_sql,
+		f"{visit_day} BETWEEN %(from_date)s AND %(to_date)s",
+		named,
+	]
+	params = {"from_date": from_date, "to_date": to_date}
+	apply_team_scope_to_conditions(conditions, params, alias="fv")
+
+	staff = (filters.get("staff") or filters.get("user") or "").strip()
+	supervisor = (filters.get("supervisor") or "").strip()
+	if staff:
+		tokens = expand_staff_tokens(staff)
+		params["staff_tokens"] = tuple(t.lower() for t in tokens) or ("__none__",)
+		conditions.append(staff_match_sql("fv", "staff_tokens"))
+	elif supervisor:
+		team_tokens = _supervisor_team_tokens(supervisor)
+		params["staff_tokens"] = tuple(t.lower() for t in team_tokens) or ("__none__",)
+		conditions.append(staff_match_sql("fv", "staff_tokens"))
+
+	province = cstr(filters.get("province") or "").strip()
+	city = cstr(filters.get("city") or "").strip()
+	if province:
+		conditions.append(
+			"""COALESCE(
+				NULLIF(TRIM(fv.province), ''),
+				NULLIF(TRIM(fv.me_province), ''),
+				NULLIF(TRIM(fv.training_province), '')
+			) = %(province)s"""
+		)
+		params["province"] = province
+	if city:
+		conditions.append(
+			"""COALESCE(
+				NULLIF(TRIM(fv.city), ''),
+				NULLIF(TRIM(fv.me_city), ''),
+				NULLIF(TRIM(fv.training_city), ''),
+				NULLIF(TRIM(fv.mt_city), '')
+			) = %(city)s"""
+		)
+		params["city"] = city
+
+	where_sql = " AND ".join(f"({c})" for c in conditions)
+	rows = frappe.db.sql(
+		f"""
+		SELECT
+			DATE_FORMAT({visit_day}, '%%Y-%%m') AS month_key,
+			LOWER(TRIM({school_expr})) AS school_key,
+			MAX(CASE WHEN ({number_sql}) THEN 1 ELSE 0 END) AS is_number,
+			MAX(CASE WHEN ({active_sql}) THEN 1 ELSE 0 END) AS is_active,
+			MAX(CASE WHEN ({new_sql}) THEN 1 ELSE 0 END) AS is_new,
+			MAX(CASE WHEN ({model0_sql}) THEN 1 ELSE 0 END) AS is_model0
+		FROM `tabField Visit` fv
+		WHERE {where_sql}
+		  AND IFNULL(TRIM({school_expr}), '') != ''
+		GROUP BY DATE_FORMAT({visit_day}, '%%Y-%%m'), LOWER(TRIM({school_expr}))
+		""",
+		params,
+		as_dict=True,
+	)
+
+	by_month = {}
+	for r in rows:
+		key = cstr(r.month_key or "").strip()
+		if not key:
+			continue
+		bucket = by_month.setdefault(
+			key,
+			{"number_of_school": 0, "active": 0, "active_new": 0, "model_0": 0, "total": 0},
+		)
+		if cint(r.is_number):
+			bucket["number_of_school"] += 1
+		is_new = cint(r.is_new)
+		is_active = cint(r.is_active)
+		is_model0 = cint(r.is_model0)
+		if is_new:
+			bucket["active_new"] += 1
+			bucket["total"] += 1
+		elif is_active:
+			bucket["active"] += 1
+			bucket["total"] += 1
+		elif is_model0:
+			bucket["model_0"] += 1
+			bucket["total"] += 1
+
+	# Fill every month in range so blank months still show.
+	cursor = from_date.replace(day=1)
+	end = to_date.replace(day=1)
+	out = []
+	sum_number = sum_active = sum_active_new = sum_model0 = sum_total = 0
+	while cursor <= end:
+		key = cursor.strftime("%Y-%m")
+		b = by_month.get(key) or {
+			"number_of_school": 0,
+			"active": 0,
+			"active_new": 0,
+			"model_0": 0,
+			"total": 0,
+		}
+		label = f"{month_abbr[cursor.month]} {cursor.year}"
+		out.append(
+			{
+				"month": key,
+				"month_label": label,
+				"number_of_school": cint(b["number_of_school"]),
+				"active": cint(b["active"]),
+				"active_new": cint(b["active_new"]),
+				"model_0": cint(b["model_0"]),
+				"total": cint(b["total"]),
+			}
+		)
+		sum_number += cint(b["number_of_school"])
+		sum_active += cint(b["active"])
+		sum_active_new += cint(b["active_new"])
+		sum_model0 += cint(b["model_0"])
+		sum_total += cint(b["total"])
+		cursor = cursor + relativedelta(months=1)
+
+	return {
+		"from_date": str(from_date),
+		"to_date": str(to_date),
+		"rows": out,
+		"totals": {
+			"number_of_school": sum_number,
+			"active": sum_active,
+			"active_new": sum_active_new,
+			"model_0": sum_model0,
+			"total": sum_total,
+		},
+		"title": _("Number of School — Monthly Breakup"),
+	}

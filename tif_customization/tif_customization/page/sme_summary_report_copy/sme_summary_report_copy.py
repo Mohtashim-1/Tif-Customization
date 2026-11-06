@@ -407,6 +407,7 @@ def get_report_data(filters=None):
 		region = "karachi"
 
 	supervisor = (filters.get("supervisor") or "").strip()
+	employee_filter = (filters.get("employee") or filters.get("staff") or "").strip()
 	supervisors = _list_field_supervisors()
 	supervisor_stats = _supervisor_stats(supervisors)
 	# When a supervisor is selected, team data is already scoped; show that one supervisor.
@@ -434,6 +435,34 @@ def get_report_data(filters=None):
 		}
 
 	staff_rows = _get_sme_staff(filters)
+	# SME filter alone: Field Supervisors card must not stay org-wide (usually 3).
+	# Show only supervisors that are the selected SME themselves (often 0).
+	if employee_filter and not supervisor:
+		emp_ids = {
+			(s.get("employee") or "").strip()
+			for s in staff_rows
+			if (s.get("employee") or "").strip()
+		}
+		emp_names = {
+			(s.get("employee_name") or "").strip().lower()
+			for s in staff_rows
+			if (s.get("employee_name") or "").strip()
+		}
+		matched_sv = [
+			s
+			for s in supervisors
+			if (s.get("employee") or "").strip() in emp_ids
+			or (s.get("employee_name") or "").strip().lower() in emp_names
+			or (s.get("value") or "").strip() in emp_ids
+			or (s.get("name") or "").strip() in emp_ids
+		]
+		supervisors = matched_sv
+		supervisor_stats = {
+			**_supervisor_stats(matched_sv),
+			"total": len(matched_sv),
+			"filtered": True,
+		}
+
 	province = (filters.get("province") or "").strip()
 	city = (filters.get("city") or "").strip()
 	visit_stats = _load_visit_stats(
@@ -495,8 +524,9 @@ def get_report_data(filters=None):
 		visited_days = cint(stats.get("visited_days") or 0)
 		present_days = flt(present_days_map.get(staff.get("employee")) or 0, 1)
 		# Province / City / Area come only from Field Officer master (not visit data).
-		province = _clean_location(staff.get("fo_province"))
-		city = _clean_location(staff.get("fo_city"))
+		# Do not overwrite filter province/city — those are used for scoped card totals.
+		fo_province = _clean_location(staff.get("fo_province"))
+		fo_city = _clean_location(staff.get("fo_city"))
 		area = _clean_location(staff.get("fo_area"))
 		# Category New on a Marketing visit is in both cards. Count that visit once here.
 		grand_total = followup + new + marketing + meetings + me - marketing_new
@@ -517,8 +547,8 @@ def get_report_data(filters=None):
 			"division": staff.get("division") or "",
 			"region": staff_region,
 			"region_label": REGION_LABELS.get(staff_region, staff_region),
-			"province": province,
-			"city": city,
+			"province": fo_province,
+			"city": fo_city,
 			"area": area,
 			"user_id": staff.get("user_id"),
 			"employment_type": (staff.get("employment_type") or "").strip(),
@@ -688,6 +718,16 @@ def get_report_data(filters=None):
 		**(fy_new_schools or {}),
 		"scope": "fiscal_ytd",
 	}
+	# Staff token for province / monthly school cards — must honour SME filter.
+	# Pass a single Employee id; expand_staff_tokens resolves user/name variants.
+	# (Do not comma-join — expand_staff_tokens treats the whole string as one value.)
+	staff_scope = ""
+	if employee_filter:
+		staff_scope = (
+			(staff_rows[0].get("employee") if staff_rows else "")
+			or employee_filter
+		).strip()
+
 	# Total Schools card must match province drill-down (Active + Active New + Model 0).
 	try:
 		from tif_customization.tif_customization.api.field_visit_drilldown import (
@@ -698,9 +738,10 @@ def get_report_data(filters=None):
 			{
 				"from_date": str(outcome_fy_from),
 				"to_date": str(outcome_fy_to),
-				"supervisor": supervisor or "",
-				"province": province or "",
-				"city": city or "",
+				"staff": staff_scope,
+				"supervisor": "" if staff_scope else (supervisor or ""),
+				"province": filter_province or "",
+				"city": filter_city or "",
 				"submitted_only": 1,
 			}
 		)
@@ -719,6 +760,26 @@ def get_report_data(filters=None):
 		stats = visit_stats.get(staff["key"]) or {}
 		for key in model_counts:
 			model_counts[key] += cint(stats.get(key) or 0)
+
+	schools_monthly = {"rows": [], "totals": {}}
+	try:
+		from tif_customization.tif_customization.api.field_visit_drilldown import (
+			get_schools_monthly_breakup,
+		)
+
+		schools_monthly = get_schools_monthly_breakup(
+			{
+				"from_date": str(outcome_fy_from),
+				"to_date": str(outcome_fy_to),
+				"staff": staff_scope,
+				"supervisor": "" if staff_scope else (supervisor or ""),
+				"province": filter_province or "",
+				"city": filter_city or "",
+				"submitted_only": 1,
+			}
+		) or schools_monthly
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "SME Schools Monthly Breakup Error")
 
 	return {
 		"from_date": str(from_date),
@@ -747,6 +808,7 @@ def get_report_data(filters=None):
 		"rows": rows,
 		"totals": totals_out,
 		"outcome_fy": outcome_fy,
+		"schools_monthly": schools_monthly,
 		"kpi_columns": list(KPI_COLUMNS),
 		"outcome_columns": _summary_outcome_columns(),
 		"kpis": {

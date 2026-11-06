@@ -962,10 +962,54 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 							outcomeFy: true,
 							hint: __("Other registered schools. Model A + B + C = Active Schools."),
 						},
+						{
+							label: __("Number of School (Monthly)"),
+							value: this.fmt(
+								((data.schools_monthly || {}).totals || {}).number_of_school
+							),
+							style: "schools",
+							cardKind: "schools_monthly",
+							outcomeFy: true,
+							hint: __(
+								"Click for month-wise Number of School breakup (Follow up + Marketing / New visits)."
+							),
+						},
 					],
+					this.schools_monthly_cards(data),
 				],
 			},
 		];
+	}
+
+	schools_monthly_cards(data) {
+		const rows = ((data && data.schools_monthly) || {}).rows || [];
+		if (!rows.length) {
+			return [
+				{
+					label: __("Number of School — Monthly Breakup"),
+					value: "—",
+					style: "schools",
+					cardKind: "schools_monthly",
+					hint: __("No monthly school data for this period."),
+				},
+			];
+		}
+		return rows.map((row) => ({
+			label: row.month_label || row.month || __("Month"),
+			value: this.fmt(row.number_of_school),
+			count: row.number_of_school,
+			style: "schools",
+			cardKind: "schools_monthly",
+			outcomeFy: true,
+			hint: __(
+				"Number of School in {0}: {1} · Total Schools: {2}",
+				[
+					row.month_label || row.month || "",
+					cint(row.number_of_school),
+					cint(row.total),
+				]
+			),
+		}));
 	}
 
 	kpi_style_for_metric(metric, group) {
@@ -1325,6 +1369,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			else if (kind === "active_school_models") me.show_active_school_models();
 			else if (kind === "active_school_by_staff") me.show_active_schools_by_staff();
 			else if (kind === "total_schools_by_province") me.show_total_schools_by_province();
+			else if (kind === "schools_monthly") me.show_schools_monthly_breakup();
 		});
 
 		$root.on("click.smeSumExpense", "[data-expense-detail]", function (e) {
@@ -1366,7 +1411,8 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					to_date,
 					province: f.province || "",
 					city: f.city || "",
-					supervisor: f.supervisor || data.supervisor || "",
+					staff: f.staff || f.employee || "",
+					supervisor: f.staff || f.employee ? "" : f.supervisor || data.supervisor || "",
 					submitted_only: f.submitted_only || 1,
 				},
 			},
@@ -1475,6 +1521,150 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 				`);
 				d.show();
 			},
+		});
+	}
+
+	show_schools_monthly_breakup() {
+		const data = this.data || {};
+		const cached = data.schools_monthly || {};
+		const renderDialog = (res) => {
+			const rows = res.rows || [];
+			const totals = res.totals || {};
+			const body = rows.length
+				? rows
+						.map(
+							(row) => `<tr>
+					<td>${frappe.utils.escape_html(row.month_label || row.month || "—")}</td>
+					<td class="text-right"><strong>${this.fmt(row.number_of_school)}</strong></td>
+					<td class="text-right">${this.fmt(row.active)}</td>
+					<td class="text-right">${this.fmt(row.active_new)}</td>
+					<td class="text-right">${this.fmt(row.model_0)}</td>
+					<td class="text-right">${this.fmt(row.total)}</td>
+				</tr>`
+						)
+						.join("")
+				: `<tr><td colspan="6" class="text-muted text-center">${__(
+						"No monthly school data"
+					)}</td></tr>`;
+			const exportMonthly = () => {
+				const headers = [
+					__("Month"),
+					__("Number of School"),
+					__("Active Schools"),
+					__("Active New Schools"),
+					__("Model 0"),
+					__("Total Schools"),
+				];
+				const exportRows = rows.map((row) => [
+					row.month_label || row.month || "",
+					row.number_of_school || 0,
+					row.active || 0,
+					row.active_new || 0,
+					row.model_0 || 0,
+					row.total || 0,
+				]);
+				if (rows.length) {
+					exportRows.push([
+						__("Total"),
+						totals.number_of_school || 0,
+						totals.active || 0,
+						totals.active_new || 0,
+						totals.model_0 || 0,
+						totals.total || 0,
+					]);
+				}
+				if (frappe.tif_customization && frappe.tif_customization.export_rows_excel) {
+					frappe.tif_customization.export_rows_excel(
+						`schools-monthly-${res.from_date || ""}-${res.to_date || ""}`,
+						headers,
+						exportRows
+					);
+				}
+			};
+			this._pending_card_title = {
+				label: __("Number of School — Monthly Breakup"),
+				count: totals.number_of_school || 0,
+			};
+			const d = new frappe.ui.Dialog({
+				title: this.card_dialog_title(
+					__("Number of School — Monthly Breakup"),
+					totals.number_of_school || 0
+				),
+				size: "extra-large",
+				fields: [{ fieldtype: "HTML", fieldname: "html" }],
+				primary_action_label: __("Close"),
+				primary_action: () => d.hide(),
+				secondary_action_label: __("Export Excel"),
+				secondary_action: () => exportMonthly(),
+			});
+			d.fields_dict.html.$wrapper.html(`
+				<p class="text-muted" style="font-size:12px;margin-bottom:10px;">
+					${__(
+						"Number of School = distinct schools with Follow up / Marketing (New) / Registration visits in that month. Total Schools = Active + Active New + Model 0 (no double-count within the month)."
+					)}
+					<br>${__("Period")}: <strong>${frappe.utils.escape_html(
+						frappe.datetime.str_to_user(res.from_date || "")
+					)} – ${frappe.utils.escape_html(frappe.datetime.str_to_user(res.to_date || ""))}</strong>
+				</p>
+				<div class="table-responsive" style="max-height:420px;overflow:auto;">
+					<table class="table table-bordered table-hover" style="font-size:12px;margin:0;">
+						<thead>
+							<tr>
+								<th>${__("Month")}</th>
+								<th class="text-right">${__("Number of School")}</th>
+								<th class="text-right">${__("Active Schools")}</th>
+								<th class="text-right">${__("Active New")}</th>
+								<th class="text-right">${__("Model 0")}</th>
+								<th class="text-right">${__("Total Schools")}</th>
+							</tr>
+						</thead>
+						<tbody>${body}</tbody>
+						${
+							rows.length
+								? `<tfoot><tr>
+							<th>${__("Total")}</th>
+							<th class="text-right">${this.fmt(totals.number_of_school)}</th>
+							<th class="text-right">${this.fmt(totals.active)}</th>
+							<th class="text-right">${this.fmt(totals.active_new)}</th>
+							<th class="text-right">${this.fmt(totals.model_0)}</th>
+							<th class="text-right">${this.fmt(totals.total)}</th>
+						</tr></tfoot>`
+								: ""
+						}
+					</table>
+				</div>
+			`);
+			d.show();
+		};
+
+		if ((cached.rows || []).length) {
+			renderDialog(cached);
+			return;
+		}
+		const f = this.get_filters();
+		const from_date = data.outcome_fy_from || f.from_date;
+		const to_date = data.outcome_fy_to || f.to_date;
+		if (!from_date || !to_date) {
+			frappe.msgprint(__("Please select Visit From Date and Visit To Date."));
+			return;
+		}
+		frappe.call({
+			method:
+				"tif_customization.tif_customization.api.visit_drilldown_report.get_schools_monthly_breakup",
+			args: {
+				filters: {
+					from_date,
+					to_date,
+					province: f.province || "",
+					city: f.city || "",
+					staff: f.staff || f.employee || "",
+					supervisor: f.staff || f.employee ? "" : f.supervisor || data.supervisor || "",
+					submitted_only: f.submitted_only || 1,
+				},
+			},
+			freeze: true,
+			freeze_message: __("Loading monthly school breakup…"),
+			callback: (r) => renderDialog(r.message || {}),
 		});
 	}
 
@@ -2467,27 +2657,27 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			},
 			{
 				group: __("Overview"),
+				label: __("Working Days"),
+				value: data.working_days,
+				hint: __("Weekdays (Mon–Fri) in Visit From–To. Same as report Working Days."),
+			},
+			{
+				group: __("Overview"),
 				label: __("Visited Days"),
 				value: row.visited_days,
 				metric: "visited_days",
+				hint: __(
+					"Distinct calendar days with any Field Visit for this SME (school visits + meetings + M&E, etc.). Can be higher than Present Days if visits were filed without full attendance."
+				),
 			},
 			{
 				group: __("Overview"),
 				label: __("Present Days"),
 				value: row.present_days,
 				display: this.fmt_days(row.present_days),
-			},
-			{
-				group: __("Overview"),
-				label: __("Earned Points"),
-				value: row.earned_points,
-				display: this.fmt_score(row.earned_points),
-			},
-			{
-				group: __("Overview"),
-				label: __("Percentage"),
-				value: row.percentage,
-				display: this.fmt_pct(row.percentage),
+				hint: __(
+					"Attendance days with check-in and check-out (not absent). Same rule as Individual Attendance Sheet."
+				),
 			},
 			{
 				group: __("Activity (period)"),
@@ -2591,10 +2781,16 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 			<p class="text-muted" style="font-size:12px;margin-bottom:10px;">
 				${__("Visit Date")}: <strong>${frappe.utils.escape_html(frappe.datetime.str_to_user(data.from_date || ""))}
 				– ${frappe.utils.escape_html(frappe.datetime.str_to_user(data.to_date || ""))}</strong>
+				&nbsp;·&nbsp; ${__("Employee Type")}: <strong>${frappe.utils.escape_html(row.employment_type || "—")}</strong>
 				&nbsp;·&nbsp; ${__("Type / Division")}: <strong>${frappe.utils.escape_html(row.division || row.region_label || "—")}</strong>
+				&nbsp;·&nbsp; ${__("Earned")}: <strong>${this.fmt_score(row.earned_points)}</strong>
+				&nbsp;·&nbsp; ${__("Percentage")}: <strong>${this.fmt_pct(row.percentage)}</strong>
 			</p>
 			<p class="text-muted" style="font-size:12px;margin-bottom:10px;">
 				${__("Click a visit card to open documents. Labels match the main report (Marketing → Follow up → Monitoring).")}
+				<br>${__(
+					"Visited Days = distinct Field Visit days. Present Days = attendance check-in + check-out. Working Days = Mon–Fri in the filter period."
+				)}
 			</p>
 			<div style="max-height:70vh;overflow:auto;padding-right:4px;">
 				${cardsHtml}
