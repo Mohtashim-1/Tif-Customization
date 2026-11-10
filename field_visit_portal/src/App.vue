@@ -2648,8 +2648,10 @@ const steps = [
 						<span class="fw">Tip / ٹپ:</span>
 						Form auto Asia/Karachi time pe set hai.
 						<span class="urdu"> فارم خودکار طور پر کراچی کے وقت پر سیٹ ہے۔</span>
+						Duplicate School Entry: you cannot submit the same school more than once on the same day.
+						<span class="urdu"> ایک ہی دن ایک ہی اسکول کی دوبارہ انٹری نہیں ہو سکتی۔</span>
 						Backdated entries older than 72 hours, and a 3rd+ visit to the same school in a month, go to your supervisor for approval.
-						<span class="urdu"> ۴۸ گھنٹے سے پرانی بیک ڈیٹ یا ایک ماہ میں ایک ہی اسکول کی تیسری وزٹ سپروائزر کی منظوری کے لیے جاتی ہے۔</span>
+						<span class="urdu"> ۷۲ گھنٹے سے پرانی بیک ڈیٹ یا ایک ماہ میں ایک ہی اسکول کی تیسری وزٹ سپروائزر کی منظوری کے لیے جاتی ہے۔</span>
 					</div>
 				</div>
 			</section>

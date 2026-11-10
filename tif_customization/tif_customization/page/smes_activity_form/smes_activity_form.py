@@ -2285,9 +2285,10 @@ def submit_smes_activity(data):
 	_apply_travel_fields(doc, data)
 	sync_travel_cost(doc)
 
-	# Supervisor approval: backdated >72h or 3rd+ same-school visit in the month.
+	# Same-day duplicate school = hard block. Supervisor approval: backdated >72h or 3rd+/month.
 	from tif_customization.tif_customization.field_visit_approval import (
 		apply_pending_approval,
+		assert_no_duplicate_school_same_day,
 		can_bypass_visit_approval_rules,
 		evaluate_approval_requirements,
 		get_supervisor_user_for_employee,
@@ -2303,6 +2304,15 @@ def submit_smes_activity(data):
 	owner_for_rule = (
 		((for_officer or {}).get("user") if for_officer else None)
 		or frappe.session.user
+	)
+	assert_no_duplicate_school_same_day(
+		doc_type=doc_type,
+		activity_date=doc.get_visit_date() or doc.visit_date,
+		school_name=school_for_rule,
+		visit_by=doc.visit_by or data.get("visit_by"),
+		owner=owner_for_rule,
+		exclude_name=None,
+		force_skip=can_bypass_visit_approval_rules(),
 	)
 	approval = evaluate_approval_requirements(
 		doc_type=doc_type,

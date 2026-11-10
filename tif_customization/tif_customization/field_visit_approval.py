@@ -5,6 +5,7 @@
 Rules for field officers (supervisors / managers skip):
 1. Backdated activity older than 72 hours → Pending Supervisor Approval
 2. Same school visited 2+ times already in the calendar month → 3rd+ needs approval
+3. Same school more than once on the same calendar day → hard block (cannot save/submit)
 
 Approval state lives on DocType "Field Visit Approval Request" (avoids Field Visit row-size limits).
 """
@@ -101,26 +102,21 @@ def _school_match_keys(school_name):
 	return [k for k in keys if k]
 
 
-def count_same_school_visits_in_month(
+def _count_same_school_visits(
 	school_name,
-	activity_date,
+	from_date,
+	to_date,
 	visit_by=None,
 	owner=None,
 	exclude_name=None,
 ):
-	"""Count this officer's non-cancelled visits to the same school in the calendar month.
-
-	1st and 2nd are free; when this returns >= 2, the next visit is the 3rd+ and needs approval.
-	"""
+	"""Count this officer's non-cancelled / non-rejected visits to the school in a date range."""
 	keys = _school_match_keys(school_name)
-	if not keys or not activity_date:
+	if not keys or not from_date or not to_date:
 		return 0
-	d = getdate(activity_date)
-	month_start = get_first_day(d)
-	month_end = get_last_day(d)
 	params = {
-		"from_date": month_start,
-		"to_date": month_end,
+		"from_date": getdate(from_date),
+		"to_date": getdate(to_date),
 		"keys": tuple(keys),
 	}
 	extra = ""
@@ -161,6 +157,91 @@ def count_same_school_visits_in_month(
 		as_dict=True,
 	)
 	return cint(row[0].cnt) if row else 0
+
+
+def count_same_school_visits_in_month(
+	school_name,
+	activity_date,
+	visit_by=None,
+	owner=None,
+	exclude_name=None,
+):
+	"""Count this officer's non-cancelled visits to the same school in the calendar month.
+
+	1st and 2nd are free; when this returns >= 2, the next visit is the 3rd+ and needs approval.
+	"""
+	if not activity_date:
+		return 0
+	d = getdate(activity_date)
+	return _count_same_school_visits(
+		school_name,
+		get_first_day(d),
+		get_last_day(d),
+		visit_by=visit_by,
+		owner=owner,
+		exclude_name=exclude_name,
+	)
+
+
+def count_same_school_visits_on_day(
+	school_name,
+	activity_date,
+	visit_by=None,
+	owner=None,
+	exclude_name=None,
+):
+	"""Count this officer's visits to the same school on the same calendar day."""
+	if not activity_date:
+		return 0
+	d = getdate(activity_date)
+	return _count_same_school_visits(
+		school_name,
+		d,
+		d,
+		visit_by=visit_by,
+		owner=owner,
+		exclude_name=exclude_name,
+	)
+
+
+def assert_no_duplicate_school_same_day(
+	*,
+	doc_type,
+	activity_date,
+	school_name=None,
+	visit_by=None,
+	owner=None,
+	exclude_name=None,
+	force_skip=False,
+):
+	"""Hard block: field staff may not file the same school more than once per day.
+
+	Applies to school visit types only. System Manager / full viewers may bypass.
+	"""
+	if force_skip or can_bypass_visit_approval_rules():
+		return
+	if (doc_type or "").strip() not in SCHOOL_VISIT_TYPES:
+		return
+	school = cstr(school_name or "").strip()
+	if not school or not activity_date:
+		return
+	existing = count_same_school_visits_on_day(
+		school,
+		activity_date,
+		visit_by=visit_by,
+		owner=owner,
+		exclude_name=exclude_name,
+	)
+	if existing <= 0:
+		return
+	d = getdate(activity_date)
+	frappe.throw(
+		_(
+			"Duplicate School Entry: you already have a visit for {0} on {1}. "
+			"Field staff cannot submit the same school's data more than once on the same day."
+		).format(school, frappe.format(d, {"fieldtype": "Date"})),
+		title=_("Duplicate School Entry"),
+	)
 
 
 def can_bypass_visit_approval_rules(user: str | None = None) -> bool:

@@ -92,6 +92,7 @@ class FieldVisit(Document):
 		self._clear_date_typed_as_officer()
 		validate_supervisor_only_field_visit(self)
 		validate_farhan_only_field_visit(self)
+		self._block_duplicate_school_same_day()
 		if self.type in ("Training", "Workshop", "Teachers Training Meeting"):
 			self._validate_training_attendees()
 			self._sync_training_attendee_defaults()
@@ -100,6 +101,26 @@ class FieldVisit(Document):
 		self._validate_enrolment_participants()
 		self._validate_workshop_attendees()
 		self._sync_school_contacts()
+
+	def _block_duplicate_school_same_day(self):
+		"""Field staff: one visit per school per calendar day (portal + desk)."""
+		from tif_customization.tif_customization.field_visit_approval import (
+			assert_no_duplicate_school_same_day,
+		)
+
+		school = (
+			(self.school_name or "").strip()
+			or (getattr(self, "me_school_name", None) or "").strip()
+			or (getattr(self, "pending_school_name", None) or "").strip()
+		)
+		assert_no_duplicate_school_same_day(
+			doc_type=self.type,
+			activity_date=self.get_visit_date() if hasattr(self, "get_visit_date") else self.visit_date,
+			school_name=school,
+			visit_by=self.visit_by,
+			owner=self.owner or frappe.session.user,
+			exclude_name=None if self.is_new() else self.name,
+		)
 
 	def _block_field_officer_edit_on_submit(self):
 		"""Field Officers may create/submit, but cannot change already-submitted visits.
