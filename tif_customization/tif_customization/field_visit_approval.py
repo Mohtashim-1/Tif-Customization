@@ -695,7 +695,15 @@ def list_pending_approvals(limit=50):
 		if cint(fv.get("docstatus")) == 2:
 			continue
 		fake = frappe._dict({**fv, "field_visit": fv_name})
-		can_appr = user_can_approve_field_visit(fake, user)
+		assigned_to = cstr(r.get("supervisor_user") or "").strip()
+		# Queue = requests routed to this user. System Manager / view-all users can still
+		# approve any visit from its page, but only see their own queue here.
+		# Unrouted requests (no supervisor set) fall to the escalation approver.
+		if assigned_to:
+			in_queue = assigned_to == user
+		else:
+			in_queue = bool(escalation_user and user == escalation_user)
+		can_appr = in_queue and user_can_approve_field_visit(fake, user)
 		mine = cstr(r.get("requested_by") or "") == user or cstr(fv.get("owner") or "") == user
 
 		if can_appr and len(to_approve) < limit:
