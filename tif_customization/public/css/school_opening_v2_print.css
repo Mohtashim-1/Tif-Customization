@@ -394,9 +394,10 @@
 	border: 0;
 }
 
-/* Hide interactive controls in print body */
-#school-opening-portal.soa-v2 .soa-print-toolbar {
-	display: none !important;
+@media print {
+	#school-opening-portal.soa-v2 .soa-print-toolbar {
+		display: none !important;
+	}
 }
 
 #school-opening-portal.soa-v2 input,
