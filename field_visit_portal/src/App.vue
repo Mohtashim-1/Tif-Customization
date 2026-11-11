@@ -1877,7 +1877,6 @@ async function uploadAttachments(docname) {
 		map = [
 			["school_picture", "school_picture"],
 			["visiting_card_attach", "visiting_card_attach"],
-			["attendance_sheet_attach", "attendance_sheet_attach"],
 		];
 	} else if (isWorkshopCard.value) {
 		map = [
@@ -3153,7 +3152,6 @@ const steps = [
 						<div class="attach-grid">
 							<AttachDrop :mode="lang" label-en="School Picture" label-ur="اسکول کی تصویر" :file="attachments.school_picture" @pick="attachments.school_picture = $event" />
 							<AttachDrop :mode="lang" label-en="Visiting Card" label-ur="وزٹنگ کارڈ" :file="attachments.visiting_card_attach" @pick="attachments.visiting_card_attach = $event" />
-							<AttachDrop :mode="lang" label-en="School Visit form" label-ur="اسکول وزٹ فارم" required :file="attachments.attendance_sheet_attach" @pick="attachments.attendance_sheet_attach = $event" />
 						</div>
 					</div>
 
