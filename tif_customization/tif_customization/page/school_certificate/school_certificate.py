@@ -1,58 +1,16 @@
 import base64
 import json
-import re
 
 import frappe
 from frappe import _
 from frappe.utils import cint, cstr, escape_html, formatdate, getdate, today
 
+from tif_customization.tif_customization.api.school_dataset import fetch_schools
+
 PAGE_ROLES = ("System Manager", "School Approval", "Field Staff Manager", "SME Manager", "COO", "HOD")
 
-# Program fields on Field Visit ("Yes" = running). Meetings are not programs, so
-# qps_meeting_educationalist is intentionally left out.
-PROGRAMS = (
-	("qps_mqh_books", "MQH Books", "QPS"),
-	("qps_mqh_teachers_guides", "MQH Teachers Guides", "QPS"),
-	("qps_onsite_training", "Onsite Training", "QPS"),
-	("qps_online_training", "Online Training", "QPS"),
-	("qps_registration_lms", "Registration in LMS", "QPS"),
-	("qps_50_days_syllabus", "50 Days Short MQH Syllabus", "QPS"),
-	("qps_mqh_quiz", "MQH Quiz Program", "QPS"),
-	("tps_noorani_qaida", "Noorani Qaida", "TPS"),
-	("tps_noorani_qaida_guide", "Noorani Qaida Teacher's Guide", "TPS"),
-	("tps_1_day_tajweed_females", "Intro of Tajweed for Females", "TPS"),
-	("tps_ttc_tajweed_khi", "TTC Tajweed Training Course", "TPS"),
-	("tps_tajweed_customize", "Tajweed Customize Course", "TPS"),
-	("tps_noorani_qaida_workbook_khi", "Noorani Qaida Workbook", "TPS"),
-	("tps_tajweed_workshop_kids_khi", "Tajweed Workshop for Kids", "TPS"),
-	("cee_elp", "ELP", "CEE"),
-	("cee_tecc_foundation", "TECC - Foundation", "CEE"),
-	("cee_tecc_professional", "TECC - Professional", "CEE"),
-	("cee_one_day_workshop", "One Day Workshop", "CEE"),
-)
-
-# Other "program running" signals in registered_school_sql (SME report Active Schools rule)
-EXTRA_SIGNALS = (
-	("ifnull(fv.me_mqh_book_status, '') != ''", "MQH Books (M&E)", "QPS"),
-	# Check fields (0/1): `= 'Yes'` would match 0 in MariaDB, so use the report's yes-test
-	("{yes:mt_mqh_sample_provided}", "MQH Sample Provided", "QPS"),
-	("{yes:me_teachers_training_session}", "Teachers Training (M&E)", "CEE"),
-	(
-		"fv.type in ('Workshop Conducted', 'Workshop', 'Workshop Arranged', 'Training', 'Teachers Training Meeting')",
-		"Workshop / Training",
-		"CEE",
-	),
-	("ifnull(fv.qps_affiliated, '') like 'Yes%%'", "QPS Affiliated", "QPS"),
-	("ifnull(fv.tps_affiliated, '') like 'Yes%%'", "TPS Affiliated", "TPS"),
-	("ifnull(fv.cee_affiliated, '') like 'Yes%%'", "CEE Affiliated", "CEE"),
-)
-
-PROVINCE_ALIASES = {"KPK": "Khyber Pakhtunkhwa"}
 # ~20s for 767 pages; keep well under the 120s gunicorn timeout (mirrored in school_certificate.js)
 MAX_DOWNLOAD = 1500
-
-def _clean_label(value):
-	return re.sub(r"[\s\u200b\u200c\u200d\u2060\ufeff]+", " ", cstr(value)).strip()
 
 
 def _check_access():
@@ -63,111 +21,7 @@ def _check_access():
 
 
 def _fetch_schools(from_date=None, to_date=None, schools=None):
-	"""One row per school, using the exact school set and buckets of the SME Summary
-	"Total Schools" cards (get_total_schools_by_province)."""
-	from tif_customization.tif_customization.api.field_visit_drilldown import (
-		_has_named_school_sql,
-		_metric_condition,
-		_school_key_sql,
-		_school_sql,
-		_yes_field_sql,
-		registered_school_sql,
-		school_field_visit_type_sql,
-	)
-	from tif_customization.tif_customization.field_visit_permissions import (
-		apply_team_scope_to_conditions,
-		staff_match_sql,
-		visit_day_sql,
-	)
-	from tif_customization.tif_customization.page.sme_summary_report_copy.sme_summary_report_copy import (
-		_get_sme_staff,
-		_staff_token_list,
-	)
-
-	visit_day = visit_day_sql("fv")
-	school_expr = _school_sql("fv")
-	school_key = _school_key_sql("fv")
-	active_sql = registered_school_sql("fv")
-	model0_sql = f"not ({active_sql}) and ({school_field_visit_type_sql('fv')})"
-	new_sql = _metric_condition("new_schools", "fv")
-
-	conds = [
-		"fv.docstatus = 1",
-		f"({_has_named_school_sql('fv')}) and (({active_sql}) or ({model0_sql}) or ({new_sql}))",
-	]
-	values = {}
-	if from_date:
-		conds.append(f"{visit_day} >= %(from_date)s")
-		values["from_date"] = getdate(from_date)
-	if to_date:
-		conds.append(f"{visit_day} <= %(to_date)s")
-		values["to_date"] = getdate(to_date)
-	if schools:
-		conds.append(f"{school_key} in %(schools)s")
-		values["schools"] = tuple(schools)
-	apply_team_scope_to_conditions(conds, values, alias="fv")
-	# SME Summary roster (same scope as its Model A/B/C and Total Schools cards)
-	roster = _staff_token_list(_get_sme_staff({}))
-	values["staff_tokens"] = tuple(t.lower() for t in roster) or ("__none__",)
-	conds.append(staff_match_sql("fv", "staff_tokens"))
-
-	def signal_sql(cond):
-		if cond.startswith("{yes:"):
-			return _yes_field_sql(cond[5:-1], "fv")
-		return cond
-
-	flags = [f"max(case when {_yes_field_sql(field, 'fv')} then 1 else 0 end) as `{field}`" for field, _l, _d in PROGRAMS]
-	flags += [
-		f"max(case when {signal_sql(cond)} then 1 else 0 end) as `extra_{i}`"
-		for i, (cond, _l, _d) in enumerate(EXTRA_SIGNALS)
-	]
-	rows = frappe.db.sql(
-		f"""
-		select
-			{school_key} as school,
-			max({school_expr}) as school_label,
-			max(nullif(fv.school_name, '')) as customer,
-			max({visit_day}) as last_visit,
-			count(*) as visits,
-			substring_index(group_concat(coalesce(nullif(trim(fv.province), ''), nullif(trim(fv.me_province), ''), nullif(trim(fv.training_province), ''))
-				order by {visit_day} desc separator '||'), '||', 1) as province,
-			substring_index(group_concat(coalesce(nullif(fv.city, ''), nullif(fv.me_city, ''), nullif(fv.training_city, ''))
-				order by {visit_day} desc separator '||'), '||', 1) as city,
-			max(case when ({active_sql}) then 1 else 0 end) as is_active,
-			max(case when ({new_sql}) then 1 else 0 end) as is_new,
-			{", ".join(flags)}
-		from `tabField Visit` fv
-		where {" and ".join(conds)}
-		group by {school_key}
-		""",
-		values,
-		as_dict=True,
-	)
-
-	out = []
-	for r in rows:
-		running = [{"label": label, "dept": dept} for field, label, dept in PROGRAMS if cint(r.get(field))]
-		running += [
-			{"label": label, "dept": dept}
-			for i, (_c, label, dept) in enumerate(EXTRA_SIGNALS)
-			if cint(r.get(f"extra_{i}"))
-		]
-		out.append(
-			{
-				"school": r.school,
-				"school_label": _clean_label(r.school_label) or _clean_label(r.school),
-				"last_visit": r.last_visit,
-				"visits": r.visits,
-				"province": PROVINCE_ALIASES.get(r.province or "", r.province or ""),
-				"city": r.city or "",
-				"running": running,
-				# Same disjoint buckets as the report: new-in-period wins over Active / Model 0
-				"bucket": "Active New" if cint(r.is_new) else ("Active" if cint(r.is_active) else "Model 0"),
-				"eligible": bool(cint(r.is_active)),
-				"customer": r.customer or "",
-			}
-		)
-	return out
+	return fetch_schools(from_date=from_date, to_date=to_date, schools=schools)
 
 
 @frappe.whitelist()
