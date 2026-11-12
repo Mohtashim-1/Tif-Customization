@@ -1086,6 +1086,10 @@ def update_school_opening(application=None, customer=None, data=None):
 		if not frappe.db.exists("School Opening Application", application):
 			frappe.throw(_("School Opening Application {0} not found.").format(application))
 		doc = frappe.get_doc("School Opening Application", application)
+		# Fields not shown on the V2 sheet must survive an HO save
+		for key in ("visit_type", "tilawat_services", "marketing_sample_provided", "school_whatsapp"):
+			if not data.get(key):
+				data[key] = doc.get(key)
 		_apply_school_opening_payload(doc, data)
 		doc.flags.ignore_permissions = True
 		doc.flags.ignore_validate_update_after_submit = True
@@ -1388,6 +1392,7 @@ def _view_from_application(app):
 		"type_of_school": app.type_of_school or "",
 		"no_of_campuses": app.no_of_campuses,
 		"no_of_students": _display_no_of_students(app.no_of_students),
+		"no_of_students_raw": cstr(app.no_of_students or ""),
 		"structure": app.structure or "",
 		"academic_shift": app.academic_shift or "",
 		"teacher_training_services": _csv_to_list(app.teacher_training_services),

@@ -330,18 +330,55 @@
 	min-height: 22px;
 }
 
-#school-opening-portal.soa-v2 .v2-contacts td.role {
+#school-opening-portal.soa-v2 .v2-contacts td.v2-c-role {
 	background: #d9e6e2 !important;
 	font-weight: 700;
-	width: 32%;
+	display: table-cell !important;
 }
 
-#school-opening-portal.soa-v2 .v2-contacts td.name {
-	width: 38%;
+/* Inline edit controls (HO editors only, never printed) */
+#school-opening-portal.soa-v2 .v2-edit-input {
+	width: 100%;
+	border: 1px solid #9fb8b0;
+	border-radius: 3px;
+	padding: 3px 6px;
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: 12px;
+	background: #fffef5;
+	color: var(--v2-ink);
 }
 
-#school-opening-portal.soa-v2 .v2-contacts td.cell {
-	width: 30%;
+#school-opening-portal.soa-v2 .v2-input-edit {
+	padding: 2px;
+}
+
+#school-opening-portal.soa-v2 .v2-edit-date {
+	width: 100px;
+	padding: 1px 4px;
+}
+
+#school-opening-portal.soa-v2 .v2-edit-inline {
+	width: auto;
+	min-width: 110px;
+	display: inline-block;
+}
+
+#school-opening-portal.soa-v2 .v2-edit-pair .v2-edit-input {
+	width: 48%;
+	display: inline-block;
+	margin-right: 2%;
+}
+
+#school-opening-portal.soa-v2 label.v2-check.v2-edit {
+	cursor: pointer;
+	margin: 0;
+	font-weight: 400;
+}
+
+#school-opening-portal.soa-v2 label.v2-check.v2-edit input {
+	margin: 0 5px 0 0;
+	vertical-align: -2px;
+	accent-color: var(--v2-green);
 }
 
 /* Attachments */

@@ -1,6 +1,6 @@
 {# SC-1.2 V2 — Need Analysis Form print (matches paper PDF layout) #}
-{# Static V2 paper layout — edit on Desk DocType; this view is print/approve only #}
-{% set editable = false %}
+{# Static V2 paper layout; HO editors (can_edit) get inline inputs on screen #}
+{% set editable = data.can_edit and not print_mode %}
 {% set sel_inst = data.institution_types or [] %}
 {% set sel_edu = data.educational_system or [] %}
 {% set sel_courses = data.teacher_training_services or [] %}
@@ -14,21 +14,43 @@
 <span class="v2-check{% if on %} on{% endif %}"><span class="v2-box"></span></span>
 {%- endmacro %}
 
-{% macro check(label, selected) -%}
+{% macro check(label, selected, name=none, multi=true) -%}
+{%- if editable and name -%}
+<label class="v2-check v2-edit"><input type="{{ 'checkbox' if multi else 'radio' }}" name="{{ name }}" value="{{ label | e }}"{% if label in (selected or []) %} checked{% endif %}>{{ label }}</label>
+{%- else -%}
 <span class="v2-check{% if label in (selected or []) %} on{% endif %}"><span class="v2-box"></span>{{ label }}</span>
+{%- endif -%}
 {%- endmacro %}
 
-{% macro checks(options, selected, cols=2) -%}
+{# Values saved outside the V2 option list must stay selectable or Save would drop them #}
+{% macro extras(options, selected, name) -%}
+{%- if editable and name -%}
+{%- for v in (selected or []) if v and v not in options -%}
+<label class="v2-check v2-edit"><input type="checkbox" name="{{ name }}" value="{{ v | e }}" checked>{{ v }}</label>
+{%- endfor -%}
+{%- endif -%}
+{%- endmacro %}
+
+{% macro checks(options, selected, cols=2, name=none, multi=true) -%}
 <div class="v2-checks cols-{{ cols }}">
 	{%- for opt in options -%}
-	{{ check(opt, selected) }}
+	{{ check(opt, selected, name, multi) }}
 	{%- endfor -%}
+	{%- if multi %}{{ extras(options, selected, name) }}{% endif -%}
 </div>
 {%- endmacro %}
 
-{% macro field(label, value) -%}
+{% macro val(name, value, placeholder="") -%}
+{%- if editable -%}
+<input type="text" class="v2-edit-input" name="{{ name }}" value="{{ (value if value is not none else '') | e }}"{% if placeholder %} placeholder="{{ placeholder }}"{% endif %}>
+{%- else -%}
+{{ value if value is not none else "" }}
+{%- endif -%}
+{%- endmacro %}
+
+{% macro field(label, value, name=none) -%}
 <div class="v2-field-label">{{ label }}</div>
-<div class="v2-input">{{ value if value is not none else "" }}</div>
+<div class="v2-input{% if editable and name %} v2-input-edit{% endif %}">{% if name %}{{ val(name, value) }}{% else %}{{ value if value is not none else "" }}{% endif %}</div>
 {%- endmacro %}
 
 <div id="school-opening-portal" class="school-opening-portal soa-v2{% if editable %} soa-editable{% endif %}">
@@ -72,9 +94,13 @@
 			<div class="v2-title-bar">School Opening — Need Analysis Form</div>
 			<div class="v2-meta-box">
 				<div>Form No.: <strong>{{ data.form_no or "SC-1.2" }}</strong></div>
-				<div>Date: <strong>{{ data.form_date_display or "" }}</strong></div>
+				<div>Date: {% if editable %}<input type="text" class="v2-edit-input v2-edit-date" name="form_date_display" value="{{ data.form_date_display or '' }}" placeholder="dd/mm/yyyy">{% else %}<strong>{{ data.form_date_display or "" }}</strong>{% endif %}</div>
 			</div>
 		</div>
+		{% if editable %}
+		<input type="hidden" name="form_date" value="{{ data.form_date or '' }}">
+		<input type="hidden" name="visit_type" value="{{ data.visit_type or '' }}">
+		{% endif %}
 
 		<section class="v2-section">
 			<div class="v2-section-head">
@@ -83,29 +109,29 @@
 			</div>
 
 			<div class="v2-row">
-				<div class="v2-col">{{ field("Name of School", data.school_name) }}</div>
-				<div class="v2-col">{{ field("TIF Representative", data.tif_representative) }}</div>
+				<div class="v2-col">{{ field("Name of School", data.school_name, "school_name") }}</div>
+				<div class="v2-col">{{ field("TIF Representative", data.tif_representative, "tif_representative") }}</div>
 			</div>
 
 			<div class="v2-label">Type of Institution</div>
-			{{ checks(["School", "College", "University", "Madrasa", "Fahm-Ul-Quran Group", "Special School"], sel_inst, 3) }}
+			{{ checks(["School", "College", "University", "Madrasa", "Fahm-Ul-Quran Group", "Special School"], sel_inst, 3, "institution_types") }}
 
 			<div class="v2-label">Category</div>
-			{{ checks(["Provincial Govt.", "Private"], [data.institution_category] if data.institution_category else [], 2) }}
+			{{ checks(["Provincial Govt.", "Private"], [data.institution_category] if data.institution_category else [], 2, "institution_category", false) }}
 
 			<div class="v2-label">Educational System</div>
-			{{ checks(["Pre-Primary", "Primary", "Secondary", "Matric", "Intermediate", "Hifz-o-Nazra", "Cambridge", "O / A Levels"], sel_edu, 4) }}
+			{{ checks(["Pre-Primary", "Primary", "Secondary", "Matric", "Intermediate", "Hifz-o-Nazra", "Cambridge", "O / A Levels"], sel_edu, 4, "educational_system") }}
 
 			<div class="v2-label">Type of School</div>
-			{{ checks(["Single Campus", "Chain"], [structure] if structure else [], 2) }}
+			{{ checks(["Single Campus", "Chain"], [structure] if structure else [], 2, "structure", false) }}
 
 			<div class="v2-row">
-				<div class="v2-col">{{ field("No. of Students", data.no_of_students) }}</div>
-				<div class="v2-col">{{ field("No. of Campuses", data.no_of_campuses) }}</div>
+				<div class="v2-col">{{ field("No. of Students", data.no_of_students_raw if editable and data.no_of_students_raw else data.no_of_students, "no_of_students") }}</div>
+				<div class="v2-col">{{ field("No. of Campuses", data.no_of_campuses, "no_of_campuses") }}</div>
 			</div>
 
 			<div class="v2-label">Academic Session — Shift</div>
-			{{ checks(["Morning", "Evening", "Both"], [data.academic_shift] if data.academic_shift else [], 3) }}
+			{{ checks(["Morning", "Evening", "Both"], [data.academic_shift] if data.academic_shift else [], 3, "academic_shift", false) }}
 		</section>
 
 		<section class="v2-section">
@@ -115,19 +141,7 @@
 			</div>
 			<div class="v2-label">Courses &amp; Workshops</div>
 			{# two-column order matching V2 paper #}
-			<div class="v2-checks cols-2">
-				{{ check("ELP", sel_courses) }}
-				{{ check("Workshop", sel_courses) }}
-				{{ check("TECC Professional", sel_courses) }}
-				{{ check("PEF Pakistan Workshop", sel_courses) }}
-				{{ check("TECC Foundation", sel_courses) }}
-				{{ check("Workshop Value Driven Teaching", sel_courses) }}
-				{{ check("Customize Tajweed online Course", sel_courses) }}
-				{{ check("Intro to Tajweed", sel_courses) }}
-				{{ check("Tajweed Training Course (TTC)", sel_courses) }}
-				{{ check("Kids Workshop", sel_courses) }}
-				{{ check("Workshop Art of Storytelling", sel_courses) }}
-			</div>
+			{{ checks(["ELP", "Workshop", "TECC Professional", "PEF Pakistan Workshop", "TECC Foundation", "Workshop Value Driven Teaching", "Customize Tajweed online Course", "Intro to Tajweed", "Tajweed Training Course (TTC)", "Kids Workshop", "Workshop Art of Storytelling"], sel_courses, 2, "teacher_training_services") }}
 		</section>
 
 		<div class="v2-page">Page 1 of 3</div>
@@ -150,16 +164,7 @@
 				<div class="v2-section-title">Services Onboard</div>
 			</div>
 			<div class="v2-label">Services onboard</div>
-			<div class="v2-checks cols-2">
-				{{ check("MQH Green Version Part-1 to 7", sel_onboard) }}
-				{{ check("Noorani Qaida", sel_onboard) }}
-				{{ check("MQH Green Version Teacher Guide 1 to 5", sel_onboard) }}
-				{{ check("Noorani Qaida — NQ Workbook", sel_onboard) }}
-				{{ check("MQH English Version Part-1 – 2", sel_onboard) }}
-				{{ check("Noorani Qaida — NQ Teachers Guide", sel_onboard) }}
-				{{ check("MQH Sindhi Version Part-1 – 3", sel_onboard) }}
-				{{ check("MQH KP Edition Part-1 to 7", sel_onboard) }}
-			</div>
+			{{ checks(["MQH Green Version Part-1 to 7", "Noorani Qaida", "MQH Green Version Teacher Guide 1 to 5", "Noorani Qaida — NQ Workbook", "MQH English Version Part-1 – 2", "Noorani Qaida — NQ Teachers Guide", "MQH Sindhi Version Part-1 – 3", "MQH KP Edition Part-1 to 7"], sel_onboard, 2, "quran_program_services") }}
 		</section>
 
 		<section class="v2-section">
@@ -169,33 +174,40 @@
 			</div>
 
 			<div class="v2-label">School Already Running TIF Services</div>
-			{{ checks(["Quran Program for Student", "Tilawat Program for School", "Teacher Training"], sel_running, 3) }}
+			{{ checks(["Quran Program for Student", "Tilawat Program for School", "Teacher Training"], sel_running, 3, "running_tif_services") }}
 
+			{% set curr_opts = ["Oral Nazra", "Qaida", "Afaq", "National Book Foundation", "Noorani Qaida (Not TPS)", "Iqra Qaida", "Spectrum", "Rehmani Qaida", "Madni Qaida", "Gaba", "Jamiat Qaida", "Qurani Qaida", "Moonlight", "Islamic Values", "CEF", "Zia ul Quran"] %}
+			{% set cn = "curriculum_in_use" %}
 			<div class="v2-label">Curriculum Currently in Use</div>
 			<div class="v2-checks cols-4">
-				{{ check("Oral Nazra", sel_curr) }}
-				{{ check("Qaida", sel_curr) }}
-				{{ check("Afaq", sel_curr) }}
-				{{ check("National Book Foundation", sel_curr) }}
-				{{ check("Noorani Qaida (Not TPS)", sel_curr) }}
-				{{ check("Iqra Qaida", sel_curr) }}
-				{{ check("Spectrum", sel_curr) }}
+				{{ check("Oral Nazra", sel_curr, cn) }}
+				{{ check("Qaida", sel_curr, cn) }}
+				{{ check("Afaq", sel_curr, cn) }}
+				{{ check("National Book Foundation", sel_curr, cn) }}
+				{{ check("Noorani Qaida (Not TPS)", sel_curr, cn) }}
+				{{ check("Iqra Qaida", sel_curr, cn) }}
+				{{ check("Spectrum", sel_curr, cn) }}
+				{% if editable %}
+				<span class="v2-check v2-edit">Others <input type="text" class="v2-edit-input v2-edit-inline" name="curriculum_others" value="{{ (data.curriculum_others or '') | e }}"></span>
+				{% else %}
 				<span class="v2-check{% if data.curriculum_others %} on{% endif %}"><span class="v2-box"></span>Others <span class="v2-others-line">{{ data.curriculum_others or "" }}</span></span>
-				{{ check("Rehmani Qaida", sel_curr) }}
-				{{ check("Madni Qaida", sel_curr) }}
-				{{ check("Gaba", sel_curr) }}
+				{% endif %}
+				{{ check("Rehmani Qaida", sel_curr, cn) }}
+				{{ check("Madni Qaida", sel_curr, cn) }}
+				{{ check("Gaba", sel_curr, cn) }}
 				<span class="v2-check"><span class="v2-box" style="visibility:hidden"></span><span class="v2-others-line">&nbsp;</span></span>
-				{{ check("Jamiat Qaida", sel_curr) }}
-				{{ check("Qurani Qaida", sel_curr) }}
-				{{ check("Moonlight", sel_curr) }}
+				{{ check("Jamiat Qaida", sel_curr, cn) }}
+				{{ check("Qurani Qaida", sel_curr, cn) }}
+				{{ check("Moonlight", sel_curr, cn) }}
 				<span class="v2-check"><span class="v2-box" style="visibility:hidden"></span></span>
-				{{ check("Islamic Values", sel_curr) }}
-				{{ check("CEF", sel_curr) }}
-				{{ check("Zia ul Quran", sel_curr) }}
+				{{ check("Islamic Values", sel_curr, cn) }}
+				{{ check("CEF", sel_curr, cn) }}
+				{{ check("Zia ul Quran", sel_curr, cn) }}
+				{{ extras(curr_opts, sel_curr, cn) }}
 			</div>
 
 			<div class="v2-label">Fee Structure</div>
-			{{ checks(["Above 15K", "Between 5K – 15K", "Below 5K"], [data.fee_structure] if data.fee_structure else [], 3) }}
+			{{ checks(["Above 15K", "Between 5K – 15K", "Below 5K"], [data.fee_structure] if data.fee_structure else [], 3, "fee_structure", false) }}
 		</section>
 
 		<section class="v2-section">
@@ -206,19 +218,19 @@
 			<table class="v2-grid">
 				<tr>
 					<td class="v2-k">Website</td>
-					<td class="v2-v">{{ data.website or "" }}</td>
+					<td class="v2-v">{{ val("website", data.website) }}</td>
 					<td class="v2-k">Facebook</td>
-					<td class="v2-v">{{ data.facebook or "" }}</td>
+					<td class="v2-v">{{ val("facebook", data.facebook) }}</td>
 				</tr>
 				<tr>
 					<td class="v2-k">Instagram</td>
-					<td class="v2-v">{{ data.instagram or "" }}</td>
+					<td class="v2-v">{{ val("instagram", data.instagram) }}</td>
 					<td class="v2-k">LinkedIn</td>
-					<td class="v2-v">{{ data.linkedin or "" }}</td>
+					<td class="v2-v">{{ val("linkedin", data.linkedin) }}</td>
 				</tr>
 				<tr>
 					<td class="v2-k">Other Links</td>
-					<td class="v2-v" colspan="3">{{ data.other_links or "" }}</td>
+					<td class="v2-v" colspan="3">{{ val("other_links", data.other_links) }}</td>
 				</tr>
 			</table>
 		</section>
@@ -231,21 +243,21 @@
 			<table class="v2-grid">
 				<tr>
 					<td class="v2-k">Address</td>
-					<td class="v2-v" colspan="3">{{ data.address or "" }}</td>
+					<td class="v2-v" colspan="3">{{ val("address", data.address) }}</td>
 				</tr>
 				<tr>
 					<td class="v2-k">Area</td>
-					<td class="v2-v">{{ data.area or "" }}</td>
+					<td class="v2-v">{{ val("area", data.area) }}</td>
 					<td class="v2-k">City</td>
-					<td class="v2-v">{{ data.city or "" }}</td>
+					<td class="v2-v">{{ val("city", data.city) }}</td>
 				</tr>
 				<tr>
 					<td class="v2-k">Other Country</td>
-					<td class="v2-v" colspan="3">{{ data.country or "Pakistan" }}</td>
+					<td class="v2-v" colspan="3">{{ val("country", data.country or "Pakistan") }}</td>
 				</tr>
 			</table>
 			<div class="v2-label">Province</div>
-			{{ checks(["Sindh", "Punjab", "KPK", "Balochistan", "Gilgit-Baltistan", "Azad Jammu & Kashmir"], [data.province] if data.province else [], 3) }}
+			{{ checks(["Sindh", "Punjab", "KPK", "Balochistan", "Gilgit-Baltistan", "Azad Jammu & Kashmir"], [data.province] if data.province else [], 3, "province", false) }}
 		</section>
 
 		<div class="v2-page">Page 2 of 3</div>
@@ -285,21 +297,23 @@
 				{% for role in roles %}
 					{% set row = contacts.get(role) if contacts else none %}
 					{% if not row %}{% set row = {} %}{% endif %}
-					<tr>
-						<td class="role">{{ role }}</td>
-						<td class="name">{{ row.get("name") or row.get("contact_name") or "" }}</td>
-						<td class="cell">{{ row.get("cell") or row.get("cell_no") or "" }}</td>
+					<tr data-contact-role="{{ role }}">
+						<td class="v2-c-role">{{ role }}</td>
+						<td class="v2-c-name">{% if editable %}<input type="text" class="v2-edit-input soa-contact-name" value="{{ (row.get('name') or row.get('contact_name') or '') | e }}">{% else %}{{ row.get("name") or row.get("contact_name") or "" }}{% endif %}</td>
+						<td class="v2-c-cell">{% if editable %}<input type="text" class="v2-edit-input soa-contact-cell" value="{{ (row.get('cell') or row.get('cell_no') or '') | e }}">{% else %}{{ row.get("cell") or row.get("cell_no") or "" }}{% endif %}</td>
 					</tr>
 				{% endfor %}
 					<tr>
-						<td class="role">School PTCL / Mobile Number</td>
-						<td class="name">{% if data.school_ptcl %}{{ data.school_ptcl }}{% elif data.school_mobile %}{{ data.school_mobile }}{% endif %}{% if data.school_ptcl and data.school_mobile and data.school_ptcl != data.school_mobile %} / {{ data.school_mobile }}{% endif %}</td>
-						<td class="cell"></td>
+						<td class="v2-c-role">School PTCL / Mobile Number</td>
+						{% if editable %}
+						<td class="v2-c-cell v2-edit-pair" colspan="2">{{ val("school_ptcl", data.school_ptcl, _("PTCL")) }}{{ val("school_mobile", data.school_mobile, _("Mobile")) }}</td>
+						{% else %}
+						<td class="v2-c-cell" colspan="2">{{ data.school_ptcl or "" }}{% if data.school_ptcl and data.school_mobile and data.school_ptcl != data.school_mobile %} / {% endif %}{% if data.school_mobile and data.school_mobile != data.school_ptcl %}{{ data.school_mobile }}{% endif %}</td>
+						{% endif %}
 					</tr>
 					<tr>
-						<td class="role">School Email</td>
-						<td class="name">{{ data.school_email or "" }}</td>
-						<td class="cell"></td>
+						<td class="v2-c-role">School Email</td>
+						<td class="v2-c-cell" colspan="2">{{ val("school_email", data.school_email) }}</td>
 					</tr>
 				</tbody>
 			</table>

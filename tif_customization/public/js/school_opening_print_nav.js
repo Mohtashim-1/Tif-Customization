@@ -114,7 +114,7 @@
 		});
 		return {
 			form_date: parseDisplayDate(fieldValue("form_date_display")) || fieldValue("form_date"),
-			visit_type: radioValue("visit_type"),
+			visit_type: radioValue("visit_type") || fieldValue("visit_type"),
 			institution_types: checkedValues("institution_types"),
 			school_name: fieldValue("school_name"),
 			tif_representative: fieldValue("tif_representative"),
