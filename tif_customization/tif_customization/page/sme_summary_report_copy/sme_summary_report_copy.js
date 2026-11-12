@@ -1426,6 +1426,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 					city: f.city || "",
 					staff: f.staff || f.employee || "",
 					supervisor: f.staff || f.employee ? "" : f.supervisor || data.supervisor || "",
+					sme_roster: f.staff || f.employee || f.supervisor || data.supervisor ? 0 : 1,
 					submitted_only: f.submitted_only || 1,
 				},
 			},

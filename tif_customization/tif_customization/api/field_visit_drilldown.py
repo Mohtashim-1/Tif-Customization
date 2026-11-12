@@ -1757,7 +1757,19 @@ def get_total_schools_by_province(filters=None):
 		team_tokens = _supervisor_team_tokens(supervisor)
 		params["staff_tokens"] = tuple(t.lower() for t in team_tokens) or ("__none__",)
 		conditions.append(staff_match_sql("fv", "staff_tokens"))
+	elif cint(filters.get("sme_roster") or 0):
+		# Same SME / FO roster as the Model A/B/C split, so A + B + C = Active + Active New
+		from tif_customization.tif_customization.page.sme_summary_report_copy.sme_summary_report_copy import (
+			_get_sme_staff,
+			_staff_token_list,
+		)
 
+		roster_tokens = _staff_token_list(_get_sme_staff(filters))
+		params["staff_tokens"] = tuple(t.lower() for t in roster_tokens) or ("__none__",)
+		conditions.append(staff_match_sql("fv", "staff_tokens"))
+
+	# Tab/newline-safe key (same as Model A/B/C) so "School\t" and "School" count once
+	school_key = _school_key_sql("fv")
 	where_sql = " AND ".join(conditions)
 	# Mutually exclusive: new-in-period wins over Active / Model 0.
 	rows = frappe.db.sql(
@@ -1770,14 +1782,14 @@ def get_total_schools_by_province(filters=None):
 			COUNT(*) AS total
 		FROM (
 			SELECT
-				LOWER(TRIM({school_expr})) AS school_key,
+				{school_key} AS school_key,
 				MAX({province_expr}) AS province,
 				MAX(CASE WHEN ({active_sql}) THEN 1 ELSE 0 END) AS is_active,
 				MAX(CASE WHEN ({new_sql}) THEN 1 ELSE 0 END) AS is_new,
 				MAX(CASE WHEN ({model0_sql}) THEN 1 ELSE 0 END) AS is_model0
 			FROM `tabField Visit` fv
 			WHERE {where_sql}
-			GROUP BY LOWER(TRIM({school_expr}))
+			GROUP BY {school_key}
 		) school_rows
 		GROUP BY province
 		ORDER BY total DESC, province ASC

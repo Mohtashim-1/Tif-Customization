@@ -740,6 +740,7 @@ def get_report_data(filters=None):
 				"to_date": str(outcome_fy_to),
 				"staff": staff_scope,
 				"supervisor": "" if staff_scope else (supervisor or ""),
+				"sme_roster": 0 if (staff_scope or supervisor) else 1,
 				"province": filter_province or "",
 				"city": filter_city or "",
 				"submitted_only": 1,

@@ -34,8 +34,9 @@ PROGRAMS = (
 # Other "program running" signals in registered_school_sql (SME report Active Schools rule)
 EXTRA_SIGNALS = (
 	("ifnull(fv.me_mqh_book_status, '') != ''", "MQH Books (M&E)", "QPS"),
-	("fv.mt_mqh_sample_provided = 'Yes'", "MQH Sample Provided", "QPS"),
-	("fv.me_teachers_training_session = 'Yes'", "Teachers Training (M&E)", "CEE"),
+	# Check fields (0/1): `= 'Yes'` would match 0 in MariaDB, so use the report's yes-test
+	("{yes:mt_mqh_sample_provided}", "MQH Sample Provided", "QPS"),
+	("{yes:me_teachers_training_session}", "Teachers Training (M&E)", "CEE"),
 	(
 		"fv.type in ('Workshop Conducted', 'Workshop', 'Workshop Arranged', 'Training', 'Teachers Training Meeting')",
 		"Workshop / Training",
@@ -67,18 +68,25 @@ def _fetch_schools(from_date=None, to_date=None, schools=None):
 	from tif_customization.tif_customization.api.field_visit_drilldown import (
 		_has_named_school_sql,
 		_metric_condition,
+		_school_key_sql,
 		_school_sql,
+		_yes_field_sql,
 		registered_school_sql,
 		school_field_visit_type_sql,
 	)
 	from tif_customization.tif_customization.field_visit_permissions import (
 		apply_team_scope_to_conditions,
+		staff_match_sql,
 		visit_day_sql,
+	)
+	from tif_customization.tif_customization.page.sme_summary_report_copy.sme_summary_report_copy import (
+		_get_sme_staff,
+		_staff_token_list,
 	)
 
 	visit_day = visit_day_sql("fv")
 	school_expr = _school_sql("fv")
-	school_key = f"lower(trim({school_expr}))"
+	school_key = _school_key_sql("fv")
 	active_sql = registered_school_sql("fv")
 	model0_sql = f"not ({active_sql}) and ({school_field_visit_type_sql('fv')})"
 	new_sql = _metric_condition("new_schools", "fv")
@@ -98,9 +106,21 @@ def _fetch_schools(from_date=None, to_date=None, schools=None):
 		conds.append(f"{school_key} in %(schools)s")
 		values["schools"] = tuple(schools)
 	apply_team_scope_to_conditions(conds, values, alias="fv")
+	# SME Summary roster (same scope as its Model A/B/C and Total Schools cards)
+	roster = _staff_token_list(_get_sme_staff({}))
+	values["staff_tokens"] = tuple(t.lower() for t in roster) or ("__none__",)
+	conds.append(staff_match_sql("fv", "staff_tokens"))
 
-	flags = [f"max(case when fv.{field} = 'Yes' then 1 else 0 end) as `{field}`" for field, _l, _d in PROGRAMS]
-	flags += [f"max(case when {cond} then 1 else 0 end) as `extra_{i}`" for i, (cond, _l, _d) in enumerate(EXTRA_SIGNALS)]
+	def signal_sql(cond):
+		if cond.startswith("{yes:"):
+			return _yes_field_sql(cond[5:-1], "fv")
+		return cond
+
+	flags = [f"max(case when {_yes_field_sql(field, 'fv')} then 1 else 0 end) as `{field}`" for field, _l, _d in PROGRAMS]
+	flags += [
+		f"max(case when {signal_sql(cond)} then 1 else 0 end) as `extra_{i}`"
+		for i, (cond, _l, _d) in enumerate(EXTRA_SIGNALS)
+	]
 	rows = frappe.db.sql(
 		f"""
 		select

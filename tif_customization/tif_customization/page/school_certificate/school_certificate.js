@@ -47,18 +47,11 @@ class SchoolCertificatePage {
 				fieldtype: "Data",
 				change: frappe.utils.debounce(reload, 400),
 			}),
-			from_date: this.page.add_field({
-				fieldname: "from_date",
-				label: __("Visits From"),
-				fieldtype: "Date",
-				default: `${fy_year}-07-01`,
-				change: reload,
-			}),
-			to_date: this.page.add_field({
-				fieldname: "to_date",
-				label: __("Visits To"),
-				fieldtype: "Date",
-				default: frappe.datetime.get_today(),
+			visit_period: this.page.add_field({
+				fieldname: "visit_period",
+				label: __("Visit Period"),
+				fieldtype: "DateRange",
+				default: [`${fy_year}-07-01`, frappe.datetime.get_today()],
 				change: reload,
 			}),
 			eligible_only: this.page.add_field({
@@ -68,13 +61,13 @@ class SchoolCertificatePage {
 				default: 1,
 				change: reload,
 			}),
-			cert_date: this.page.add_field({
-				fieldname: "cert_date",
-				label: __("Certificate Date"),
-				fieldtype: "Date",
-				default: frappe.datetime.get_today(),
-			}),
 		};
+		this.f.visit_period.$wrapper.attr("title", __("Visit Period (same as SME Summary: 1 July → today)"));
+	}
+
+	period() {
+		const v = this.f.visit_period.get_value() || [];
+		return { from_date: v[0] || "", to_date: v[1] || "" };
 	}
 
 	make_body() {
@@ -141,8 +134,7 @@ class SchoolCertificatePage {
 				search: v.search,
 				province: v.province,
 				city: v.city,
-				from_date: v.from_date,
-				to_date: v.to_date,
+				...this.period(),
 				eligible_only: v.eligible_only ? 1 : 0,
 			},
 			freeze: !this.loaded,
@@ -223,21 +215,37 @@ class SchoolCertificatePage {
 			);
 			return;
 		}
-		open_url_post(`/api/method/${SC_API}.download_certificates`, {
-			schools: JSON.stringify(schools),
-			cert_date: this.f.cert_date.get_value() || frappe.datetime.get_today(),
-			from_date: this.f.from_date.get_value() || "",
-			to_date: this.f.to_date.get_value() || "",
-		});
-		frappe.show_alert(
-			{
-				message:
-					schools.length > 100
-						? __("Preparing {0} certificates… this can take up to a minute.", [schools.length])
-						: __("Preparing {0} certificate(s)…", [schools.length]),
-				indicator: "blue",
+		frappe.prompt(
+			[
+				{
+					fieldname: "cert_date",
+					label: __("Certificate Date"),
+					fieldtype: "Date",
+					reqd: 1,
+					default: this.last_cert_date || frappe.datetime.get_today(),
+					description: __("Printed on the DATE line of the certificate."),
+				},
+			],
+			({ cert_date }) => {
+				this.last_cert_date = cert_date;
+				open_url_post(`/api/method/${SC_API}.download_certificates`, {
+					schools: JSON.stringify(schools),
+					cert_date,
+					...this.period(),
+				});
+				frappe.show_alert(
+					{
+						message:
+							schools.length > 100
+								? __("Preparing {0} certificates… this can take up to a minute.", [schools.length])
+								: __("Preparing {0} certificate(s)…", [schools.length]),
+						indicator: "blue",
+					},
+					schools.length > 100 ? 15 : 5
+				);
 			},
-			schools.length > 100 ? 15 : 5
+			__("Download {0} Certificate(s)", [schools.length]),
+			__("Download PDF")
 		);
 	}
 }
