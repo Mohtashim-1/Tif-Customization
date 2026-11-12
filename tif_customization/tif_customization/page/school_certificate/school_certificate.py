@@ -31,11 +31,24 @@ PROGRAMS = (
 	("cee_one_day_workshop", "One Day Workshop", "CEE"),
 )
 
+# Other "program running" signals in registered_school_sql (SME report Active Schools rule)
+EXTRA_SIGNALS = (
+	("ifnull(fv.me_mqh_book_status, '') != ''", "MQH Books (M&E)", "QPS"),
+	("fv.mt_mqh_sample_provided = 'Yes'", "MQH Sample Provided", "QPS"),
+	("fv.me_teachers_training_session = 'Yes'", "Teachers Training (M&E)", "CEE"),
+	(
+		"fv.type in ('Workshop Conducted', 'Workshop', 'Workshop Arranged', 'Training', 'Teachers Training Meeting')",
+		"Workshop / Training",
+		"CEE",
+	),
+	("ifnull(fv.qps_affiliated, '') like 'Yes%%'", "QPS Affiliated", "QPS"),
+	("ifnull(fv.tps_affiliated, '') like 'Yes%%'", "TPS Affiliated", "TPS"),
+	("ifnull(fv.cee_affiliated, '') like 'Yes%%'", "CEE Affiliated", "CEE"),
+)
+
 PROVINCE_ALIASES = {"KPK": "Khyber Pakhtunkhwa"}
 # ~20s for 767 pages; keep well under the 120s gunicorn timeout (mirrored in school_certificate.js)
 MAX_DOWNLOAD = 1500
-VISIT_DATE = "coalesce(fv.visit_date, fv.me_visit_date, date(fv.creation))"
-
 
 def _clean_label(value):
 	return re.sub(r"[\s\u200b\u200c\u200d\u2060\ufeff]+", " ", cstr(value)).strip()
@@ -49,35 +62,63 @@ def _check_access():
 
 
 def _fetch_schools(from_date=None, to_date=None, schools=None):
-	conds = ["fv.docstatus = 1", "ifnull(fv.school_name, '') != ''"]
+	"""One row per school, using the exact school set and buckets of the SME Summary
+	"Total Schools" cards (get_total_schools_by_province)."""
+	from tif_customization.tif_customization.api.field_visit_drilldown import (
+		_has_named_school_sql,
+		_metric_condition,
+		_school_sql,
+		registered_school_sql,
+		school_field_visit_type_sql,
+	)
+	from tif_customization.tif_customization.field_visit_permissions import (
+		apply_team_scope_to_conditions,
+		visit_day_sql,
+	)
+
+	visit_day = visit_day_sql("fv")
+	school_expr = _school_sql("fv")
+	school_key = f"lower(trim({school_expr}))"
+	active_sql = registered_school_sql("fv")
+	model0_sql = f"not ({active_sql}) and ({school_field_visit_type_sql('fv')})"
+	new_sql = _metric_condition("new_schools", "fv")
+
+	conds = [
+		"fv.docstatus = 1",
+		f"({_has_named_school_sql('fv')}) and (({active_sql}) or ({model0_sql}) or ({new_sql}))",
+	]
 	values = {}
 	if from_date:
-		conds.append(f"{VISIT_DATE} >= %(from_date)s")
+		conds.append(f"{visit_day} >= %(from_date)s")
 		values["from_date"] = getdate(from_date)
 	if to_date:
-		conds.append(f"{VISIT_DATE} <= %(to_date)s")
+		conds.append(f"{visit_day} <= %(to_date)s")
 		values["to_date"] = getdate(to_date)
 	if schools:
-		conds.append("fv.school_name in %(schools)s")
+		conds.append(f"{school_key} in %(schools)s")
 		values["schools"] = tuple(schools)
+	apply_team_scope_to_conditions(conds, values, alias="fv")
 
-	flags = ",\n\t\t\t".join(
-		f"max(case when fv.{field} = 'Yes' then 1 else 0 end) as `{field}`" for field, _l, _d in PROGRAMS
-	)
+	flags = [f"max(case when fv.{field} = 'Yes' then 1 else 0 end) as `{field}`" for field, _l, _d in PROGRAMS]
+	flags += [f"max(case when {cond} then 1 else 0 end) as `extra_{i}`" for i, (cond, _l, _d) in enumerate(EXTRA_SIGNALS)]
 	rows = frappe.db.sql(
 		f"""
 		select
-			fv.school_name as school,
-			max(c.customer_name) as school_label,
-			max({VISIT_DATE}) as last_visit,
+			{school_key} as school,
+			max({school_expr}) as school_label,
+			max(nullif(fv.school_name, '')) as customer,
+			max({visit_day}) as last_visit,
 			count(*) as visits,
-			substring_index(group_concat(nullif(fv.province, '') order by {VISIT_DATE} desc separator '||'), '||', 1) as province,
-			substring_index(group_concat(nullif(fv.city, '') order by {VISIT_DATE} desc separator '||'), '||', 1) as city,
-			{flags}
+			substring_index(group_concat(coalesce(nullif(trim(fv.province), ''), nullif(trim(fv.me_province), ''), nullif(trim(fv.training_province), ''))
+				order by {visit_day} desc separator '||'), '||', 1) as province,
+			substring_index(group_concat(coalesce(nullif(fv.city, ''), nullif(fv.me_city, ''), nullif(fv.training_city, ''))
+				order by {visit_day} desc separator '||'), '||', 1) as city,
+			max(case when ({active_sql}) then 1 else 0 end) as is_active,
+			max(case when ({new_sql}) then 1 else 0 end) as is_new,
+			{", ".join(flags)}
 		from `tabField Visit` fv
-		left join `tabCustomer` c on c.name = fv.school_name
 		where {" and ".join(conds)}
-		group by fv.school_name
+		group by {school_key}
 		""",
 		values,
 		as_dict=True,
@@ -86,6 +127,11 @@ def _fetch_schools(from_date=None, to_date=None, schools=None):
 	out = []
 	for r in rows:
 		running = [{"label": label, "dept": dept} for field, label, dept in PROGRAMS if cint(r.get(field))]
+		running += [
+			{"label": label, "dept": dept}
+			for i, (_c, label, dept) in enumerate(EXTRA_SIGNALS)
+			if cint(r.get(f"extra_{i}"))
+		]
 		out.append(
 			{
 				"school": r.school,
@@ -95,7 +141,10 @@ def _fetch_schools(from_date=None, to_date=None, schools=None):
 				"province": PROVINCE_ALIASES.get(r.province or "", r.province or ""),
 				"city": r.city or "",
 				"running": running,
-				"eligible": bool(running),
+				# Same disjoint buckets as the report: new-in-period wins over Active / Model 0
+				"bucket": "Active New" if cint(r.is_new) else ("Active" if cint(r.is_active) else "Model 0"),
+				"eligible": bool(cint(r.is_active)),
+				"customer": r.customer or "",
 			}
 		)
 	return out
@@ -123,10 +172,14 @@ def get_schools(search=None, province=None, city=None, from_date=None, to_date=N
 		return True
 
 	filtered = sorted((r for r in rows if keep(r)), key=lambda r: r["school_label"].lower())
+	buckets = {b: sum(1 for r in rows if r["bucket"] == b) for b in ("Active", "Active New", "Model 0")}
 	return {
 		"rows": filtered,
 		"total_schools": len(rows),
 		"total_eligible": total_eligible,
+		"active": buckets["Active"],
+		"active_new": buckets["Active New"],
+		"model_0": buckets["Model 0"],
 		"provinces": sorted({r["province"] for r in rows if r["province"]}),
 	}
 
@@ -178,18 +231,17 @@ def _certificate_html(names, cert_date):
 
 
 @frappe.whitelist()
-def download_certificates(schools=None, cert_date=None):
+def download_certificates(schools=None, cert_date=None, from_date=None, to_date=None):
 	_check_access()
 	if isinstance(schools, str):
 		schools = json.loads(schools) if schools.strip().startswith("[") else [schools]
-	# Customer names can carry stray spaces; keep IDs exactly as listed
 	schools = [cstr(s) for s in (schools or []) if cstr(s).strip()]
 	if not schools:
 		frappe.throw(_("Select at least one school."))
 	if len(schools) > MAX_DOWNLOAD:
 		frappe.throw(_("Please download at most {0} certificates at a time.").format(MAX_DOWNLOAD))
 
-	rows = {r["school"]: r for r in _fetch_schools(schools=schools)}
+	rows = {r["school"]: r for r in _fetch_schools(from_date=from_date, to_date=to_date, schools=schools)}
 	not_eligible = [s for s in schools if not rows.get(s, {}).get("eligible")]
 	if not_eligible:
 		frappe.throw(

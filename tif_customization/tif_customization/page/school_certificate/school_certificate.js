@@ -24,6 +24,9 @@ class SchoolCertificatePage {
 
 	make_filters() {
 		const reload = () => this.load();
+		// Same window as SME Summary outcome cards: 1 July of current fiscal year → today
+		const today = frappe.datetime.str_to_obj(frappe.datetime.get_today());
+		const fy_year = today.getMonth() >= 6 ? today.getFullYear() : today.getFullYear() - 1;
 		this.f = {
 			search: this.page.add_field({
 				fieldname: "search",
@@ -48,12 +51,14 @@ class SchoolCertificatePage {
 				fieldname: "from_date",
 				label: __("Visits From"),
 				fieldtype: "Date",
+				default: `${fy_year}-07-01`,
 				change: reload,
 			}),
 			to_date: this.page.add_field({
 				fieldname: "to_date",
 				label: __("Visits To"),
 				fieldtype: "Date",
+				default: frappe.datetime.get_today(),
 				change: reload,
 			}),
 			eligible_only: this.page.add_field({
@@ -95,6 +100,7 @@ class SchoolCertificatePage {
 					<thead><tr>
 						<th style="width:32px"><input type="checkbox" class="sc-all" title="${__("Select all")}"></th>
 						<th>${__("School")}</th>
+						<th>${__("Bucket")}</th>
 						<th>${__("City")}</th>
 						<th>${__("Province")}</th>
 						<th>${__("Running Programs")}</th>
@@ -160,7 +166,10 @@ class SchoolCertificatePage {
 		const t = this.totals || {};
 		const card = (lbl, val) => `<div class="sc-card"><div class="lbl">${lbl}</div><div class="val">${val}</div></div>`;
 		this.$body.find(".sc-summary").html(
-			card(__("Schools visited"), t.total_schools || 0) +
+			card(__("Active Schools"), t.active || 0) +
+				card(__("Active New"), t.active_new || 0) +
+				card(__("Model 0 (No Program)"), t.model_0 || 0) +
+				card(__("Total Schools"), t.total_schools || 0) +
 				card(__("Eligible (program running)"), t.total_eligible || 0) +
 				card(__("Showing"), this.rows.length) +
 				card(__("Selected"), this.selected.size)
@@ -179,7 +188,12 @@ class SchoolCertificatePage {
 					: `<span class="text-muted">${__("No program running")}</span>`;
 				return `<tr class="${r.eligible ? "" : "sc-off"}">
 					<td><input type="checkbox" class="sc-row" data-school="${key}" ${r.eligible ? "" : "disabled"} ${this.selected.has(r.school) ? "checked" : ""}></td>
-					<td><a href="/app/customer/${key}" target="_blank">${esc(r.school_label)}</a></td>
+					<td>${
+						r.customer
+							? `<a href="/app/customer/${encodeURIComponent(r.customer)}" target="_blank">${esc(r.school_label)}</a>`
+							: esc(r.school_label)
+					}</td>
+					<td><span class="indicator-pill ${{ Active: "green", "Active New": "blue" }[r.bucket] || "gray"}">${esc(__(r.bucket))}</span></td>
 					<td>${esc(r.city || "")}</td>
 					<td>${esc(r.province || "")}</td>
 					<td>${pills}</td>
@@ -190,7 +204,7 @@ class SchoolCertificatePage {
 			.join("");
 		this.$body
 			.find("tbody")
-			.html(html || `<tr><td colspan="7" class="text-center text-muted py-4">${__("No schools found")}</td></tr>`);
+			.html(html || `<tr><td colspan="8" class="text-center text-muted py-4">${__("No schools found")}</td></tr>`);
 		this.render_summary();
 	}
 
@@ -212,6 +226,8 @@ class SchoolCertificatePage {
 		open_url_post(`/api/method/${SC_API}.download_certificates`, {
 			schools: JSON.stringify(schools),
 			cert_date: this.f.cert_date.get_value() || frappe.datetime.get_today(),
+			from_date: this.f.from_date.get_value() || "",
+			to_date: this.f.to_date.get_value() || "",
 		});
 		frappe.show_alert(
 			{
