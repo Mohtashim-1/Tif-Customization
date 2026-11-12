@@ -1,4 +1,5 @@
 const SC_API = "tif_customization.tif_customization.page.school_certificate.school_certificate";
+const SC_MAX_DOWNLOAD = 1500;
 
 frappe.pages["school-certificate"].on_page_load = function (wrapper) {
 	const page = frappe.ui.make_app_page({
@@ -199,10 +200,28 @@ class SchoolCertificatePage {
 			frappe.msgprint(__("Select at least one eligible school."));
 			return;
 		}
+		if (schools.length > SC_MAX_DOWNLOAD) {
+			frappe.msgprint(
+				__("You selected {0} schools. Please download at most {1} certificates at a time (use the Province or City filter to split).", [
+					schools.length,
+					SC_MAX_DOWNLOAD,
+				])
+			);
+			return;
+		}
 		open_url_post(`/api/method/${SC_API}.download_certificates`, {
 			schools: JSON.stringify(schools),
 			cert_date: this.f.cert_date.get_value() || frappe.datetime.get_today(),
 		});
-		frappe.show_alert({ message: __("Preparing {0} certificate(s)…", [schools.length]), indicator: "blue" });
+		frappe.show_alert(
+			{
+				message:
+					schools.length > 100
+						? __("Preparing {0} certificates… this can take up to a minute.", [schools.length])
+						: __("Preparing {0} certificate(s)…", [schools.length]),
+				indicator: "blue",
+			},
+			schools.length > 100 ? 15 : 5
+		);
 	}
 }

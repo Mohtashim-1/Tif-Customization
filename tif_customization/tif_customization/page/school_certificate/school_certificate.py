@@ -32,7 +32,8 @@ PROGRAMS = (
 )
 
 PROVINCE_ALIASES = {"KPK": "Khyber Pakhtunkhwa"}
-MAX_DOWNLOAD = 300
+# ~20s for 767 pages; keep well under the 120s gunicorn timeout (mirrored in school_certificate.js)
+MAX_DOWNLOAD = 1500
 VISIT_DATE = "coalesce(fv.visit_date, fv.me_visit_date, date(fv.creation))"
 
 
