@@ -92,6 +92,7 @@ class SchoolCertificatePage {
 				<div class="sc-scroll"><table class="table table-hover table-sm mb-0">
 					<thead><tr>
 						<th style="width:32px"><input type="checkbox" class="sc-all" title="${__("Select all")}"></th>
+						<th>${__("Certificate No")}</th>
 						<th>${__("School")}</th>
 						<th>${__("Bucket")}</th>
 						<th>${__("City")}</th>
@@ -180,6 +181,7 @@ class SchoolCertificatePage {
 					: `<span class="text-muted">${__("No program running")}</span>`;
 				return `<tr class="${r.eligible ? "" : "sc-off"}">
 					<td><input type="checkbox" class="sc-row" data-school="${key}" ${r.eligible ? "" : "disabled"} ${this.selected.has(r.school) ? "checked" : ""}></td>
+					<td style="white-space:nowrap">${r.certificate_no ? `<a href="/app/mission-partner-certificate/${encodeURIComponent(r.certificate_no)}" target="_blank">${esc(r.certificate_no)}</a>` : `<span class="text-muted">${__("Not issued")}</span>`}</td>
 					<td>${
 						r.customer
 							? `<a href="/app/customer/${encodeURIComponent(r.customer)}" target="_blank">${esc(r.school_label)}</a>`
@@ -196,7 +198,7 @@ class SchoolCertificatePage {
 			.join("");
 		this.$body
 			.find("tbody")
-			.html(html || `<tr><td colspan="8" class="text-center text-muted py-4">${__("No schools found")}</td></tr>`);
+			.html(html || `<tr><td colspan="9" class="text-center text-muted py-4">${__("No schools found")}</td></tr>`);
 		this.render_summary();
 	}
 
@@ -243,6 +245,8 @@ class SchoolCertificatePage {
 					},
 					schools.length > 100 ? 15 : 5
 				);
+				// Reload so newly issued certificate numbers appear in the list
+				setTimeout(() => this.load(), schools.length > 100 ? 30000 : 6000);
 			},
 			__("Download {0} Certificate(s)", [schools.length]),
 			__("Download PDF")
