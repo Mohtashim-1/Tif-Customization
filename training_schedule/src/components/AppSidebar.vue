@@ -13,12 +13,6 @@ const nav = [
 	{ id: "trainers", label: "Trainers", icon: "◎" },
 	{ id: "schedule", label: "Schedule", icon: "☰" },
 	{ id: "programs", label: "Training Programs", icon: "◇" },
-	{ id: "cards", label: "Create Cards", icon: "▣" },
-	{ id: "sessions", label: "Sessions", icon: "▤" },
-	{ id: "rooms", label: "Rooms", icon: "⌂" },
-	{ id: "reports", label: "Reports", icon: "▤" },
-	{ id: "notifications", label: "Notifications", icon: "◉" },
-	{ id: "settings", label: "Settings", icon: "⚙" },
 ];
 
 const cal = computed(() => {

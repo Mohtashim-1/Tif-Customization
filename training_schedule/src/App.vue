@@ -523,7 +523,7 @@ watch(plannerView, () => {
 		<main class="ts-main">
 			<nav class="ts-mobile-nav">
 				<button
-					v-for="id in ['dashboard', 'schedule', 'cards', 'sessions', 'trainers']"
+					v-for="id in ['dashboard', 'trainers', 'schedule', 'programs']"
 					:key="id"
 					type="button"
 					:class="{ active: activeNav === id }"
