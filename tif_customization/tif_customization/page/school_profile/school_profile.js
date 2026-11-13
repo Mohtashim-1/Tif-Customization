@@ -40,7 +40,11 @@ class SchoolProfile {
 		this.$body.on("click", "[data-open]", (e) => {
 			e.preventDefault();
 			const [doctype, name] = $(e.currentTarget).attr("data-open").split("::");
-			window.open(`/app/${frappe.router.slug(doctype)}/${encodeURIComponent(name)}`, "_blank");
+			const url =
+				doctype === "Field Visit"
+					? `/field-visit-easy?name=${encodeURIComponent(name)}`
+					: `/app/${frappe.router.slug(doctype)}/${encodeURIComponent(name)}`;
+			window.open(url, "_blank");
 		});
 		this.$body.on("input", ".sp-visit-search", frappe.utils.debounce((e) => {
 			this.visit_query = cstr($(e.target).val()).toLowerCase();
