@@ -705,3 +705,156 @@ def get_drilldown(filters=None, kind=None, value=None):
 		"present": sum(cint(s["present"]) for s in sessions),
 	}
 	return out
+
+
+# ---------------------------------------------------------------------------
+# Directorate view (overview / programs / instructors / program detail)
+# ---------------------------------------------------------------------------
+
+_TOPIC_ALIASES = (
+	("value driven", "Value-Driven Teaching"),
+	("value base", "Value-Based Workshop"),
+	("etq", "ETQ"),
+	("mutal", "Mutala-e-Quran-e-Hakeem Teachers’ Training"),
+	("ow to teach", "How to teach Terjuma-tul-Quran other subject and Time Management"),
+)
+
+
+def _norm_text(text):
+	return " ".join("".join(ch.lower() if ch.isalnum() else " " for ch in (text or "")).split())
+
+
+def _program_group(row):
+	"""Program when set; otherwise the workshop topic (variants merged)."""
+	program = (row.get("program") or "").strip()
+	if program:
+		return program
+	topic = " ".join((row.get("workshop_topic") or row.get("training_type") or "").split())
+	key = _norm_text(topic)
+	for needle, label in _TOPIC_ALIASES:
+		if key.startswith(needle):
+			return label
+	return topic or "(No Program)"
+
+
+def _program_code(label):
+	words = [w for w in "".join(ch if ch.isalnum() else " " for ch in label).split()]
+	if not words:
+		return "—"
+	if len(label) <= 5:
+		return label.upper()
+	head = next((w for w in words if w.isupper() and len(w) > 1), None)
+	if head:
+		rest = [w for w in words if w != head]
+		return head + ("-" + rest[0][0].upper() if rest else "")
+	return "".join(w[0] for w in words if w.lower() not in ("the", "of", "and", "for", "to", "a", "an"))[:4].upper()
+
+
+def _minutes(start, end):
+	if not start or not end:
+		return 0
+	mins = int((end.total_seconds() - start.total_seconds()) // 60) if hasattr(end, "total_seconds") else 0
+	return mins if 0 < mins <= 12 * 60 else 0
+
+
+def _fy_bounds(fy):
+	fy = cint(fy)
+	if not fy:
+		d = getdate(today())
+		fy = _fiscal_year_start(d.year, d.month)
+	return fy, getdate(f"{fy}-07-01"), getdate(f"{fy + 1}-06-30")
+
+
+@frappe.whitelist()
+def get_overview(fy=None, department=None):
+	_check()
+	fy, from_date, to_date = _fy_bounds(fy)
+	department = (department or DEPT_DEFAULT).strip()
+	conds = ["IFNULL(docstatus, 0) < 2", "training_date BETWEEN %(from_date)s AND %(to_date)s"]
+	params = {"from_date": from_date, "to_date": to_date}
+	if department.lower() not in ("all", "__all__"):
+		conds.append("IFNULL(department_training, '') = %(department)s")
+		params["department"] = department
+
+	rows = frappe.db.sql(
+		f"""
+		SELECT name, type, training_date, training_time, training_end_time, schedule_status,
+			training_type, workshop_topic, mode_of_training, school_name, tag_school, city,
+			trainer_name, program, attendance_count
+		FROM `tab{DOCTYPE}`
+		WHERE {" AND ".join(conds)}
+		ORDER BY training_date, training_time
+		""",
+		params,
+		as_dict=True,
+	)
+	today_d = getdate(today())
+	marks = _attendance_map([r.name for r in rows])
+	titles = _customer_titles([r.tag_school for r in rows])
+
+	sessions = []
+	for r in rows:
+		stats = marks.get(r.name)
+		present = cint(stats.present) if stats else cint(r.attendance_count)
+		sessions.append(
+			{
+				"name": r.name,
+				"date": str(r.training_date),
+				"status": _status(r, today_d),
+				"program": _program_group(r),
+				"kind": r.type or "Training",
+				"module": " ".join(((r.training_type if r.program else r.workshop_topic) or r.training_type or _title(r) or "").split()),
+				"trainer": " ".join((r.trainer_name or "").split()),
+				"mode": (r.mode_of_training or "").strip(),
+				"city": (r.city or "").strip(),
+				"school": _school_label(r, titles),
+				"minutes": _minutes(r.training_time, r.training_end_time),
+				"present": present,
+				"fv": 0,
+			}
+		)
+
+	# Field Visit attendees: attach to the one session on that date run by the same trainer
+	fv_total, fv_unmatched = 0, []
+	for a in _field_visit_participants(from_date, to_date):
+		fv_total += 1
+		day = str(a.training_date or "")[:10]
+		same_day = [s for s in sessions if s["date"] == day]
+		hits = [s for s in same_day if _trainers_match(a.trainer_name, s["trainer"])]
+		if len(hits) != 1 and len(same_day) == 1:
+			hits = same_day
+		if len(hits) == 1:
+			hits[0]["fv"] += 1
+		else:
+			fv_unmatched.append({"date": day, "trainer": " ".join((a.trainer_name or "").split())})
+
+	feedback = []
+	for f in _feedback_rows(from_date, to_date):
+		program = _program_for_event(f.training_date, f.trainer_name, sessions)
+		feedback.append(
+			{
+				"date": str(f.training_date or "")[:10],
+				"trainer": " ".join((f.trainer_name or "").split()),
+				"program": program,
+				"overall": cint(f.overall_rating),
+				"recommend": (f.would_recommend or "").strip(),
+			}
+		)
+
+	programs = {}
+	for s in sessions:
+		programs.setdefault(s["program"], {"label": s["program"], "code": _program_code(s["program"]), "kind": s["kind"]})
+
+	return {
+		"fy": fy,
+		"from_date": str(from_date),
+		"to_date": str(to_date),
+		"today": str(today_d),
+		"department": department,
+		"sessions": sessions,
+		"feedback": feedback,
+		"fv_total": fv_total,
+		"fv_unmatched": fv_unmatched,
+		"programs": list(programs.values()),
+		"links": {"schedule": "/training-schedule", "list": "/app/upcoming-training"},
+	}
