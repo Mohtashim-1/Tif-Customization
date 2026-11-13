@@ -25,7 +25,7 @@ def _check_access():
 	if frappe.session.user == "Administrator":
 		return
 	if not set(frappe.get_roles()) & set(PAGE_ROLES):
-		frappe.throw(_("Not permitted to view the School Dashboard."), frappe.PermissionError)
+		frappe.throw(_("Not permitted to view the School Database Dashboard New (UAT)."), frappe.PermissionError)
 
 
 @frappe.whitelist()

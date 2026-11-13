@@ -29,7 +29,7 @@ class SchoolProfile {
 	constructor(page) {
 		this.page = page;
 		this.tab = "overview";
-		this.page.set_secondary_action(__("School Dashboard"), () => frappe.set_route("school-visit-dashboard"));
+		this.page.set_secondary_action(__("School Database Dashboard New (UAT)"), () => frappe.set_route("school-visit-dashboard"));
 		this.$body = $(`<div class="sp-wrap"><style>${this.css()}</style><div class="sp-root"></div></div>`).appendTo(this.page.main);
 		this.$root = this.$body.find(".sp-root");
 
@@ -64,7 +64,7 @@ class SchoolProfile {
 		const school = q.get("school") || (frappe.route_options || {}).school || "";
 		const args = { school, from_date: q.get("from") || "", to_date: q.get("to") || "" };
 		if (!school) {
-			this.$root.html(`<div class="sp-empty">${__("Open a school from the School Dashboard.")}</div>`);
+			this.$root.html(`<div class="sp-empty">${__("Open a school from the School Database Dashboard New (UAT).")}</div>`);
 			return;
 		}
 		if (this.args && JSON.stringify(this.args) === JSON.stringify(args)) return;

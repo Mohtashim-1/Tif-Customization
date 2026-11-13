@@ -21,7 +21,7 @@ const SD_DEPT = {
 frappe.pages["school-visit-dashboard"].on_page_load = function (wrapper) {
 	const page = frappe.ui.make_app_page({
 		parent: wrapper,
-		title: __("School Dashboard"),
+		title: __("School Database Dashboard New (UAT)"),
 		single_column: true,
 	});
 	new SchoolDashboard(page);
@@ -93,7 +93,7 @@ class SchoolDashboard {
 				<div class="sv-hero">
 					<div class="sv-hero-text">
 						<div class="sv-hero-eyebrow">${__("Field Visit Records")}</div>
-						<h3 class="sv-hero-title">${__("School Dashboard")}</h3>
+						<h3 class="sv-hero-title">${__("School Database Dashboard New (UAT)")}</h3>
 						<div class="sv-hero-sub"></div>
 					</div>
 					<div class="sv-hero-stats"></div>
@@ -578,6 +578,6 @@ class SchoolDashboard {
 				r.first_visit || "", r.last_visit || "", r.last_by,
 			])
 		);
-		frappe.tools.downloadify(data, null, `School Dashboard ${frappe.datetime.get_today()}`);
+		frappe.tools.downloadify(data, null, `School Database Dashboard New ${frappe.datetime.get_today()}`);
 	}
 }
