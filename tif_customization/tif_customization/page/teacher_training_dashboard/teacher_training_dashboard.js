@@ -19,7 +19,6 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 		this.department = "T. Training";
 		this.program = null;
 		this.program_trainer = "";
-		this.kind_filter = "";
 		this.inst_sort = { key: "sessions", dir: -1 };
 		this.make();
 	}
@@ -35,9 +34,8 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 				`<link id="tt-fonts" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">`
 			);
 		}
-		$(this.page.body).html(`<div class="tt-app">${this.styles()}<aside class="tt-side"></aside><main class="tt-main"></main></div>`);
+		$(this.page.body).html(`<div class="tt-app">${this.styles()}<main class="tt-main"></main></div>`);
 		this.$app = $(this.page.body).find(".tt-app");
-		this.$side = this.$app.find(".tt-side");
 		this.$main = this.$app.find(".tt-main");
 		this.bind();
 		this.load();
@@ -45,51 +43,48 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 
 	styles() {
 		return `<style>
-.tt-app{--ink:#1E1B4B;--teal:#6366F1;--teal2:#8B5CF6;--paper:#F5F6FF;--sand:#F59E0B;--line:#E6E8F5;--mute:#6B6F8A;
-	display:grid;grid-template-columns:220px 1fr;min-height:calc(100vh - 120px);background:var(--paper);
+.tt-app{--ink:#0F172A;--teal:#1E40AF;--teal2:#2563EB;--paper:#F4F6F9;--sand:#C2862D;--line:#E2E8F0;--mute:#64748B;
+	display:block;min-height:calc(100vh - 120px);background:var(--paper);
 	font-family:"Public Sans",system-ui,sans-serif;color:var(--ink);border-radius:14px;overflow:hidden;margin:0 0 24px}
 .tt-app *{box-sizing:border-box}
 .tt-mono{font-family:"IBM Plex Mono",ui-monospace,monospace}
-.tt-side{background:linear-gradient(180deg,#312E81 0%,#5B21B6 55%,#9D174D 100%);color:#DDD6FE;padding:22px 14px;display:flex;flex-direction:column;gap:4px}
-.tt-brand{display:flex;gap:10px;align-items:center;padding:0 8px 20px}
-.tt-brand .mk{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#F59E0B,#EC4899);box-shadow:0 6px 14px rgba(236,72,153,.4);color:#fff;display:grid;place-items:center;font-weight:800}
-.tt-brand b{display:block;color:#fff;font-size:14px}.tt-brand small{font-size:11px;color:#C4B5FD}
-.tt-nav{display:flex;justify-content:space-between;align-items:center;padding:9px 10px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;color:#DDD6FE}
-.tt-nav:hover{background:rgba(255,255,255,.1);color:#fff}
-.tt-nav.on{background:rgba(255,255,255,.18);color:#fff;box-shadow:inset 3px 0 0 #FBBF24}
-.tt-nav .ct{font-size:11px;background:#FBBF24;color:#1E1B4B;font-weight:700;padding:1px 7px;border-radius:10px}
-.tt-side-foot{margin-top:auto;padding:14px 10px 0;border-top:1px solid rgba(255,255,255,.15);font-size:11px;color:#DDD6FE;line-height:1.6}
-.tt-side-foot a{color:#FDE68A}
 .tt-main{padding:22px 26px 30px;min-width:0}
+.tt-tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:-4px 0 18px}
+.tt-tab{padding:9px 14px;font-size:13px;font-weight:700;color:var(--mute);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;display:flex;gap:6px;align-items:center}
+.tt-tab:hover{color:var(--ink)}
+.tt-tab.on{color:#1E40AF;border-bottom-color:#1E40AF}
+.tt-tab .ct{font-size:11px;background:#E2E8F0;color:#334155;padding:0 7px;border-radius:10px}
+.tt-tab-links{margin-left:auto;display:flex;gap:14px;align-items:center;font-size:12px}
+.tt-tab-links a{color:#1E40AF;font-weight:600}
 .tt-head{display:flex;justify-content:space-between;align-items:flex-end;gap:14px;flex-wrap:wrap;margin-bottom:18px}
-.tt-head h1{font-size:24px;font-weight:800;margin:0;letter-spacing:-.01em;background:linear-gradient(90deg,#4F46E5,#DB2777);-webkit-background-clip:text;background-clip:text;color:transparent;display:inline-block}
+.tt-head h1{font-size:24px;font-weight:800;margin:0;letter-spacing:-.01em;color:var(--ink)}
 .tt-head p{margin:4px 0 0;color:var(--mute);font-size:13px}
 .tt-ctrl{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .tt-seg{display:flex;background:#fff;border:1px solid var(--line);border-radius:9px;padding:3px}
 .tt-seg button{border:0;background:transparent;padding:5px 11px;border-radius:6px;font-size:12px;font-weight:700;color:var(--mute);cursor:pointer}
-.tt-seg button.on{background:linear-gradient(135deg,#6366F1,#EC4899);color:#fff}
+.tt-seg button.on{background:#0F2A4A;color:#fff}
 .tt-sel{border:1px solid var(--line);background:#fff;border-radius:9px;padding:6px 10px;font-size:12px;font-weight:600;color:var(--ink);height:34px}
-.tt-btn{border:0;background:linear-gradient(135deg,#6366F1,#EC4899);box-shadow:0 6px 14px rgba(99,102,241,.3);color:#fff;border-radius:9px;padding:0 14px;height:34px;font-size:12px;font-weight:700;cursor:pointer}
-.tt-btn:hover{filter:brightness(1.08)}
+.tt-btn{border:0;background:#1E40AF;color:#fff;border-radius:9px;padding:0 14px;height:34px;font-size:12px;font-weight:700;cursor:pointer}
+.tt-btn:hover{background:#1D4ED8}
 .tt-btn.ghost{background:#fff;color:var(--ink);border:1px solid var(--line);box-shadow:none}
-.tt-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-bottom:14px}
-.tt-kpi{--c:#6366F1;--bg:#EEF2FF;background:linear-gradient(160deg,var(--bg),#fff 70%);border:1px solid var(--line);border-top:4px solid var(--c);border-radius:12px;padding:14px 16px;position:relative;overflow:hidden}
-.tt-kpi::after{content:"";position:absolute;right:-18px;top:-18px;width:70px;height:70px;border-radius:50%;background:var(--c);opacity:.12}
-.tt-kpis>.tt-kpi:nth-child(1){--c:#6366F1;--bg:#EEF2FF}
-.tt-kpis>.tt-kpi:nth-child(2){--c:#EC4899;--bg:#FDF2F8}
-.tt-kpis>.tt-kpi:nth-child(3){--c:#10B981;--bg:#ECFDF5}
-.tt-kpis>.tt-kpi:nth-child(4){--c:#F59E0B;--bg:#FFFBEB}
-.tt-kpis>.tt-kpi:nth-child(5){--c:#06B6D4;--bg:#ECFEFF}
-.tt-kpi .l{font-size:11px;font-weight:700;color:var(--c);text-transform:uppercase;letter-spacing:.05em}
+.tt-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px}
+.tt-kpi{--c:#1E40AF;background:#fff;border:1px solid var(--line);border-top:3px solid var(--c);border-radius:10px;padding:14px 16px}
+.tt-kpis>.tt-kpi:nth-child(1){--c:#1E40AF}
+.tt-kpis>.tt-kpi:nth-child(2){--c:#0E7490}
+.tt-kpis>.tt-kpi:nth-child(3){--c:#15803D}
+.tt-kpis>.tt-kpi:nth-child(4){--c:#B45309}
+.tt-kpis>.tt-kpi:nth-child(5){--c:#475569}
+.tt-kpis>.tt-kpi:nth-child(6){--c:#6D28D9}
+.tt-kpi .l{font-size:11px;font-weight:700;color:var(--mute);text-transform:uppercase;letter-spacing:.05em}
 .tt-kpi .v{font-size:28px;font-weight:800;margin-top:6px;font-variant-numeric:tabular-nums;color:var(--ink)}
 .tt-kpi .s{font-size:11px;color:var(--mute);margin-top:2px}
-.tt-band{background:linear-gradient(110deg,#4F46E5 0%,#9333EA 40%,#DB2777 75%,#F97316 100%);box-shadow:0 12px 28px rgba(147,51,234,.25);color:#fff;border-radius:14px;padding:16px 20px;display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:14px}
-.tt-band>div{background:rgba(255,255,255,.12);border-radius:10px;padding:10px 12px}
+.tt-band{background:linear-gradient(110deg,#0F2A4A 0%,#1E3A8A 100%);color:#fff;border-radius:14px;padding:16px 20px;display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:14px}
+.tt-band>div{border-left:2px solid rgba(147,197,253,.5);padding:2px 12px}
 .tt-band .l{font-size:11px;text-transform:uppercase;letter-spacing:.06em;opacity:.9;font-weight:700}
 .tt-band .v{font-size:26px;font-weight:800;margin-top:4px}
 .tt-band .s{font-size:11px;opacity:.8}
 .tt-grid2{display:grid;grid-template-columns:1.5fr 1fr;gap:14px;margin-bottom:14px}
-.tt-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px 18px;min-width:0;box-shadow:0 4px 14px rgba(79,70,229,.05)}
+.tt-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px 18px;min-width:0;box-shadow:0 1px 3px rgba(15,23,42,.04)}
 .tt-card-h{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px;gap:8px}
 .tt-card-h h3{font-size:14px;font-weight:800;margin:0;color:var(--ink)}
 .tt-card-h small{font-size:11px;color:var(--mute)}
@@ -98,7 +93,7 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 .tt-bars{display:flex;align-items:flex-end;gap:8px;height:190px;padding-top:14px}
 .tt-bar{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;height:100%;justify-content:flex-end;min-width:0}
 .tt-bar .stk{width:100%;max-width:38px;display:flex;flex-direction:column-reverse;border-radius:5px 5px 2px 2px;overflow:hidden;cursor:default}
-.tt-bar .c{background:linear-gradient(180deg,#8B5CF6,#4F46E5)}.tt-bar .u{background:linear-gradient(180deg,#FBBF24,#F472B6)}
+.tt-bar .c{background:#1E40AF}.tt-bar .u{background:#93C5FD}
 .tt-bar .n{font-size:11px;font-weight:700;color:var(--ink)}
 .tt-bar .m{font-size:10px;color:var(--mute);text-transform:uppercase}
 .tt-hb{display:grid;grid-template-columns:62px 1fr 40px;gap:8px;align-items:center;margin:0 0 9px;font-size:12px}
@@ -110,29 +105,29 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 .tt-tbl th{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute);font-weight:700;text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
 .tt-tbl th.sort{cursor:pointer}.tt-tbl th.sort:hover{color:var(--ink)}
 .tt-tbl td{padding:10px;border-bottom:1px solid #EEF0FA;vertical-align:middle}
-.tt-tbl tr.click{cursor:pointer}.tt-tbl tr.click:hover td{background:#F5F3FF}
+.tt-tbl tr.click{cursor:pointer}.tt-tbl tr.click:hover td{background:#F8FAFC}
 .tt-tbl .r{text-align:right;font-variant-numeric:tabular-nums}
 .tt-pname{font-weight:700;color:var(--ink);line-height:1.3}
 .tt-psub{font-size:11px;color:var(--mute);margin-top:2px}
 .tt-pill{display:inline-block;font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:20px;white-space:nowrap}
 .tt-pill.completed{background:#D1FAE5;color:#047857}
 .tt-pill.progress{background:#FEF3C7;color:#B45309}
-.tt-pill.upcoming{background:#E0E7FF;color:#4338CA}
+.tt-pill.upcoming{background:#E2E8F0;color:#334155}
 .tt-prog{display:flex;align-items:center;gap:8px;min-width:120px}
 .tt-prog .tr{flex:1;height:6px;background:#EEEDE6;border-radius:6px;overflow:hidden}
-.tt-prog .tr b{display:block;height:100%;background:linear-gradient(90deg,#10B981,#06B6D4)}
+.tt-prog .tr b{display:block;height:100%;background:#2563EB}
 .tt-prog span{font-size:11px;color:var(--mute);white-space:nowrap}
 .tt-inst{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #F0EFE9}
 .tt-inst:last-child{border-bottom:0}
-.tt-av{width:32px;height:32px;border-radius:50%;background:var(--ink);box-shadow:0 3px 8px rgba(30,27,75,.18);color:#fff;display:grid;place-items:center;font-size:11px;font-weight:700;flex:none}
+.tt-av{width:32px;height:32px;border-radius:50%;background:var(--ink);color:#fff;display:grid;place-items:center;font-size:11px;font-weight:700;flex:none}
 .tt-inst .nm{flex:1;min-width:0}.tt-inst .nm b{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tt-inst .nm small{font-size:11px;color:var(--mute)}
 .tt-inst .st{text-align:right;font-size:12px;font-weight:700}.tt-inst .st small{display:block;font-weight:500;color:var(--mute);font-size:10.5px}
 .tt-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
 .tt-chip{border:1px solid var(--line);background:#fff;border-radius:20px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;color:var(--ink)}
-.tt-chip.on{background:linear-gradient(135deg,#6366F1,#EC4899);color:#fff;border-color:transparent}
+.tt-chip.on{background:#0F2A4A;color:#fff;border-color:#0F2A4A}
 .tt-pcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px}
-.tt-pc{background:#fff;border:1px solid var(--line);border-top:4px solid var(--pc,#6366F1);border-radius:14px;padding:16px;cursor:pointer;transition:box-shadow .15s,transform .15s}
+.tt-pc{background:#fff;border:1px solid var(--line);border-top:3px solid var(--pc,#1E40AF);border-radius:14px;padding:16px;cursor:pointer;transition:box-shadow .15s,transform .15s}
 .tt-pc:hover{box-shadow:0 10px 24px rgba(27,31,42,.08);transform:translateY(-1px)}
 .tt-pc .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
 .tt-pc h4{font-size:14px;font-weight:800;margin:0 0 4px;line-height:1.3;color:var(--ink)}
@@ -145,7 +140,7 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 .tt-empty{padding:30px;text-align:center;color:var(--mute);font-size:13px}
 .tt-note{font-size:11px;color:var(--mute);margin-top:10px;line-height:1.5}
 @media (max-width:1100px){.tt-kpis{grid-template-columns:repeat(3,1fr)}.tt-grid2{grid-template-columns:1fr}.tt-band{grid-template-columns:repeat(2,1fr)}}
-@media (max-width:760px){.tt-app{grid-template-columns:1fr}.tt-side{flex-direction:row;flex-wrap:wrap;padding:12px}.tt-brand,.tt-side-foot{display:none}.tt-kpis{grid-template-columns:repeat(2,1fr)}.tt-main{padding:16px}}
+@media (max-width:760px){.tt-tab-links{display:none}.tt-kpis{grid-template-columns:repeat(2,1fr)}.tt-main{padding:16px}}
 </style>`;
 	}
 
@@ -175,10 +170,6 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 			me.program = $(this).attr("data-program");
 			me.program_trainer = "";
 			me.view = "program";
-			me.render();
-		});
-		this.$app.on("click", "[data-kind]", function () {
-			me.kind_filter = $(this).attr("data-kind");
 			me.render();
 		});
 		this.$app.on("click", "[data-ptrainer]", function () {
@@ -215,7 +206,7 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 		return Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: d, minimumFractionDigits: d });
 	}
 	color(key) {
-		const pal = ["#6366F1", "#EC4899", "#10B981", "#F59E0B", "#06B6D4", "#8B5CF6", "#EF4444", "#14B8A6", "#F97316", "#3B82F6"];
+		const pal = ["#1E40AF", "#0E7490", "#15803D", "#B45309", "#475569", "#6D28D9", "#0F766E", "#9F1239"];
 		let h = 0;
 		for (const ch of String(key || "")) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
 		return pal[h % pal.length];
@@ -225,7 +216,7 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 	}
 	avatar(name) {
 		const c = this.color(name);
-		return `<div class="tt-av" style="background:linear-gradient(135deg,${c},${this.color(name + "~")})">${this.initials(name)}</div>`;
+		return `<div class="tt-av" style="background:${c}">${this.initials(name)}</div>`;
 	}
 	initials(name) {
 		return (name || "?").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("");
@@ -292,6 +283,13 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 			})
 			.sort((a, b) => b.sessions - a.sessions || b.people - a.people);
 	}
+	is_workshop(p) {
+		return /workshop/i.test(p.kind || "");
+	}
+	list_view_of(label) {
+		const s = (this.data.sessions || []).find((x) => x.program === label);
+		return s && /workshop/i.test(s.kind || "") ? "workshops" : "programs";
+	}
 	status_pill(st) {
 		const t = { completed: __("Completed"), progress: __("In progress"), upcoming: __("Upcoming") }[st] || st;
 		return `<span class="tt-pill ${st}">${t}</span>`;
@@ -328,36 +326,39 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 			this.$main.html(`<div class="tt-empty">${__("Could not load training data.")}</div>`);
 			return;
 		}
-		this.render_side();
-		const body = { overview: () => this.view_overview(), programs: () => this.view_programs(), instructors: () => this.view_instructors(), program: () => this.view_program() }[this.view]();
-		this.$main.html(this.header() + body);
+		const body = { overview: () => this.view_overview(), programs: () => this.view_list("Training"), workshops: () => this.view_list("Workshop"), instructors: () => this.view_instructors(), program: () => this.view_program() }[this.view]();
+		this.$main.html(this.header() + this.tabs() + body);
 	}
 
-	render_side() {
+	tabs() {
 		const list = this.sessions();
-		const nprog = new Set(list.map((s) => s.program)).size;
+		const groups = this.program_stats(list);
+		const nprog = groups.filter((p) => !this.is_workshop(p)).length;
+		const nwork = groups.length - nprog;
 		const ninst = new Set(list.map((s) => s.trainer).filter(Boolean)).size;
-		const nav = (k, label, ct) =>
-			`<div class="tt-nav ${this.view === k || (k === "programs" && this.view === "program") ? "on" : ""}" data-view="${k}"><span>${label}</span>${ct != null ? `<span class="ct">${ct}</span>` : ""}</div>`;
-		this.$side.html(`
-			<div class="tt-brand"><div class="mk">TT</div><div><b>${__("Teacher Training")}</b><small>${__("Directorate view")}</small></div></div>
-			${nav("overview", __("Overview"))}
-			${nav("programs", __("Programs"), nprog)}
-			${nav("instructors", __("Instructors"), ninst)}
-			<div class="tt-side-foot">
-				${__("Department")}: <b style="color:#fff">${this.esc(this.department === "__all__" ? __("All") : this.department)}</b><br>
-				${__("Data as of")} ${frappe.datetime.str_to_user(this.data.today)}<br>
-				<a href="${this.data.links.schedule}" target="_blank">${__("Open Training Schedule")} ↗</a><br>
+		const active = this.view === "program" ? this.list_view_of(this.program) : this.view;
+		const tab = (k, label, ct) =>
+			`<div class="tt-tab ${active === k ? "on" : ""}" data-view="${k}">${label}${ct != null ? `<span class="ct">${ct}</span>` : ""}</div>`;
+		return `<div class="tt-tabs">
+			${tab("overview", __("Overview"))}
+			${tab("programs", __("Programs"), nprog)}
+			${tab("workshops", __("Workshops"), nwork)}
+			${tab("instructors", __("Instructors"), ninst)}
+			<div class="tt-tab-links">
+				<span style="color:var(--mute)">${__("Data as of")} ${frappe.datetime.str_to_user(this.data.today)}</span>
+				<a href="${this.data.links.schedule}" target="_blank">${__("Training Schedule")} ↗</a>
 				<a href="${this.data.links.list}" target="_blank">${__("Upcoming Training list")} ↗</a>
-			</div>`);
+			</div>
+		</div>`;
 	}
 
 	header() {
 		const titles = {
-			overview: [__("Training overview"), __("Programs, sessions and instructor activity across the directorate.")],
-			programs: [__("Programs"), __("Every program and workshop topic delivered in the period.")],
+			overview: [__("Training overview"), __("Programs, workshops and instructor activity across the directorate.")],
+			programs: [__("Programs"), __("Training programs delivered in the period.")],
+			workshops: [__("Workshops"), __("Workshop topics delivered in the period.")],
 			instructors: [__("Instructors"), __("Delivery load and reach per instructor.")],
-			program: [this.program || "", this.program_meta(this.program).kind || ""],
+			program: [this.program || "", this.list_view_of(this.program) === "workshops" ? __("Workshop") : __("Program")],
 		}[this.view];
 		const fy0 = this.current_fy();
 		const fys = [fy0 + 1, fy0, fy0 - 1, fy0 - 2]
@@ -372,7 +373,7 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 		return `
 			<div class="tt-head">
 				<div>
-					${this.view === "program" ? `<button class="tt-back" data-view="programs">← ${__("All programs")}</button>` : ""}
+					${this.view === "program" ? (this.list_view_of(this.program) === "workshops" ? `<button class="tt-back" data-view="workshops">← ${__("All workshops")}</button>` : `<button class="tt-back" data-view="programs">← ${__("All programs")}</button>`) : ""}
 					<h1>${this.esc(titles[0])}</h1>
 					<p>${this.esc(titles[1])}${titles[1] ? " · " : ""}${this.period_label()}</p>
 				</div>
@@ -396,7 +397,8 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 		const done = list.filter((s) => s.status === "completed");
 		const upcoming = list.length - done.length;
 		const progs = this.program_stats(list);
-		const delivered = progs.filter((p) => p.done > 0).length;
+		const trainings = progs.filter((p) => !this.is_workshop(p));
+		const workshops = progs.filter((p) => this.is_workshop(p));
 		const unm = this.unmatched_fv().length;
 		const present = list.reduce((t, s) => t + (s.present || 0), 0);
 		const people = list.reduce((t, s) => t + this.people(s), 0) + unm;
@@ -413,7 +415,8 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 
 		return `
 			<div class="tt-kpis">
-				${this.kpi(__("Programs delivered"), this.fmt(delivered), __("{0} programs scheduled", [progs.length]))}
+				${this.kpi(__("Programs delivered"), this.fmt(trainings.filter((p) => p.done > 0).length), __("{0} programs scheduled", [trainings.length]))}
+				${this.kpi(__("Workshops delivered"), this.fmt(workshops.filter((p) => p.done > 0).length), __("{0} workshop topics scheduled", [workshops.length]))}
 				${this.kpi(__("Sessions conducted"), this.fmt(done.length), __("+{0} scheduled", [upcoming]))}
 				${this.kpi(__("Teachers trained"), this.fmt(people), __("{0} schedule · {1} field visit", [this.fmt(present), this.fmt(fvAll)]))}
 				${this.kpi(__("Instructors engaged"), this.fmt(instructors), __("delivered at least one session"))}
@@ -428,23 +431,27 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 			<div class="tt-grid2">
 				<div class="tt-card">
 					<div class="tt-card-h"><h3>${__("Sessions by month")}</h3>
-						<div class="tt-legend"><span><i style="background:#6366F1"></i>${__("Conducted")}</span><span><i style="background:#F472B6"></i>${__("Scheduled")}</span></div></div>
+						<div class="tt-legend"><span><i style="background:#1E40AF"></i>${__("Conducted")}</span><span><i style="background:#93C5FD"></i>${__("Scheduled")}</span></div></div>
 					${this.month_chart(list)}
 				</div>
 				<div class="tt-card">
-					<div class="tt-card-h"><h3>${__("Teachers reached by program")}</h3><small>${__("attendance + field visit")}</small></div>
+					<div class="tt-card-h"><h3>${__("Teachers reached by program / workshop")}</h3><small>${__("attendance + field visit")}</small></div>
 					${this.reach_bars(progs)}
 				</div>
 			</div>
 			<div class="tt-grid2">
 				<div class="tt-card">
 					<div class="tt-card-h"><h3>${__("Programs")}</h3><small><a href="#" data-view="programs" onclick="return false">${__("View all")} →</a></small></div>
-					${this.program_table(progs.slice(0, 8))}
+					${this.program_table(trainings.slice(0, 8), __("Program"))}
 				</div>
 				<div class="tt-card">
 					<div class="tt-card-h"><h3>${__("Most active instructors")}</h3><small><a href="#" data-view="instructors" onclick="return false">${__("View all")} →</a></small></div>
 					${this.top_instructors(list)}
 				</div>
+			</div>
+			<div class="tt-card">
+				<div class="tt-card-h"><h3>${__("Workshops")}</h3><small><a href="#" data-view="workshops" onclick="return false">${__("View all")} →</a></small></div>
+				${this.program_table(workshops.slice(0, 8), __("Workshop"))}
 			</div>`;
 	}
 
@@ -486,17 +493,17 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 				.map(
 					(p) => `<div class="tt-hb" data-program="${this.esc(p.label)}" style="cursor:pointer" title="${this.esc(p.label)}">
 				${this.code_chip(p)}
-				<div class="tr"><b style="width:${(p.people / max) * 100}%;background:linear-gradient(90deg,${this.color(p.label)},${this.color(p.label + "~")})"></b></div>
+				<div class="tr"><b style="width:${(p.people / max) * 100}%;background:${this.color(p.label)}"></b></div>
 				<span class="num">${this.fmt(p.people)}</span></div>`
 				)
 				.join("") + `<div class="tt-note">${__("Field-visit attendees that can't be tied to a scheduled session are counted in Teachers trained only.")}</div>`
 		);
 	}
 
-	program_table(progs) {
-		if (!progs.length) return `<div class="tt-empty">${__("No programs.")}</div>`;
+	program_table(progs, label) {
+		if (!progs.length) return `<div class="tt-empty">${__("Nothing in this period.")}</div>`;
 		return `<table class="tt-tbl"><thead><tr>
-			<th>${__("Program")}</th><th>${__("Status")}</th><th>${__("Sessions")}</th>
+			<th>${label}</th><th>${__("Status")}</th><th>${__("Sessions")}</th>
 			<th class="r">${__("Teachers")}</th><th class="r">${__("Hours")}</th><th class="r">${__("Rating")}</th></tr></thead><tbody>
 			${progs
 				.map(
@@ -519,21 +526,17 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 		return rows
 			.map(
 				(t) => `<div class="tt-inst">${this.avatar(t.name)}
-				<div class="nm"><b>${this.esc(t.name)}</b><small>${__("{0} programs · {1} teachers", [t.nprog, this.fmt(t.people)])}</small></div>
+				<div class="nm"><b>${this.esc(t.name)}</b><small>${__("{0} programs/workshops · {1} teachers", [t.nprog, this.fmt(t.people)])}</small></div>
 				<div class="st">${t.sessions}<small>${__("sessions")} · ${this.fmt(t.hours, 0)}h</small></div></div>`
 			)
 			.join("");
 	}
 
-	view_programs() {
-		const all = this.program_stats(this.sessions());
-		const kinds = [...new Set(all.map((p) => p.kind).filter(Boolean))];
-		const progs = this.kind_filter ? all.filter((p) => p.kind === this.kind_filter) : all;
-		const chips = [["", __("All")], ...kinds.map((k) => [k, k])]
-			.map(([v, l]) => `<span class="tt-chip ${this.kind_filter === v ? "on" : ""}" data-kind="${this.esc(v)}">${this.esc(l)} · ${v ? all.filter((p) => p.kind === v).length : all.length}</span>`)
-			.join("");
-		if (!progs.length) return `<div class="tt-chips">${chips}</div><div class="tt-card tt-empty">${__("No programs in this period.")}</div>`;
-		return `<div class="tt-chips">${chips}</div><div class="tt-pcards">${progs
+	view_list(kind) {
+		const workshop = kind === "Workshop";
+		const progs = this.program_stats(this.sessions()).filter((p) => this.is_workshop(p) === workshop);
+		if (!progs.length) return `<div class="tt-card tt-empty">${workshop ? __("No workshops in this period.") : __("No programs in this period.")}</div>`;
+		return `<div class="tt-pcards">${progs
 			.map(
 				(p) => `<div class="tt-pc" data-program="${this.esc(p.label)}" style="--pc:${this.color(p.label)}">
 				<div class="top">${this.code_chip(p)}${this.status_pill(p.status)}</div>
@@ -602,9 +605,9 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 			<div class="tt-grid2" style="grid-template-columns:1fr 2.2fr">
 				<div class="tt-card">
 					<div class="tt-card-h"><h3>${__("Participant sources")}</h3></div>
-					${src(__("Schedule attendance (Present)"), present, "linear-gradient(90deg,#6366F1,#8B5CF6)")}
-					${src(__("Field visit attendees"), fv, "linear-gradient(90deg,#10B981,#06B6D4)")}
-					${src(__("Feedback forms"), fbRows.length, "linear-gradient(90deg,#F59E0B,#EC4899)")}
+					${src(__("Schedule attendance (Present)"), present, "#1E40AF")}
+					${src(__("Field visit attendees"), fv, "#0E7490")}
+					${src(__("Feedback forms"), fbRows.length, "#B45309")}
 					<div class="tt-note">${__("Teachers per session use the higher of schedule attendance and field-visit attendees, so the same teacher isn't counted twice.")}</div>
 				</div>
 				<div class="tt-card">
