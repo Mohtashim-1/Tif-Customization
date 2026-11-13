@@ -23,7 +23,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "School Database Dashboard (UAT)",
+   "label": "School Database Dashboard Old (UAT)",
    "link_count": 0,
    "link_to": "school-location-report",
    "link_type": "Page",
@@ -71,7 +71,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-11-06 10:32:16.940730",
+ "modified": "2026-11-13 10:40:53.644463",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Schools",

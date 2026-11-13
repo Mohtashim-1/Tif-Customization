@@ -35,7 +35,7 @@ PORTAL_LINKS = {
 	],
 	"School": [
 		{
-			"label": "School Database Dashboard (UAT)",
+			"label": "School Database Dashboard Old (UAT)",
 			"link_type": "Page",
 			"link_to": "school-location-report",
 			"is_query_report": 0,
@@ -107,8 +107,11 @@ def _inject_portal_links(sections):
 		if title not in sections:
 			sections[title] = {"title": title, "links": []}
 		existing = {(link.get("label") or "").strip().lower() for link in sections[title]["links"]}
+		existing |= {str(link.get("link_to") or "").strip().lower() for link in sections[title]["links"]}
 		for extra in extras:
-			if (extra.get("label") or "").strip().lower() in existing:
+			label = (extra.get("label") or "").strip().lower()
+			target = str(extra.get("link_to") or "").strip().lower()
+			if label in existing or target in existing:
 				continue
 			sections[title]["links"].insert(0, extra)
 
