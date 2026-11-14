@@ -5,12 +5,6 @@ from frappe import _
 from frappe.utils import cint, flt, get_first_day, get_last_day, getdate
 
 
-DIVISIONS = (
-	{"key": "karachi", "label": "Karachi Division", "target": 1},
-	{"key": "kpk_1", "label": "KPK Division", "target": 1},
-	{"key": "kpk_2", "label": "KPK Division", "target": 1},
-)
-
 KPI_ROWS = [
 	{
 		"key": "individual_school_visits",
@@ -68,6 +62,14 @@ KPI_ROWS = [
 		"target": 30,
 		"metric": "office_invitations",
 		"source": "Meeting records containing office/invitation text",
+	},
+	{
+		"key": "enrolment_of_volunteers",
+		"particulars": "Enrolment of Volunteers",
+		"explanation": "Register new volunteers",
+		"target": 25,
+		"metric": "volunteers",
+		"source": "Volunteer Registration records",
 	},
 	{
 		"key": "sme_daily_monitoring",
@@ -148,45 +150,71 @@ def get_report_data(filters=None):
 		frappe.throw(_("You are not permitted to view Field Visit data."))
 
 	from_date, to_date = _resolve_date_range(filters)
+	month_from = max(from_date, get_first_day(to_date))
 	supervisor = (filters.get("supervisor") or "").strip()
-	supervisor_info = _get_supervisor_info(supervisor)
-	actuals = _count_actuals(from_date, to_date, supervisor_info)
+	supervisor_info = _get_supervisor_info(supervisor) if supervisor else _all_supervisors_info()
+	headcount = supervisor_info.get("headcount") or 1
+	yearly = _count_actuals(from_date, to_date, supervisor_info)
+	monthly = _count_actuals(month_from, to_date, supervisor_info)
 	field_staff = _get_supervisor_field_staff(supervisor_info)
 
 	rows = []
 	for row in KPI_ROWS:
 		target = row.get("target")
-		total_target = target * len(DIVISIONS) if target is not None else None
-		actual = actuals.get(row.get("metric"), 0) if row.get("metric") else None
-		rows.append(
-			{
-				"key": row["key"],
-				"particulars": _(row["particulars"]),
-				"explanation": _(row["explanation"]),
-				"targets": {d["key"]: target for d in DIVISIONS},
-				"total_target": total_target,
-				"actual": actual,
-				"percent": flt((actual / total_target * 100) if actual is not None and total_target else 0, 2),
-				"source": _(row.get("source") or ""),
-			}
-		)
+		metric = row.get("metric")
+		entry = {
+			"key": row["key"],
+			"particulars": _(row["particulars"]),
+			"explanation": _(row["explanation"]),
+			"source": _(row.get("source") or ""),
+			"yearly": None,
+			"monthly": None,
+		}
+		if target is not None and metric:
+			target = target * headcount
+			entry["yearly"] = _kpi_cell(target, yearly.get(metric, 0))
+			entry["monthly"] = _kpi_cell(flt(target / 12, 2), monthly.get(metric, 0))
+		rows.append(entry)
 
+	scored = [r for r in rows if r["yearly"]]
 	return {
 		"foundation_title": _("The ILM Foundation"),
-		"sheet_title": _("Regional Staff Target Base - KPIs"),
+		"sheet_title": _("Supervisors Target Base - KPIs"),
 		"from_date": str(from_date),
 		"to_date": str(to_date),
+		"month_from": str(month_from),
+		"month_label": getdate(to_date).strftime("%B %Y"),
 		"supervisor": supervisor,
 		"supervisor_label": supervisor_info.get("label") or _("All Supervisors"),
-		"divisions": DIVISIONS,
+		"headcount": headcount,
 		"rows": rows,
+		"yearly_percent": _average(r["yearly"]["percent"] for r in scored),
+		"monthly_percent": _average(r["monthly"]["percent"] for r in scored),
 		"field_staff": field_staff,
 		"field_staff_count": len(field_staff),
 		"notes": [
+			_("Yearly columns cover From Date to To Date; Monthly columns cover the month of To Date."),
+			_("Monthly Target = Yearly Target / 12. Excess / Remaining = Target - Achievements (negative means target exceeded)."),
+			_("Yearly / Monthly Performance Percentage is the average of the KPI percentages with a numeric target."),
+			_("All Supervisors: targets are multiplied by the number of supervisors and only the supervisors' own activities are counted."),
 			_("Supervisor Field Staff are active Employees whose Reports To is the selected supervisor."),
-			_("Rows without a yearly target are shown as policy/qualitative responsibilities."),
 		],
 	}
+
+
+def _kpi_cell(target, actual):
+	actual = cint(actual)
+	return {
+		"target": target,
+		"actual": actual,
+		"remaining": flt(target - actual, 2),
+		"percent": flt(actual / target * 100, 0) if target else 0,
+	}
+
+
+def _average(values):
+	values = list(values)
+	return flt(sum(values) / len(values), 0) if values else 0
 
 
 def _supervisor_option_description(row):
@@ -249,6 +277,25 @@ def _resolve_date_range(filters):
 	if from_date > to_date:
 		frappe.throw(_("From Date cannot be after To Date."))
 	return from_date, to_date
+
+
+def _all_supervisors_info():
+	from tif_customization.tif_customization.doctype.field_officer.field_officer import (
+		list_field_supervisors,
+	)
+
+	sups = list_field_supervisors()
+	names = []
+	for row in sups:
+		names.extend(v for v in (row.get("employee"), row.get("employee_name"), row.get("user_id")) if v)
+	return {
+		"value": "",
+		"label": _("All Supervisors ({0})").format(len(sups)),
+		"employee": None,
+		"user_id": None,
+		"names": names or ["__none__"],
+		"headcount": len(sups) or 1,
+	}
 
 
 def _get_supervisor_info(supervisor):
@@ -396,7 +443,24 @@ def _count_actuals(from_date, to_date, supervisor_info):
 			supervisor_info,
 			("invitation", "regional office", "head office", "office"),
 		),
+		"volunteers": _count_volunteers(from_date, to_date, supervisor_info),
 	}
+
+
+def _count_volunteers(from_date, to_date, supervisor_info):
+	user_expr = "COALESCE(NULLIF(TRIM(vr.field_officer), ''), vr.owner)"
+	condition, params = _supervisor_condition(supervisor_info, user_expr)
+	return _scalar_count(
+		f"""
+		SELECT COUNT(DISTINCT vr.name)
+		FROM `tabVolunteer Registration` vr
+		{_employee_join(user_expr)}
+		WHERE vr.docstatus < 2
+		AND COALESCE(vr.visit_date, DATE(vr.creation)) BETWEEN %(from_date)s AND %(to_date)s
+		{condition}
+		""",
+		{"from_date": from_date, "to_date": to_date, **params},
+	)
 
 
 def _count_field_visits(from_date, to_date, supervisor_info, types):
@@ -416,7 +480,7 @@ def _count_field_visits(from_date, to_date, supervisor_info, types):
 
 	return _scalar_count(
 		f"""
-		SELECT COUNT(*)
+		SELECT COUNT(DISTINCT fv.name)
 		FROM `tabField Visit` fv
 		{_employee_join(user_expr)}
 		WHERE fv.docstatus < 2
@@ -449,7 +513,7 @@ def _count_meetings_by_text(from_date, to_date, supervisor_info, patterns):
 
 	return _scalar_count(
 		f"""
-		SELECT COUNT(*)
+		SELECT COUNT(DISTINCT fv.name)
 		FROM `tabField Visit` fv
 		{_employee_join(user_expr)}
 		WHERE fv.docstatus < 2

@@ -16,7 +16,7 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 		this.view = "overview";
 		this.period = "FY";
 		this.fy = this.current_fy();
-		this.department = "T. Training";
+		this.department = "__all__";
 		this.program = null;
 		this.program_trainer = "";
 		this.inst_sort = { key: "sessions", dir: -1 };
@@ -364,7 +364,7 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 		const fys = [fy0 + 1, fy0, fy0 - 1, fy0 - 2]
 			.map((y) => `<option value="${y}" ${y === this.data.fy ? "selected" : ""}>FY ${y}-${String(y + 1).slice(2)}</option>`)
 			.join("");
-		const depts = [["T. Training", "T. Training"], ["TPS", "TPS"], ["CEE", "CEE"], ["QPS", "QPS"], ["TIF", "TIF"], ["__all__", __("All departments")]]
+		const depts = [["__all__", __("All departments")], ["T. Training", "T. Training"], ["TPS", "TPS"], ["CEE", "CEE"], ["QPS", "QPS"], ["TIF", "TIF"]]
 			.map(([v, l]) => `<option value="${v}" ${v === this.department ? "selected" : ""}>${l}</option>`)
 			.join("");
 		const seg = ["FY", "Q1", "Q2", "Q3", "Q4"]

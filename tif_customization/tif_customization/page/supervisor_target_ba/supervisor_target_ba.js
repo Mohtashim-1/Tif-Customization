@@ -6,7 +6,7 @@ class SupervisorTargetBasePage {
 	constructor(wrapper) {
 		this.page = frappe.ui.make_app_page({
 			parent: wrapper,
-			title: __("Supervisor Target Base KPI"),
+			title: __("Supervisors Target Base - KPIs"),
 			single_column: true,
 		});
 		this.setup_layout();
@@ -75,8 +75,20 @@ class SupervisorTargetBasePage {
 					background: #e8eef7;
 					font-weight: 700;
 				}
-				.supervisor-sheet .target-col { background: #fdf6ec; }
-				.supervisor-sheet .actual-col { background: #eef4fb; font-weight: 700; }
+				.supervisor-sheet .target-col { background: #ddd9c4; }
+				.supervisor-sheet .actual-col { background: #c4d79b; font-weight: 700; }
+				.supervisor-sheet .month-col { background: #dce6f1; }
+				.supervisor-sheet .sec-hdr { background: #b4c6e7; font-size: 14px; font-weight: 700; }
+				.supervisor-sheet .perf-row td { font-weight: 700; font-size: 13px; }
+				.supervisor-sheet .perf-val { background: #fff; font-size: 14px; }
+				.supervisor-sheet .neg { color: #15803d; }
+				.supervisor-sheet .pct-good { color: #15803d; font-weight: 700; }
+				.supervisor-sheet .pct-mid { color: #b45309; font-weight: 700; }
+				.supervisor-sheet .pct-low { color: #b91c1c; font-weight: 700; }
+				.supervisor-sign { border-collapse: collapse; margin: 6px 0 18px; font-size: 12px; font-family: Calibri, Arial, sans-serif; }
+				.supervisor-sign td { padding: 8px 10px; }
+				.supervisor-sign td.lbl { font-weight: 700; width: 200px; }
+				.supervisor-sign td.box { border: 1px solid #000; width: 320px; height: 30px; }
 				.supervisor-sheet .muted-cell { color: #64748b; }
 				.supervisor-sheet .source-cell { font-size: 10px; color: #475569; }
 				.supervisor-summary {
@@ -204,46 +216,73 @@ class SupervisorTargetBasePage {
 		return format_number(val, null, { precision: opts.precision || 0 });
 	}
 
+	pct(val) {
+		if (val === null || val === undefined) return "";
+		const cls = val >= 90 ? "pct-good" : val >= 60 ? "pct-mid" : "pct-low";
+		return `<span class="${cls}">${format_number(val, null, 0)}%</span>`;
+	}
+
+	kpi_cells(cell, monthly) {
+		const cls = monthly ? "month-col" : "";
+		if (!cell) return `<td class="target-col ${cls}">-</td><td class="actual-col ${cls}">-</td><td class="${cls}"></td><td class="${cls}"></td>`;
+		const prec = monthly ? 1 : 0;
+		const rem = cell.remaining;
+		return `
+			<td class="${monthly ? "month-col" : "target-col"}">${format_number(cell.target, null, prec)}</td>
+			<td class="${monthly ? "month-col" : "actual-col"}">${format_number(cell.actual, null, 0)}</td>
+			<td class="${cls} ${rem < 0 ? "neg" : ""}">${format_number(rem, null, prec)}</td>
+			<td class="${cls}">${this.pct(cell.percent)}</td>`;
+	}
+
 	render_main_table(data) {
-		const divisions = data.divisions || [];
-		const divisionHeaders = divisions
-			.map((d) => `<th class="target-col">${frappe.utils.escape_html(d.label)}</th>`)
-			.join("");
+		const esc = frappe.utils.escape_html;
 		const rows = (data.rows || [])
-			.map((row) => {
-				const targets = row.targets || {};
-				return `
-					<tr>
-						<td class="left">${frappe.utils.escape_html(row.particulars || "")}</td>
-						<td class="left">${frappe.utils.escape_html(row.explanation || "")}</td>
-						${divisions.map((d) => `<td class="target-col">${this.fmt(targets[d.key], { blank: "-" })}</td>`).join("")}
-						<td class="target-col">${this.fmt(row.total_target, { blank: "" })}</td>
-						<td class="actual-col">${this.fmt(row.actual, { blank: "" })}</td>
-						<td class="actual-col">${row.total_target ? this.fmt(row.percent, { suffix: "%" }) : ""}</td>
-						<td class="left source-cell">${frappe.utils.escape_html(row.source || "")}</td>
-					</tr>
-				`;
-			})
+			.map(
+				(row) => `
+					<tr title="${esc(row.source || "")}">
+						<td class="left"><b>${esc(row.particulars || "")}</b></td>
+						<td class="left" style="font-size:11px">${esc(row.explanation || "")}</td>
+						${this.kpi_cells(row.yearly, false)}
+						${this.kpi_cells(row.monthly, true)}
+					</tr>`
+			)
 			.join("");
-		const colSpan = 2 + divisions.length + 4;
 
 		return `
 			<div class="supervisor-sheet-wrap">
 				<table class="supervisor-sheet">
-					<tr><th colspan="${colSpan}" class="hdr-title">${frappe.utils.escape_html(data.foundation_title || "")}</th></tr>
-					<tr><th colspan="${colSpan}" class="hdr-sub">${frappe.utils.escape_html(data.sheet_title || "")}</th></tr>
+					<tr><th colspan="10" class="hdr-title">${esc(data.foundation_title || "")}</th></tr>
+					<tr><th colspan="10" class="hdr-sub">${esc(data.sheet_title || "")}</th></tr>
 					<tr>
-						<th class="col-hdr left">${__("Particulars")}</th>
-						<th class="col-hdr left">${__("Explanation")}</th>
-						${divisionHeaders}
-						<th class="col-hdr">${__("Total")}</th>
-						<th class="col-hdr">${__("Actual")}</th>
-						<th class="col-hdr">${__("Achieved")}</th>
-						<th class="col-hdr left">${__("ERP Source")}</th>
+						<th colspan="2" class="col-hdr"></th>
+						<th colspan="4" class="sec-hdr">${__("Yearly Target")}<div style="font-size:11px;font-weight:500">${esc(frappe.datetime.str_to_user(data.from_date))} – ${esc(frappe.datetime.str_to_user(data.to_date))}</div></th>
+						<th colspan="4" class="sec-hdr">${__("Monthly Target")}<div style="font-size:11px;font-weight:500">${esc(data.month_label || "")}</div></th>
+					</tr>
+					<tr>
+						<th class="col-hdr">${__("Particulars")}</th>
+						<th class="col-hdr">${__("Explanation")}</th>
+						<th class="col-hdr target-col">${__("Supervisor - Targets")}<div style="font-size:10px;font-weight:500">${__("Yearly Compulsory Target")}</div></th>
+						<th class="col-hdr actual-col">${__("Achievements")}<div style="font-size:10px;font-weight:500">${__("Actual Activities")}</div></th>
+						<th class="col-hdr">${__("Excess / Remaining")}</th>
+						<th class="col-hdr">${__("Performance Percentage")}</th>
+						<th class="col-hdr month-col">${__("Monthly Targets")}</th>
+						<th class="col-hdr month-col">${__("Achievements")}</th>
+						<th class="col-hdr month-col">${__("Excess / Remaining")}</th>
+						<th class="col-hdr month-col">${__("Performance Percentage")}</th>
 					</tr>
 					${rows}
+					<tr class="perf-row">
+						<td colspan="2" class="left">${__("Yearly Performance Percentage")}</td>
+						<td colspan="3"></td><td class="perf-val">${this.pct(data.yearly_percent)}</td>
+						<td colspan="3"></td><td class="perf-val">${this.pct(data.monthly_percent)}</td>
+					</tr>
 				</table>
 			</div>
+			<table class="supervisor-sign">
+				<tr><td class="lbl">${__("Regional Staff Name")}</td><td class="box">${data.supervisor ? esc(data.supervisor_label || "") : ""}</td></tr>
+				<tr><td class="lbl">${__("Staff Signature")}</td><td class="box"></td></tr>
+				<tr><td class="lbl">${__("Line Manager Signature")}</td><td class="box"></td></tr>
+			</table>
 		`;
 	}
 
