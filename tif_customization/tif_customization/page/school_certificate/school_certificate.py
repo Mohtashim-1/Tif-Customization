@@ -163,8 +163,8 @@ def _certificate_html(certs, cert_date):
 	.name-wrap {{ position: absolute; left: 22mm; width: 253mm; top: 122mm; height: 32mm; display: table; }}
 	.name {{ display: table-cell; vertical-align: middle; text-align: center;
 		font-family: "Belgiano Serif", Georgia, serif; color: #263b5e; font-weight: normal; line-height: 1.15; }}
-	.sig {{ position: absolute; left: 112mm; top: 168mm; width: 73mm; height: auto; }}
-	.date {{ position: absolute; left: 160mm; width: 31mm; top: 207.5mm; text-align: center;
+	.sig {{ position: absolute; left: 126mm; top: 171mm; width: 45mm; height: auto; }}
+	.date {{ position: absolute; left: 160mm; width: 31mm; top: 208.2mm; text-align: center;
 		font-family: "Belgiano Serif", Georgia, serif; font-size: 11pt; color: #263b5e; }}
 	.cert-no {{ position: absolute; right: 14mm; top: 15mm; text-align: right; color: #ffffff;
 		font-family: "Belgiano Serif", Georgia, serif; font-size: 13pt; letter-spacing: .04em; line-height: 1.25; }}

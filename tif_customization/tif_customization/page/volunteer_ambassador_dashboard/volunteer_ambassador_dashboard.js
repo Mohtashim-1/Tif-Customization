@@ -301,8 +301,8 @@ frappe.tif_customization.VolunteerAmbassadorDashboard = class VolunteerAmbassado
 					<td style="max-width:220px;font-size:11px;line-height:1.35">${this.esc(r.contribution || "—")}</td>
 					<td>${this.esc(r.city)}${r.area ? ", " + this.esc(r.area) : ""}<div style="color:#94a3b8;font-size:11px">${this.esc(r.province)}</div></td>
 					<td>
-						<a href="${this.esc(r.url)}" target="_blank">${this.esc(r.visit)}</a>
-						<div style="color:#94a3b8;font-size:11px">${this.esc(r.visit_date)} · ${this.esc(r.officer)}</div>
+						<a href="${this.esc(r.url)}" target="_blank">${this.esc(r.visit_date)}</a>
+						<div style="color:#94a3b8;font-size:11px">${this.esc(r.officer)}</div>
 					</td>
 					<td><span class="vad-pill ${formYes ? "yes" : "no"}">${this.esc(r.form_submitted || "No")}</span></td>
 				</tr>`;
