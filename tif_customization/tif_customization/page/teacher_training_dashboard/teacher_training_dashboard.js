@@ -199,9 +199,6 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 			me.inst_sort = me.inst_sort.key === k ? { key: k, dir: -me.inst_sort.dir } : { key: k, dir: k === "name" ? 1 : -1 };
 			me.render();
 		});
-		this.$app.on("click", "[data-session]", function () {
-			window.open(`/app/upcoming-training/${encodeURIComponent($(this).data("session"))}`, "_blank");
-		});
 	}
 
 	load() {
@@ -671,7 +668,7 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 						<th class="r" style="width:52px">${__("Hrs")}</th><th class="r" style="width:64px">${__("Teachers")}</th><th style="width:96px">${__("Status")}</th></tr></thead><tbody>
 					${list
 						.map(
-							(s, i) => `<tr class="click" data-session="${this.esc(s.name)}" title="${this.esc(s.school || "")}">
+							(s, i) => `<tr title="${this.esc(s.school || "")}">
 						<td class="tt-mono" style="color:var(--mute)">${i + 1}</td>
 						<td class="tt-mono" style="font-size:11.5px;white-space:nowrap">${frappe.datetime.str_to_user(s.date)}</td>
 						<td><div class="tt-pname" style="font-weight:600">${this.esc(s.module || "—")}</div>${s.school ? `<div class="tt-psub">${this.esc(s.school)}</div>` : ""}</td>
@@ -733,7 +730,7 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 				</tr></thead><tbody>
 				${list
 					.map(
-						(s, i) => `<tr class="click" data-session="${this.esc(s.name)}">
+						(s, i) => `<tr>
 					<td class="tt-mono" style="color:var(--mute)">${i + 1}</td>
 					<td class="tt-mono" style="font-size:11px;white-space:nowrap">${frappe.datetime.str_to_user(s.date)}</td>
 					<td><span class="tt-pill ${/workshop/i.test(s.kind || "") ? "progress" : "upcoming"}">${/workshop/i.test(s.kind || "") ? __("Workshop") : __("Program")}</span></td>
