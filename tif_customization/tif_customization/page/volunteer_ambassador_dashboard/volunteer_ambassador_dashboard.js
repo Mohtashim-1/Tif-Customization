@@ -45,11 +45,6 @@ frappe.tif_customization.VolunteerAmbassadorDashboard = class VolunteerAmbassado
 		frappe.require("/assets/tif_customization/js/field_visit_drilldown.js", run);
 	}
 
-	fy_start() {
-		const d = frappe.datetime.str_to_obj(frappe.datetime.get_today());
-		const y = d.getMonth() + 1 >= 7 ? d.getFullYear() : d.getFullYear() - 1;
-		return `${y}-07-01`;
-	}
 
 	make_layout() {
 		$(this.page.body).html(`
@@ -84,7 +79,7 @@ frappe.tif_customization.VolunteerAmbassadorDashboard = class VolunteerAmbassado
 					@media (max-width:960px){.vad-grid{grid-template-columns:1fr}}
 				</style>
 				<p class="vad-note">${__(
-					"Counts people recorded on submitted Field Visits (Volunteer Enrolment and Ambassador Enrolment). Default range is fiscal YTD (1 July → selected To Date)."
+					"Counts all people recorded on submitted Field Visits (Volunteer Enrolment and Ambassador Enrolment). Totals are for all time."
 				)}</p>
 				<div class="vad-filters no-print"></div>
 				<div class="vad-kpis"></div>
@@ -117,20 +112,7 @@ frappe.tif_customization.VolunteerAmbassadorDashboard = class VolunteerAmbassado
 	}
 
 	make_filters() {
-		const today = frappe.datetime.get_today();
 		this.filters = {
-			from_date: this.make_control({
-				fieldtype: "Date",
-				fieldname: "from_date",
-				label: __("From Date"),
-				default: this.fy_start(),
-			}),
-			to_date: this.make_control({
-				fieldtype: "Date",
-				fieldname: "to_date",
-				label: __("To Date"),
-				default: today,
-			}),
 			province: this.make_control({
 				fieldtype: "Select",
 				fieldname: "province",
@@ -166,8 +148,6 @@ frappe.tif_customization.VolunteerAmbassadorDashboard = class VolunteerAmbassado
 		$(`<button class="btn btn-sm btn-default">${__("Reset")}</button>`)
 			.appendTo(actions)
 			.on("click", () => {
-				this.filters.from_date.set_value(this.fy_start());
-				this.filters.to_date.set_value(frappe.datetime.get_today());
 				this.filters.province.set_value("");
 				this.filters.city.set_value("");
 				this.filters.staff.set_value("");
@@ -177,8 +157,6 @@ frappe.tif_customization.VolunteerAmbassadorDashboard = class VolunteerAmbassado
 
 	filter_values() {
 		return {
-			from_date: this.filters.from_date.get_value(),
-			to_date: this.filters.to_date.get_value(),
 			province: this.filters.province.get_value(),
 			city: this.filters.city.get_value(),
 			staff: this.filters.staff.get_value(),

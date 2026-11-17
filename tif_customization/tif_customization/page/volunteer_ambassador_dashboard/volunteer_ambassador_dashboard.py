@@ -8,16 +8,11 @@ import json
 
 import frappe
 from frappe import _
-from frappe.utils import getdate, today
-
 from tif_customization.tif_customization.field_visit_permissions import (
 	apply_team_scope_to_conditions,
 	expand_staff_tokens,
 	staff_match_sql,
 	visit_day_sql,
-)
-from tif_customization.tif_customization.page.smes_target_base___k.smes_target_base___k import (
-	_fiscal_year_start,
 )
 
 KIND_META = {
@@ -51,19 +46,6 @@ def _parse(filters):
 	return filters or {}
 
 
-def _dates(filters):
-	to_date = getdate(filters.get("to_date") or today())
-	from_date = filters.get("from_date")
-	if from_date:
-		from_date = getdate(from_date)
-	else:
-		fy = _fiscal_year_start(to_date.year, to_date.month)
-		from_date = getdate(f"{fy}-07-01")
-	if from_date > to_date:
-		from_date = to_date
-	return from_date, to_date
-
-
 @frappe.whitelist()
 def get_dashboard_data(filters=None, kind=None):
 	"""kind: volunteer | ambassador | both (default both for legacy page)."""
@@ -75,18 +57,15 @@ def get_dashboard_data(filters=None, kind=None):
 	if kind not in ("volunteer", "ambassador", "both"):
 		frappe.throw(_("Invalid dashboard kind."))
 
-	from_date, to_date = _dates(filters)
 	province = (filters.get("province") or "").strip()
 	city = (filters.get("city") or "").strip()
 	staff = (filters.get("staff") or "").strip()
 
 	if kind == "both":
-		volunteers = _fetch_rows("volunteer", from_date, to_date, province, city, staff)
-		ambassadors = _fetch_rows("ambassador", from_date, to_date, province, city, staff)
+		volunteers = _fetch_rows("volunteer", province, city, staff)
+		ambassadors = _fetch_rows("ambassador", province, city, staff)
 		return {
 			"kind": "both",
-			"from_date": str(from_date),
-			"to_date": str(to_date),
 			"kpis": {
 				"volunteers": len(volunteers),
 				"ambassadors": len(ambassadors),
@@ -106,14 +85,12 @@ def get_dashboard_data(filters=None, kind=None):
 			"ambassadors": ambassadors[:200],
 		}
 
-	rows = _fetch_rows(kind, from_date, to_date, province, city, staff)
+	rows = _fetch_rows(kind, province, city, staff)
 	meta = KIND_META[kind]
 	return {
 		"kind": kind,
 		"label": meta["label"],
 		"plural": meta["plural"],
-		"from_date": str(from_date),
-		"to_date": str(to_date),
 		"kpis": {
 			"people": len(rows),
 			"visits": len({r["visit"] for r in rows}),
@@ -133,7 +110,7 @@ def get_dashboard_data(filters=None, kind=None):
 	}
 
 
-def _fetch_rows(kind, from_date, to_date, province, city, staff):
+def _fetch_rows(kind, province, city, staff):
 	meta = KIND_META[kind]
 	if not frappe.db.exists("DocType", meta["child_doctype"]):
 		return []
@@ -141,8 +118,6 @@ def _fetch_rows(kind, from_date, to_date, province, city, staff):
 		meta["child_doctype"],
 		meta["parentfield"],
 		meta["visit_type"],
-		from_date,
-		to_date,
 		province,
 		city,
 		staff,
@@ -151,19 +126,16 @@ def _fetch_rows(kind, from_date, to_date, province, city, staff):
 	)
 
 
-def _rows(child_doctype, parentfield, visit_type, from_date, to_date, province, city, staff, name_field, form_field):
+def _rows(child_doctype, parentfield, visit_type, province, city, staff, name_field, form_field):
 	if not frappe.db.exists("DocType", child_doctype):
 		return []
 	visit_day = visit_day_sql("fv")
 	conditions = [
 		"fv.docstatus = 1",
-		f"{visit_day} BETWEEN %(from_date)s AND %(to_date)s",
 		"c.parenttype = 'Field Visit'",
 		"c.parentfield = %(parentfield)s",
 	]
 	params = {
-		"from_date": from_date,
-		"to_date": to_date,
 		"parentfield": parentfield,
 	}
 	_ = visit_type
