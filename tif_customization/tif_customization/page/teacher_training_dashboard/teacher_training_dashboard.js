@@ -19,6 +19,7 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 		this.department = "__all__";
 		this.program = null;
 		this.instructor = null;
+		this.instructor_kind = "";
 		this.program_trainer = "";
 		this.inst_sort = { key: "sessions", dir: -1 };
 		this.make();
@@ -174,8 +175,13 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 		this.$app.on("click", "[data-instructor]", function (e) {
 			e.stopPropagation();
 			me.instructor = $(this).attr("data-instructor");
+			me.instructor_kind = $(this).attr("data-ikind") || "";
 			me.program = null;
 			me.view = "instructor";
+			me.render();
+		});
+		this.$app.on("click", "[data-ikind-filter]", function () {
+			me.instructor_kind = $(this).attr("data-ikind-filter");
 			me.render();
 		});
 		this.$app.on("click", "[data-ptrainer]", function () {
@@ -554,9 +560,9 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 			</div>
 			<div class="tt-kpis" style="margin-bottom:16px">
 				${this.kpi(__("Instructors"), this.fmt(trainers.length), __("engaged on {0}", [label_plural.toLowerCase()]))}
-				${this.kpi(__("Top trainer sessions"), top ? this.fmt(top.sessions) : "—", top ? this.esc(top.name) : __("no trainers"))}
-				${this.kpi(__("Top trainer teachers"), top ? this.fmt(top.people) : "—", top ? __("{0}h delivered", [this.fmt(top.hours, 0)]) : "")}
-				${this.kpi(__("Avg sessions / trainer"), trainers.length ? this.fmt(sessions.length / trainers.length, 1) : "—", __("across all instructors"))}
+				${this.kpi(__("Top trainer · {0} sessions", [label]), top ? this.fmt(top.sessions) : "—", top ? this.esc(top.name) : __("no trainers"))}
+				${this.kpi(__("Top trainer teachers"), top ? this.fmt(top.people) : "—", top ? __("{0}h on {1}s", [this.fmt(top.hours, 0), label]) : "")}
+				${this.kpi(__("Avg sessions / trainer"), trainers.length ? this.fmt(sessions.length / trainers.length, 1) : "—", __("{0} sessions only", [label_plural]))}
 			</div>`;
 
 		const top_row = trainers.length
@@ -565,10 +571,10 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 					${trainers
 						.slice(0, 6)
 						.map(
-							(t) => `<div class="tt-inst" data-instructor="${this.esc(t.name)}" title="${__("Open instructor")}">
+							(t) => `<div class="tt-inst" data-instructor="${this.esc(t.name)}" data-ikind="${workshop ? "Workshop" : "Training"}" title="${__("Open instructor")}">
 						${this.avatar(t.name)}
 						<div class="nm"><b>${this.esc(t.name)}</b><small>${__("{0} topics · {1} teachers", [t.nprog, this.fmt(t.people)])}</small></div>
-						<div class="st">${t.sessions}<small>${__("sessions")} · ${this.fmt(t.hours, 0)}h</small></div></div>`
+						<div class="st">${t.sessions}<small>${workshop ? __("workshop sessions") : __("program sessions")} · ${this.fmt(t.hours, 0)}h</small></div></div>`
 						)
 						.join("")}
 				</div>`
@@ -677,37 +683,53 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 		const name = this.instructor;
 		const all = this.sessions().filter((s) => s.trainer === name);
 		if (!all.length) return `<div class="tt-card tt-empty">${__("No sessions for this instructor in the selected period.")}</div>`;
+		const workshops = all.filter((s) => /workshop/i.test(s.kind || ""));
+		const programs = all.filter((s) => !/workshop/i.test(s.kind || ""));
+		const kind = this.instructor_kind || "";
+		const list = kind === "Workshop" ? workshops : kind === "Training" ? programs : all;
 		const stats = this.instructor_stats(all)[0];
-		const progs = this.program_stats(all);
+		const scoped = this.instructor_stats(list)[0] || stats;
+		const progs = this.program_stats(list);
 		const fbRows = this.feedback().filter((f) => (f.trainer || "") === name);
+		const chips = [
+			["", __("All ({0})", [all.length])],
+			["Workshop", __("Workshops ({0})", [workshops.length])],
+			["Training", __("Programs ({0})", [programs.length])],
+		]
+			.map(([v, l]) => `<span class="tt-chip ${kind === v ? "on" : ""}" data-ikind-filter="${this.esc(v)}">${this.esc(l)}</span>`)
+			.join("");
 		return `
 			<div style="display:flex;gap:10px;align-items:center;margin:-6px 0 14px">${this.avatar(name)}
-				<span class="tt-psub" style="margin:0">${__("{0} topics · last session {1}", [stats.nprog, stats.last ? frappe.datetime.str_to_user(stats.last) : "—"])}</span>
+				<span class="tt-psub" style="margin:0">${__("{0} workshop + {1} program sessions · last {2}", [workshops.length, programs.length, stats.last ? frappe.datetime.str_to_user(stats.last) : "—"])}</span>
 			</div>
 			<div class="tt-kpis">
-				${this.kpi(__("Sessions"), `${stats.done}<span style="font-size:16px;color:var(--mute)">/${stats.sessions}</span>`, __("conducted / scheduled"))}
-				${this.kpi(__("Teachers"), this.fmt(stats.people), __("attendance + field visit"))}
-				${this.kpi(__("Training hours"), this.fmt(stats.hours, 1), __("conducted sessions"))}
-				${this.kpi(__("Programs / Workshops"), stats.nprog, "")}
-				${this.kpi(__("Onsite / Online"), `${stats.onsite} / ${stats.online}`, "")}
-				${this.kpi(__("Rating"), stats.rating == null ? "—" : this.fmt(stats.rating, 1), fbRows.length ? __("{0} feedback forms", [fbRows.length]) : __("no feedback yet"))}
+				${this.kpi(__("Total sessions"), `${stats.done}<span style="font-size:16px;color:var(--mute)">/${stats.sessions}</span>`, __("{0} workshop · {1} program", [workshops.length, programs.length]))}
+				${this.kpi(__("Workshop sessions"), this.fmt(workshops.length), __("{0} conducted", [workshops.filter((s) => s.status === "completed").length]))}
+				${this.kpi(__("Program sessions"), this.fmt(programs.length), __("{0} conducted", [programs.filter((s) => s.status === "completed").length]))}
+				${this.kpi(__("Teachers"), this.fmt(scoped.people), kind ? __("for selected filter") : __("attendance + field visit"))}
+				${this.kpi(__("Training hours"), this.fmt(scoped.hours, 1), kind ? __("for selected filter") : __("all conducted sessions"))}
+				${this.kpi(__("Onsite · Online"), `${stats.onsite} · ${stats.online}`, __("delivery mode (all sessions)"))}
 			</div>
+			<div class="tt-note" style="margin:-6px 0 12px">${__("The Workshops tab counts only workshop sessions (e.g. {0} for this trainer). This page shows every session, including programs.", [workshops.length])}</div>
+			<div class="tt-chips">${chips}</div>
 			<div class="tt-grid2">
 				<div class="tt-card">
-					<div class="tt-card-h"><h3>${__("Topics delivered")}</h3></div>
+					<div class="tt-card-h"><h3>${__("Topics delivered")}</h3><small>${list.length} ${__("sessions in filter")}</small></div>
 					${this.program_table(progs, __("Program / Workshop"))}
 				</div>
 				<div class="tt-card">
-					<div class="tt-card-h"><h3>${__("Sessions")}</h3><small>${all.length}</small></div>
-					<table class="tt-tbl"><thead><tr><th>#</th><th>${__("Date")}</th><th>${__("Topic")}</th><th>${__("Module")}</th><th>${__("Mode")}</th>
+					<div class="tt-card-h"><h3>${__("Sessions")}</h3><small>${list.length}</small></div>
+					<table class="tt-tbl"><thead><tr><th>#</th><th>${__("Date")}</th><th>${__("Type")}</th><th>${__("Topic")}</th><th>${__("Mode")}</th>
 						<th class="r">${__("Hrs")}</th><th class="r">${__("Teachers")}</th><th>${__("Status")}</th></tr></thead><tbody>
-					${all
+					${list
 						.map(
 							(s, i) => `<tr class="click" data-session="${this.esc(s.name)}">
 						<td class="tt-mono" style="color:var(--mute)">${i + 1}</td>
 						<td class="tt-mono" style="font-size:11.5px;white-space:nowrap">${frappe.datetime.str_to_user(s.date)}</td>
-						<td><span class="tt-pname" style="font-weight:600">${this.esc(s.program)}</span></td>
-						<td>${this.esc(s.module || "—")}</td><td>${this.esc(s.mode || "—")}</td>
+						<td><span class="tt-pill ${/workshop/i.test(s.kind || "") ? "progress" : "upcoming"}">${/workshop/i.test(s.kind || "") ? __("Workshop") : __("Program")}</span></td>
+						<td><span class="tt-pname" style="font-weight:600">${this.esc(s.program)}</span>
+							<div class="tt-psub">${this.esc(s.module || "")}</div></td>
+						<td>${this.esc(s.mode || "—")}</td>
 						<td class="r">${s.minutes ? this.fmt(s.minutes / 60, 1) : "—"}</td>
 						<td class="r">${this.people(s) || "—"}</td>
 						<td>${this.status_pill(s.status === "completed" ? "completed" : "upcoming")}</td></tr>`

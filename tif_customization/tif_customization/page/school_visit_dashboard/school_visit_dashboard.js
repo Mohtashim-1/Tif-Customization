@@ -110,10 +110,6 @@ class SchoolDashboard {
 						<div class="sv-panel-h"><span>${__("By Province")}</span><small>${__("Current filter")}</small></div>
 						<div class="sv-prov"></div>
 					</div>
-					<div class="sv-panel">
-						<div class="sv-panel-h"><span>${__("Top Running Programs")}</span><small>${__("Schools per program")}</small></div>
-						<div class="sv-programs"></div>
-					</div>
 				</div>
 				<div class="sv-panel sv-table-panel">
 					<div class="sv-panel-h sv-table-h">
@@ -206,7 +202,7 @@ class SchoolDashboard {
 			.sv-kpi-bar { height:4px; border-radius:4px; background:var(--bg-light-gray); margin-top:12px; overflow:hidden; }
 			.sv-kpi-bar i { display:block; height:100%; background:var(--c); border-radius:4px; transition:width .5s; }
 
-			.sv-grid { display:grid; grid-template-columns:1.1fr 1fr 1fr; gap:14px; margin-bottom:18px; }
+			.sv-grid { display:grid; grid-template-columns:1.1fr 1fr; gap:14px; margin-bottom:18px; }
 			@media (max-width: 1100px) { .sv-grid { grid-template-columns:1fr; } }
 			.sv-panel { background:var(--card-bg); border:1px solid var(--border-color); border-radius:var(--sv-radius); padding:16px 18px; }
 			.sv-panel-h { display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin-bottom:12px; }
@@ -232,8 +228,7 @@ class SchoolDashboard {
 			.sv-prov-top b { color:var(--heading-color); }
 			.sv-prov .sv-stack { height:8px; }
 
-			.sv-programs { display:flex; flex-direction:column; gap:9px; max-height:300px; overflow:auto; padding-right:4px; }
-			.sv-prog-top { display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px; gap:8px; }
+						.sv-prog-top { display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px; gap:8px; }
 			.sv-prog-top span { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 			.sv-prog-bar { height:7px; border-radius:6px; background:var(--bg-light-gray); overflow:hidden; }
 			.sv-prog-bar i { display:block; height:100%; border-radius:6px; transition:width .5s; }
@@ -382,7 +377,6 @@ class SchoolDashboard {
 		]);
 
 		this.render_provinces();
-		this.render_programs();
 		this.render_active_filters();
 		this.render_rows();
 	}
@@ -424,34 +418,6 @@ class SchoolDashboard {
 						})
 						.join("")
 				: `<div class="sv-empty">${__("No data")}</div>`
-		);
-	}
-
-	render_programs() {
-		const esc = frappe.utils.escape_html;
-		const counts = {};
-		(this.data.rows || []).forEach((r) =>
-			(r.running || []).forEach((p) => {
-				const c = (counts[p.label] = counts[p.label] || { label: p.label, dept: p.dept, n: 0 });
-				c.n += 1;
-			})
-		);
-		const list = Object.values(counts).sort((a, b) => b.n - a.n).slice(0, 12);
-		const max = Math.max(1, ...list.map((p) => p.n));
-		this.$body.find(".sv-programs").html(
-			list.length
-				? list
-						.map((p) => {
-							const color = (SD_DEPT[p.dept] || {}).color || SD_COLORS.total;
-							return `<div>
-								<div class="sv-prog-top"><span title="${esc(p.label)}">${esc(p.label)}
-									<span class="sv-pill" style="--c:${color}">${esc(p.dept || "")}</span></span>
-									<b>${format_number(p.n, null, 0)}</b></div>
-								<div class="sv-prog-bar"><i style="width:${(p.n * 100) / max}%;background:${color}"></i></div>
-							</div>`;
-						})
-						.join("")
-				: `<div class="sv-empty">${__("No programs running in this selection")}</div>`
 		);
 	}
 

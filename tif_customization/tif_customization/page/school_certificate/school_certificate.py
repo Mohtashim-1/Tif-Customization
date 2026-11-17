@@ -62,16 +62,22 @@ def get_schools(search=None, province=None, city=None, from_date=None, to_date=N
 	}
 
 
-def _certificate_image_uri():
-	path = frappe.get_app_path("tif_customization", "public", "images", "mission_partner_certificate.jpg")
+def _data_uri(rel_path, mime):
+	path = frappe.get_app_path("tif_customization", "public", *rel_path.split("/"))
 	with open(path, "rb") as f:
-		return "data:image/jpeg;base64," + base64.b64encode(f.read()).decode()
+		return f"data:{mime};base64," + base64.b64encode(f.read()).decode()
+
+
+def _certificate_image_uri():
+	return _data_uri("images/mission_partner_certificate.jpg", "image/jpeg")
+
+
+def _signature_uri():
+	return _data_uri("images/director_signature.png", "image/png")
 
 
 def _font_uri():
-	path = frappe.get_app_path("tif_customization", "public", "fonts", "belgiano_serif.woff")
-	with open(path, "rb") as f:
-		return "data:font/woff;base64," + base64.b64encode(f.read()).decode()
+	return _data_uri("fonts/belgiano_serif.woff", "font/woff")
 
 
 def _issued_numbers(schools):
@@ -130,6 +136,7 @@ def _name_font_size(name):
 
 def _certificate_html(certs, cert_date):
 	img = _certificate_image_uri()
+	sig = _signature_uri()
 	font = _font_uri()
 	date_label = formatdate(cert_date, "dd-MM-yyyy")
 	pages = []
@@ -141,6 +148,7 @@ def _certificate_html(certs, cert_date):
 	<img class="bg" src="{img}">
 	<div class="cert-no"><span>Certificate No.</span>{escape_html(number)}</div>
 	<div class="name-wrap"><div class="name" style="font-size:{_name_font_size(name)}pt">{escape_html(name)}</div></div>
+	<img class="sig" src="{sig}" alt="">
 	<div class="date">{date_label}</div>
 </div>"""
 		)
@@ -155,6 +163,7 @@ def _certificate_html(certs, cert_date):
 	.name-wrap {{ position: absolute; left: 22mm; width: 253mm; top: 122mm; height: 32mm; display: table; }}
 	.name {{ display: table-cell; vertical-align: middle; text-align: center;
 		font-family: "Belgiano Serif", Georgia, serif; color: #263b5e; font-weight: normal; line-height: 1.15; }}
+	.sig {{ position: absolute; left: 112mm; top: 168mm; width: 73mm; height: auto; }}
 	.date {{ position: absolute; left: 160mm; width: 31mm; top: 207.5mm; text-align: center;
 		font-family: "Belgiano Serif", Georgia, serif; font-size: 11pt; color: #263b5e; }}
 	.cert-no {{ position: absolute; right: 14mm; top: 15mm; text-align: right; color: #ffffff;
