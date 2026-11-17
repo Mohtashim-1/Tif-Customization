@@ -18,6 +18,7 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 		this.fy = this.current_fy();
 		this.department = "__all__";
 		this.program = null;
+		this.instructor = null;
 		this.program_trainer = "";
 		this.inst_sort = { key: "sessions", dir: -1 };
 		this.make();
@@ -78,11 +79,6 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 .tt-kpi .l{font-size:11px;font-weight:700;color:var(--mute);text-transform:uppercase;letter-spacing:.05em}
 .tt-kpi .v{font-size:28px;font-weight:800;margin-top:6px;font-variant-numeric:tabular-nums;color:var(--ink)}
 .tt-kpi .s{font-size:11px;color:var(--mute);margin-top:2px}
-.tt-band{background:linear-gradient(110deg,#0F2A4A 0%,#1E3A8A 100%);color:#fff;border-radius:14px;padding:16px 20px;display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:14px}
-.tt-band>div{border-left:2px solid rgba(147,197,253,.5);padding:2px 12px}
-.tt-band .l{font-size:11px;text-transform:uppercase;letter-spacing:.06em;opacity:.9;font-weight:700}
-.tt-band .v{font-size:26px;font-weight:800;margin-top:4px}
-.tt-band .s{font-size:11px;opacity:.8}
 .tt-grid2{display:grid;grid-template-columns:1.5fr 1fr;gap:14px;margin-bottom:14px}
 .tt-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px 18px;min-width:0;box-shadow:0 1px 3px rgba(15,23,42,.04)}
 .tt-card-h{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px;gap:8px}
@@ -117,7 +113,8 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 .tt-prog .tr{flex:1;height:6px;background:#EEEDE6;border-radius:6px;overflow:hidden}
 .tt-prog .tr b{display:block;height:100%;background:#2563EB}
 .tt-prog span{font-size:11px;color:var(--mute);white-space:nowrap}
-.tt-inst{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #F0EFE9}
+.tt-inst{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #F0EFE9;cursor:pointer;border-radius:8px;margin:0 -6px;padding-left:6px;padding-right:6px}
+.tt-inst:hover{background:#F8FAFC}
 .tt-inst:last-child{border-bottom:0}
 .tt-av{width:32px;height:32px;border-radius:50%;background:var(--ink);color:#fff;display:grid;place-items:center;font-size:11px;font-weight:700;flex:none}
 .tt-inst .nm{flex:1;min-width:0}.tt-inst .nm b{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -139,7 +136,7 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 .tt-src .tr{height:8px;background:#EEEDE6;border-radius:6px;overflow:hidden}.tt-src .tr b{display:block;height:100%;border-radius:6px}
 .tt-empty{padding:30px;text-align:center;color:var(--mute);font-size:13px}
 .tt-note{font-size:11px;color:var(--mute);margin-top:10px;line-height:1.5}
-@media (max-width:1100px){.tt-kpis{grid-template-columns:repeat(3,1fr)}.tt-grid2{grid-template-columns:1fr}.tt-band{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:1100px){.tt-kpis{grid-template-columns:repeat(3,1fr)}.tt-grid2{grid-template-columns:1fr}}
 @media (max-width:760px){.tt-tab-links{display:none}.tt-kpis{grid-template-columns:repeat(2,1fr)}.tt-main{padding:16px}}
 </style>`;
 	}
@@ -149,6 +146,7 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 		this.$app.on("click", "[data-view]", function () {
 			me.view = $(this).data("view");
 			me.program = null;
+			me.instructor = null;
 			me.render();
 		});
 		this.$app.on("click", "[data-period]", function () {
@@ -169,7 +167,15 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 		this.$app.on("click", "[data-program]", function () {
 			me.program = $(this).attr("data-program");
 			me.program_trainer = "";
+			me.instructor = null;
 			me.view = "program";
+			me.render();
+		});
+		this.$app.on("click", "[data-instructor]", function (e) {
+			e.stopPropagation();
+			me.instructor = $(this).attr("data-instructor");
+			me.program = null;
+			me.view = "instructor";
 			me.render();
 		});
 		this.$app.on("click", "[data-ptrainer]", function () {
@@ -326,7 +332,7 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 			this.$main.html(`<div class="tt-empty">${__("Could not load training data.")}</div>`);
 			return;
 		}
-		const body = { overview: () => this.view_overview(), programs: () => this.view_list("Training"), workshops: () => this.view_list("Workshop"), instructors: () => this.view_instructors(), program: () => this.view_program() }[this.view]();
+		const body = { overview: () => this.view_overview(), programs: () => this.view_list("Training"), workshops: () => this.view_list("Workshop"), instructors: () => this.view_instructors(), program: () => this.view_program(), instructor: () => this.view_instructor() }[this.view]();
 		this.$main.html(this.header() + this.tabs() + body);
 	}
 
@@ -336,7 +342,7 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 		const nprog = groups.filter((p) => !this.is_workshop(p)).length;
 		const nwork = groups.length - nprog;
 		const ninst = new Set(list.map((s) => s.trainer).filter(Boolean)).size;
-		const active = this.view === "program" ? this.list_view_of(this.program) : this.view;
+		const active = this.view === "program" ? this.list_view_of(this.program) : this.view === "instructor" ? "instructors" : this.view;
 		const tab = (k, label, ct) =>
 			`<div class="tt-tab ${active === k ? "on" : ""}" data-view="${k}">${label}${ct != null ? `<span class="ct">${ct}</span>` : ""}</div>`;
 		return `<div class="tt-tabs">
@@ -359,6 +365,7 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 			workshops: [__("Workshops"), __("Workshop topics delivered in the period.")],
 			instructors: [__("Instructors"), __("Delivery load and reach per instructor.")],
 			program: [this.program || "", this.list_view_of(this.program) === "workshops" ? __("Workshop") : __("Program")],
+			instructor: [this.instructor || "", __("Instructor detail")],
 		}[this.view];
 		const fy0 = this.current_fy();
 		const fys = [fy0 + 1, fy0, fy0 - 1, fy0 - 2]
@@ -374,6 +381,7 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 			<div class="tt-head">
 				<div>
 					${this.view === "program" ? (this.list_view_of(this.program) === "workshops" ? `<button class="tt-back" data-view="workshops">← ${__("All workshops")}</button>` : `<button class="tt-back" data-view="programs">← ${__("All programs")}</button>`) : ""}
+					${this.view === "instructor" ? `<button class="tt-back" data-view="instructors">← ${__("All instructors")}</button>` : ""}
 					<h1>${this.esc(titles[0])}</h1>
 					<p>${this.esc(titles[1])}${titles[1] ? " · " : ""}${this.period_label()}</p>
 				</div>
@@ -405,13 +413,6 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 		const fvAll = list.reduce((t, s) => t + (s.fv || 0), 0) + unm;
 		const instructors = new Set(done.map((s) => s.trainer).filter(Boolean)).size;
 		const hours = done.reduce((t, s) => t + (s.minutes || 0), 0) / 60;
-		const withPeople = done.filter((s) => this.people(s) > 0);
-		const avgAtt = withPeople.length ? withPeople.reduce((t, s) => t + this.people(s), 0) / withPeople.length : 0;
-		const online = done.filter((s) => /online/i.test(s.mode)).length;
-		const onsitePct = done.length ? Math.round(((done.length - online) / done.length) * 100) : 0;
-		const schools = new Set(list.map((s) => s.school).filter(Boolean)).size;
-		const fb = this.feedback();
-		const rating = this.rating(fb);
 
 		return `
 			<div class="tt-kpis">
@@ -421,12 +422,6 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 				${this.kpi(__("Teachers trained"), this.fmt(people), __("{0} schedule · {1} field visit", [this.fmt(present), this.fmt(fvAll)]))}
 				${this.kpi(__("Instructors engaged"), this.fmt(instructors), __("delivered at least one session"))}
 				${this.kpi(__("Training hours"), this.fmt(hours, 0), __("from session start/end times"))}
-			</div>
-			<div class="tt-band">
-				<div><div class="l">${__("Avg attendance")}</div><div class="v">${this.fmt(avgAtt, 1)}</div><div class="s">${__("teachers per session · recorded on {0} of {1}", [withPeople.length, done.length])}</div></div>
-				<div><div class="l">${__("Session rating")}</div><div class="v">${rating == null ? "—" : this.fmt(rating, 1) + " / 5"}</div><div class="s">${fb.length ? __("{0} feedback forms", [fb.length]) : __("No feedback forms submitted yet")}</div></div>
-				<div><div class="l">${__("Onsite delivery")}</div><div class="v">${onsitePct}%</div><div class="s">${__("{0} onsite · {1} online", [done.length - online, online])}</div></div>
-				<div><div class="l">${__("Schools reached")}</div><div class="v">${this.fmt(schools)}</div><div class="s">${__("distinct schools in sessions")}</div></div>
 			</div>
 			<div class="tt-grid2">
 				<div class="tt-card">
@@ -525,7 +520,8 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 		if (!rows.length) return `<div class="tt-empty">${__("No instructors.")}</div>`;
 		return rows
 			.map(
-				(t) => `<div class="tt-inst">${this.avatar(t.name)}
+				(t) => `<div class="tt-inst" data-instructor="${this.esc(t.name)}" title="${__("Open instructor")}">
+				${this.avatar(t.name)}
 				<div class="nm"><b>${this.esc(t.name)}</b><small>${__("{0} programs/workshops · {1} teachers", [t.nprog, this.fmt(t.people)])}</small></div>
 				<div class="st">${t.sessions}<small>${__("sessions")} · ${this.fmt(t.hours, 0)}h</small></div></div>`
 			)
@@ -534,11 +530,56 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 
 	view_list(kind) {
 		const workshop = kind === "Workshop";
-		const progs = this.program_stats(this.sessions()).filter((p) => this.is_workshop(p) === workshop);
-		if (!progs.length) return `<div class="tt-card tt-empty">${workshop ? __("No workshops in this period.") : __("No programs in this period.")}</div>`;
-		return `<div class="tt-pcards">${progs
-			.map(
-				(p) => `<div class="tt-pc" data-program="${this.esc(p.label)}" style="--pc:${this.color(p.label)}">
+		const sessions = this.sessions().filter((s) => /workshop/i.test(s.kind || "") === workshop);
+		const progs = this.program_stats(sessions);
+		const label = workshop ? __("workshop") : __("program");
+		const label_plural = workshop ? __("Workshops") : __("Programs");
+		if (!progs.length)
+			return `<div class="tt-card tt-empty">${workshop ? __("No workshops in this period.") : __("No programs in this period.")}</div>`;
+
+		const done = sessions.filter((s) => s.status === "completed");
+		const upcoming = sessions.length - done.length;
+		const people = sessions.reduce((t, s) => t + this.people(s), 0);
+		const hours = done.reduce((t, s) => t + (s.minutes || 0), 0) / 60;
+		const trainers = this.instructor_stats(sessions).sort((a, b) => b.sessions - a.sessions || b.hours - a.hours);
+		const top = trainers[0];
+		const delivered = progs.filter((p) => p.done > 0).length;
+
+		const cards = `
+			<div class="tt-kpis" style="margin-bottom:10px">
+				${this.kpi(label_plural, this.fmt(progs.length), __("{0} with sessions conducted", [delivered]))}
+				${this.kpi(__("Sessions"), this.fmt(done.length), __("+{0} scheduled", [upcoming]))}
+				${this.kpi(__("Teachers trained"), this.fmt(people), __("{0}-wise total", [label]))}
+				${this.kpi(__("Training hours"), this.fmt(hours, 0), __("conducted sessions"))}
+			</div>
+			<div class="tt-kpis" style="margin-bottom:16px">
+				${this.kpi(__("Instructors"), this.fmt(trainers.length), __("engaged on {0}", [label_plural.toLowerCase()]))}
+				${this.kpi(__("Top trainer sessions"), top ? this.fmt(top.sessions) : "—", top ? this.esc(top.name) : __("no trainers"))}
+				${this.kpi(__("Top trainer teachers"), top ? this.fmt(top.people) : "—", top ? __("{0}h delivered", [this.fmt(top.hours, 0)]) : "")}
+				${this.kpi(__("Avg sessions / trainer"), trainers.length ? this.fmt(sessions.length / trainers.length, 1) : "—", __("across all instructors"))}
+			</div>`;
+
+		const top_row = trainers.length
+			? `<div class="tt-card" style="margin-bottom:14px">
+					<div class="tt-card-h"><h3>${__("Trainers on {0}", [label_plural.toLowerCase()])}</h3><small>${trainers.length} ${__("instructors")}</small></div>
+					${trainers
+						.slice(0, 6)
+						.map(
+							(t) => `<div class="tt-inst" data-instructor="${this.esc(t.name)}" title="${__("Open instructor")}">
+						${this.avatar(t.name)}
+						<div class="nm"><b>${this.esc(t.name)}</b><small>${__("{0} topics · {1} teachers", [t.nprog, this.fmt(t.people)])}</small></div>
+						<div class="st">${t.sessions}<small>${__("sessions")} · ${this.fmt(t.hours, 0)}h</small></div></div>`
+						)
+						.join("")}
+				</div>`
+			: "";
+
+		return (
+			cards +
+			top_row +
+			`<div class="tt-pcards">${progs
+				.map(
+					(p) => `<div class="tt-pc" data-program="${this.esc(p.label)}" style="--pc:${this.color(p.label)}">
 				<div class="top">${this.code_chip(p)}${this.status_pill(p.status)}</div>
 				<h4>${this.esc(p.label)}</h4>
 				<div class="sub">${this.esc(p.kind)}${p.city ? " · " + this.esc(p.city) : ""}</div>
@@ -549,8 +590,9 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 					<div><b>${p.trainers.size}</b><small>${__("Instr.")}</small></div>
 					<div><b>${p.rating == null ? "—" : this.fmt(p.rating, 1)}</b><small>${__("Rating")}</small></div>
 				</div></div>`
-			)
-			.join("")}</div>`;
+				)
+				.join("")}</div>`
+		);
 	}
 
 	view_instructors() {
@@ -568,7 +610,7 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 			${th("hours", __("Hours"), 1)}${th("people", __("Teachers"), 1)}<th>${__("Onsite / Online")}</th>${th("rating", __("Rating"), 1)}${th("last", __("Last session"), 1)}
 			</tr></thead><tbody>${rows
 				.map(
-					(t) => `<tr>
+					(t) => `<tr class="click" data-instructor="${this.esc(t.name)}">
 				<td><div style="display:flex;align-items:center;gap:10px">${this.avatar(t.name)}<span class="tt-pname">${this.esc(t.name)}</span></div></td>
 				<td class="r">${t.nprog}</td><td class="r">${t.sessions}</td><td class="r">${t.done}</td>
 				<td class="r">${this.fmt(t.hours, 1)}</td><td class="r">${this.fmt(t.people)}</td>
@@ -622,6 +664,50 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 						<td class="tt-mono" style="font-size:11.5px;white-space:nowrap">${frappe.datetime.str_to_user(s.date)}</td>
 						<td><div class="tt-pname" style="font-weight:600">${this.esc(s.module || "—")}</div>${s.school ? `<div class="tt-psub">${this.esc(s.school)}</div>` : ""}</td>
 						<td>${this.esc(s.trainer || "—")}</td><td>${this.esc(s.mode || "—")}</td>
+						<td class="r">${s.minutes ? this.fmt(s.minutes / 60, 1) : "—"}</td>
+						<td class="r">${this.people(s) || "—"}</td>
+						<td>${this.status_pill(s.status === "completed" ? "completed" : "upcoming")}</td></tr>`
+						)
+						.join("")}</tbody></table>
+				</div>
+			</div>`;
+	}
+
+	view_instructor() {
+		const name = this.instructor;
+		const all = this.sessions().filter((s) => s.trainer === name);
+		if (!all.length) return `<div class="tt-card tt-empty">${__("No sessions for this instructor in the selected period.")}</div>`;
+		const stats = this.instructor_stats(all)[0];
+		const progs = this.program_stats(all);
+		const fbRows = this.feedback().filter((f) => (f.trainer || "") === name);
+		return `
+			<div style="display:flex;gap:10px;align-items:center;margin:-6px 0 14px">${this.avatar(name)}
+				<span class="tt-psub" style="margin:0">${__("{0} topics · last session {1}", [stats.nprog, stats.last ? frappe.datetime.str_to_user(stats.last) : "—"])}</span>
+			</div>
+			<div class="tt-kpis">
+				${this.kpi(__("Sessions"), `${stats.done}<span style="font-size:16px;color:var(--mute)">/${stats.sessions}</span>`, __("conducted / scheduled"))}
+				${this.kpi(__("Teachers"), this.fmt(stats.people), __("attendance + field visit"))}
+				${this.kpi(__("Training hours"), this.fmt(stats.hours, 1), __("conducted sessions"))}
+				${this.kpi(__("Programs / Workshops"), stats.nprog, "")}
+				${this.kpi(__("Onsite / Online"), `${stats.onsite} / ${stats.online}`, "")}
+				${this.kpi(__("Rating"), stats.rating == null ? "—" : this.fmt(stats.rating, 1), fbRows.length ? __("{0} feedback forms", [fbRows.length]) : __("no feedback yet"))}
+			</div>
+			<div class="tt-grid2">
+				<div class="tt-card">
+					<div class="tt-card-h"><h3>${__("Topics delivered")}</h3></div>
+					${this.program_table(progs, __("Program / Workshop"))}
+				</div>
+				<div class="tt-card">
+					<div class="tt-card-h"><h3>${__("Sessions")}</h3><small>${all.length}</small></div>
+					<table class="tt-tbl"><thead><tr><th>#</th><th>${__("Date")}</th><th>${__("Topic")}</th><th>${__("Module")}</th><th>${__("Mode")}</th>
+						<th class="r">${__("Hrs")}</th><th class="r">${__("Teachers")}</th><th>${__("Status")}</th></tr></thead><tbody>
+					${all
+						.map(
+							(s, i) => `<tr class="click" data-session="${this.esc(s.name)}">
+						<td class="tt-mono" style="color:var(--mute)">${i + 1}</td>
+						<td class="tt-mono" style="font-size:11.5px;white-space:nowrap">${frappe.datetime.str_to_user(s.date)}</td>
+						<td><span class="tt-pname" style="font-weight:600">${this.esc(s.program)}</span></td>
+						<td>${this.esc(s.module || "—")}</td><td>${this.esc(s.mode || "—")}</td>
 						<td class="r">${s.minutes ? this.fmt(s.minutes / 60, 1) : "—"}</td>
 						<td class="r">${this.people(s) || "—"}</td>
 						<td>${this.status_pill(s.status === "completed" ? "completed" : "upcoming")}</td></tr>`
