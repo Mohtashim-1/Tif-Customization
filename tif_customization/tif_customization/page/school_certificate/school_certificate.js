@@ -181,7 +181,7 @@ class SchoolCertificatePage {
 					: `<span class="text-muted">${__("No program running")}</span>`;
 				return `<tr class="${r.eligible ? "" : "sc-off"}">
 					<td><input type="checkbox" class="sc-row" data-school="${key}" ${r.eligible ? "" : "disabled"} ${this.selected.has(r.school) ? "checked" : ""}></td>
-					<td style="white-space:nowrap">${r.certificate_no ? `<a href="/app/mission-partner-certificate/${encodeURIComponent(r.certificate_no)}" target="_blank">${esc(r.certificate_no)}</a>` : `<span class="text-muted">${__("Not issued")}</span>`}</td>
+					<td style="white-space:nowrap">${r.certificate_no ? `<a href="/app/mission-partner-certificate/${encodeURIComponent(r.certificate_name || r.certificate_no)}" target="_blank">${esc(r.certificate_no)}</a>` : `<span class="text-muted">${__("Not issued")}</span>`}</td>
 					<td>${
 						r.customer
 							? `<a href="/app/customer/${encodeURIComponent(r.customer)}" target="_blank">${esc(r.school_label)}</a>`

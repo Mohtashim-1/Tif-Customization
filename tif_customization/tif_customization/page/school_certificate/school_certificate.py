@@ -1,5 +1,6 @@
 import base64
 import json
+import re
 
 import frappe
 from frappe import _
@@ -12,6 +13,16 @@ PAGE_ROLES = ("System Manager", "School Approval", "Field Staff Manager", "SME M
 # ~20s for 767 pages; keep well under the 120s gunicorn timeout (mirrored in school_certificate.js)
 MAX_DOWNLOAD = 1500
 CERT_DOCTYPE = "Mission Partner Certificate"
+_CERT_NO_RE = re.compile(r"^(SR TIF-MP)(\d+)$", re.I)
+
+
+def _format_certificate_no(name):
+	"""Always show 5-digit serial: SR TIF-MP00001 (legacy 4-digit names are padded)."""
+	name = cstr(name).strip()
+	m = _CERT_NO_RE.match(name)
+	if not m:
+		return name
+	return f"SR TIF-MP{int(m.group(2)):05d}"
 
 
 def _check_access():
@@ -49,7 +60,9 @@ def get_schools(search=None, province=None, city=None, from_date=None, to_date=N
 	filtered = sorted((r for r in rows if keep(r)), key=lambda r: r["school_label"].lower())
 	issued = _issued_numbers([r["school"] for r in filtered])
 	for r in filtered:
-		r["certificate_no"] = issued.get(r["school"], "")
+		raw = issued.get(r["school"], "")
+		r["certificate_name"] = raw  # DocType name (may be legacy 4-digit)
+		r["certificate_no"] = _format_certificate_no(raw)  # always 5-digit display
 	buckets = {b: sum(1 for r in rows if r["bucket"] == b) for b in ("Active", "Active New", "Model 0")}
 	return {
 		"rows": filtered,
@@ -90,7 +103,7 @@ def _issued_numbers(schools):
 
 
 def _assign_numbers(rows, cert_date):
-	"""Same school always keeps its first certificate number (SR TIF-MP0001, ...)."""
+	"""Same school always keeps its first certificate number (SR TIF-MP00001, ...)."""
 	issued = _issued_numbers([r["school"] for r in rows])
 	out = {}
 	for r in rows:
@@ -197,12 +210,13 @@ def download_certificates(schools=None, cert_date=None, from_date=None, to_date=
 
 	cert_date = getdate(cert_date or today())
 	numbers = _assign_numbers([rows[s] for s in schools], cert_date)
+	display_numbers = {s: _format_certificate_no(numbers[s]) for s in schools}
 	names = [rows[s]["school_label"] for s in schools]
-	certs = [(rows[s]["school_label"], numbers[s]) for s in schools]
+	certs = [(rows[s]["school_label"], display_numbers[s]) for s in schools]
 	pdf = HTML(string=_certificate_html(certs, cert_date)).write_pdf()
 
 	if len(names) == 1:
-		filename = f"Mission Partner Certificate - {numbers[schools[0]]} - {names[0]}.pdf"
+		filename = f"Mission Partner Certificate - {display_numbers[schools[0]]} - {names[0]}.pdf"
 	else:
 		filename = f"Mission Partner Certificates ({len(names)} schools).pdf"
 	frappe.local.response.filename = filename.replace("/", "-")

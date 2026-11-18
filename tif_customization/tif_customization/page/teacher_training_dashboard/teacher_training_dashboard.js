@@ -84,10 +84,12 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 .tt-grid2.tt-stack{grid-template-columns:1fr}
 .tt-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 16px;min-width:0;max-width:100%;overflow:hidden;box-shadow:0 1px 3px rgba(15,23,42,.04)}
 .tt-scroll{display:block;width:100%;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
-.tt-scroll>.tt-tbl{width:100%;min-width:0}
-.tt-tbl.tt-compact th,.tt-tbl.tt-compact td{padding:8px 6px;font-size:12px}
-.tt-tbl.tt-compact th{white-space:nowrap}
-.tt-tbl.tt-compact .tt-pill{padding:2px 6px;font-size:10px}
+.tt-scroll>.tt-tbl{width:100%;min-width:720px}
+.tt-tbl.tt-compact th,.tt-tbl.tt-compact td{padding:8px 8px;font-size:12px}
+.tt-tbl.tt-compact th{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tt-tbl.tt-compact .tt-pill{padding:2px 8px;font-size:10px}
+.tt-tbl th.tt-col-teachers,.tt-tbl td.tt-col-teachers{width:78px;min-width:78px;text-align:right}
+.tt-tbl th.tt-col-status,.tt-tbl td.tt-col-status{width:110px;min-width:110px}
 .tt-card-h{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px;gap:8px}
 .tt-card-h h3{font-size:14px;font-weight:800;margin:0;color:var(--ink)}
 .tt-card-h small{font-size:11px;color:var(--mute)}
@@ -660,18 +662,24 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 				<div class="tt-card">
 					<div class="tt-card-h"><h3>${__("Sessions")}</h3><small>${list.length} ${__("shown")}</small></div>
 					<div class="tt-chips">${chips}</div>
-					<div class="tt-scroll"><table class="tt-tbl tt-compact" style="table-layout:fixed;width:100%"><thead><tr><th style="width:36px">#</th><th style="width:92px">${__("Date")}</th><th>${__("Module")}</th><th style="width:140px">${__("Instructor")}</th><th style="width:70px">${__("Mode")}</th>
-						<th class="r" style="width:52px">${__("Hrs")}</th><th class="r" style="width:64px">${__("Teachers")}</th><th style="width:96px">${__("Status")}</th></tr></thead><tbody>
+					<div class="tt-scroll"><table class="tt-tbl tt-compact" style="table-layout:fixed;width:100%;min-width:780px"><colgroup>
+						<col style="width:36px"><col style="width:92px"><col>
+						<col style="width:130px"><col style="width:68px"><col style="width:48px"><col style="width:78px"><col style="width:110px">
+					</colgroup><thead><tr>
+						<th>#</th><th>${__("Date")}</th><th>${__("Module")}</th><th>${__("Instructor")}</th><th>${__("Mode")}</th>
+						<th class="r">${__("Hrs")}</th><th class="r tt-col-teachers">${__("Teachers")}</th><th class="tt-col-status">${__("Status")}</th>
+					</tr></thead><tbody>
 					${list
 						.map(
 							(s, i) => `<tr title="${this.esc(s.school || "")}">
 						<td class="tt-mono" style="color:var(--mute)">${i + 1}</td>
 						<td class="tt-mono" style="font-size:11.5px;white-space:nowrap">${frappe.datetime.str_to_user(s.date)}</td>
-						<td><div class="tt-pname" style="font-weight:600">${this.esc(s.module || "—")}</div>${s.school ? `<div class="tt-psub">${this.esc(s.school)}</div>` : ""}</td>
-						<td>${this.esc(s.trainer || "—")}</td><td>${this.esc(s.mode || "—")}</td>
+						<td><div class="tt-pname" style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${this.esc(s.module || "")}">${this.esc(s.module || "—")}</div>${s.school ? `<div class="tt-psub" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${this.esc(s.school)}</div>` : ""}</td>
+						<td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${this.esc(s.trainer || "")}">${this.esc(s.trainer || "—")}</td>
+						<td>${this.esc(s.mode || "—")}</td>
 						<td class="r">${s.minutes ? this.fmt(s.minutes / 60, 1) : "—"}</td>
-						<td class="r">${this.people(s) || "—"}</td>
-						<td>${this.status_pill(s.status === "completed" ? "completed" : "upcoming")}</td></tr>`
+						<td class="r tt-col-teachers">${this.people(s) || "—"}</td>
+						<td class="tt-col-status">${this.status_pill(s.status === "completed" ? "completed" : "upcoming")}</td></tr>`
 						)
 						.join("")}</tbody></table></div>
 				</div>
@@ -717,12 +725,12 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 			</div>
 			<div class="tt-card">
 				<div class="tt-card-h"><h3>${__("Sessions")}</h3><small>${list.length}</small></div>
-				<div class="tt-scroll"><table class="tt-tbl tt-compact" style="table-layout:fixed;width:100%"><colgroup>
+				<div class="tt-scroll"><table class="tt-tbl tt-compact" style="table-layout:fixed;width:100%;min-width:780px"><colgroup>
 					<col style="width:36px"><col style="width:92px"><col style="width:88px"><col>
-					<col style="width:70px"><col style="width:52px"><col style="width:64px"><col style="width:96px">
+					<col style="width:68px"><col style="width:48px"><col style="width:78px"><col style="width:110px">
 				</colgroup><thead><tr>
 					<th>#</th><th>${__("Date")}</th><th>${__("Type")}</th><th>${__("Topic")}</th>
-					<th>${__("Mode")}</th><th class="r">${__("Hrs")}</th><th class="r">${__("Teachers")}</th><th>${__("Status")}</th>
+					<th>${__("Mode")}</th><th class="r">${__("Hrs")}</th><th class="r tt-col-teachers">${__("Teachers")}</th><th class="tt-col-status">${__("Status")}</th>
 				</tr></thead><tbody>
 				${list
 					.map(
@@ -734,8 +742,8 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 						<div class="tt-psub" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${this.esc(s.module || "")}">${this.esc(s.module || "")}</div></td>
 					<td style="white-space:nowrap">${this.esc(s.mode || "—")}</td>
 					<td class="r">${s.minutes ? this.fmt(s.minutes / 60, 1) : "—"}</td>
-					<td class="r">${this.people(s) || "—"}</td>
-					<td>${this.status_pill(s.status === "completed" ? "completed" : "upcoming")}</td></tr>`
+					<td class="r tt-col-teachers">${this.people(s) || "—"}</td>
+					<td class="tt-col-status">${this.status_pill(s.status === "completed" ? "completed" : "upcoming")}</td></tr>`
 					)
 					.join("")}</tbody></table></div>
 			</div>`;
