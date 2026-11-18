@@ -422,14 +422,23 @@ MANUAL_HEADER_MAP = {
 	"participant name": "participant_name",
 	"student name": "participant_name",
 	"teacher name": "participant_name",
+	"principal name": "participant_name",
+	"director name": "participant_name",
+	"principal / director name": "participant_name",
+	"principal/director name": "participant_name",
+	"attendee name": "participant_name",
+	"full name": "participant_name",
 	"institute": "institute",
 	"school": "institute",
 	"school name": "institute",
+	"institution": "institute",
 	"phone": "phone",
 	"cell": "phone",
 	"cell no": "phone",
 	"cell number": "phone",
 	"mobile": "phone",
+	"mobile no": "phone",
+	"contact": "phone",
 	"email": "email",
 	"user email": "email",
 	"attendance": "attendance_status",
@@ -437,7 +446,10 @@ MANUAL_HEADER_MAP = {
 	"status": "attendance_status",
 	"sign": "signed",
 	"signed": "signed",
+	"signature": "signed",
 	"remarks": "remarks",
+	"remarks (ocr notes)": "remarks",
+	"ocr notes": "remarks",
 }
 
 
@@ -483,11 +495,80 @@ def _sheet_rows_from_bytes(data: bytes, filename: str = "") -> list[list]:
 	return [list(r) for r in csv.reader(io.StringIO(text), delimiter=delim)]
 
 
-def _map_header_row(headers: list[str], header_map: dict) -> dict:
+def _is_attendance_name_row(name: str) -> bool:
+	"""Reject header / serial / summary rows (e.g. 'Total signed')."""
+	name = cstr(name or "").strip()
+	if not name or name.isdigit():
+		return False
+	lower = name.lower().rstrip(":")
+	blocked = {
+		"name",
+		"participant name",
+		"principal / director name",
+		"principal name",
+		"director name",
+		"s. no.",
+		"s no",
+		"sr no",
+		"total",
+		"total signed",
+		"grand total",
+		"subtotal",
+		"sum",
+	}
+	if lower in blocked:
+		return False
+	if lower.startswith("total ") or lower.startswith("total:") or lower.endswith(" total"):
+		return False
+	return True
+
+
+def _fuzzy_header_field(norm: str, source: str = "Manual") -> str | None:
+	"""Map common spreadsheet headers that are not exact dict keys."""
+	if not norm:
+		return None
+	# Skip serial / index columns
+	if norm in ("s no", "s. no", "s. no.", "sr", "sr no", "sr. no", "serial", "serial no", "#"):
+		return None
+	if norm.startswith("s no") or norm.startswith("sr no") or norm.startswith("serial"):
+		return None
+	if "email" in norm:
+		return "email"
+	if any(k in norm for k in ("phone", "cell", "mobile", "contact no", "whatsapp")):
+		return "phone"
+	if any(k in norm for k in ("school", "institute", "institution", "campus")):
+		return "institute"
+	if any(k in norm for k in ("sign", "present", "attendance", "status")) and "remark" not in norm:
+		if "sign" in norm:
+			return "signed"
+		return "attendance_status"
+	if "remark" in norm or "note" in norm or "ocr" in norm:
+		return "remarks"
+	if source == "Zoom":
+		if "join" in norm:
+			return "join_time"
+		if "leave" in norm:
+			return "leave_time"
+		if "duration" in norm:
+			return "duration_minutes"
+		if "guest" in norm:
+			return "is_guest"
+	# Name-like headers (Principal / Director Name, Attendee, etc.)
+	if "name" in norm and "school" not in norm and "file" not in norm:
+		return "participant_name"
+	if any(k in norm for k in ("participant", "attendee", "principal", "director", "teacher", "student")):
+		return "participant_name"
+	return None
+
+
+def _map_header_row(headers: list[str], header_map: dict, source: str = "Manual") -> dict:
 	field_map = {}
 	for i, raw in enumerate(headers):
-		key = header_map.get(_normalize_header(cstr(raw)))
-		if key:
+		norm = _normalize_header(cstr(raw))
+		key = header_map.get(norm) or _fuzzy_header_field(norm, source)
+		if key and key not in field_map.values():
+			field_map[i] = key
+		elif key == "participant_name" and "participant_name" not in field_map.values():
 			field_map[i] = key
 	return field_map
 
@@ -495,27 +576,53 @@ def _map_header_row(headers: list[str], header_map: dict) -> dict:
 def _rows_from_table(table_rows: list[list], header_map: dict, source: str) -> list[dict]:
 	if not table_rows:
 		return []
-	# Find header row in first 15 lines
-	header_idx = 0
+	# Find header row in first 20 lines (title rows often sit above the real header)
+	header_idx = -1
 	field_map = {}
-	for i, row in enumerate(table_rows[:15]):
-		candidate = _map_header_row([cstr(c) for c in row], header_map)
+	best = {}
+	best_idx = -1
+	for i, row in enumerate(table_rows[:20]):
+		candidate = _map_header_row([cstr(c) for c in row], header_map, source)
 		if "participant_name" in candidate.values():
 			header_idx = i
 			field_map = candidate
 			break
+		# Keep richest partial map (e.g. school/phone/signed without exact name key)
+		if len(candidate) > len(best):
+			best = candidate
+			best_idx = i
+	if "participant_name" not in field_map.values() and best:
+		# Try fuzzy name on the best header row again (already done) — if still missing,
+		# pick first non-serial text column as name.
+		header_idx = best_idx
+		field_map = dict(best)
+		if "participant_name" not in field_map.values() and header_idx >= 0:
+			header_cells = [cstr(c) for c in table_rows[header_idx]]
+			for i, raw in enumerate(header_cells):
+				norm = _normalize_header(raw)
+				if i in field_map:
+					continue
+				if _fuzzy_header_field(norm, source) == "participant_name" or (
+					"name" in norm and "school" not in norm
+				):
+					field_map[i] = "participant_name"
+					break
 	if "participant_name" not in field_map.values():
-		# No header — treat first column as name for manual paste
 		if source == "Manual":
-			field_map = {0: "participant_name"}
-			if len(table_rows[0]) > 1:
-				field_map[1] = "institute"
-			if len(table_rows[0]) > 2:
-				field_map[2] = "phone"
-			if len(table_rows[0]) > 3:
-				field_map[3] = "email"
-			if len(table_rows[0]) > 4:
-				field_map[4] = "attendance_status"
+			# Positional fallback: skip leading serial column when present
+			sample = table_rows[0] if table_rows else []
+			start_col = 0
+			if len(sample) > 1:
+				first = _normalize_header(cstr(sample[0]))
+				if first in ("s no", "s. no", "s. no.", "sr", "sr no", "#", "1") or first.startswith("s no"):
+					start_col = 1
+				# If first data-looking row has numeric col0, also shift
+			field_map = {start_col: "participant_name"}
+			cols = [("institute", 1), ("phone", 2), ("email", 3), ("attendance_status", 4)]
+			for field, offset in cols:
+				idx = start_col + offset
+				if len(sample) > idx:
+					field_map[idx] = field
 			header_idx = -1
 		else:
 			frappe.throw(_("File must include a Name column."))
@@ -530,6 +637,10 @@ def _rows_from_table(table_rows: list[list], header_map: dict, source: str) -> l
 			if field == "duration_minutes":
 				val = _duration_to_minutes(val)
 			mapped[field] = val
+		# Skip leftover header / title / summary rows accidentally included
+		name = cstr(mapped.get("participant_name") or "").strip()
+		if not _is_attendance_name_row(name):
+			continue
 		if mapped.get("signed") and not mapped.get("attendance_status"):
 			mapped["attendance_status"] = _attendance_status_from_row(mapped)
 		payload = _attendance_append_values(mapped)
@@ -545,10 +656,15 @@ def _parse_attendance_upload(content=None, content_b64=None, filename=None, sour
 	data = _decode_upload_content(content, content_b64)
 	if not data:
 		return []
+	name = (filename or "").lower()
+	if name.endswith((".ods", ".xls")):
+		frappe.throw(
+			_("Please save the sheet as .xlsx or .csv (Excel / LibreOffice → File → Save As), then import again.")
+		)
 	table = _sheet_rows_from_bytes(data, filename or "")
 	header_map = ZOOM_HEADER_MAP if source == "Zoom" else MANUAL_HEADER_MAP
 	# Zoom CSV may still use the old text parser for better Zoom header detection
-	if source == "Zoom" and not (filename or "").lower().endswith((".xlsx", ".xlsm")):
+	if source == "Zoom" and not name.endswith((".xlsx", ".xlsm")):
 		try:
 			text = data.decode("utf-8-sig", errors="replace")
 			rows = _parse_zoom_attendance_csv(text)
@@ -1825,6 +1941,49 @@ def import_attendance(
 		"attendance_total": len(attendance),
 	}
 
+
+
+def _file_row(file_doc) -> dict:
+	return {
+		"name": file_doc.name,
+		"file_name": file_doc.file_name,
+		"file_url": file_doc.file_url,
+		"file_size": file_doc.file_size or 0,
+		"creation": str(file_doc.creation) if file_doc.creation else "",
+	}
+
+
+def _list_training_files(name: str) -> list[dict]:
+	rows = frappe.get_all(
+		"File",
+		filters={"attached_to_doctype": DOCTYPE, "attached_to_name": name},
+		fields=["name", "file_name", "file_url", "file_size", "creation"],
+		order_by="creation desc",
+		limit_page_length=100,
+	)
+	seen_urls = set()
+	files = []
+	for row in rows:
+		url = row.file_url or ""
+		if url in seen_urls:
+			continue
+		seen_urls.add(url)
+		files.append(row)
+
+	zoom_file = frappe.db.get_value(DOCTYPE, name, "zoom_attendance_file")
+	if zoom_file and zoom_file not in seen_urls:
+		files.insert(
+			0,
+			{
+				"name": "",
+				"file_name": zoom_file.rsplit("/", 1)[-1],
+				"file_url": zoom_file,
+				"file_size": 0,
+				"creation": "",
+				"is_zoom_csv": 1,
+			},
+		)
+	return files
 
 
 @frappe.whitelist()

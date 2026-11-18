@@ -279,6 +279,16 @@ function applyPaste(tableRows) {
 		const get = (k) => (map[k] != null && cells[map[k]] != null ? String(cells[map[k]]).trim() : "");
 		const name = get("participant_name");
 		if (!name) continue;
+		const lower = name.toLowerCase().replace(/:$/, "");
+		if (
+			/^\d+$/.test(name) ||
+			lower === "total signed" ||
+			lower === "total" ||
+			lower.startsWith("total ") ||
+			lower.endsWith(" total")
+		) {
+			continue;
+		}
 		const signedRaw = get("signed").toLowerCase();
 		const signed = ["no", "absent", "n", "0"].includes(signedRaw) ? "No" : "Yes";
 		mapped.push({

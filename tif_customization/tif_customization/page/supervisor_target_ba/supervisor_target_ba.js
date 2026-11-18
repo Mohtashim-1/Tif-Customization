@@ -32,6 +32,7 @@ class SupervisorTargetBasePage {
 						<div class="col-lg-4 col-md-6 mb-2" data-field="supervisor"></div>
 						<div class="col-lg-2 col-md-3 mb-2" data-field="from_date"></div>
 						<div class="col-lg-2 col-md-3 mb-2" data-field="to_date"></div>
+						<div class="col-lg-2 col-md-3 mb-2" data-field="working_days"></div>
 					</div>
 				</div>
 				<div class="supervisor-kpi-report"></div>
@@ -103,6 +104,77 @@ class SupervisorTargetBasePage {
 					padding: 8px 10px;
 					background: #fff;
 				}
+				.supervisor-kpis {
+					display: grid;
+					grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+					gap: 10px;
+					margin: 0 0 14px;
+				}
+				.supervisor-kpi {
+					border: 1px solid #e5e7eb;
+					border-top: 4px solid #64748b;
+					border-radius: 10px;
+					background: #fff;
+					padding: 12px 14px;
+				}
+				.supervisor-kpi__label { color: #64748b; font-size: 11px; margin-bottom: 6px; }
+				.supervisor-kpi__value {
+					color: #0f172a;
+					font-size: 22px;
+					font-weight: 700;
+					font-variant-numeric: tabular-nums;
+				}
+				.supervisor-kpi__hint { margin-top: 6px; font-size: 10px; color: #94a3b8; }
+				.supervisor-kpi--overall { border-top-color: #0f766e; }
+				.supervisor-kpi--activity { border-top-color: #2563eb; }
+				.supervisor-kpi--outcome { border-top-color: #ca8a04; }
+				.supervisor-kpi--days { border-top-color: #7c3aed; }
+				.supervisor-extra-title {
+					font-size: 15px;
+					font-weight: 700;
+					margin: 16px 0 8px;
+				}
+				.supervisor-extra-wrap {
+					overflow-x: auto;
+					margin-bottom: 14px;
+					background: #fff;
+					border: 1px solid #e5e7eb;
+					border-radius: 8px;
+				}
+				.supervisor-extra {
+					border-collapse: collapse;
+					width: 100%;
+					min-width: 420px;
+					font-size: 12px;
+					font-family: Calibri, Arial, sans-serif;
+				}
+				.supervisor-extra th, .supervisor-extra td {
+					border: 1px solid #e5e7eb;
+					padding: 6px 8px;
+					vertical-align: middle;
+					text-align: center;
+				}
+				.supervisor-extra .left { text-align: left; }
+				.supervisor-extra thead th { background: #f1f5f9; font-weight: 700; }
+				.supervisor-extra .skd-green { background: #c6efce; font-weight: 700; }
+				.supervisor-extra .skd-tier { background: #00b050; color: #fff; font-weight: 800; }
+				.supervisor-bottom {
+					display: grid;
+					grid-template-columns: 1.2fr 1fr;
+					gap: 16px;
+					margin: 0 0 14px;
+				}
+				.supervisor-reward {
+					border: 1px solid #e5e7eb;
+					border-radius: 8px;
+					padding: 10px 12px;
+					background: #fff;
+					margin-bottom: 8px;
+					font-size: 12px;
+				}
+				@media (max-width: 900px) {
+					.supervisor-bottom { grid-template-columns: 1fr; }
+				}
 				@media print {
 					.supervisor-kpi-filters, .page-head, .no-print { display: none !important; }
 					.supervisor-sheet { font-size: 10px; }
@@ -147,6 +219,12 @@ class SupervisorTargetBasePage {
 				default: today,
 				reqd: 1,
 			}),
+			working_days: this.make_filter({
+				label: __("Working Days"),
+				fieldname: "working_days",
+				fieldtype: "Int",
+				description: __("Leave blank to auto-calc (exclude Sunday / holiday / leave)"),
+			}),
 		};
 	}
 
@@ -166,6 +244,7 @@ class SupervisorTargetBasePage {
 			this.filters.supervisor.set_value("");
 			this.filters.from_date.set_value(frappe.datetime.year_start(today));
 			this.filters.to_date.set_value(today);
+			this.filters.working_days.set_value("");
 			this.load_data();
 		});
 	}
@@ -187,6 +266,7 @@ class SupervisorTargetBasePage {
 			supervisor: (this.filters.supervisor.get_value() || "").trim(),
 			from_date,
 			to_date,
+			working_days: cint(this.filters.working_days.get_value()) || 0,
 		};
 	}
 
@@ -317,6 +397,167 @@ class SupervisorTargetBasePage {
 		`;
 	}
 
+	fmt_pct(val) {
+		if (val === null || val === undefined || val === "") return "";
+		return `${format_number(val, null, { precision: 2 })}%`;
+	}
+
+	render_month_rows(data) {
+		return (data.months || [])
+			.map((m) => {
+				const score = m.score == null ? "" : format_number(m.score, null, { precision: 2 });
+				const pct = m.percent == null ? "" : this.fmt_pct(m.percent);
+				return `<tr>
+					<td class="left">${frappe.utils.escape_html(m.label || "")}</td>
+					<td>${score}</td>
+					<td>${pct}</td>
+				</tr>`;
+			})
+			.join("");
+	}
+
+	render_increment_table(data) {
+		const scale = data.increment_scale || [];
+		const current = ((data.increment_tier || {}).label || "").toLowerCase();
+		const heads = scale
+			.map((r) => `<th>${frappe.utils.escape_html(r.label || "")}</th>`)
+			.concat(`<th>${__("Achieved")}</th>`)
+			.join("");
+		const cells = scale
+			.map((r) => {
+				const cls = (r.label || "").toLowerCase() === current ? "skd-tier" : "";
+				return `<td class="${cls}">${frappe.utils.escape_html(r.increment || "")}</td>`;
+			})
+			.concat(`<td class="skd-green">${frappe.utils.escape_html(data.increment_achieved || "")}</td>`)
+			.join("");
+		return `<table class="supervisor-extra">
+			<thead><tr>${heads}</tr></thead>
+			<tbody>
+				<tr>${cells}</tr>
+				<tr>
+					<td class="left" colspan="${scale.length + 1}">
+						${__("Current Overall")}: <strong>${this.fmt_pct(data.overall_pct)}</strong>
+						— ${__("band")}: <strong>${frappe.utils.escape_html((data.increment_tier || {}).label || "")}</strong>
+					</td>
+				</tr>
+			</tbody>
+		</table>`;
+	}
+
+	render_monthly_sections(data) {
+		return `
+			<div class="supervisor-extra-title">${__("Monthly summary")} ***</div>
+			<div class="supervisor-extra-wrap">
+				<table class="supervisor-extra">
+					<tbody>
+						<tr>
+							<td class="left">${__("No of Working Days")}</td>
+							<td>${this.fmt(data.working_days)}</td>
+						</tr>
+						<tr>
+							<td class="left">${__("Per day Target Points")}</td>
+							<td>${this.fmt(data.per_day_points, { precision: 2 })}</td>
+						</tr>
+						<tr>
+							<td class="left"><strong>${__("Total Expected Targets Points Monthly ***")}</strong></td>
+							<td><strong>${this.fmt(data.activity_target, { precision: 2 })}</strong></td>
+						</tr>
+						<tr>
+							<td class="left"><strong>${__("Total Achieve Points Monthly")}</strong></td>
+							<td class="skd-green">${this.fmt(data.activity_actual, { precision: 2 })}</td>
+						</tr>
+						<tr>
+							<td class="left"><strong>${__("Percentage")}</strong></td>
+							<td class="skd-green">${this.fmt_pct(data.activity_pct)}</td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+
+			<div class="supervisor-bottom">
+				<div>
+					<div class="supervisor-extra-title">${__("Monthly performance")} (${frappe.utils.escape_html(
+						data.fiscal_year_label || ""
+					)})</div>
+					<div class="supervisor-extra-wrap">
+						<table class="supervisor-extra">
+							<thead>
+								<tr>
+									<th class="left">${__("Month")}</th>
+									<th>${__("Monthly Point")}</th>
+									<th>${__("Monthly Percentage")}</th>
+								</tr>
+							</thead>
+							<tbody>
+								${this.render_month_rows(data)}
+								<tr>
+									<td class="left"><strong>${__("Total")}</strong></td>
+									<td class="skd-green">${this.fmt(data.ytd_activity_actual, { precision: 2 })}</td>
+									<td class="skd-green">${this.fmt_pct(data.ytd_activity_pct)}</td>
+								</tr>
+								<tr>
+									<td class="left skd-green" colspan="2"><strong>${__("Yearly Target Score")}</strong></td>
+									<td class="skd-green">${this.fmt(data.yearly_target_score, { precision: 2 })}</td>
+								</tr>
+								<tr>
+									<td class="left skd-green" colspan="2"><strong>${__("Achievement %")}</strong> (${__(
+										"Overall 70/30"
+									)})</td>
+									<td class="skd-green">${this.fmt_pct(data.overall_pct)}</td>
+								</tr>
+							</tbody>
+						</table>
+					</div>
+				</div>
+				<div>
+					<div class="supervisor-extra-title">${__("Annual Increment (Performance base)")}</div>
+					<div class="supervisor-extra-wrap">
+						${this.render_increment_table(data)}
+					</div>
+					<div class="supervisor-reward">
+						<strong>${frappe.utils.escape_html(data.reward_note || "")}</strong>
+					</div>
+				</div>
+			</div>
+		`;
+	}
+
+	render_kpi_cards(data) {
+		const wd = data.working_days_info || {};
+		return `
+			<div class="supervisor-kpis">
+				<div class="supervisor-kpi supervisor-kpi--overall">
+					<div class="supervisor-kpi__label">${__("Overall")}</div>
+					<div class="supervisor-kpi__value">${this.fmt_pct(data.overall_pct)}</div>
+					<div class="supervisor-kpi__hint">70% ${__("activity")} + 30% ${__("outcome")}</div>
+				</div>
+				<div class="supervisor-kpi supervisor-kpi--activity">
+					<div class="supervisor-kpi__label">${__("Activity")}</div>
+					<div class="supervisor-kpi__value">${this.fmt_pct(data.activity_pct)}</div>
+					<div class="supervisor-kpi__hint">
+						${this.fmt(data.activity_actual, { precision: 2 })} / ${this.fmt(data.activity_target, {
+							precision: 2,
+						})} ${__("pts")}
+					</div>
+				</div>
+				<div class="supervisor-kpi supervisor-kpi--outcome">
+					<div class="supervisor-kpi__label">${__("Outcome (YTD)")}</div>
+					<div class="supervisor-kpi__value">${this.fmt_pct(data.outcome_pct)}</div>
+					<div class="supervisor-kpi__hint">${__("Average of yearly compulsory mins")}</div>
+				</div>
+				<div class="supervisor-kpi supervisor-kpi--days">
+					<div class="supervisor-kpi__label">${__("Working days")}</div>
+					<div class="supervisor-kpi__value">${this.fmt(data.working_days)}</div>
+					<div class="supervisor-kpi__hint">
+						${__("Sun")} ${this.fmt(wd.sundays || 0)} · ${__("Holiday")} ${this.fmt(wd.gazetted || 0)} · ${__(
+							"Leave"
+						)} ${this.fmt(wd.leave_days || 0)}
+					</div>
+				</div>
+			</div>
+		`;
+	}
+
 	render_report(data) {
 		const notes = (data.notes || [])
 			.map((note) => `<li>${frappe.utils.escape_html(note)}</li>`)
@@ -327,9 +568,15 @@ class SupervisorTargetBasePage {
 				<div class="supervisor-chip"><strong>${__("Period")}:</strong> ${frappe.utils.escape_html(data.from_date || "")} - ${frappe.utils.escape_html(data.to_date || "")}</div>
 				<div class="supervisor-chip"><strong>${__("Supervisor Field Staff")}:</strong> ${this.fmt(data.field_staff_count)}</div>
 			</div>
+			${this.render_kpi_cards(data)}
 			${this.render_main_table(data)}
+			${this.render_monthly_sections(data)}
 			${this.render_field_staff(data)}
 			<ul class="small text-muted">${notes}</ul>
 		`);
 	}
+}
+
+function cint(v) {
+	return parseInt(v, 10) || 0;
 }

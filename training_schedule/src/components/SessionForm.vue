@@ -268,13 +268,14 @@ function removeAttendeeBySource(source, idxInSource) {
 function mergeImportedRows(rows, mode, source = "Zoom") {
 	const mapped = (rows || []).map((a) => ({ ...blankAttendee(source), ...a, attendance_source: source }));
 	const other = (form.attendance || []).filter((r) => rowSource(r) !== source);
+	let next;
 	if (mode === "append") {
 		const keys = new Set(
 			(form.attendance || [])
 				.filter((r) => rowSource(r) === source)
 				.map((r) => `${(r.participant_name || "").toLowerCase()}|${(r.email || "").toLowerCase()}`)
 		);
-		const next = [...(form.attendance || [])];
+		next = [...(form.attendance || [])];
 		for (const row of mapped) {
 			const key = `${(row.participant_name || "").toLowerCase()}|${(row.email || "").toLowerCase()}`;
 			if (!keys.has(key)) {
@@ -282,15 +283,24 @@ function mergeImportedRows(rows, mode, source = "Zoom") {
 				keys.add(key);
 			}
 		}
-		form.attendance = next;
 	} else {
-		form.attendance = [...other, ...mapped];
+		next = [...other, ...mapped];
 	}
+	// Splice in-place so Vue always refreshes the Zoom/Manual tables
+	form.attendance.splice(0, form.attendance.length, ...next);
 }
 
 function fileToPayload(file) {
 	return new Promise((resolve, reject) => {
 		const name = (file.name || "").toLowerCase();
+		if (name.endsWith(".ods") || name.endsWith(".xls")) {
+			reject(
+				new Error(
+					"Save the sheet as .xlsx or .csv first (LibreOffice: File → Save As → Excel 2007–365 .xlsx), then import."
+				)
+			);
+			return;
+		}
 		if (name.endsWith(".xlsx") || name.endsWith(".xlsm")) {
 			const reader = new FileReader();
 			reader.onload = () => {
@@ -301,13 +311,39 @@ function fileToPayload(file) {
 			};
 			reader.onerror = () => reject(new Error("Could not read Excel file."));
 			reader.readAsArrayBuffer(file);
-		} else {
+		} else if (name.endsWith(".csv") || name.endsWith(".txt") || !name.includes(".")) {
 			file
 				.text()
-				.then((content) => resolve({ content, filename: file.name }))
+				.then((content) => resolve({ content, filename: file.name || "attendance.csv" }))
 				.catch(reject);
+		} else {
+			reject(new Error("Use .xlsx or .csv files only."));
 		}
 	});
+}
+
+function isAttendanceName(name) {
+	const n = String(name || "").trim();
+	if (!n || /^\d+$/.test(n)) return false;
+	const lower = n.toLowerCase().replace(/:$/, "");
+	const blocked = new Set([
+		"name",
+		"participant name",
+		"principal / director name",
+		"principal name",
+		"director name",
+		"s. no.",
+		"s no",
+		"sr no",
+		"total",
+		"total signed",
+		"grand total",
+		"subtotal",
+		"sum",
+	]);
+	if (blocked.has(lower)) return false;
+	if (lower.startsWith("total ") || lower.startsWith("total:") || lower.endsWith(" total")) return false;
+	return true;
 }
 
 function parsePasteText(text) {
@@ -336,24 +372,60 @@ function parsePasteText(text) {
 
 function applyPasteRows(tableRows, source) {
 	if (!tableRows.length) return 0;
-	const header = tableRows[0].map((c) => String(c || "").trim().toLowerCase());
-	const hasHeader = header.some((h) => ["name", "email", "participant", "institute", "phone", "cell"].some((k) => h.includes(k)));
-	const data = hasHeader ? tableRows.slice(1) : tableRows;
+	// Prefer a real header row (may sit below a title line)
+	let headerIdx = 0;
+	for (let i = 0; i < Math.min(tableRows.length, 8); i++) {
+		const cells = tableRows[i].map((c) => String(c || "").trim().toLowerCase());
+		const hit = cells.some((h) =>
+			["name", "email", "participant", "institute", "school", "phone", "cell", "signed", "principal"].some((k) =>
+				h.includes(k)
+			)
+		);
+		if (hit) {
+			headerIdx = i;
+			break;
+		}
+	}
+	const header = tableRows[headerIdx].map((c) => String(c || "").trim().toLowerCase());
+	const hasHeader = header.some((h) =>
+		["name", "email", "participant", "institute", "school", "phone", "cell", "signed", "principal"].some((k) =>
+			h.includes(k)
+		)
+	);
+	const data = hasHeader ? tableRows.slice(headerIdx + 1) : tableRows;
 	const map = {};
 	if (hasHeader) {
 		header.forEach((h, i) => {
-			if (h.includes("name") && !h.includes("original") && !map.participant_name) map.participant_name = i;
-			if (h.includes("original") || h === "name (original name)") map.participant_name = i;
+			if (!h || h === "s. no." || h === "s no" || h === "sr" || h === "#" || h.startsWith("s. no")) return;
 			if (h.includes("email")) map.email = i;
-			if (h.includes("institute") || h === "school") map.institute = i;
-			if (h.includes("phone") || h.includes("cell") || h.includes("mobile")) map.phone = i;
-			if (h.includes("join")) map.join_time = i;
-			if (h.includes("leave")) map.leave_time = i;
-			if (h.includes("duration")) map.duration_minutes = i;
-			if (h.includes("guest")) map.is_guest = i;
-			if (h.includes("status") || h.includes("attendance") || h === "sign") map.attendance_status = i;
+			else if (h.includes("phone") || h.includes("cell") || h.includes("mobile")) map.phone = i;
+			else if (h.includes("institute") || h.includes("school")) map.institute = i;
+			else if (h.includes("sign") || h === "present") map.signed = i;
+			else if (h.includes("status") || h.includes("attendance")) map.attendance_status = i;
+			else if (h.includes("join")) map.join_time = i;
+			else if (h.includes("leave")) map.leave_time = i;
+			else if (h.includes("duration")) map.duration_minutes = i;
+			else if (h.includes("guest")) map.is_guest = i;
+			else if (h.includes("remark")) map.remarks = i;
+			else if (
+				(h.includes("name") || h.includes("principal") || h.includes("director") || h.includes("participant") || h.includes("attendee")) &&
+				!h.includes("school") &&
+				map.participant_name == null
+			) {
+				map.participant_name = i;
+			}
 		});
-		if (map.participant_name == null) map.participant_name = 0;
+		if (map.participant_name == null) {
+			// First non-serial column
+			for (let i = 0; i < header.length; i++) {
+				const h = header[i];
+				if (!h || h.startsWith("s.") || h === "#" || h.includes("no") && h.length < 8) continue;
+				if (map.institute === i || map.phone === i || map.email === i || map.signed === i) continue;
+				map.participant_name = i;
+				break;
+			}
+		}
+		if (map.participant_name == null) map.participant_name = header[0]?.match(/s\.?\s*no/) ? 1 : 0;
 	} else {
 		map.participant_name = 0;
 		if (source === "Manual") {
@@ -372,11 +444,13 @@ function applyPasteRows(tableRows, source) {
 	for (const cells of data) {
 		const get = (k) => (map[k] != null && cells[map[k]] != null ? String(cells[map[k]]).trim() : "");
 		const name = get("participant_name");
-		if (!name) continue;
-		const statusRaw = get("attendance_status").toLowerCase();
+		if (!isAttendanceName(name)) continue;
+		const signedRaw = get("signed").toLowerCase();
+		const statusRaw = (get("attendance_status") || signedRaw).toLowerCase();
 		let attendance_status = "Present";
 		if (["absent", "no", "n", "0"].includes(statusRaw)) attendance_status = "Absent";
 		else if (statusRaw === "late") attendance_status = "Late";
+		else if (["yes", "y", "1", "present", "signed"].includes(statusRaw) || signedRaw === "yes") attendance_status = "Present";
 		const row = {
 			...blankAttendee(source),
 			participant_name: name,
@@ -387,6 +461,7 @@ function applyPasteRows(tableRows, source) {
 			leave_time: get("leave_time"),
 			duration_minutes: get("duration_minutes"),
 			is_guest: ["1", "yes", "true", "y"].includes(get("is_guest").toLowerCase()) ? 1 : 0,
+			remarks: get("remarks"),
 			attendance_status,
 			attendance_source: source,
 		};
@@ -926,6 +1001,7 @@ onMounted(load);
 									hidden
 									@change="onImportFile($event, 'Zoom')"
 								/>
+								<!-- LibreOffice .ods is not supported — save as .xlsx -->
 								<button type="button" class="ghost" :disabled="importing" @click="triggerImport('Zoom')">
 									{{ importing ? "Importing…" : "Import Excel / CSV" }}
 								</button>
@@ -983,7 +1059,8 @@ onMounted(load);
 							<div>
 								<h4>Manual attendance</h4>
 								<p class="import-hint">
-									Import Excel/CSV (Name, Institute, Cell No, Email, Status) or paste the same columns from Excel.
+									Import .xlsx / .csv (Name, School, Cell No, Signed) or paste from Excel/LibreOffice.
+									If file is .ods, use File → Save As → .xlsx first.
 								</p>
 							</div>
 							<div class="attend-actions">

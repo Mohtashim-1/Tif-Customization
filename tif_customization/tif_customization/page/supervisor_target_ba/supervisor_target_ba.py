@@ -2,8 +2,36 @@ import json
 
 import frappe
 from frappe import _
-from frappe.utils import cint, flt, get_first_day, get_last_day, getdate
+from frappe.utils import add_days, cint, flt, get_first_day, get_last_day, getdate, today
 
+from tif_customization.tif_customization.doctype.reporting.reporting import (
+	_gazetted_holiday_dates,
+	_leave_dates_by_employee,
+)
+from tif_customization.tif_customization.page.smes_target_base___k.smes_target_base_kpi_config import (
+	FISCAL_MONTHS,
+	INCREMENT_SCALE,
+)
+from tif_customization.tif_customization.page.smes_target_base___k.smes_target_base___k import (
+	_fiscal_year_start,
+	_increment_tier,
+)
+
+ACTIVITY_WEIGHT = 0.70
+OUTCOME_WEIGHT = 0.30
+
+# Scored KPIs used for monthly points / overall (same spirit as SME 70/30)
+ACTIVITY_METRICS = (
+	"school_visits",
+	"workshops",
+	"meetings",
+	"me_visits",
+	"sme_target_meetings",
+)
+OUTCOME_METRICS = (
+	"office_invitations",
+	"volunteers",
+)
 
 KPI_ROWS = [
 	{
@@ -154,6 +182,7 @@ def get_report_data(filters=None):
 	supervisor = (filters.get("supervisor") or "").strip()
 	supervisor_info = _get_supervisor_info(supervisor) if supervisor else _all_supervisors_info()
 	headcount = supervisor_info.get("headcount") or 1
+	employee = supervisor_info.get("employee")
 	yearly = _count_actuals(from_date, to_date, supervisor_info)
 	monthly = _count_actuals(month_from, to_date, supervisor_info)
 	field_staff = _get_supervisor_field_staff(supervisor_info)
@@ -177,6 +206,39 @@ def get_report_data(filters=None):
 		rows.append(entry)
 
 	scored = [r for r in rows if r["yearly"]]
+	yearly_percent = _average(r["yearly"]["percent"] for r in scored)
+	monthly_percent = _average(r["monthly"]["percent"] for r in scored)
+
+	# Monthly summary + FY performance (SME KPI Details sections)
+	wd_info = _working_days_info(month_from, to_date, employee)
+	working_days = cint(filters.get("working_days") or 0) or wd_info["working_days"]
+	full_month_wd = _working_days_info(
+		get_first_day(to_date), get_last_day(to_date), employee, cutoff_today=False
+	)["working_days"]
+	activity_yearly = _metric_target_sum(ACTIVITY_METRICS) * headcount
+	outcome_yearly = _metric_target_sum(OUTCOME_METRICS) * headcount
+	activity_monthly_target = flt(activity_yearly / 12.0, 4)
+	per_day_points = flt(activity_monthly_target / full_month_wd, 4) if full_month_wd else 0.0
+	activity_target = flt(working_days * per_day_points, 2)
+	activity_actual = flt(_sum_metrics(monthly, ACTIVITY_METRICS), 2)
+	activity_pct = flt((activity_actual / activity_target * 100) if activity_target else 0.0, 2)
+
+	fy_start_year = cint(filters.get("fiscal_year_start") or _fiscal_year_start(to_date.year, to_date.month))
+	ytd_from = getdate(f"{fy_start_year}-07-01")
+	if ytd_from > to_date:
+		ytd_from = from_date
+	ytd_actuals = _count_actuals(ytd_from, to_date, supervisor_info)
+	outcome_pct = _outcome_percent(ytd_actuals, headcount)
+	overall_pct = flt(ACTIVITY_WEIGHT * activity_pct + OUTCOME_WEIGHT * outcome_pct, 2)
+
+	months, ytd_activity_actual, ytd_activity_expected, yearly_target_score = _fiscal_month_rows(
+		supervisor_info, headcount, employee, fy_start_year
+	)
+	ytd_activity_pct = flt(
+		(ytd_activity_actual / ytd_activity_expected * 100) if ytd_activity_expected else 0.0, 2
+	)
+	increment_tier = _increment_tier(overall_pct)
+
 	return {
 		"foundation_title": _("The ILM Foundation"),
 		"sheet_title": _("Supervisors Target Base - KPIs"),
@@ -184,18 +246,43 @@ def get_report_data(filters=None):
 		"to_date": str(to_date),
 		"month_from": str(month_from),
 		"month_label": getdate(to_date).strftime("%B %Y"),
+		"ytd_from": str(ytd_from),
+		"fiscal_year_label": f"{fy_start_year}-{str(fy_start_year + 1)[-2:]}",
 		"supervisor": supervisor,
 		"supervisor_label": supervisor_info.get("label") or _("All Supervisors"),
 		"headcount": headcount,
 		"rows": rows,
-		"yearly_percent": _average(r["yearly"]["percent"] for r in scored),
-		"monthly_percent": _average(r["monthly"]["percent"] for r in scored),
+		"yearly_percent": yearly_percent,
+		"monthly_percent": monthly_percent,
 		"field_staff": field_staff,
 		"field_staff_count": len(field_staff),
+		"per_day_points": flt(per_day_points, 2),
+		"working_days": working_days,
+		"working_days_info": wd_info,
+		"activity_actual": activity_actual,
+		"activity_target": activity_target,
+		"activity_pct": activity_pct,
+		"outcome_pct": flt(outcome_pct, 2),
+		"overall_pct": overall_pct,
+		"activity_weight": ACTIVITY_WEIGHT,
+		"outcome_weight": OUTCOME_WEIGHT,
+		"months": months,
+		"ytd_activity_actual": flt(ytd_activity_actual, 2),
+		"ytd_activity_expected": flt(ytd_activity_expected, 2),
+		"ytd_activity_pct": ytd_activity_pct,
+		"yearly_target_score": flt(yearly_target_score, 2),
+		"increment_scale": INCREMENT_SCALE,
+		"increment_tier": increment_tier,
+		"increment_achieved": (increment_tier or {}).get("increment") or "",
+		"reward_note": _("Highest % Achiever {0}-{1}: Cash Reward with Shield").format(
+			fy_start_year, fy_start_year + 1
+		),
 		"notes": [
 			_("Yearly columns cover From Date to To Date; Monthly columns cover the month of To Date."),
 			_("Monthly Target = Yearly Target / 12. Excess / Remaining = Target - Achievements (negative means target exceeded)."),
-			_("Yearly / Monthly Performance Percentage is the average of the KPI percentages with a numeric target."),
+			_("Monthly summary points = sum of activity KPI counts (visits, workshops, meetings, SME visits/meetings)."),
+			_("Expected monthly points = working days × (activity monthly target ÷ full-month working days)."),
+			_("Overall % = 70% activity (monthly points) + 30% outcome (invitations + volunteers vs yearly mins, YTD)."),
 			_("All Supervisors: targets are multiplied by the number of supervisors and only the supervisors' own activities are counted."),
 			_("Supervisor Field Staff are active Employees whose Reports To is the selected supervisor."),
 		],
@@ -215,6 +302,132 @@ def _kpi_cell(target, actual):
 def _average(values):
 	values = list(values)
 	return flt(sum(values) / len(values), 0) if values else 0
+
+
+def _metric_target_map():
+	return {row["metric"]: row["target"] for row in KPI_ROWS if row.get("metric") and row.get("target") is not None}
+
+
+def _metric_target_sum(metrics):
+	targets = _metric_target_map()
+	return flt(sum(flt(targets.get(m) or 0) for m in metrics), 2)
+
+
+def _sum_metrics(actuals, metrics):
+	return sum(cint((actuals or {}).get(m) or 0) for m in metrics)
+
+
+def _outcome_percent(actuals, headcount=1):
+	targets = _metric_target_map()
+	pcts = []
+	for metric in OUTCOME_METRICS:
+		target = flt(targets.get(metric) or 0) * (headcount or 1)
+		actual = cint((actuals or {}).get(metric) or 0)
+		if target:
+			pcts.append(min(100.0, actual / target * 100.0))
+	return flt(sum(pcts) / len(pcts), 2) if pcts else 0.0
+
+
+def _working_days_info(from_date, to_date, employee=None, cutoff_today=True):
+	start = getdate(from_date)
+	end = getdate(to_date)
+	if cutoff_today:
+		cutoff = getdate(today())
+		if end > cutoff:
+			end = cutoff
+	if start > end:
+		return {
+			"working_days": 0,
+			"calendar_days": 0,
+			"sundays": 0,
+			"gazetted": 0,
+			"leave_days": 0,
+			"employee": employee,
+		}
+
+	holidays = _gazetted_holiday_dates(start, end)
+	leave = set()
+	if employee:
+		leave = (_leave_dates_by_employee(start, end, [employee]) or {}).get(employee) or set()
+
+	sundays = gazetted = leave_days = working = 0
+	calendar = 0
+	cur = start
+	while cur <= end:
+		calendar += 1
+		is_sunday = cur.weekday() == 6
+		is_holiday = cur in holidays
+		is_leave = cur in leave
+		if is_sunday:
+			sundays += 1
+		elif is_holiday:
+			gazetted += 1
+		elif is_leave:
+			leave_days += 1
+		else:
+			working += 1
+		cur = add_days(cur, 1)
+
+	return {
+		"working_days": working,
+		"calendar_days": calendar,
+		"sundays": sundays,
+		"gazetted": gazetted,
+		"leave_days": leave_days,
+		"employee": employee,
+	}
+
+
+def _fiscal_month_rows(supervisor_info, headcount, employee, fy_start):
+	"""Jul–Jun activity points / % using each month's own working days."""
+	activity_yearly = _metric_target_sum(ACTIVITY_METRICS) * (headcount or 1)
+	activity_monthly_target = flt(activity_yearly / 12.0, 4)
+	today_d = getdate(today())
+	out = []
+	ytd_actual = 0.0
+	ytd_expected = 0.0
+	year_expected = 0.0
+
+	for month_num, short in FISCAL_MONTHS:
+		year = fy_start if month_num >= 7 else fy_start + 1
+		start = get_first_day(f"{year}-{month_num:02d}-01")
+		end = get_last_day(start)
+		wd_full = _working_days_info(start, end, employee, cutoff_today=False)
+		per_day = (
+			flt(activity_monthly_target / wd_full["working_days"], 4) if wd_full["working_days"] else 0.0
+		)
+		year_expected += wd_full["working_days"] * per_day
+		elapsed = start <= today_d
+		row = {
+			"month": month_num,
+			"year": year,
+			"label": f"{short}-{str(year)[-2:]}",
+			"score": None,
+			"percent": None,
+			"expected": None,
+			"working_days": wd_full["working_days"],
+			"elapsed": elapsed,
+		}
+		if elapsed:
+			actual_end = end if end <= today_d else today_d
+			wd = _working_days_info(start, actual_end, employee, cutoff_today=True)
+			expected = flt(wd["working_days"] * per_day, 2)
+			actuals = _count_actuals(start, actual_end, supervisor_info)
+			score = flt(_sum_metrics(actuals, ACTIVITY_METRICS), 2)
+			percent = (score / expected * 100) if expected else 0.0
+			row.update(
+				{
+					"score": score,
+					"percent": flt(percent, 2),
+					"expected": expected,
+					"working_days": wd["working_days"],
+				}
+			)
+			ytd_actual += score
+			ytd_expected += expected
+		out.append(row)
+
+	return out, ytd_actual, ytd_expected, year_expected
 
 
 def _supervisor_option_description(row):
