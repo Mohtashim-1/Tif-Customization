@@ -28,6 +28,7 @@ function blankRow(institute = "") {
 		email: "",
 		signed: "Yes",
 		attendance_status: "Present",
+		attendance_source: "Manual",
 	};
 }
 
@@ -84,8 +85,15 @@ async function load() {
 			trainer: doc.trainer_name || "",
 			institute,
 		};
-		rows.value = ensureMinRows(doc.attendance || [], institute).map((r) => ({
+		const manual = (doc.attendance || []).filter((r) => {
+			const src = (r.attendance_source || "").trim();
+			if (src === "Manual") return true;
+			if (src === "Zoom") return false;
+			return !(r.join_time || r.leave_time || r.duration_minutes || r.zoom_participant_id);
+		});
+		rows.value = ensureMinRows(manual, institute).map((r) => ({
 			...r,
+			attendance_source: "Manual",
 			institute: institute || (r.institute || "").trim(),
 		}));
 		await nextTick();
@@ -231,6 +239,112 @@ function onKeydown(e, rowIdx, colIdx) {
 	navigate(rowIdx, colIdx, key, e.shiftKey);
 }
 
+
+const importing = ref(false);
+const importMode = ref("replace");
+const fileInput = ref(null);
+const pasteMsg = ref("");
+
+function parsePasteText(text) {
+	const lines = String(text || "")
+		.replace(/\r\n/g, '\n')
+		.replace(/\r/g, '\n')
+		.split('\n')
+		.map((l) => l.trimEnd())
+		.filter((l) => l.trim());
+	return lines.map((line) => {
+		if (line.includes('\t')) return line.split('\t').map((c) => c.trim());
+		return line.split(",").map((c) => c.trim());
+	});
+}
+
+function applyPaste(tableRows) {
+	if (!tableRows.length) return 0;
+	const header = tableRows[0].map((c) => String(c || "").toLowerCase());
+	const hasHeader = header.some((h) => ["name", "email", "institute", "phone", "cell"].some((k) => h.includes(k)));
+	const data = hasHeader ? tableRows.slice(1) : tableRows;
+	const map = { participant_name: 0, institute: 1, phone: 2, email: 3, signed: 4 };
+	if (hasHeader) {
+		header.forEach((h, i) => {
+			if (h.includes("name")) map.participant_name = i;
+			if (h.includes("institute") || h.includes("school")) map.institute = i;
+			if (h.includes("phone") || h.includes("cell") || h.includes("mobile")) map.phone = i;
+			if (h.includes("email")) map.email = i;
+			if (h.includes("sign") || h.includes("status") || h.includes("attendance")) map.signed = i;
+		});
+	}
+	const institute = meta.value.institute || "";
+	const mapped = [];
+	for (const cells of data) {
+		const get = (k) => (map[k] != null && cells[map[k]] != null ? String(cells[map[k]]).trim() : "");
+		const name = get("participant_name");
+		if (!name) continue;
+		const signedRaw = get("signed").toLowerCase();
+		const signed = ["no", "absent", "n", "0"].includes(signedRaw) ? "No" : "Yes";
+		mapped.push({
+			...blankRow(institute),
+			participant_name: name,
+			institute: get("institute") || institute,
+			phone: get("phone"),
+			email: get("email"),
+			signed,
+			attendance_status: signed === "Yes" ? "Present" : "Absent",
+			attendance_source: "Manual",
+		});
+	}
+	if (importMode.value === "replace") {
+		rows.value = ensureMinRows(mapped, institute);
+	} else {
+		rows.value = ensureMinRows([...rows.value.filter((r) => (r.participant_name || "").trim()), ...mapped], institute);
+	}
+	return mapped.length;
+}
+
+function onSheetPaste(event) {
+	const text = event.clipboardData?.getData("text") || "";
+	if (!text || (!text.includes('\t') && !text.includes('\n'))) return;
+	event.preventDefault();
+	const n = applyPaste(parsePasteText(text));
+	pasteMsg.value = n ? `Pasted ${n} row(s).` : "Nothing to paste.";
+}
+
+async function onImportFile(event) {
+	const file = event.target?.files?.[0];
+	if (!file) return;
+	importing.value = true;
+	error.value = "";
+	pasteMsg.value = "";
+	try {
+		let content;
+		let content_b64;
+		const name = (file.name || "").toLowerCase();
+		if (name.endsWith(".xlsx") || name.endsWith(".xlsm")) {
+			const buf = new Uint8Array(await file.arrayBuffer());
+			let binary = "";
+			for (let i = 0; i < buf.length; i++) binary += String.fromCharCode(buf[i]);
+			content_b64 = btoa(binary);
+		} else {
+			content = await file.text();
+		}
+		const result = await apiPost(`${METHOD}.import_attendance`, {
+			name: props.sessionName,
+			content,
+			content_b64,
+			filename: file.name,
+			mode: importMode.value,
+			source: "Manual",
+		});
+		await load();
+		pasteMsg.value = result.message || `Imported ${result.added || 0} row(s).`;
+		emit("saved", result);
+	} catch (e) {
+		error.value = e.message || String(e);
+	} finally {
+		importing.value = false;
+		if (event.target) event.target.value = "";
+	}
+}
+
 async function save() {
 	const validationError = validateRows();
 	if (validationError) {
@@ -253,7 +367,8 @@ async function save() {
 			}));
 		const result = await apiPost(`${METHOD}.save_attendance`, {
 			name: props.sessionName,
-			attendance: payload,
+			attendance: payload.map((r) => ({ ...r, attendance_source: "Manual" })),
+			source: "Manual",
 		});
 		emit("saved", result);
 		emit("close");
@@ -270,7 +385,7 @@ async function save() {
 		<section class="sheet" role="dialog" aria-label="Attendance">
 			<header>
 				<div>
-					<p class="kicker">Attendance</p>
+					<p class="kicker">Manual attendance</p>
 					<h2>{{ meta.title || "Mark attendance" }}</h2>
 					<p class="sub">
 						{{ sessionName }}
@@ -290,13 +405,33 @@ async function save() {
 				</span>
 			</div>
 			<p class="hint">
-				Cell No / Email optional, but must be valid if filled · Tab / Enter / ↑↓ to move
+				Manual attendance only (Zoom stays on the session form) · Paste Excel rows · Import Excel/CSV · Cell No / Email optional
 			</p>
+			<div class="sheet-tools">
+				<label class="mode-pick">
+					Import mode
+					<select v-model="importMode">
+						<option value="replace">Replace manual</option>
+						<option value="append">Append new</option>
+					</select>
+				</label>
+				<input
+					ref="fileInput"
+					type="file"
+					accept=".csv,.xlsx,.xlsm,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+					hidden
+					@change="onImportFile"
+				/>
+				<button type="button" class="ghost" :disabled="importing" @click="fileInput?.click()">
+					{{ importing ? "Importing…" : "Import Excel / CSV" }}
+				</button>
+			</div>
+			<p v-if="pasteMsg" class="ok">{{ pasteMsg }}</p>
 
 			<p v-if="error" class="err">{{ error }}</p>
 			<div v-if="loading" class="loading">Loading attendance…</div>
 
-			<div v-else ref="tableRef" class="grid-wrap">
+			<div v-else ref="tableRef" class="grid-wrap" @paste="onSheetPaste">
 				<table class="sheet-table">
 					<thead>
 						<tr>
@@ -401,6 +536,11 @@ h2 {
 	letter-spacing: -0.02em;
 }
 .sub,
+.sheet-tools { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin:0 0 10px; }
+.sheet-tools .ghost { border:1px solid #cbd5e1; background:#fff; border-radius:8px; padding:6px 10px; font-size:12px; font-weight:650; cursor:pointer; }
+.mode-pick { font-size:11px; color:#64748b; display:flex; gap:6px; align-items:center; }
+.mode-pick select { border:1px solid #e2e8f0; border-radius:6px; padding:4px 6px; }
+.ok { color:#047857; font-size:12px; margin:0 0 8px; }
 .hint {
 	margin: 4px 0 0;
 	font-size: 13px;

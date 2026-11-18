@@ -25,7 +25,9 @@ const attachErr = ref("");
 const attachStatus = ref(""); // Saving… / Uploading… / Running OCR…
 const importMode = ref("replace");
 const importAllDates = ref(false);
-const fileInput = ref(null);
+const fileInputZoom = ref(null);
+const fileInputManual = ref(null);
+const pasteMsg = ref("");
 const attachmentInput = ref(null);
 const attachments = ref([]);
 const feedbackForms = ref([]);
@@ -83,9 +85,11 @@ const presentCount = computed(
 	() => (form.attendance || []).filter((a) => a.attendance_status === "Present").length
 );
 
-function blankAttendee() {
+function blankAttendee(source = "Manual") {
 	return {
+		attendance_source: source === "Zoom" ? "Zoom" : "Manual",
 		participant_name: "",
+		institute: "",
 		email: "",
 		join_time: "",
 		leave_time: "",
@@ -100,6 +104,22 @@ function blankAttendee() {
 		remarks: "",
 	};
 }
+
+function rowSource(row) {
+	const s = (row?.attendance_source || "").trim();
+	if (s === "Zoom" || s === "Manual") return s;
+	if (row?.join_time || row?.leave_time || row?.duration_minutes || row?.zoom_participant_id) return "Zoom";
+	return "Manual";
+}
+
+const zoomAttendance = computed(() => (form.attendance || []).filter((r) => rowSource(r) === "Zoom"));
+const manualAttendance = computed(() => (form.attendance || []).filter((r) => rowSource(r) === "Manual"));
+const zoomPresent = computed(
+	() => zoomAttendance.value.filter((a) => a.attendance_status === "Present").length
+);
+const manualPresent = computed(
+	() => manualAttendance.value.filter((a) => a.attendance_status === "Present").length
+);
 
 function reset() {
 	Object.assign(form, {
@@ -233,32 +253,158 @@ async function removeAttachment(file) {
 	}
 }
 
-function addAttendee() {
-	form.attendance.push(blankAttendee());
+function addAttendee(source = "Manual") {
+	form.attendance.push(blankAttendee(source));
 }
 
-function removeAttendee(idx) {
-	form.attendance.splice(idx, 1);
+function removeAttendeeBySource(source, idxInSource) {
+	const list = (form.attendance || []).filter((r) => rowSource(r) === source);
+	const row = list[idxInSource];
+	if (!row) return;
+	const i = form.attendance.indexOf(row);
+	if (i >= 0) form.attendance.splice(i, 1);
 }
 
-function mergeImportedRows(rows, mode) {
-	const mapped = (rows || []).map((a) => ({ ...blankAttendee(), ...a }));
+function mergeImportedRows(rows, mode, source = "Zoom") {
+	const mapped = (rows || []).map((a) => ({ ...blankAttendee(source), ...a, attendance_source: source }));
+	const other = (form.attendance || []).filter((r) => rowSource(r) !== source);
 	if (mode === "append") {
 		const keys = new Set(
-			form.attendance.map(
-				(r) => `${(r.participant_name || "").toLowerCase()}|${(r.email || "").toLowerCase()}`
-			)
+			(form.attendance || [])
+				.filter((r) => rowSource(r) === source)
+				.map((r) => `${(r.participant_name || "").toLowerCase()}|${(r.email || "").toLowerCase()}`)
 		);
+		const next = [...(form.attendance || [])];
 		for (const row of mapped) {
 			const key = `${(row.participant_name || "").toLowerCase()}|${(row.email || "").toLowerCase()}`;
 			if (!keys.has(key)) {
-				form.attendance.push(row);
+				next.push(row);
 				keys.add(key);
 			}
 		}
+		form.attendance = next;
 	} else {
-		form.attendance = mapped;
+		form.attendance = [...other, ...mapped];
 	}
+}
+
+function fileToPayload(file) {
+	return new Promise((resolve, reject) => {
+		const name = (file.name || "").toLowerCase();
+		if (name.endsWith(".xlsx") || name.endsWith(".xlsm")) {
+			const reader = new FileReader();
+			reader.onload = () => {
+				const buf = new Uint8Array(reader.result);
+				let binary = "";
+				for (let i = 0; i < buf.length; i++) binary += String.fromCharCode(buf[i]);
+				resolve({ content_b64: btoa(binary), filename: file.name });
+			};
+			reader.onerror = () => reject(new Error("Could not read Excel file."));
+			reader.readAsArrayBuffer(file);
+		} else {
+			file
+				.text()
+				.then((content) => resolve({ content, filename: file.name }))
+				.catch(reject);
+		}
+	});
+}
+
+function parsePasteText(text) {
+	const lines = String(text || "")
+		.replace(/\r\n/g, '\n')
+		.replace(/\r/g, '\n')
+		.split('\n')
+		.map((l) => l.trimEnd())
+		.filter((l) => l.trim());
+	return lines.map((line) => {
+		if (line.includes('\t')) return line.split('\t').map((c) => c.trim());
+		const cells = [];
+		let cur = "";
+		let q = false;
+		for (const ch of line) {
+			if (ch === '"') q = !q;
+			else if (ch === "," && !q) {
+				cells.push(cur.trim());
+				cur = "";
+			} else cur += ch;
+		}
+		cells.push(cur.trim());
+		return cells;
+	});
+}
+
+function applyPasteRows(tableRows, source) {
+	if (!tableRows.length) return 0;
+	const header = tableRows[0].map((c) => String(c || "").trim().toLowerCase());
+	const hasHeader = header.some((h) => ["name", "email", "participant", "institute", "phone", "cell"].some((k) => h.includes(k)));
+	const data = hasHeader ? tableRows.slice(1) : tableRows;
+	const map = {};
+	if (hasHeader) {
+		header.forEach((h, i) => {
+			if (h.includes("name") && !h.includes("original") && !map.participant_name) map.participant_name = i;
+			if (h.includes("original") || h === "name (original name)") map.participant_name = i;
+			if (h.includes("email")) map.email = i;
+			if (h.includes("institute") || h === "school") map.institute = i;
+			if (h.includes("phone") || h.includes("cell") || h.includes("mobile")) map.phone = i;
+			if (h.includes("join")) map.join_time = i;
+			if (h.includes("leave")) map.leave_time = i;
+			if (h.includes("duration")) map.duration_minutes = i;
+			if (h.includes("guest")) map.is_guest = i;
+			if (h.includes("status") || h.includes("attendance") || h === "sign") map.attendance_status = i;
+		});
+		if (map.participant_name == null) map.participant_name = 0;
+	} else {
+		map.participant_name = 0;
+		if (source === "Manual") {
+			map.institute = 1;
+			map.phone = 2;
+			map.email = 3;
+			map.attendance_status = 4;
+		} else {
+			map.email = 1;
+			map.join_time = 2;
+			map.leave_time = 3;
+			map.duration_minutes = 4;
+		}
+	}
+	const rows = [];
+	for (const cells of data) {
+		const get = (k) => (map[k] != null && cells[map[k]] != null ? String(cells[map[k]]).trim() : "");
+		const name = get("participant_name");
+		if (!name) continue;
+		const statusRaw = get("attendance_status").toLowerCase();
+		let attendance_status = "Present";
+		if (["absent", "no", "n", "0"].includes(statusRaw)) attendance_status = "Absent";
+		else if (statusRaw === "late") attendance_status = "Late";
+		const row = {
+			...blankAttendee(source),
+			participant_name: name,
+			email: get("email"),
+			institute: get("institute") || (form.school_name || ""),
+			phone: get("phone"),
+			join_time: get("join_time"),
+			leave_time: get("leave_time"),
+			duration_minutes: get("duration_minutes"),
+			is_guest: ["1", "yes", "true", "y"].includes(get("is_guest").toLowerCase()) ? 1 : 0,
+			attendance_status,
+			attendance_source: source,
+		};
+		rows.push(row);
+	}
+	mergeImportedRows(rows, importMode.value, source);
+	return rows.length;
+}
+
+function onAttendPaste(event, source) {
+	const text = event.clipboardData?.getData("text") || "";
+	if (!text || (!text.includes('\t') && !text.includes('\n') && text.split(",").length < 2)) return;
+	event.preventDefault();
+	const n = applyPasteRows(parsePasteText(text), source);
+	pasteMsg.value = n
+		? `Pasted ${n} ${source.toLowerCase()} row(s) (${importMode.value}).`
+		: "Nothing to paste — need a Name column.";
+	importMsg.value = "";
 }
 
 async function ensureTrainingSaved() {
@@ -280,31 +426,30 @@ async function ensureTrainingSaved() {
 	return form.name;
 }
 
-async function onImportFile(event) {
+async function onImportFile(event, source = "Zoom") {
 	const file = event.target?.files?.[0];
 	if (!file) return;
 	importing.value = true;
 	error.value = "";
 	importMsg.value = "";
+	pasteMsg.value = "";
 	try {
-		const content = await file.text();
-		// File attach needs a saved Upcoming Training — auto-save New Training first.
+		const payload = await fileToPayload(file);
 		const name = await ensureTrainingSaved();
 		const result = await apiPost(`${METHOD}.import_attendance`, {
 			name,
-			content,
+			...payload,
 			mode: importMode.value,
-			filename: file.name,
-			ignore_date: importAllDates.value ? 1 : 0,
+			ignore_date: source === "Zoom" && importAllDates.value ? 1 : 0,
+			source,
 		});
-		// Re-fetch so the table always matches what was saved (avoids stale empty UI).
 		const doc = await apiGet(`${METHOD}.get_session`, { name });
 		await applySessionDoc(doc);
-		importMsg.value = result.message || `Imported ${result.added || 0} row(s).`;
+		importMsg.value = result.message || `Imported ${result.added || 0} ${source} row(s).`;
 		if (result.date_mismatch) {
 			error.value =
 				result.message ||
-				"CSV attached, but no rows match this session date. Tick “Import all rows” and import again.";
+				"File attached, but no rows match this session date. Tick “Import all rows” and import again.";
 			importMsg.value = "";
 		}
 		emit("saved", { ...result, silent: true, bindName: name });
@@ -316,8 +461,8 @@ async function onImportFile(event) {
 	}
 }
 
-function triggerImport() {
-	fileInput.value?.click();
+function triggerImport(source = "Zoom") {
+	(source === "Manual" ? fileInputManual : fileInputZoom).value?.click();
 }
 
 async function createLink(key, field, name) {
@@ -384,7 +529,7 @@ watch(
 async function applySessionDoc(doc) {
 	Object.assign(form, {
 		...doc,
-		attendance: (doc.attendance || []).map((a) => ({ ...blankAttendee(), ...a })),
+		attendance: (doc.attendance || []).map((a) => ({ ...blankAttendee(rowSource(a)), ...a, attendance_source: rowSource(a) })),
 	});
 	attachments.value = doc.attachments || [];
 	if (doc.zoom_attendance_file) form.zoom_attendance_file = doc.zoom_attendance_file;
@@ -720,9 +865,10 @@ onMounted(load);
 						<div>
 							<h3>Attendance</h3>
 							<p>
-								Tagged to this training
+								Zoom {{ zoomPresent }}/{{ zoomAttendance.length }} · Manual
+								{{ manualPresent }}/{{ manualAttendance.length }} · Total
+								{{ presentCount }}/{{ form.attendance.length }} present
 								<template v-if="form.zoom_id"> · Zoom ID {{ form.zoom_id }}</template>
-								· {{ presentCount }}/{{ form.attendance.length }} present
 							</p>
 						</div>
 						<div class="attend-actions">
@@ -737,113 +883,165 @@ onMounted(load);
 									})
 								"
 							>
-								Open Attendance Sheet
+								Open Manual Sheet
 							</button>
 							<label class="mode-pick">
 								Import mode
 								<select v-model="importMode">
-									<option value="replace">Replace all</option>
+									<option value="replace">Replace this type</option>
 									<option value="append">Append new</option>
 								</select>
 							</label>
-							<label class="mode-pick check-inline" title="Use when Zoom export date does not match this session">
-								<input type="checkbox" v-model="importAllDates" />
-								Import all rows
-							</label>
-							<input
-								ref="fileInput"
-								type="file"
-								accept=".csv,text/csv"
-								hidden
-								@change="onImportFile"
-							/>
-							<button type="button" class="ghost" :disabled="importing" @click="triggerImport">
-								{{ importing ? "Importing…" : "Bulk import CSV" }}
-							</button>
-							<button type="button" class="ghost" @click="addAttendee">+ Add participant</button>
 						</div>
 					</div>
 
 					<p v-if="importMsg" class="import-ok">{{ importMsg }}</p>
+					<p v-if="pasteMsg" class="import-ok">{{ pasteMsg }}</p>
 					<div v-if="form.zoom_attendance_file" class="attach-row">
-						<span class="attach-label">Attached CSV</span>
+						<span class="attach-label">Attached Zoom CSV</span>
 						<a :href="form.zoom_attendance_file" target="_blank" rel="noopener" class="attach-link">
 							{{ form.zoom_attendance_file.split("/").pop() }}
 						</a>
 					</div>
-					<p class="import-hint">
-						CSV: Name, Email, Join time, Leave time, Duration, Guest, Disclaimer, Waiting room.
-						By default only rows whose Zoom join date matches this session date
-						({{ form.training_date || "—" }}) are imported.
-						If the Zoom file date is wrong, tick <strong>Import all rows</strong> before importing.
-					</p>
 
-					<div v-if="!form.attendance.length" class="attend-empty">
-						No attendance yet. Import a Zoom CSV or add a participant.
+					<!-- Zoom attendance -->
+					<div class="attend-cat">
+						<div class="attend-cat-head">
+							<div>
+								<h4>Zoom attendance</h4>
+								<p class="import-hint">
+									Import Zoom report (CSV/Excel) or paste rows (Name, Email, Join time…).
+									Default: only rows matching session date ({{ form.training_date || "—" }}).
+								</p>
+							</div>
+							<div class="attend-actions">
+								<label class="mode-pick check-inline" title="Use when Zoom export date does not match this session">
+									<input type="checkbox" v-model="importAllDates" />
+									Import all rows
+								</label>
+								<input
+									ref="fileInputZoom"
+									type="file"
+									accept=".csv,.xlsx,.xlsm,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+									hidden
+									@change="onImportFile($event, 'Zoom')"
+								/>
+								<button type="button" class="ghost" :disabled="importing" @click="triggerImport('Zoom')">
+									{{ importing ? "Importing…" : "Import Excel / CSV" }}
+								</button>
+								<button type="button" class="ghost" @click="addAttendee('Zoom')">+ Add</button>
+							</div>
+						</div>
+						<div v-if="!zoomAttendance.length" class="attend-empty" tabindex="0" @paste="onAttendPaste($event, 'Zoom')">
+							No Zoom attendance yet. Import a file or click here and paste from Excel.
+						</div>
+						<div v-else class="attend-table-wrap" @paste="onAttendPaste($event, 'Zoom')">
+							<table class="attend-table">
+								<thead>
+									<tr>
+										<th>Name</th>
+										<th>Email</th>
+										<th>Join time</th>
+										<th>Leave time</th>
+										<th>Duration</th>
+										<th>Guest</th>
+										<th>Status</th>
+										<th></th>
+									</tr>
+								</thead>
+								<tbody>
+									<tr v-for="(row, idx) in zoomAttendance" :key="'z-' + idx">
+										<td><input v-model="row.participant_name" placeholder="Name" /></td>
+										<td><input v-model="row.email" type="email" placeholder="email@" /></td>
+										<td><input v-model="row.join_time" placeholder="Join time" /></td>
+										<td><input v-model="row.leave_time" placeholder="Leave time" /></td>
+										<td><input v-model="row.duration_minutes" type="number" min="0" /></td>
+										<td class="center">
+											<input v-model="row.is_guest" type="checkbox" true-value="1" false-value="0" />
+										</td>
+										<td>
+											<select v-model="row.attendance_status">
+												<option>Present</option>
+												<option>Absent</option>
+												<option>Late</option>
+											</select>
+										</td>
+										<td>
+											<button type="button" class="linkish" @click="removeAttendeeBySource('Zoom', idx)">
+												Remove
+											</button>
+										</td>
+									</tr>
+								</tbody>
+							</table>
+						</div>
 					</div>
 
-					<div v-else class="attend-table-wrap">
-						<table class="attend-table">
-							<thead>
-								<tr>
-									<th>Name (original name)</th>
-									<th>Email</th>
-									<th>Join time</th>
-									<th>Leave time</th>
-									<th>Duration (min)</th>
-									<th>Guest</th>
-									<th>Recording disclaimer</th>
-									<th>Waiting room</th>
-									<th>Status</th>
-									<th></th>
-								</tr>
-							</thead>
-							<tbody>
-								<tr v-for="(row, idx) in form.attendance" :key="idx">
-									<td>
-										<input v-model="row.participant_name" placeholder="Name" required />
-									</td>
-									<td>
-										<input v-model="row.email" type="email" placeholder="email@" />
-									</td>
-									<td>
-										<input v-model="row.join_time" placeholder="Join time" />
-									</td>
-									<td>
-										<input v-model="row.leave_time" placeholder="Leave time" />
-									</td>
-									<td>
-										<input v-model="row.duration_minutes" type="number" min="0" />
-									</td>
-									<td class="center">
-										<input v-model="row.is_guest" type="checkbox" true-value="1" false-value="0" />
-									</td>
-									<td>
-										<input v-model="row.recording_disclaimer_response" placeholder="Yes / No" />
-									</td>
-									<td class="center">
-										<input
-											v-model="row.in_waiting_room"
-											type="checkbox"
-											true-value="1"
-											false-value="0"
-										/>
-									</td>
-									<td>
-										<select v-model="row.attendance_status">
-											<option>Present</option>
-											<option>Absent</option>
-											<option>Late</option>
-										</select>
-									</td>
-									<td>
-										<button type="button" class="linkish" @click="removeAttendee(idx)">
-											Remove
-										</button>
-									</td>
-								</tr>
-							</tbody>
-						</table>
+					<!-- Manual attendance -->
+					<div class="attend-cat">
+						<div class="attend-cat-head">
+							<div>
+								<h4>Manual attendance</h4>
+								<p class="import-hint">
+									Import Excel/CSV (Name, Institute, Cell No, Email, Status) or paste the same columns from Excel.
+								</p>
+							</div>
+							<div class="attend-actions">
+								<input
+									ref="fileInputManual"
+									type="file"
+									accept=".csv,.xlsx,.xlsm,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+									hidden
+									@change="onImportFile($event, 'Manual')"
+								/>
+								<button type="button" class="ghost" :disabled="importing" @click="triggerImport('Manual')">
+									{{ importing ? "Importing…" : "Import Excel / CSV" }}
+								</button>
+								<button type="button" class="ghost" @click="addAttendee('Manual')">+ Add</button>
+							</div>
+						</div>
+						<div v-if="!manualAttendance.length" class="attend-empty" @paste="onAttendPaste($event, 'Manual')" tabindex="0">
+							No manual attendance yet. Import a file or click here and paste from Excel.
+						</div>
+						<div v-else class="attend-table-wrap" @paste="onAttendPaste($event, 'Manual')">
+							<table class="attend-table">
+								<thead>
+									<tr>
+										<th>Name</th>
+										<th>Institute</th>
+										<th>Cell No</th>
+										<th>Email</th>
+										<th>Status</th>
+										<th></th>
+									</tr>
+								</thead>
+								<tbody>
+									<tr v-for="(row, idx) in manualAttendance" :key="'m-' + idx">
+										<td><input v-model="row.participant_name" placeholder="Name" /></td>
+										<td>
+											<input
+												v-model="row.institute"
+												:placeholder="form.school_name || 'Institute / school'"
+											/>
+										</td>
+										<td><input v-model="row.phone" placeholder="Cell no" /></td>
+										<td><input v-model="row.email" type="email" placeholder="email@" /></td>
+										<td>
+											<select v-model="row.attendance_status">
+												<option>Present</option>
+												<option>Absent</option>
+												<option>Late</option>
+											</select>
+										</td>
+										<td>
+											<button type="button" class="linkish" @click="removeAttendeeBySource('Manual', idx)">
+												Remove
+											</button>
+										</td>
+									</tr>
+								</tbody>
+							</table>
+						</div>
 					</div>
 				</section>
 

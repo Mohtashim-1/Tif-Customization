@@ -5,6 +5,7 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
+  "attendance_source",
   "participant_name",
   "institute",
   "phone",
@@ -21,6 +22,15 @@
   "remarks"
  ],
  "fields": [
+  {
+   "columns": 1,
+   "default": "Manual",
+   "fieldname": "attendance_source",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Source",
+   "options": "Zoom\nManual"
+  },
   {
    "columns": 2,
    "fieldname": "participant_name",

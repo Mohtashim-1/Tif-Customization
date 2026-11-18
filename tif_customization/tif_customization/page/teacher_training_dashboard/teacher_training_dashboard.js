@@ -136,7 +136,7 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 .tt-pc .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
 .tt-pc h4{font-size:14px;font-weight:800;margin:0 0 4px;line-height:1.3;color:var(--ink)}
 .tt-pc .sub{font-size:11px;color:var(--mute);margin-bottom:12px}
-.tt-pc .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:12px;padding-top:12px;border-top:1px solid #F0EFE9}
+.tt-pc .stats{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:12px;padding-top:12px;border-top:1px solid #F0EFE9}
 .tt-pc .stats b{display:block;font-size:16px;font-weight:800}.tt-pc .stats small{font-size:10px;color:var(--mute);text-transform:uppercase}
 .tt-back{background:none;border:0;color:var(--teal);font-weight:700;font-size:12px;cursor:pointer;padding:0;margin-bottom:8px}
 .tt-src{margin-bottom:12px}.tt-src .row{display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px}
@@ -564,8 +564,6 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 			<div class="tt-kpis" style="margin-bottom:16px">
 				${this.kpi(__("Instructors"), this.fmt(trainers.length), __("engaged on {0}", [label_plural.toLowerCase()]))}
 				${this.kpi(__("Top trainer · {0} sessions", [label]), top ? this.fmt(top.sessions) : "—", top ? this.esc(top.name) : __("no trainers"))}
-				${this.kpi(__("Top trainer teachers"), top ? this.fmt(top.people) : "—", top ? __("{0}h on {1}s", [this.fmt(top.hours, 0), label]) : "")}
-				${this.kpi(__("Avg sessions / trainer"), trainers.length ? this.fmt(sessions.length / trainers.length, 1) : "—", __("{0} sessions only", [label_plural]))}
 			</div>`;
 
 		const top_row = trainers.length
@@ -596,8 +594,6 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 				<div class="stats">
 					<div><b>${this.fmt(p.people)}</b><small>${__("Teachers")}</small></div>
 					<div><b>${this.fmt(p.minutes / 60, 0)}</b><small>${__("Hours")}</small></div>
-					<div><b>${p.trainers.size}</b><small>${__("Instr.")}</small></div>
-					<div><b>${p.rating == null ? "—" : this.fmt(p.rating, 1)}</b><small>${__("Rating")}</small></div>
 				</div></div>`
 				)
 				.join("")}</div>`

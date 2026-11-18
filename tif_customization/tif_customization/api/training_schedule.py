@@ -283,11 +283,32 @@ def _as_row_dict(row) -> frappe._dict:
 	return frappe._dict(row or {})
 
 
+def _infer_attendance_source(row) -> str:
+	"""Zoom vs Manual — prefer explicit field; else infer from Zoom-like columns."""
+	row = _as_row_dict(row)
+	raw = ""
+	if hasattr(row, "get"):
+		raw = cstr(row.get("attendance_source") or "").strip()
+	else:
+		raw = cstr(getattr(row, "attendance_source", None) or "").strip()
+	if raw in ("Zoom", "Manual"):
+		return raw
+	if (
+		cstr(getattr(row, "join_time", None) or (row.get("join_time") if hasattr(row, "get") else "") or "").strip()
+		or cint(getattr(row, "duration_minutes", None) or (row.get("duration_minutes") if hasattr(row, "get") else 0) or 0)
+		or cstr(getattr(row, "zoom_participant_id", None) or (row.get("zoom_participant_id") if hasattr(row, "get") else "") or "").strip()
+		or cstr(getattr(row, "leave_time", None) or (row.get("leave_time") if hasattr(row, "get") else "") or "").strip()
+	):
+		return "Zoom"
+	return "Manual"
+
+
 def _attendance_row_dict(row) -> dict:
 	row = _as_row_dict(row)
 	status = (row.attendance_status or "Present").strip() or "Present"
 	return {
 		"name": row.name or "",
+		"attendance_source": _infer_attendance_source(row),
 		"participant_name": row.participant_name or "",
 		"institute": (row.get("institute") if hasattr(row, "get") else getattr(row, "institute", None)) or "",
 		"email": row.email or "",
@@ -358,6 +379,9 @@ def _attendance_append_values(row) -> dict | None:
 		"check_in_time": row.check_in_time or None,
 		"remarks": (row.remarks or "").strip() or None,
 	}
+	if frappe.get_meta("Upcoming Training Attendance").has_field("attendance_source"):
+		src = cstr(row.get("attendance_source") or "").strip()
+		payload["attendance_source"] = src if src in ("Zoom", "Manual") else _infer_attendance_source(row)
 	if frappe.get_meta("Upcoming Training Attendance").has_field("institute"):
 		payload["institute"] = (row.get("institute") or "").strip() or None
 	return payload
@@ -390,6 +414,188 @@ ZOOM_HEADER_MAP = {
 	"status": "attendance_status",
 	"remarks": "remarks",
 }
+
+
+
+MANUAL_HEADER_MAP = {
+	"name": "participant_name",
+	"participant name": "participant_name",
+	"student name": "participant_name",
+	"teacher name": "participant_name",
+	"institute": "institute",
+	"school": "institute",
+	"school name": "institute",
+	"phone": "phone",
+	"cell": "phone",
+	"cell no": "phone",
+	"cell number": "phone",
+	"mobile": "phone",
+	"email": "email",
+	"user email": "email",
+	"attendance": "attendance_status",
+	"attendance status": "attendance_status",
+	"status": "attendance_status",
+	"sign": "signed",
+	"signed": "signed",
+	"remarks": "remarks",
+}
+
+
+def _decode_upload_content(content=None, content_b64=None) -> bytes:
+	import base64
+
+	if content_b64:
+		raw = cstr(content_b64).strip()
+		if "," in raw and raw.lower().startswith("data:"):
+			raw = raw.split(",", 1)[1]
+		return base64.b64decode(raw)
+	if content is None:
+		return b""
+	if isinstance(content, bytes):
+		return content
+	return cstr(content).encode("utf-8")
+
+
+def _sheet_rows_from_bytes(data: bytes, filename: str = "") -> list[list]:
+	"""Return rows (list of lists) from CSV or Excel bytes."""
+	import csv
+	import io
+
+	name = (filename or "").lower()
+	if name.endswith(".xlsx") or name.endswith(".xlsm"):
+		from openpyxl import load_workbook
+
+		wb = load_workbook(io.BytesIO(data), read_only=True, data_only=True)
+		ws = wb.active
+		rows = []
+		for row in ws.iter_rows(values_only=True):
+			rows.append(["" if v is None else str(v).strip() for v in row])
+		wb.close()
+		return rows
+	text = data.decode("utf-8-sig", errors="replace")
+	# Detect delimiter
+	sample = text[:2000]
+	try:
+		dialect = csv.Sniffer().sniff(sample, delimiters=",	;")
+		delim = dialect.delimiter
+	except Exception:
+		delim = "	" if sample.count("	") > sample.count(",") else ","
+	return [list(r) for r in csv.reader(io.StringIO(text), delimiter=delim)]
+
+
+def _map_header_row(headers: list[str], header_map: dict) -> dict:
+	field_map = {}
+	for i, raw in enumerate(headers):
+		key = header_map.get(_normalize_header(cstr(raw)))
+		if key:
+			field_map[i] = key
+	return field_map
+
+
+def _rows_from_table(table_rows: list[list], header_map: dict, source: str) -> list[dict]:
+	if not table_rows:
+		return []
+	# Find header row in first 15 lines
+	header_idx = 0
+	field_map = {}
+	for i, row in enumerate(table_rows[:15]):
+		candidate = _map_header_row([cstr(c) for c in row], header_map)
+		if "participant_name" in candidate.values():
+			header_idx = i
+			field_map = candidate
+			break
+	if "participant_name" not in field_map.values():
+		# No header — treat first column as name for manual paste
+		if source == "Manual":
+			field_map = {0: "participant_name"}
+			if len(table_rows[0]) > 1:
+				field_map[1] = "institute"
+			if len(table_rows[0]) > 2:
+				field_map[2] = "phone"
+			if len(table_rows[0]) > 3:
+				field_map[3] = "email"
+			if len(table_rows[0]) > 4:
+				field_map[4] = "attendance_status"
+			header_idx = -1
+		else:
+			frappe.throw(_("File must include a Name column."))
+	out = []
+	start = header_idx + 1 if header_idx >= 0 else 0
+	for raw in table_rows[start:]:
+		if not any(cstr(c).strip() for c in raw):
+			continue
+		mapped = {"attendance_source": source}
+		for i, field in field_map.items():
+			val = cstr(raw[i] if i < len(raw) else "").strip()
+			if field == "duration_minutes":
+				val = _duration_to_minutes(val)
+			mapped[field] = val
+		if mapped.get("signed") and not mapped.get("attendance_status"):
+			mapped["attendance_status"] = _attendance_status_from_row(mapped)
+		payload = _attendance_append_values(mapped)
+		if payload:
+			payload["attendance_source"] = source
+			row = _attendance_row_dict(payload)
+			row["join_time"] = payload.get("join_time") or row.get("join_time") or ""
+			out.append(row)
+	return out
+
+
+def _parse_attendance_upload(content=None, content_b64=None, filename=None, source="Zoom") -> list[dict]:
+	data = _decode_upload_content(content, content_b64)
+	if not data:
+		return []
+	table = _sheet_rows_from_bytes(data, filename or "")
+	header_map = ZOOM_HEADER_MAP if source == "Zoom" else MANUAL_HEADER_MAP
+	# Zoom CSV may still use the old text parser for better Zoom header detection
+	if source == "Zoom" and not (filename or "").lower().endswith((".xlsx", ".xlsm")):
+		try:
+			text = data.decode("utf-8-sig", errors="replace")
+			rows = _parse_zoom_attendance_csv(text)
+			for r in rows:
+				r["attendance_source"] = "Zoom"
+			return rows
+		except Exception:
+			pass
+	return _rows_from_table(table, header_map, source)
+
+
+def _merge_attendance_by_source(doc, new_rows: list[dict], source: str, mode: str = "replace"):
+	"""Replace or append rows for one source; keep the other source intact."""
+	keep = []
+	for r in doc.attendance or []:
+		if _infer_attendance_source(r) != source:
+			keep.append(_attendance_append_values(_attendance_row_dict(r)))
+	doc.set("attendance", [])
+	for payload in keep:
+		if payload:
+			doc.append("attendance", payload)
+	existing_keys = {
+		((r.participant_name or "").strip().lower(), (r.email or "").strip().lower())
+		for r in (doc.attendance or [])
+		if _infer_attendance_source(r) == source
+	}
+	# After keeping other source only, existing_keys for this source is empty unless append after partial — rebuild from keep of same source
+	if mode != "replace":
+		existing_keys = {
+			((r.participant_name or "").strip().lower(), (r.email or "").strip().lower())
+			for r in (doc.attendance or [])
+		}
+	added = 0
+	for row in new_rows or []:
+		row = dict(row)
+		row["attendance_source"] = source
+		key = ((row.get("participant_name") or "").strip().lower(), (row.get("email") or "").strip().lower())
+		if mode == "append" and key in existing_keys:
+			continue
+		payload = _attendance_append_values(row)
+		if not payload:
+			continue
+		payload["attendance_source"] = source
+		doc.append("attendance", payload)
+		existing_keys.add(key)
+		added += 1
+	return added
 
 
 def _attach_csv_to_training(doc, filename: str, content: str) -> str | None:
@@ -1228,8 +1434,8 @@ def _validate_optional_contact(row, idx):
 
 
 @frappe.whitelist()
-def save_attendance(name=None, attendance=None):
-	"""Replace attendance rows on one Upcoming Training (Excel-style portal dialog)."""
+def save_attendance(name=None, attendance=None, source="Manual"):
+	"""Replace Manual (default) or Zoom attendance; the other source is kept."""
 	_require_login()
 	if not name:
 		frappe.throw(_("Upcoming Training name is required."))
@@ -1243,8 +1449,9 @@ def save_attendance(name=None, attendance=None):
 	if not frappe.get_meta(DOCTYPE).has_field("attendance"):
 		frappe.throw(_("Attendance table is not available on Upcoming Training."))
 	institute = _session_institute(doc)
+	source = "Zoom" if cstr(source).strip() == "Zoom" else "Manual"
 
-	doc.set("attendance", [])
+	rows_in = []
 	n = 0
 	for row in attendance or []:
 		if isinstance(row, str):
@@ -1254,11 +1461,11 @@ def save_attendance(name=None, attendance=None):
 			continue
 		n += 1
 		_validate_optional_contact(row, n)
-		# Prefer session school; otherwise keep whatever the sheet sent.
 		row["institute"] = institute or cstr(row.get("institute") or "").strip()
-		payload = _attendance_append_values(row)
-		if payload:
-			doc.append("attendance", payload)
+		row["attendance_source"] = source
+		rows_in.append(row)
+
+	_merge_attendance_by_source(doc, rows_in, source, mode="replace")
 	doc.save(ignore_permissions=False)
 	frappe.db.commit()
 	rows = [_attendance_row_dict(r) for r in doc.attendance or []]
@@ -1530,12 +1737,20 @@ def parse_attendance_csv(content=None, training_date=None):
 
 
 @frappe.whitelist()
-def import_attendance(name=None, content=None, mode="replace", filename=None, ignore_date=0):
-	"""Bulk-import Zoom attendance CSV onto one Upcoming Training.
+def import_attendance(
+	name=None,
+	content=None,
+	content_b64=None,
+	mode="replace",
+	filename=None,
+	ignore_date=0,
+	source="Zoom",
+):
+	"""Bulk-import Zoom or Manual attendance (CSV/Excel) onto one Upcoming Training.
 
-	By default only rows whose Zoom join date matches this training's training_date
-	are imported (multi-day programs). Pass ignore_date=1 to load every CSV row
-	onto this session (use when Zoom export date is wrong / single report for this day).
+	source=Zoom (default): Zoom report; date filter applies unless ignore_date=1.
+	source=Manual: Name / Institute / Phone / Email / Status sheet.
+	Replace mode only replaces rows of that source; the other source is kept.
 	"""
 	_require_login()
 	if not name:
@@ -1543,55 +1758,42 @@ def import_attendance(name=None, content=None, mode="replace", filename=None, ig
 	if not frappe.has_permission(DOCTYPE, "write"):
 		frappe.throw(_("You are not permitted to update Upcoming Training."), frappe.PermissionError)
 
-	rows = _parse_zoom_attendance_csv(content or "")
+	source = "Manual" if cstr(source).strip() == "Manual" else "Zoom"
+	rows = _parse_attendance_upload(content=content, content_b64=content_b64, filename=filename, source=source)
 	if not rows:
-		frappe.throw(_("No attendance rows found in the CSV."))
+		frappe.throw(_("No attendance rows found in the file."))
 
 	doc = frappe.get_doc(DOCTYPE, name)
-	# Always keep the uploaded CSV on the training, even if date filter keeps 0 rows.
-	file_url = _attach_csv_to_training(doc, filename or "zoom_attendance.csv", content or "")
+	file_url = None
+	if source == "Zoom":
+		raw = _decode_upload_content(content, content_b64)
+		try:
+			text = raw.decode("utf-8-sig", errors="replace")
+		except Exception:
+			text = ""
+		if text and not (filename or "").lower().endswith((".xlsx", ".xlsm")):
+			file_url = _attach_csv_to_training(doc, filename or "zoom_attendance.csv", text)
 
 	ignore_date = cint(ignore_date)
-	if ignore_date:
-		matched, stats = rows, {
-			"filtered": 0,
-			"kept": len(rows),
-			"undated": 0,
-			"other_dates": [],
-			"training_date": str(getdate(doc.training_date)) if doc.training_date else "",
-			"ignored_date_filter": 1,
-		}
-	else:
+	stats = {"training_date": str(getdate(doc.training_date)) if doc.training_date else ""}
+	matched = rows
+	if source == "Zoom" and not ignore_date:
 		matched, stats = _filter_attendance_rows_for_training_date(rows, doc.training_date)
+	elif source == "Zoom" and ignore_date:
+		stats["ignored_date_filter"] = 1
+		stats["kept"] = len(rows)
 
 	mode = (mode or "replace").strip().lower()
 	added = 0
 	if matched:
-		if mode == "replace":
-			doc.set("attendance", [])
-
-		existing_keys = {
-			((r.participant_name or "").strip().lower(), (r.email or "").strip().lower())
-			for r in (doc.attendance or [])
-		}
-		for row in matched:
-			key = ((row.get("participant_name") or "").strip().lower(), (row.get("email") or "").strip().lower())
-			if mode == "append" and key in existing_keys:
-				continue
-			payload = _attendance_append_values(row)
-			if not payload:
-				continue
-			doc.append("attendance", payload)
-			existing_keys.add(key)
-			added += 1
-	elif mode == "replace":
-		# CSV attached but no day match — clear stale attendance so the wrong day is not kept.
-		doc.set("attendance", [])
+		added = _merge_attendance_by_source(doc, matched, source, mode=mode)
+	elif mode == "replace" and source == "Zoom":
+		_merge_attendance_by_source(doc, [], source, mode="replace")
 
 	doc.save(ignore_permissions=False)
 	frappe.db.commit()
 	attendance = [_attendance_row_dict(r) for r in doc.attendance or []]
-	if not matched:
+	if source == "Zoom" and not matched:
 		other = ", ".join(stats.get("other_dates") or []) or _("none")
 		msg = _(
 			"CSV attached, but no rows match this session date ({0}). "
@@ -1599,72 +1801,30 @@ def import_attendance(name=None, content=None, mode="replace", filename=None, ig
 			"Tick “Import all rows” and import again if this file is for this session."
 		).format(stats.get("training_date") or doc.training_date, other)
 	else:
-		msg = _("Imported {0} attendance row(s) for {1} ({2}).").format(
-			added, doc.name, stats.get("training_date") or doc.training_date
-		)
-		if ignore_date:
+		msg = _("Imported {0} {1} attendance row(s) for {2}.").format(added, source, doc.name)
+		if source == "Zoom" and ignore_date:
 			msg += " " + _("(Imported all CSV rows — join-date filter off.)")
-		elif stats.get("filtered"):
+		elif source == "Zoom" and stats.get("filtered"):
 			msg += " " + _("Skipped {0} row(s) from other day(s): {1}.").format(
 				stats.get("filtered"),
 				", ".join(stats.get("other_dates") or []) or _("n/a"),
 			)
+
 	return {
 		"ok": 1,
 		"name": doc.name,
-		"zoom_id": doc.zoom_id or "",
-		"zoom_attendance_file": file_url or getattr(doc, "zoom_attendance_file", None) or "",
-		"attachments": _list_training_files(doc.name),
 		"added": added,
-		"filter_stats": stats,
-		"date_mismatch": 0 if matched else 1,
+		"mode": mode,
+		"source": source,
+		"date_mismatch": 1 if (source == "Zoom" and not matched) else 0,
+		"date_filter": stats,
+		"zoom_attendance_file": file_url or getattr(doc, "zoom_attendance_file", None) or "",
+		"message": msg,
 		"attendance": attendance,
 		"attendance_present": sum(1 for a in attendance if a["attendance_status"] == "Present"),
 		"attendance_total": len(attendance),
-		"message": msg,
 	}
 
-def _file_row(file_doc) -> dict:
-	return {
-		"name": file_doc.name,
-		"file_name": file_doc.file_name,
-		"file_url": file_doc.file_url,
-		"file_size": file_doc.file_size or 0,
-		"creation": str(file_doc.creation) if file_doc.creation else "",
-	}
-
-
-def _list_training_files(name: str) -> list[dict]:
-	rows = frappe.get_all(
-		"File",
-		filters={"attached_to_doctype": DOCTYPE, "attached_to_name": name},
-		fields=["name", "file_name", "file_url", "file_size", "creation"],
-		order_by="creation desc",
-		limit_page_length=100,
-	)
-	seen_urls = set()
-	files = []
-	for row in rows:
-		url = row.file_url or ""
-		if url in seen_urls:
-			continue
-		seen_urls.add(url)
-		files.append(row)
-
-	zoom_file = frappe.db.get_value(DOCTYPE, name, "zoom_attendance_file")
-	if zoom_file and zoom_file not in seen_urls:
-		files.insert(
-			0,
-			{
-				"name": "",
-				"file_name": zoom_file.rsplit("/", 1)[-1],
-				"file_url": zoom_file,
-				"file_size": 0,
-				"creation": "",
-				"is_zoom_csv": 1,
-			},
-		)
-	return files
 
 
 @frappe.whitelist()
