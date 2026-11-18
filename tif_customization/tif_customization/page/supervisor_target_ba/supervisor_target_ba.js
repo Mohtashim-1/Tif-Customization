@@ -18,169 +18,72 @@ class SupervisorTargetBasePage {
 
 	setup_layout() {
 		this.body = $(`
-			<div class="supervisor-kpi-page p-2">
-				<div class="border rounded p-3 mb-3 supervisor-kpi-filters no-print">
-					<div class="d-flex align-items-center justify-content-between mb-2">
-						<h5 class="mb-0">${__("Filters")}</h5>
+			<div class="stb-root">
+				<style>
+					.stb-root{padding:12px 12px 28px;max-width:1180px;margin:0 auto}
+					.stb-filters{background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:12px 14px;margin-bottom:14px}
+					.stb-note{font-size:12px;color:#64748b;margin:0 0 12px;line-height:1.45}
+					.stb-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin:0 0 14px}
+					.stb-kpi{border:1px solid #e5e7eb;border-top:4px solid #64748b;border-radius:10px;background:#fff;padding:12px 14px}
+					.stb-kpi__label{color:#64748b;font-size:11px;margin-bottom:6px}
+					.stb-kpi__value{color:#0f172a;font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
+					.stb-kpi__hint{margin-top:6px;font-size:10px;color:#94a3b8}
+					.stb-kpi--overall{border-top-color:#0f766e}
+					.stb-kpi--activity{border-top-color:#2563eb}
+					.stb-kpi--outcome{border-top-color:#ca8a04}
+					.stb-kpi--days{border-top-color:#7c3aed}
+					.stb-table-wrap{overflow:auto;background:#fff;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:14px}
+					.stb-table{border-collapse:collapse;width:100%;font-size:12px}
+					.stb-table th,.stb-table td{border:1px solid #e5e7eb;padding:6px 8px;vertical-align:middle;text-align:center}
+					.stb-table .left{text-align:left}
+					.stb-table thead th{background:#f1f5f9;font-weight:700}
+					.stb-table .actual{background:#ecfdf5;font-weight:700}
+					.stb-table .sum{background:#0f766e;color:#fff;font-weight:800}
+					.stb-low{background:#fef2f2}
+					.stb-ok{background:#ecfdf5}
+					.stb-green{background:#c6efce;font-weight:700}
+					.stb-tier{background:#00b050;color:#fff;font-weight:800}
+					.stb-bottom{display:grid;grid-template-columns:1.2fr 1fr;gap:16px;margin:0 0 14px}
+					.stb-reward{border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;background:#fff;margin-bottom:8px;font-size:12px}
+					.stb-reward strong{display:block;margin-bottom:4px}
+					.stb-title{font-size:16px;font-weight:700;margin:4px 0 10px}
+					.stb-meta{font-size:12px;color:#64748b;margin:0 0 12px}
+					.stb-sign{display:none;margin-top:18px;font-size:12px}
+					.stb-sign td{padding:8px 10px}
+					.stb-sign .lbl{font-weight:700;width:200px}
+					.stb-sign .box{border:1px solid #000;width:320px;height:30px}
+					@media (max-width:900px){.stb-bottom{grid-template-columns:1fr}}
+					@media print{
+						.page-head,.navbar,.stb-filters,.no-print{display:none!important}
+						.stb-sign{display:table}
+						body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+					}
+				</style>
+				<div class="stb-filters no-print">
+					<div class="d-flex justify-content-between align-items-center mb-2">
+						<strong>${__("Supervisors Target Base - KPIs")}</strong>
 						<div>
-							<button class="btn btn-sm btn-primary supervisor-apply">${__("Apply")}</button>
-							<button class="btn btn-sm btn-default supervisor-reset">${__("Reset")}</button>
-							<button class="btn btn-sm btn-default supervisor-print"><i class="fa fa-print"></i> ${__("Print")}</button>
+							<button class="btn btn-sm btn-primary stb-apply">${__("Apply")}</button>
+							<button class="btn btn-sm btn-default stb-reset">${__("Reset")}</button>
+							<button class="btn btn-sm btn-default stb-print"><i class="fa fa-print"></i> ${__("Print")}</button>
 						</div>
 					</div>
 					<div class="row">
-						<div class="col-lg-4 col-md-6 mb-2" data-field="supervisor"></div>
-						<div class="col-lg-2 col-md-3 mb-2" data-field="from_date"></div>
-						<div class="col-lg-2 col-md-3 mb-2" data-field="to_date"></div>
-						<div class="col-lg-2 col-md-3 mb-2" data-field="working_days"></div>
+						<div class="col-md-3 mb-2" data-field="supervisor"></div>
+						<div class="col-md-2 mb-2" data-field="from_date"></div>
+						<div class="col-md-2 mb-2" data-field="to_date"></div>
+						<div class="col-md-2 mb-2" data-field="working_days"></div>
 					</div>
+					<p class="stb-note mb-0">
+						${__("Leave Supervisor blank to include all supervisors.")}
+						${__("Working days auto-exclude Sunday, gazetted holidays and approved leave (leave blank to auto-calc).")}
+						${__("Overall = 70% activity + 30% outcome. Activity points = visits / workshops / meetings / SME visits.")}
+					</p>
 				</div>
-				<div class="supervisor-kpi-report"></div>
+				<div class="stb-body"></div>
 			</div>
 		`);
 		$(this.page.body).empty().append(this.body);
-		this.inject_styles();
-	}
-
-	inject_styles() {
-		if ($("#supervisor-kpi-style").length) return;
-		$("head").append(`
-			<style id="supervisor-kpi-style">
-				.supervisor-sheet-wrap { overflow-x: auto; margin-bottom: 18px; }
-				.supervisor-sheet {
-					border-collapse: collapse;
-					width: 100%;
-					min-width: 1180px;
-					font-size: 12px;
-					font-family: Calibri, Arial, sans-serif;
-				}
-				.supervisor-sheet th, .supervisor-sheet td {
-					border: 1px solid #000;
-					padding: 6px;
-					vertical-align: middle;
-					text-align: center;
-				}
-				.supervisor-sheet .left { text-align: left; }
-				.supervisor-sheet .hdr-title {
-					background: #b4c6e7;
-					font-size: 16px;
-					font-weight: 700;
-					padding: 8px;
-				}
-				.supervisor-sheet .hdr-sub {
-					background: #b4c6e7;
-					font-size: 14px;
-					font-weight: 700;
-				}
-				.supervisor-sheet .col-hdr {
-					background: #e8eef7;
-					font-weight: 700;
-				}
-				.supervisor-sheet .target-col { background: #ddd9c4; }
-				.supervisor-sheet .actual-col { background: #c4d79b; font-weight: 700; }
-				.supervisor-sheet .month-col { background: #dce6f1; }
-				.supervisor-sheet .sec-hdr { background: #b4c6e7; font-size: 14px; font-weight: 700; }
-				.supervisor-sheet .perf-row td { font-weight: 700; font-size: 13px; }
-				.supervisor-sheet .perf-val { background: #fff; font-size: 14px; }
-				.supervisor-sheet .neg { color: #15803d; }
-				.supervisor-sheet .pct-good { color: #15803d; font-weight: 700; }
-				.supervisor-sheet .pct-mid { color: #b45309; font-weight: 700; }
-				.supervisor-sheet .pct-low { color: #b91c1c; font-weight: 700; }
-				.supervisor-sign { border-collapse: collapse; margin: 6px 0 18px; font-size: 12px; font-family: Calibri, Arial, sans-serif; }
-				.supervisor-sign td { padding: 8px 10px; }
-				.supervisor-sign td.lbl { font-weight: 700; width: 200px; }
-				.supervisor-sign td.box { border: 1px solid #000; width: 320px; height: 30px; }
-				.supervisor-sheet .muted-cell { color: #64748b; }
-				.supervisor-sheet .source-cell { font-size: 10px; color: #475569; }
-				.supervisor-summary {
-					display: flex;
-					flex-wrap: wrap;
-					gap: 16px;
-					margin: 14px 0;
-				}
-				.supervisor-chip {
-					border: 1px solid #d1d5db;
-					border-radius: 6px;
-					padding: 8px 10px;
-					background: #fff;
-				}
-				.supervisor-kpis {
-					display: grid;
-					grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-					gap: 10px;
-					margin: 0 0 14px;
-				}
-				.supervisor-kpi {
-					border: 1px solid #e5e7eb;
-					border-top: 4px solid #64748b;
-					border-radius: 10px;
-					background: #fff;
-					padding: 12px 14px;
-				}
-				.supervisor-kpi__label { color: #64748b; font-size: 11px; margin-bottom: 6px; }
-				.supervisor-kpi__value {
-					color: #0f172a;
-					font-size: 22px;
-					font-weight: 700;
-					font-variant-numeric: tabular-nums;
-				}
-				.supervisor-kpi__hint { margin-top: 6px; font-size: 10px; color: #94a3b8; }
-				.supervisor-kpi--overall { border-top-color: #0f766e; }
-				.supervisor-kpi--activity { border-top-color: #2563eb; }
-				.supervisor-kpi--outcome { border-top-color: #ca8a04; }
-				.supervisor-kpi--days { border-top-color: #7c3aed; }
-				.supervisor-extra-title {
-					font-size: 15px;
-					font-weight: 700;
-					margin: 16px 0 8px;
-				}
-				.supervisor-extra-wrap {
-					overflow-x: auto;
-					margin-bottom: 14px;
-					background: #fff;
-					border: 1px solid #e5e7eb;
-					border-radius: 8px;
-				}
-				.supervisor-extra {
-					border-collapse: collapse;
-					width: 100%;
-					min-width: 420px;
-					font-size: 12px;
-					font-family: Calibri, Arial, sans-serif;
-				}
-				.supervisor-extra th, .supervisor-extra td {
-					border: 1px solid #e5e7eb;
-					padding: 6px 8px;
-					vertical-align: middle;
-					text-align: center;
-				}
-				.supervisor-extra .left { text-align: left; }
-				.supervisor-extra thead th { background: #f1f5f9; font-weight: 700; }
-				.supervisor-extra .skd-green { background: #c6efce; font-weight: 700; }
-				.supervisor-extra .skd-tier { background: #00b050; color: #fff; font-weight: 800; }
-				.supervisor-bottom {
-					display: grid;
-					grid-template-columns: 1.2fr 1fr;
-					gap: 16px;
-					margin: 0 0 14px;
-				}
-				.supervisor-reward {
-					border: 1px solid #e5e7eb;
-					border-radius: 8px;
-					padding: 10px 12px;
-					background: #fff;
-					margin-bottom: 8px;
-					font-size: 12px;
-				}
-				@media (max-width: 900px) {
-					.supervisor-bottom { grid-template-columns: 1fr; }
-				}
-				@media print {
-					.supervisor-kpi-filters, .page-head, .no-print { display: none !important; }
-					.supervisor-sheet { font-size: 10px; }
-				}
-			</style>
-		`);
 	}
 
 	make_filter(df) {
@@ -209,7 +112,7 @@ class SupervisorTargetBasePage {
 				label: __("From Date"),
 				fieldname: "from_date",
 				fieldtype: "Date",
-				default: frappe.datetime.year_start(today),
+				default: frappe.datetime.month_start(today),
 				reqd: 1,
 			}),
 			to_date: this.make_filter({
@@ -223,7 +126,7 @@ class SupervisorTargetBasePage {
 				label: __("Working Days"),
 				fieldname: "working_days",
 				fieldtype: "Int",
-				description: __("Leave blank to auto-calc (exclude Sunday / holiday / leave)"),
+				description: __("Leave blank to auto-calc"),
 			}),
 		};
 	}
@@ -237,22 +140,24 @@ class SupervisorTargetBasePage {
 	}
 
 	bind_actions() {
-		this.body.find(".supervisor-apply").on("click", () => this.load_data());
-		this.body.find(".supervisor-print").on("click", () => window.print());
-		this.body.find(".supervisor-reset").on("click", () => {
+		this.body.find(".stb-apply").on("click", () => this.load_data());
+		this.body.find(".stb-print").on("click", () => window.print());
+		this.body.find(".stb-reset").on("click", () => {
 			const today = frappe.datetime.get_today();
 			this.filters.supervisor.set_value("");
-			this.filters.from_date.set_value(frappe.datetime.year_start(today));
+			this.filters.from_date.set_value(frappe.datetime.month_start(today));
 			this.filters.to_date.set_value(today);
 			this.filters.working_days.set_value("");
 			this.load_data();
 		});
+		if (this.page && this.page.set_primary_action) {
+			this.page.set_primary_action(__("Refresh"), () => this.load_data(), "refresh");
+		}
 	}
 
 	get_filter_values() {
 		const from_date = this.filters.from_date.get_value();
 		const to_date = this.filters.to_date.get_value();
-
 		if (!from_date || !to_date) {
 			frappe.msgprint(__("Please set From Date and To Date."));
 			return null;
@@ -261,7 +166,6 @@ class SupervisorTargetBasePage {
 			frappe.msgprint(__("From Date cannot be after To Date."));
 			return null;
 		}
-
 		return {
 			supervisor: (this.filters.supervisor.get_value() || "").trim(),
 			from_date,
@@ -273,8 +177,7 @@ class SupervisorTargetBasePage {
 	load_data() {
 		const filters = this.get_filter_values();
 		if (!filters) return;
-
-		this.body.find(".supervisor-kpi-report").html(`<div class="text-muted p-3">${__("Loading...")}</div>`);
+		this.body.find(".stb-body").html(`<div class="text-muted p-3">${__("Loading...")}</div>`);
 		frappe.call({
 			method:
 				"tif_customization.tif_customization.page.supervisor_target_ba.supervisor_target_ba.get_report_data",
@@ -283,118 +186,21 @@ class SupervisorTargetBasePage {
 			freeze_message: __("Loading supervisor KPI..."),
 			callback: (r) => this.render_report(r.message || {}),
 			error: () => {
-				this.body.find(".supervisor-kpi-report").html(
-					`<div class="text-danger p-3">${__("Failed to load supervisor KPI.")}</div>`
-				);
+				this.body
+					.find(".stb-body")
+					.html(`<div class="text-danger p-3">${__("Failed to load supervisor KPI.")}</div>`);
 			},
 		});
 	}
 
-	fmt(val, opts = {}) {
-		if (val === null || val === undefined || val === "") return opts.blank || "";
-		if (opts.suffix === "%") return `${format_number(val, null, { precision: 2 })}%`;
-		return format_number(val, null, { precision: opts.precision || 0 });
+	esc(v) {
+		return frappe.utils.escape_html(v == null ? "" : String(v));
 	}
 
-	pct(val) {
-		if (val === null || val === undefined) return "";
-		const cls = val >= 90 ? "pct-good" : val >= 60 ? "pct-mid" : "pct-low";
-		return `<span class="${cls}">${format_number(val, null, 0)}%</span>`;
-	}
-
-	kpi_cells(cell, monthly) {
-		const cls = monthly ? "month-col" : "";
-		if (!cell) return `<td class="target-col ${cls}">-</td><td class="actual-col ${cls}">-</td><td class="${cls}"></td><td class="${cls}"></td>`;
-		const prec = monthly ? 1 : 0;
-		const rem = cell.remaining;
-		return `
-			<td class="${monthly ? "month-col" : "target-col"}">${format_number(cell.target, null, prec)}</td>
-			<td class="${monthly ? "month-col" : "actual-col"}">${format_number(cell.actual, null, 0)}</td>
-			<td class="${cls} ${rem < 0 ? "neg" : ""}">${format_number(rem, null, prec)}</td>
-			<td class="${cls}">${this.pct(cell.percent)}</td>`;
-	}
-
-	render_main_table(data) {
-		const esc = frappe.utils.escape_html;
-		const rows = (data.rows || [])
-			.map(
-				(row) => `
-					<tr title="${esc(row.source || "")}">
-						<td class="left"><b>${esc(row.particulars || "")}</b></td>
-						<td class="left" style="font-size:11px">${esc(row.explanation || "")}</td>
-						${this.kpi_cells(row.yearly, false)}
-						${this.kpi_cells(row.monthly, true)}
-					</tr>`
-			)
-			.join("");
-
-		return `
-			<div class="supervisor-sheet-wrap">
-				<table class="supervisor-sheet">
-					<tr><th colspan="10" class="hdr-title">${esc(data.foundation_title || "")}</th></tr>
-					<tr><th colspan="10" class="hdr-sub">${esc(data.sheet_title || "")}</th></tr>
-					<tr>
-						<th colspan="2" class="col-hdr"></th>
-						<th colspan="4" class="sec-hdr">${__("Yearly Target")}<div style="font-size:11px;font-weight:500">${esc(frappe.datetime.str_to_user(data.from_date))} – ${esc(frappe.datetime.str_to_user(data.to_date))}</div></th>
-						<th colspan="4" class="sec-hdr">${__("Monthly Target")}<div style="font-size:11px;font-weight:500">${esc(data.month_label || "")}</div></th>
-					</tr>
-					<tr>
-						<th class="col-hdr">${__("Particulars")}</th>
-						<th class="col-hdr">${__("Explanation")}</th>
-						<th class="col-hdr target-col">${__("Supervisor - Targets")}<div style="font-size:10px;font-weight:500">${__("Yearly Compulsory Target")}</div></th>
-						<th class="col-hdr actual-col">${__("Achievements")}<div style="font-size:10px;font-weight:500">${__("Actual Activities")}</div></th>
-						<th class="col-hdr">${__("Excess / Remaining")}</th>
-						<th class="col-hdr">${__("Performance Percentage")}</th>
-						<th class="col-hdr month-col">${__("Monthly Targets")}</th>
-						<th class="col-hdr month-col">${__("Achievements")}</th>
-						<th class="col-hdr month-col">${__("Excess / Remaining")}</th>
-						<th class="col-hdr month-col">${__("Performance Percentage")}</th>
-					</tr>
-					${rows}
-					<tr class="perf-row">
-						<td colspan="2" class="left">${__("Yearly Performance Percentage")}</td>
-						<td colspan="3"></td><td class="perf-val">${this.pct(data.yearly_percent)}</td>
-						<td colspan="3"></td><td class="perf-val">${this.pct(data.monthly_percent)}</td>
-					</tr>
-				</table>
-			</div>
-			<table class="supervisor-sign">
-				<tr><td class="lbl">${__("Regional Staff Name")}</td><td class="box">${data.supervisor ? esc(data.supervisor_label || "") : ""}</td></tr>
-				<tr><td class="lbl">${__("Staff Signature")}</td><td class="box"></td></tr>
-				<tr><td class="lbl">${__("Line Manager Signature")}</td><td class="box"></td></tr>
-			</table>
-		`;
-	}
-
-	render_field_staff(data) {
-		const rows = (data.field_staff || [])
-			.map(
-				(row) => `
-					<tr>
-						<td class="left">${frappe.utils.escape_html(row.employee_name || row.name || "")}</td>
-						<td>${frappe.utils.escape_html(row.user_id || "")}</td>
-						<td>${frappe.utils.escape_html(row.department || "")}</td>
-						<td>${frappe.utils.escape_html(row.designation || "")}</td>
-					</tr>
-				`
-			)
-			.join("");
-		const empty = `<tr><td colspan="4" class="muted-cell">${__("No active field staff found for this supervisor.")}</td></tr>`;
-
-		return `
-			<div class="supervisor-sheet-wrap">
-				<table class="supervisor-sheet" style="min-width: 760px;">
-					<tr><th colspan="4" class="hdr-sub">${__("Supervisor Field Staff")}</th></tr>
-					<tr>
-						<th class="col-hdr left">${__("Employee")}</th>
-						<th class="col-hdr">${__("User")}</th>
-						<th class="col-hdr">${__("Department")}</th>
-						<th class="col-hdr">${__("Designation")}</th>
-					</tr>
-					${rows || empty}
-				</table>
-			</div>
-		`;
+	fmt(val, precision) {
+		if (val === null || val === undefined || val === "") return "";
+		const p = precision != null ? precision : 0;
+		return format_number(val, null, { precision: p });
 	}
 
 	fmt_pct(val) {
@@ -402,13 +208,165 @@ class SupervisorTargetBasePage {
 		return `${format_number(val, null, { precision: 2 })}%`;
 	}
 
+	pct_cls(v) {
+		return flt(v) < 50 ? "stb-low" : "stb-ok";
+	}
+
+	activity_keys() {
+		return new Set([
+			"individual_school_visits",
+			"workshop",
+			"meetings",
+			"school_visits_with_smes",
+			"monthly_meeting_with_smes",
+		]);
+	}
+
+	outcome_keys() {
+		return new Set(["invitation", "enrolment_of_volunteers"]);
+	}
+
+	render_kpi_cards(data) {
+		const wd = data.working_days_info || {};
+		return `
+			<div class="stb-kpis">
+				<div class="stb-kpi stb-kpi--overall">
+					<div class="stb-kpi__label">${__("Overall")}</div>
+					<div class="stb-kpi__value">${this.fmt_pct(data.overall_pct)}</div>
+					<div class="stb-kpi__hint">70% ${__("activity")} + 30% ${__("outcome")}</div>
+				</div>
+				<div class="stb-kpi stb-kpi--activity">
+					<div class="stb-kpi__label">${__("Activity")}</div>
+					<div class="stb-kpi__value">${this.fmt_pct(data.activity_pct)}</div>
+					<div class="stb-kpi__hint">
+						${this.fmt(data.activity_actual, 2)} / ${this.fmt(data.activity_target, 2)} ${__("pts")}
+					</div>
+				</div>
+				<div class="stb-kpi stb-kpi--outcome">
+					<div class="stb-kpi__label">${__("Outcome (YTD)")}</div>
+					<div class="stb-kpi__value">${this.fmt_pct(data.outcome_pct)}</div>
+					<div class="stb-kpi__hint">${__("Average of yearly compulsory mins")}</div>
+				</div>
+				<div class="stb-kpi stb-kpi--days">
+					<div class="stb-kpi__label">${__("Working days")}</div>
+					<div class="stb-kpi__value">${this.fmt(data.working_days)}</div>
+					<div class="stb-kpi__hint">
+						${__("Sun")} ${this.fmt(wd.sundays || 0)} · ${__("Holiday")} ${this.fmt(wd.gazetted || 0)} · ${__(
+							"Leave"
+						)} ${this.fmt(wd.leave_days || 0)}
+					</div>
+				</div>
+			</div>
+		`;
+	}
+
+	render_activity_table(data) {
+		const keys = this.activity_keys();
+		const rows = (data.rows || [])
+			.filter((r) => r.yearly && keys.has(r.key))
+			.map((r) => {
+				const y = r.yearly || {};
+				const m = r.monthly || {};
+				return `<tr class="${this.pct_cls(y.percent)}">
+					<td class="left">${this.esc(r.particulars)}</td>
+					<td class="left">${this.esc(r.explanation)}</td>
+					<td>${this.fmt(y.target, 1)}</td>
+					<td class="actual">${this.fmt(y.actual)}</td>
+					<td>${this.fmt_pct(y.percent)}</td>
+					<td>${this.fmt(m.target, 1)}</td>
+					<td class="actual">${this.fmt(m.actual)}</td>
+					<td>${this.fmt_pct(m.percent)}</td>
+				</tr>`;
+			})
+			.join("");
+
+		return `
+			<div class="stb-title">${__("Activity (period)")}</div>
+			<div class="stb-table-wrap">
+				<table class="stb-table">
+					<thead>
+						<tr>
+							<th class="left">${__("Particulars")}</th>
+							<th class="left">${__("Explanation")}</th>
+							<th>${__("Yearly target")}</th>
+							<th>${__("Yearly actual")}</th>
+							<th>${__("Yearly %")}</th>
+							<th>${__("Monthly target")}</th>
+							<th>${__("Monthly actual")}</th>
+							<th>${__("Monthly %")}</th>
+						</tr>
+					</thead>
+					<tbody>
+						${rows}
+						<tr>
+							<td class="left" colspan="7"><strong>${__("Total expected")} (${this.fmt(
+								data.working_days
+							)} × ${this.fmt(data.per_day_points, 2)})</strong></td>
+							<td class="sum">${this.fmt(data.activity_target, 2)}</td>
+						</tr>
+						<tr>
+							<td class="left" colspan="7"><strong>${__("Total achieved")}</strong></td>
+							<td class="sum">${this.fmt(data.activity_actual, 2)}</td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+		`;
+	}
+
+	render_outcome_table(data) {
+		const keys = this.outcome_keys();
+		const rows = (data.rows || [])
+			.filter((r) => r.yearly && keys.has(r.key))
+			.map((r) => {
+				const y = r.yearly || {};
+				return `<tr class="${this.pct_cls(y.percent)}">
+					<td class="left">${this.esc(r.particulars)}</td>
+					<td>${this.fmt(y.target, 1)}</td>
+					<td class="actual">${this.fmt(y.actual)}</td>
+					<td>${this.fmt_pct(Math.min(100, flt(y.percent)))}</td>
+				</tr>`;
+			})
+			.join("");
+
+		const other = (data.rows || [])
+			.filter((r) => !r.yearly)
+			.map(
+				(r) => `<tr>
+					<td class="left">${this.esc(r.particulars)}</td>
+					<td colspan="3" class="left" style="color:#64748b">${this.esc(r.explanation || __("As per need"))}</td>
+				</tr>`
+			)
+			.join("");
+
+		return `
+			<div class="stb-title">${__("Outcomes (YTD vs yearly mins)")}</div>
+			<div class="stb-table-wrap">
+				<table class="stb-table">
+					<thead>
+						<tr>
+							<th class="left">${__("Outcome")}</th>
+							<th>${__("Yearly min")}</th>
+							<th>${__("YTD actual")}</th>
+							<th>${__("% (capped 100)")}</th>
+						</tr>
+					</thead>
+					<tbody>
+						${rows || `<tr><td colspan="4" class="text-muted">${__("No outcome KPIs.")}</td></tr>`}
+						${other}
+					</tbody>
+				</table>
+			</div>
+		`;
+	}
+
 	render_month_rows(data) {
 		return (data.months || [])
 			.map((m) => {
-				const score = m.score == null ? "" : format_number(m.score, null, { precision: 2 });
+				const score = m.score == null ? "" : this.fmt(m.score, 2);
 				const pct = m.percent == null ? "" : this.fmt_pct(m.percent);
 				return `<tr>
-					<td class="left">${frappe.utils.escape_html(m.label || "")}</td>
+					<td class="left">${this.esc(m.label)}</td>
 					<td>${score}</td>
 					<td>${pct}</td>
 				</tr>`;
@@ -420,24 +378,24 @@ class SupervisorTargetBasePage {
 		const scale = data.increment_scale || [];
 		const current = ((data.increment_tier || {}).label || "").toLowerCase();
 		const heads = scale
-			.map((r) => `<th>${frappe.utils.escape_html(r.label || "")}</th>`)
+			.map((r) => `<th>${this.esc(r.label)}</th>`)
 			.concat(`<th>${__("Achieved")}</th>`)
 			.join("");
 		const cells = scale
 			.map((r) => {
-				const cls = (r.label || "").toLowerCase() === current ? "skd-tier" : "";
-				return `<td class="${cls}">${frappe.utils.escape_html(r.increment || "")}</td>`;
+				const cls = (r.label || "").toLowerCase() === current ? "stb-tier" : "";
+				return `<td class="${cls}">${this.esc(r.increment)}</td>`;
 			})
-			.concat(`<td class="skd-green">${frappe.utils.escape_html(data.increment_achieved || "")}</td>`)
+			.concat(`<td class="stb-green">${this.esc(data.increment_achieved || "")}</td>`)
 			.join("");
-		return `<table class="supervisor-extra">
+		return `<table class="stb-table">
 			<thead><tr>${heads}</tr></thead>
 			<tbody>
 				<tr>${cells}</tr>
 				<tr>
 					<td class="left" colspan="${scale.length + 1}">
 						${__("Current Overall")}: <strong>${this.fmt_pct(data.overall_pct)}</strong>
-						— ${__("band")}: <strong>${frappe.utils.escape_html((data.increment_tier || {}).label || "")}</strong>
+						— ${__("band")}: <strong>${this.esc((data.increment_tier || {}).label || "")}</strong>
 					</td>
 				</tr>
 			</tbody>
@@ -446,9 +404,9 @@ class SupervisorTargetBasePage {
 
 	render_monthly_sections(data) {
 		return `
-			<div class="supervisor-extra-title">${__("Monthly summary")} ***</div>
-			<div class="supervisor-extra-wrap">
-				<table class="supervisor-extra">
+			<div class="stb-title">${__("Monthly summary")} ***</div>
+			<div class="stb-table-wrap">
+				<table class="stb-table">
 					<tbody>
 						<tr>
 							<td class="left">${__("No of Working Days")}</td>
@@ -456,31 +414,29 @@ class SupervisorTargetBasePage {
 						</tr>
 						<tr>
 							<td class="left">${__("Per day Target Points")}</td>
-							<td>${this.fmt(data.per_day_points, { precision: 2 })}</td>
+							<td>${this.fmt(data.per_day_points, 2)}</td>
 						</tr>
 						<tr>
 							<td class="left"><strong>${__("Total Expected Targets Points Monthly ***")}</strong></td>
-							<td><strong>${this.fmt(data.activity_target, { precision: 2 })}</strong></td>
+							<td><strong>${this.fmt(data.activity_target, 2)}</strong></td>
 						</tr>
 						<tr>
 							<td class="left"><strong>${__("Total Achieve Points Monthly")}</strong></td>
-							<td class="skd-green">${this.fmt(data.activity_actual, { precision: 2 })}</td>
+							<td class="stb-green">${this.fmt(data.activity_actual, 2)}</td>
 						</tr>
 						<tr>
 							<td class="left"><strong>${__("Percentage")}</strong></td>
-							<td class="skd-green">${this.fmt_pct(data.activity_pct)}</td>
+							<td class="stb-green">${this.fmt_pct(data.activity_pct)}</td>
 						</tr>
 					</tbody>
 				</table>
 			</div>
 
-			<div class="supervisor-bottom">
+			<div class="stb-bottom">
 				<div>
-					<div class="supervisor-extra-title">${__("Monthly performance")} (${frappe.utils.escape_html(
-						data.fiscal_year_label || ""
-					)})</div>
-					<div class="supervisor-extra-wrap">
-						<table class="supervisor-extra">
+					<div class="stb-title">${__("Monthly performance")} (${this.esc(data.fiscal_year_label || "")})</div>
+					<div class="stb-table-wrap">
+						<table class="stb-table">
 							<thead>
 								<tr>
 									<th class="left">${__("Month")}</th>
@@ -492,91 +448,108 @@ class SupervisorTargetBasePage {
 								${this.render_month_rows(data)}
 								<tr>
 									<td class="left"><strong>${__("Total")}</strong></td>
-									<td class="skd-green">${this.fmt(data.ytd_activity_actual, { precision: 2 })}</td>
-									<td class="skd-green">${this.fmt_pct(data.ytd_activity_pct)}</td>
+									<td class="stb-green">${this.fmt(data.ytd_activity_actual, 2)}</td>
+									<td class="stb-green">${this.fmt_pct(data.ytd_activity_pct)}</td>
 								</tr>
 								<tr>
-									<td class="left skd-green" colspan="2"><strong>${__("Yearly Target Score")}</strong></td>
-									<td class="skd-green">${this.fmt(data.yearly_target_score, { precision: 2 })}</td>
+									<td class="left stb-green" colspan="2"><strong>${__("Yearly Target Score")}</strong></td>
+									<td class="stb-green">${this.fmt(data.yearly_target_score, 2)}</td>
 								</tr>
 								<tr>
-									<td class="left skd-green" colspan="2"><strong>${__("Achievement %")}</strong> (${__(
+									<td class="left stb-green" colspan="2"><strong>${__("Achievement %")}</strong> (${__(
 										"Overall 70/30"
 									)})</td>
-									<td class="skd-green">${this.fmt_pct(data.overall_pct)}</td>
+									<td class="stb-green">${this.fmt_pct(data.overall_pct)}</td>
 								</tr>
 							</tbody>
 						</table>
 					</div>
 				</div>
 				<div>
-					<div class="supervisor-extra-title">${__("Annual Increment (Performance base)")}</div>
-					<div class="supervisor-extra-wrap">
+					<div class="stb-title">${__("Annual Increment (Performance base)")}</div>
+					<div class="stb-table-wrap">
 						${this.render_increment_table(data)}
 					</div>
-					<div class="supervisor-reward">
-						<strong>${frappe.utils.escape_html(data.reward_note || "")}</strong>
+					<div class="stb-reward">
+						<strong>${this.esc(data.reward_note || "")}</strong>
 					</div>
 				</div>
 			</div>
 		`;
 	}
 
-	render_kpi_cards(data) {
-		const wd = data.working_days_info || {};
+	render_field_staff(data) {
+		const rows = (data.field_staff || [])
+			.map(
+				(row) => `<tr>
+					<td class="left">${this.esc(row.employee_name || row.name || "")}</td>
+					<td>${this.esc(row.user_id || "")}</td>
+					<td>${this.esc(row.department || "")}</td>
+					<td>${this.esc(row.designation || "")}</td>
+				</tr>`
+			)
+			.join("");
 		return `
-			<div class="supervisor-kpis">
-				<div class="supervisor-kpi supervisor-kpi--overall">
-					<div class="supervisor-kpi__label">${__("Overall")}</div>
-					<div class="supervisor-kpi__value">${this.fmt_pct(data.overall_pct)}</div>
-					<div class="supervisor-kpi__hint">70% ${__("activity")} + 30% ${__("outcome")}</div>
-				</div>
-				<div class="supervisor-kpi supervisor-kpi--activity">
-					<div class="supervisor-kpi__label">${__("Activity")}</div>
-					<div class="supervisor-kpi__value">${this.fmt_pct(data.activity_pct)}</div>
-					<div class="supervisor-kpi__hint">
-						${this.fmt(data.activity_actual, { precision: 2 })} / ${this.fmt(data.activity_target, {
-							precision: 2,
-						})} ${__("pts")}
-					</div>
-				</div>
-				<div class="supervisor-kpi supervisor-kpi--outcome">
-					<div class="supervisor-kpi__label">${__("Outcome (YTD)")}</div>
-					<div class="supervisor-kpi__value">${this.fmt_pct(data.outcome_pct)}</div>
-					<div class="supervisor-kpi__hint">${__("Average of yearly compulsory mins")}</div>
-				</div>
-				<div class="supervisor-kpi supervisor-kpi--days">
-					<div class="supervisor-kpi__label">${__("Working days")}</div>
-					<div class="supervisor-kpi__value">${this.fmt(data.working_days)}</div>
-					<div class="supervisor-kpi__hint">
-						${__("Sun")} ${this.fmt(wd.sundays || 0)} · ${__("Holiday")} ${this.fmt(wd.gazetted || 0)} · ${__(
-							"Leave"
-						)} ${this.fmt(wd.leave_days || 0)}
-					</div>
-				</div>
+			<div class="stb-title">${__("Supervisor Field Staff")} (${this.fmt(data.field_staff_count)})</div>
+			<div class="stb-table-wrap">
+				<table class="stb-table">
+					<thead>
+						<tr>
+							<th class="left">${__("Employee")}</th>
+							<th>${__("User")}</th>
+							<th>${__("Department")}</th>
+							<th>${__("Designation")}</th>
+						</tr>
+					</thead>
+					<tbody>
+						${
+							rows ||
+							`<tr><td colspan="4" class="text-muted">${__(
+								"No active field staff found for this supervisor."
+							)}</td></tr>`
+						}
+					</tbody>
+				</table>
 			</div>
 		`;
 	}
 
 	render_report(data) {
-		const notes = (data.notes || [])
-			.map((note) => `<li>${frappe.utils.escape_html(note)}</li>`)
-			.join("");
-		this.body.find(".supervisor-kpi-report").html(`
-			<div class="supervisor-summary">
-				<div class="supervisor-chip"><strong>${__("Supervisor")}:</strong> ${frappe.utils.escape_html(data.supervisor_label || "")}</div>
-				<div class="supervisor-chip"><strong>${__("Period")}:</strong> ${frappe.utils.escape_html(data.from_date || "")} - ${frappe.utils.escape_html(data.to_date || "")}</div>
-				<div class="supervisor-chip"><strong>${__("Supervisor Field Staff")}:</strong> ${this.fmt(data.field_staff_count)}</div>
-			</div>
+		const notes = (data.notes || []).map((n) => `<li>${this.esc(n)}</li>`).join("");
+		this.body.find(".stb-body").html(`
+			<div class="stb-title">${this.esc(data.supervisor_label || __("All Supervisors"))} — ${this.esc(
+				data.sheet_title || ""
+			)}</div>
+			<p class="stb-meta">
+				${__("Period")}: <strong>${this.esc(data.from_date)} — ${this.esc(data.to_date)}</strong>
+				&nbsp;|&nbsp; ${__("Outcomes YTD")}: <strong>${this.esc(data.ytd_from || data.from_date)} — ${this.esc(
+					data.to_date
+				)}</strong>
+				&nbsp;|&nbsp; ${__("FY")}: <strong>${this.esc(data.fiscal_year_label || "")}</strong>
+				&nbsp;|&nbsp; ${__("Month")}: <strong>${this.esc(data.month_label || "")}</strong>
+			</p>
 			${this.render_kpi_cards(data)}
-			${this.render_main_table(data)}
+			${this.render_activity_table(data)}
+			${this.render_outcome_table(data)}
 			${this.render_monthly_sections(data)}
 			${this.render_field_staff(data)}
-			<ul class="small text-muted">${notes}</ul>
+			<table class="stb-sign">
+				<tr><td class="lbl">${__("Regional Staff Name")}</td><td class="box">${
+					data.supervisor ? this.esc(data.supervisor_label || "") : ""
+				}</td></tr>
+				<tr><td class="lbl">${__("Staff Signature")}</td><td class="box"></td></tr>
+				<tr><td class="lbl">${__("Line Manager Signature")}</td><td class="box"></td></tr>
+			</table>
+			<ul class="stb-note">${notes}</ul>
 		`);
 	}
 }
 
 function cint(v) {
 	return parseInt(v, 10) || 0;
+}
+
+function flt(v) {
+	const n = Number(v);
+	return Number.isNaN(n) ? 0 : n;
 }
