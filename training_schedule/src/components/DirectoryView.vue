@@ -361,6 +361,7 @@ th { background: #f8fafc; }
 .pill[data-status="completed"] { color: #059669; }
 .pill[data-status="in_progress"] { color: #d97706; }
 .pill[data-status="upcoming"] { color: #7c3aed; }
+.pill[data-status="cancelled"] { color: #dc2626; }
 .linkish { border: 0; background: none; color: #4f46e5; font-weight: 700; cursor: pointer; }
 .linkish.attend { color: #0f766e; }
 .acts { display: flex; flex-wrap: wrap; gap: 8px; }

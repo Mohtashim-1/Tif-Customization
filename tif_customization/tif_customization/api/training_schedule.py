@@ -31,6 +31,7 @@ FIELDS = (
 	"training_time",
 	"training_end_time",
 	"schedule_status",
+	"cancel_reason",
 	"training_type",
 	"workshop_topic",
 	"mode_of_training",
@@ -972,6 +973,8 @@ def _normalize_status(value):
 		return "in_progress"
 	if raw == "upcoming":
 		return "upcoming"
+	if raw in ("cancelled", "canceled", "cancel"):
+		return "cancelled"
 	return ""
 
 
@@ -1634,6 +1637,7 @@ def get_session(name):
 		"tag_school": tag_school,
 		"institute": institute or school_label or "",
 		"schedule_status": getattr(doc, "schedule_status", None) or "",
+		"cancel_reason": getattr(doc, "cancel_reason", None) or "",
 		"zoom_id": getattr(doc, "zoom_id", None) or "",
 		"zoom_link": getattr(doc, "zoom_link", None) or "",
 		"zoom_attendance_file": getattr(doc, "zoom_attendance_file", None) or "",
@@ -1710,8 +1714,23 @@ def save_session(values=None):
 			"completed": "Completed",
 			"in_progress": "In Progress",
 			"upcoming": "Upcoming",
+			"cancelled": "Cancelled",
 		}
-		values.schedule_status = mapped.get(_normalize_status(values.get("schedule_status"))) or None
+		# Accept either "Cancelled" label or normalized key from the portal
+		raw_status = values.get("schedule_status")
+		if cstr(raw_status).strip() == "Cancelled":
+			values.schedule_status = "Cancelled"
+		else:
+			values.schedule_status = mapped.get(_normalize_status(raw_status)) or None
+
+	if values.get("schedule_status") == "Cancelled":
+		reason = cstr(values.get("cancel_reason") or "").strip()
+		if not reason:
+			frappe.throw(_("Cancel Reason is required when Status is Cancelled."))
+		values.cancel_reason = reason
+	elif "cancel_reason" in values and values.get("schedule_status") != "Cancelled":
+		# Clear reason if status is no longer Cancelled
+		values.cancel_reason = ""
 
 	for field in (
 		"type",
@@ -1732,6 +1751,7 @@ def save_session(values=None):
 		"workshop_for",
 		"tag_school",
 		"schedule_status",
+		"cancel_reason",
 		"zoom_id",
 		"zoom_link",
 		"zoom_attendance_file",

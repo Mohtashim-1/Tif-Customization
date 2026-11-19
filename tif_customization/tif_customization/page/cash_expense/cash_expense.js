@@ -4,15 +4,29 @@ frappe.pages["cash-expense"].on_page_load = function (wrapper) {
 		title: __("Cash Expense"),
 		single_column: true,
 	});
-	new frappe.tif_customization.CashExpensePage(page).make();
+	wrapper.cash_expense_page = new frappe.tif_customization.CashExpensePage(page, wrapper);
+	wrapper.cash_expense_page.make();
+};
+
+frappe.pages["cash-expense"].on_page_show = function (wrapper) {
+	const page = wrapper.cash_expense_page;
+	if (page && page._ready) page.load_data();
 };
 
 frappe.tif_customization = frappe.tif_customization || {};
 
 frappe.tif_customization.CashExpensePage = class CashExpensePage {
-	constructor(page) {
+	constructor(page, wrapper) {
 		this.page = page;
+		this.wrapper = wrapper;
 		this.data = null;
+		this._ready = false;
+		this.defaults = {
+			company: "The ILM Foundation",
+			account: "PETTY CASH - TIF",
+			from_date: "2026-07-01",
+			to_date: "2027-06-30",
+		};
 	}
 
 	make() {
@@ -22,14 +36,16 @@ frappe.tif_customization.CashExpensePage = class CashExpensePage {
 		this.page.set_primary_action(__("Refresh"), () => this.load_data(), "refresh");
 		this.page.add_inner_button(__("Print / PDF"), () => this.print_statement());
 		this.page.add_action_item(__("Export CSV"), () => this.export_csv());
-		this.apply_defaults().then(() => {
-			this._ready = true;
-			this.load_data();
-		});
+		// Sync defaults first (no race), then load — avoids empty first paint
+		this.apply_defaults_sync();
+		this._ready = true;
+		this.load_data();
+		// Optional: refine FY from server without blocking first render
+		this.refine_fy_dates();
 	}
 
 	make_layout() {
-		$(this.page.body).html(`
+		$(this.page.body).empty().html(`
 			<div class="ce-root">
 				<style>
 					.ce-root{padding:12px 16px 28px;width:100%;max-width:none;margin:0}
@@ -99,30 +115,41 @@ frappe.tif_customization.CashExpensePage = class CashExpensePage {
 					${__("Cash expense ledger from GL Entry (default: Petty Cash). Balance = Opening + Debit − Credit.")}
 					${__("Use")} <strong>${__("Print / PDF")}</strong> ${__("for a statement.")}
 				</p>
-				<div id="ce-filters" class="ce-filters row no-print"></div>
-				<div id="ce-body"></div>
+				<div class="ce-filters row no-print"></div>
+				<div class="ce-report-body"></div>
 			</div>
 		`);
+		this.$root = $(this.page.body).find(".ce-root");
+		this.$filters = this.$root.find(".ce-filters");
+		this.$report = this.$root.find(".ce-report-body");
 	}
 
 	make_filters() {
+		const d = this.defaults;
+		const company = frappe.defaults.get_user_default("Company") || d.company;
+		const fy_start = frappe.defaults.get_user_default("year_start_date") || d.from_date;
+		const fy_end = frappe.defaults.get_user_default("year_end_date") || d.to_date;
+
 		this.company = this.make_filter({
 			label: __("Company"),
 			fieldtype: "Link",
 			fieldname: "company",
 			options: "Company",
+			default: company,
 			reqd: 1,
 		});
 		this.from_date = this.make_filter({
 			label: __("From Date"),
 			fieldtype: "Date",
 			fieldname: "from_date",
+			default: fy_start,
 			reqd: 1,
 		});
 		this.to_date = this.make_filter({
 			label: __("To Date"),
 			fieldtype: "Date",
 			fieldname: "to_date",
+			default: fy_end,
 			reqd: 1,
 		});
 		this.account = this.make_filter({
@@ -130,10 +157,11 @@ frappe.tif_customization.CashExpensePage = class CashExpensePage {
 			fieldtype: "Link",
 			fieldname: "account",
 			options: "Account",
+			default: d.account,
 			reqd: 1,
 			get_query: () => ({
 				filters: {
-					company: this.company.get_value() || "The ILM Foundation",
+					company: this.company.get_value() || d.company,
 					account_type: "Cash",
 					is_group: 0,
 				},
@@ -146,43 +174,69 @@ frappe.tif_customization.CashExpensePage = class CashExpensePage {
 			options: "Cost Center",
 			get_query: () => ({
 				filters: {
-					company: this.company.get_value() || "The ILM Foundation",
+					company: this.company.get_value() || d.company,
 					is_group: 0,
 				},
 			}),
 		});
 	}
 
-	async apply_defaults() {
-		const company = frappe.defaults.get_user_default("Company") || "The ILM Foundation";
-		let fy_start = frappe.defaults.get_user_default("year_start_date");
-		let fy_end = frappe.defaults.get_user_default("year_end_date");
-		if (!fy_start || !fy_end) {
-			try {
-				const years = await frappe.db.get_list("Fiscal Year", {
-					fields: ["year_start_date", "year_end_date"],
-					filters: { disabled: 0 },
-					order_by: "year_start_date desc",
-					limit: 1,
-				});
-				const fy = (years && years[0]) || {};
-				fy_start = fy_start || fy.year_start_date || "2026-07-01";
-				fy_end = fy_end || fy.year_end_date || "2027-06-30";
-			} catch (e) {
-				fy_start = fy_start || "2026-07-01";
-				fy_end = fy_end || "2027-06-30";
-			}
-		}
+	apply_defaults_sync() {
+		const d = this.defaults;
+		const company = frappe.defaults.get_user_default("Company") || d.company;
+		const fy_start = frappe.defaults.get_user_default("year_start_date") || d.from_date;
+		const fy_end = frappe.defaults.get_user_default("year_end_date") || d.to_date;
+		this.set_filter_value(this.company, company);
+		this.set_filter_value(this.from_date, fy_start);
+		this.set_filter_value(this.to_date, fy_end);
+		this.set_filter_value(this.account, d.account);
+	}
 
-		await this.company.set_value(company);
-		await this.from_date.set_value(fy_start);
-		await this.to_date.set_value(fy_end);
-		await this.account.set_value("PETTY CASH - TIF");
+	set_filter_value(control, value) {
+		if (!control || value == null || value === "") return;
+		// Write model + input immediately (Link set_value alone is async and often blank on first paint)
+		control.value = value;
+		control.last_value = value;
+		if (control.df) control.df.default = value;
+		if (typeof control.set_input === "function") {
+			control.set_input(value);
+		} else if (control.$input) {
+			control.$input.val(value);
+		}
+		try {
+			control.set_value(value);
+		} catch (e) {
+			/* ignore */
+		}
+	}
+
+	refine_fy_dates() {
+		frappe.db
+			.get_list("Fiscal Year", {
+				fields: ["year_start_date", "year_end_date"],
+				filters: { disabled: 0 },
+				order_by: "year_start_date desc",
+				limit: 1,
+			})
+			.then((years) => {
+				const fy = (years && years[0]) || {};
+				if (!fy.year_start_date || !fy.year_end_date) return;
+				const cur_from = this.from_date.get_value();
+				const cur_to = this.to_date.get_value();
+				// Only overwrite if still on bootstrap defaults
+				if (!cur_from || cur_from === this.defaults.from_date) {
+					this.set_filter_value(this.from_date, fy.year_start_date);
+				}
+				if (!cur_to || cur_to === this.defaults.to_date) {
+					this.set_filter_value(this.to_date, fy.year_end_date);
+				}
+			})
+			.catch(() => {});
 	}
 
 	make_filter(df) {
 		const wrap = $('<div class="col-md-2" style="margin-bottom:8px;"></div>');
-		$("#ce-filters").append(wrap);
+		this.$filters.append(wrap);
 		const control = frappe.ui.form.make_control({
 			parent: wrap.get(0),
 			df: Object.assign(
@@ -196,6 +250,9 @@ frappe.tif_customization.CashExpensePage = class CashExpensePage {
 			render_input: true,
 		});
 		control.refresh();
+		if (df.default != null && df.default !== "") {
+			this.set_filter_value(control, df.default);
+		}
 		return control;
 	}
 
@@ -205,11 +262,12 @@ frappe.tif_customization.CashExpensePage = class CashExpensePage {
 	}
 
 	get_filters() {
+		const d = this.defaults;
 		return {
-			company: this.company.get_value(),
-			from_date: this.from_date.get_value(),
-			to_date: this.to_date.get_value(),
-			account: this.account.get_value() || "PETTY CASH - TIF",
+			company: this.company.get_value() || d.company,
+			from_date: this.from_date.get_value() || d.from_date,
+			to_date: this.to_date.get_value() || d.to_date,
+			account: this.account.get_value() || d.account,
 			cost_center: this.cost_center.get_value() || "",
 		};
 	}
@@ -220,20 +278,20 @@ frappe.tif_customization.CashExpensePage = class CashExpensePage {
 			frappe.msgprint(__("Please set Company, dates and Cash Account."));
 			return;
 		}
-		$("#ce-body").html(`<p class="text-muted">${__("Loading...")}</p>`);
+		this.$report.html(`<p class="text-muted">${__("Loading...")}</p>`);
 		frappe.call({
 			method: "tif_customization.tif_customization.page.cash_expense.cash_expense.get_report_data",
 			args: { filters },
 			callback: (r) => {
 				if (!r.message) {
-					$("#ce-body").html(`<p class="text-danger">${__("Failed to load.")}</p>`);
+					this.$report.html(`<p class="text-danger">${__("Failed to load.")}</p>`);
 					return;
 				}
 				this.data = r.message;
 				this.render(r.message);
 			},
 			error: () => {
-				$("#ce-body").html(`<p class="text-danger">${__("Failed to load.")}</p>`);
+				this.$report.html(`<p class="text-danger">${__("Failed to load.")}</p>`);
 			},
 		});
 	}
@@ -255,7 +313,7 @@ frappe.tif_customization.CashExpensePage = class CashExpensePage {
 			: "";
 		const contact = [brand.phone_no, brand.email, brand.website].filter(Boolean).map((x) => this.esc(x)).join(" · ");
 
-		$("#ce-body").html(`
+		this.$report.html(`
 			<div class="ce-statement">
 				<div class="ce-brand">
 					<div class="ce-brand-left">

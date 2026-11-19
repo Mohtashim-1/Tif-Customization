@@ -49,6 +49,8 @@ def _check():
 
 def _status(row, today_d):
 	raw = (row.get("schedule_status") or "").strip().lower()
+	if raw in ("cancelled", "canceled", "cancel"):
+		return "cancelled"
 	if raw in ("completed", "complete"):
 		return "completed"
 	if raw in ("in progress", "in_progress", "live"):

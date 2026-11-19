@@ -436,16 +436,6 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Donation Slip",
-   "link_count": 0,
-   "link_to": "Donation",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
    "label": "Donation Received Bank Wise",
    "link_count": 0,
    "link_to": "bank-wise-fund-distribution",
@@ -490,6 +480,26 @@
    "link_count": 0,
    "link_to": "donation-report",
    "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Cash Expense",
+   "link_count": 0,
+   "link_to": "cash-expense",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Donation Slip",
+   "link_count": 0,
+   "link_to": "Donation",
+   "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
   },
@@ -602,7 +612,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-11-17 09:33:58.542772",
+ "modified": "2026-11-19 15:41:49.270577",
  "modified_by": "farhan.hussain@tif.edu.pk",
  "module": "Tif Customization",
  "name": "Reports",

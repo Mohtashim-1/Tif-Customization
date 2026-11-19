@@ -37,6 +37,7 @@ function sessionsAt(day, slotId) {
 
 function statusIcon(status) {
 	if (status === "completed") return "✓";
+	if (status === "cancelled") return "✕";
 	if (status === "in_progress") return "●";
 	return "○";
 }
@@ -205,6 +206,10 @@ td.today {
 }
 .status[data-status="upcoming"] {
 	color: #7c3aed;
+	flex: 0 0 auto;
+}
+.status[data-status="cancelled"] {
+	color: #dc2626;
 	flex: 0 0 auto;
 }
 .meta {

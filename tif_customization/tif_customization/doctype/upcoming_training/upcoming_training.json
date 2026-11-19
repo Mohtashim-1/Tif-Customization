@@ -11,6 +11,7 @@
   "training_time",
   "training_end_time",
   "schedule_status",
+  "cancel_reason",
   "month",
   "training_type",
   "workshop_topic",
@@ -73,7 +74,15 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Status",
-   "options": "\nUpcoming\nIn Progress\nCompleted"
+   "options": "\nUpcoming\nIn Progress\nCompleted\nCancelled"
+  },
+  {
+   "depends_on": "eval:doc.schedule_status == 'Cancelled'",
+   "description": "Required when status is Cancelled",
+   "fieldname": "cancel_reason",
+   "fieldtype": "Small Text",
+   "label": "Cancel Reason",
+   "mandatory_depends_on": "eval:doc.schedule_status == 'Cancelled'"
   },
   {
    "depends_on": "eval:doc.type == 'Workshop'",

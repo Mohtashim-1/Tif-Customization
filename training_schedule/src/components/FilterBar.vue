@@ -66,6 +66,7 @@ const views = [
 				<option value="completed">Completed</option>
 				<option value="in_progress">In Progress</option>
 				<option value="upcoming">Upcoming</option>
+				<option value="cancelled">Cancelled</option>
 			</select>
 		</div>
 

@@ -73,6 +73,7 @@ const form = reactive({
 	workshop_for: "",
 	tag_school: "",
 	schedule_status: "",
+	cancel_reason: "",
 	zoom_id: "",
 	zoom_link: "",
 	zoom_attendance_file: "",
@@ -80,6 +81,7 @@ const form = reactive({
 });
 
 const isWorkshop = computed(() => form.type === "Workshop");
+const isCancelled = computed(() => form.schedule_status === "Cancelled");
 const title = computed(() => (form.name ? `Edit ${form.name}` : "New Upcoming Training"));
 const presentCount = computed(
 	() => (form.attendance || []).filter((a) => a.attendance_status === "Present").length
@@ -142,6 +144,7 @@ function reset() {
 		workshop_for: "",
 		tag_school: "",
 		schedule_status: "",
+		cancel_reason: "",
 		zoom_id: "",
 		zoom_link: "",
 		zoom_attendance_file: "",
@@ -640,8 +643,14 @@ async function save() {
 	saving.value = true;
 	error.value = "";
 	try {
+		if (form.schedule_status === "Cancelled" && !(form.cancel_reason || "").trim()) {
+			error.value = "Cancel Reason is required when Status is Cancelled.";
+			saving.value = false;
+			return;
+		}
 		const payload = {
 			...form,
+			cancel_reason: form.schedule_status === "Cancelled" ? (form.cancel_reason || "").trim() : "",
 			attendance: (form.attendance || []).filter((a) => (a.participant_name || "").trim()),
 		};
 		const result = await apiPost(`${METHOD}.save_session`, { values: payload });
@@ -700,11 +709,21 @@ onMounted(load);
 								<option value="Upcoming">Upcoming</option>
 								<option value="In Progress">In Progress</option>
 								<option value="Completed">Completed</option>
+								<option value="Cancelled">Cancelled</option>
 							</select>
 						</label>
 						<label class="pick">
 							Date
 							<DatePicker v-model="form.training_date" required />
+						</label>
+						<label v-if="isCancelled" class="full">
+							Cancel Reason
+							<textarea
+								v-model="form.cancel_reason"
+								rows="2"
+								required
+								placeholder="Why was this training cancelled?"
+							></textarea>
 						</label>
 						<label class="full">
 							Time
