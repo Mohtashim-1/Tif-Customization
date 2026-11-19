@@ -887,7 +887,7 @@ frappe.tif_customization.SMESummaryReportCopy = class SMESummaryReportCopy {
 							highlightTargets: "model_school_a,model_school_b,model_school_c",
 							outcomeFy: true,
 							hint: __(
-								"Schools with any program running. Model A + B + C. Click for model split."
+								"Active + New Active Registered School. Model A + B + C. Click for model split."
 							),
 						},
 						{

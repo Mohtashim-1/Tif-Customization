@@ -316,6 +316,11 @@ class SchoolDashboard {
 		return { Active: SD_COLORS.active, "Active New": SD_COLORS.active_new }[b] || SD_COLORS.model_0;
 	}
 
+	/** Running Programs column: affiliation only (hide books / guides / trainings). */
+	affiliated_programs(r) {
+		return (r.running || []).filter((p) => /affiliated/i.test(p.label || ""));
+	}
+
 	model_color(m) {
 		return SD_COLORS[m] || "#94a3b8";
 	}
@@ -358,7 +363,7 @@ class SchoolDashboard {
 		this.$body.find(".sv-kpis").html(
 			[
 				kpi({ label: __("Total Schools"), val: total, color: SD_COLORS.total, icon: "school", hint: __("Active + Active New + Model 0"), field: "bucket", value: "" }),
-				kpi({ label: __("Active Schools"), val: s.active, color: SD_COLORS.active, icon: "check", hint: __("Program running"), field: "bucket", value: "Active", pct: pct(s.active) }),
+				kpi({ label: __("Active Schools"), val: running, color: SD_COLORS.active, icon: "check", hint: __("Active + Active New · program running"), field: "bucket", value: "Active", pct: pct(running) }),
 				kpi({ label: __("Active New"), val: s.active_new, color: SD_COLORS.active_new, icon: "spark", hint: __("New school, program running"), field: "bucket", value: "Active New", pct: pct(s.active_new) }),
 				kpi({ label: __("Model 0"), val: s.model_0, color: SD_COLORS.model_0, icon: "pause", hint: __("Visited, no program running"), field: "bucket", value: "Model 0", pct: pct(s.model_0) }),
 				kpi({ label: __("Field Visits"), val: s.visits, color: SD_COLORS.visits, icon: "pin", hint: total ? __("{0} visits per school", [(s.visits / total).toFixed(1)]) : "" }),
@@ -480,11 +485,11 @@ class SchoolDashboard {
 			.slice(0, this.shown)
 			.map((r, i) => {
 				const bc = this.bucket_color(r.bucket);
-				const pills = r.running.length
-					? r.running
-							.slice(0, 4)
+				const affiliated = this.affiliated_programs(r);
+				const pills = affiliated.length
+					? affiliated
 							.map((p) => `<span class="sv-pill" style="--c:${(SD_DEPT[p.dept] || {}).color || "#64748b"}">${esc(p.label)}</span>`)
-							.join("") + (r.running.length > 4 ? `<span class="sv-pill" style="--c:#64748b">+${r.running.length - 4}</span>` : "")
+							.join("")
 					: `<span class="text-muted">—</span>`;
 				const ago = this.ago(r.last_visit);
 				return `<tr class="sv-row" data-idx="${i}">
@@ -539,7 +544,7 @@ class SchoolDashboard {
 		const data = [header].concat(
 			rows.map((r) => [
 				r.school_label, r.bucket, r.model, r.city, r.province, r.address,
-				r.running.map((p) => p.label).join(", "),
+				this.affiliated_programs(r).map((p) => p.label).join(", "),
 				r.visits, r.marketing_visits, r.followup_visits, r.me_visits,
 				r.first_visit || "", r.last_visit || "", r.last_by,
 			])

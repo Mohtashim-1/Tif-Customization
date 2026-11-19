@@ -1,0 +1,47 @@
+{
+ "content": null,
+ "creation": "2026-11-18 00:00:00.000000",
+ "docstatus": 0,
+ "doctype": "Page",
+ "idx": 0,
+ "modified": "2026-11-18 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Tif Customization",
+ "name": "bulk-training-attendance",
+ "owner": "Administrator",
+ "page_name": "bulk-training-attendance",
+ "roles": [
+  {
+   "role": "System Manager"
+  },
+  {
+   "role": "HR User"
+  },
+  {
+   "role": "Employee"
+  },
+  {
+   "role": "Sales User"
+  },
+  {
+   "role": "Workspace Manager"
+  },
+  {
+   "role": "Field Staff Manager"
+  },
+  {
+   "role": "SME Manager"
+  },
+  {
+   "role": "COO"
+  },
+  {
+   "role": "HOD"
+  }
+ ],
+ "script": null,
+ "standard": "Yes",
+ "style": null,
+ "system_page": 0,
+ "title": "Bulk Training Attendance"
+}

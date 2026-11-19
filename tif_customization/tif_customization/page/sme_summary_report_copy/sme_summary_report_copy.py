@@ -755,8 +755,10 @@ def get_report_data(filters=None):
 			"metric": "total_schools",
 			"label": _("Total Schools"),
 		}
+		# Active Schools = Active + Active New (matches Model A+B+C / programs running)
 		outcome_fy["active_schools"] = {
-			"actual": cint(prov_totals.get("active") or 0),
+			"actual": cint(prov_totals.get("active") or 0)
+			+ cint(prov_totals.get("active_new") or 0),
 			"yearly_min": 0,
 			"metric": "active_schools",
 			"label": _("Active Schools"),
