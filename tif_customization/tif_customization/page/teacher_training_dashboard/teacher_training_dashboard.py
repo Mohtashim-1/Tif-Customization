@@ -737,6 +737,25 @@ def _program_group(row):
 	return topic or "(No Program)"
 
 
+def _session_kind(row):
+	"""Workshop if type says so, or topic/program name is clearly a workshop (mis-tagged Training)."""
+	raw = (row.get("type") or "").strip()
+	if raw == "Workshop":
+		return "Workshop"
+	label = _program_group(row)
+	topic = " ".join(
+		(
+			row.get("workshop_topic")
+			or row.get("training_type")
+			or row.get("program")
+			or ""
+		).split()
+	)
+	if "workshop" in _norm_text(label) or "workshop" in _norm_text(topic):
+		return "Workshop"
+	return raw or "Training"
+
+
 def _program_code(label):
 	words = [w for w in "".join(ch if ch.isalnum() else " " for ch in label).split()]
 	if not words:
@@ -802,7 +821,7 @@ def get_overview(fy=None, department=None):
 				"date": str(r.training_date),
 				"status": _status(r, today_d),
 				"program": _program_group(r),
-				"kind": r.type or "Training",
+				"kind": _session_kind(r),
 				"module": " ".join(((r.training_type if r.program else r.workshop_topic) or r.training_type or _title(r) or "").split()),
 				"trainer": " ".join((r.trainer_name or "").split()),
 				"mode": (r.mode_of_training or "").strip(),
@@ -843,7 +862,13 @@ def get_overview(fy=None, department=None):
 
 	programs = {}
 	for s in sessions:
-		programs.setdefault(s["program"], {"label": s["program"], "code": _program_code(s["program"]), "kind": s["kind"]})
+		slot = programs.setdefault(
+			s["program"],
+			{"label": s["program"], "code": _program_code(s["program"]), "kind": s["kind"]},
+		)
+		# Prefer Workshop when any session in the group is a workshop
+		if (s.get("kind") or "") == "Workshop":
+			slot["kind"] = "Workshop"
 
 	return {
 		"fy": fy,

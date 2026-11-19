@@ -285,14 +285,17 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 			p.people += this.people(s);
 			if (s.trainer) p.trainers.add(s.trainer);
 			if (s.city) p.cities[s.city] = (p.cities[s.city] || 0) + 1;
+			if (/workshop/i.test(s.kind || "") || /workshop/i.test(s.program || "")) p.kind = "Workshop";
 		});
 		const fb = this.feedback();
 		return Object.values(by)
 			.map((p) => {
 				const meta = this.program_meta(p.label);
 				const city = Object.entries(p.cities).sort((a, b) => b[1] - a[1])[0];
+				const kind = /workshop/i.test(p.kind || "") || /workshop/i.test(p.label || "") || /workshop/i.test(meta.kind || "") ? "Workshop" : p.kind || meta.kind || "Training";
 				return Object.assign(p, {
 					code: meta.code,
+					kind,
 					city: city ? city[0] : "",
 					status: p.done === p.sessions ? "completed" : p.done ? "progress" : "upcoming",
 					rating: this.rating(fb.filter((f) => f.program === p.label)),
@@ -301,11 +304,13 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 			.sort((a, b) => b.sessions - a.sessions || b.people - a.people);
 	}
 	is_workshop(p) {
-		return /workshop/i.test(p.kind || "");
+		return /workshop/i.test(p.kind || "") || /workshop/i.test(p.label || "");
 	}
 	list_view_of(label) {
 		const s = (this.data.sessions || []).find((x) => x.program === label);
-		return s && /workshop/i.test(s.kind || "") ? "workshops" : "programs";
+		if (s && (/workshop/i.test(s.kind || "") || /workshop/i.test(s.program || ""))) return "workshops";
+		if (/workshop/i.test(label || "")) return "workshops";
+		return "programs";
 	}
 	status_pill(st) {
 		const t = { completed: __("Completed"), progress: __("In progress"), upcoming: __("Upcoming") }[st] || st;
@@ -541,7 +546,7 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 
 	view_list(kind) {
 		const workshop = kind === "Workshop";
-		const sessions = this.sessions().filter((s) => /workshop/i.test(s.kind || "") === workshop);
+		const sessions = this.sessions().filter((s) => (/workshop/i.test(s.kind || "") || /workshop/i.test(s.program || "")) === workshop);
 		const progs = this.program_stats(sessions);
 		const label = workshop ? __("workshop") : __("program");
 		const label_plural = workshop ? __("Workshops") : __("Programs");
@@ -690,8 +695,9 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 		const name = this.instructor;
 		const all = this.sessions().filter((s) => s.trainer === name);
 		if (!all.length) return `<div class="tt-card tt-empty">${__("No sessions for this instructor in the selected period.")}</div>`;
-		const workshops = all.filter((s) => /workshop/i.test(s.kind || ""));
-		const programs = all.filter((s) => !/workshop/i.test(s.kind || ""));
+		const isWs = (s) => /workshop/i.test(s.kind || "") || /workshop/i.test(s.program || "");
+		const workshops = all.filter(isWs);
+		const programs = all.filter((s) => !isWs(s));
 		const kind = this.instructor_kind || "";
 		const list = kind === "Workshop" ? workshops : kind === "Training" ? programs : all;
 		const stats = this.instructor_stats(all)[0];
@@ -737,7 +743,7 @@ frappe.tif_customization.TeacherTrainingDashboard = class TeacherTrainingDashboa
 						(s, i) => `<tr>
 					<td class="tt-mono" style="color:var(--mute)">${i + 1}</td>
 					<td class="tt-mono" style="font-size:11px;white-space:nowrap">${frappe.datetime.str_to_user(s.date)}</td>
-					<td><span class="tt-pill ${/workshop/i.test(s.kind || "") ? "progress" : "upcoming"}">${/workshop/i.test(s.kind || "") ? __("Workshop") : __("Program")}</span></td>
+					<td><span class="tt-pill ${/workshop/i.test(s.kind || "") || /workshop/i.test(s.program || "") ? "progress" : "upcoming"}">${/workshop/i.test(s.kind || "") || /workshop/i.test(s.program || "") ? __("Workshop") : __("Program")}</span></td>
 					<td><div class="tt-pname" style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${this.esc(s.program)}">${this.esc(s.program)}</div>
 						<div class="tt-psub" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${this.esc(s.module || "")}">${this.esc(s.module || "")}</div></td>
 					<td style="white-space:nowrap">${this.esc(s.mode || "—")}</td>
