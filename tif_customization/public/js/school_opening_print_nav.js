@@ -381,8 +381,8 @@
 				if (!fo) {
 					toast(
 						typeof __ !== "undefined"
-							? __("Set TIF Representative on the form first.")
-							: "Set TIF Representative on the form first.",
+							? __("No Field Officer found for this school. Select one, then send.")
+							: "No Field Officer found for this school. Select one, then send.",
 						"red"
 					);
 					return;

@@ -1102,6 +1102,99 @@ def _resolve_fo_label(field_officer):
 	return fo_label
 
 
+def _fo_label_for_user(user):
+	"""Map User / email → Field Officer display name (who added the school)."""
+	user = cstr(user or "").strip()
+	if not user or user in ("Administrator", "Guest"):
+		return ""
+	if not frappe.db.exists("DocType", "Field Officer"):
+		return ""
+	full = cstr(frappe.db.get_value("User", user, "full_name") or "").strip()
+	row = frappe.db.sql(
+		"""
+		SELECT name1, name, employee
+		FROM `tabField Officer`
+		WHERE IFNULL(status, 'Active') != 'Inactive'
+			AND (
+				user = %(user)s
+				OR employee = %(user)s
+				OR LOWER(TRIM(IFNULL(name1, ''))) = LOWER(%(full)s)
+				OR LOWER(TRIM(IFNULL(name1, ''))) = LOWER(%(user)s)
+			)
+		ORDER BY modified DESC
+		LIMIT 1
+		""",
+		{"user": user, "full": full or user},
+		as_dict=True,
+	)
+	if row:
+		return cstr(row[0].name1 or row[0].employee or row[0].name or "").strip()
+	return full
+
+
+def _default_field_officer(customer=None, school_name=None, owner=None, existing=None):
+	"""FO who added / owns the school — used as default Send target."""
+	existing = cstr(existing or "").strip()
+	if existing:
+		return _resolve_fo_label(existing)
+
+	customer = resolve_customer_name(customer) if customer else ""
+	school_name = cstr(school_name or "").strip()
+	if customer and not school_name:
+		school_name = cstr(frappe.db.get_value("Customer", customer, "customer_name") or "").strip()
+
+	# 1) SOA tif_representative (any status) by customer / school name
+	keys = [k for k in (customer, school_name) if k]
+	if keys:
+		fo = frappe.db.sql(
+			"""
+			SELECT TRIM(tif_representative) AS fo
+			FROM `tabSchool Opening Application`
+			WHERE IFNULL(TRIM(tif_representative), '') != ''
+				AND (
+					customer IN %(keys)s
+					OR TRIM(IFNULL(school_name, '')) IN %(keys)s
+				)
+			ORDER BY modified DESC
+			LIMIT 1
+			""",
+			{"keys": tuple(keys)},
+		)
+		if fo and fo[0][0]:
+			return _resolve_fo_label(fo[0][0])
+
+		# 2) Latest Field Visit officer for this school
+		if school_name and frappe.db.exists("DocType", "Field Visit"):
+			fv = frappe.db.sql(
+				"""
+				SELECT TRIM(COALESCE(
+					NULLIF(TRIM(visit_by), ''),
+					NULLIF(TRIM(me_visit_by), ''),
+					NULLIF(TRIM(mt_visit_by), '')
+				)) AS fo
+				FROM `tabField Visit`
+				WHERE docstatus < 2
+					AND TRIM(IFNULL(school_name, '')) = %(school)s
+					AND (
+						IFNULL(TRIM(visit_by), '') != ''
+						OR IFNULL(TRIM(me_visit_by), '') != ''
+						OR IFNULL(TRIM(mt_visit_by), '') != ''
+					)
+				ORDER BY modified DESC
+				LIMIT 1
+				""",
+				{"school": school_name},
+			)
+			if fv and fv[0][0]:
+				return _resolve_fo_label(fv[0][0])
+
+	# 3) Document / Customer owner → Field Officer master
+	owner = cstr(owner or "").strip()
+	if not owner and customer:
+		owner = cstr(frappe.db.get_value("Customer", customer, "owner") or "").strip()
+	return _fo_label_for_user(owner)
+
+
 def _ensure_application_for_send(application=None, customer=None):
 	"""Resolve SOA for send; create submitted SOA from Customer when needed."""
 	application = cstr(application or "").strip()
@@ -1147,10 +1240,15 @@ def send_school_opening_to_field_officer(application=None, field_officer=None, c
 		frappe.throw(_("Not permitted to update this application."), frappe.PermissionError)
 
 	doc = frappe.get_doc("School Opening Application", application)
-	# Default FO = form TIF Representative when dropdown not chosen
-	field_officer = cstr(field_officer or "").strip() or cstr(doc.tif_representative or "").strip()
+	# Default FO = TIF Representative, else FO who added the school (owner / visit)
+	field_officer = cstr(field_officer or "").strip() or _default_field_officer(
+		customer=doc.customer or customer,
+		school_name=doc.school_name,
+		owner=getattr(doc, "owner", None),
+		existing=doc.tif_representative,
+	)
 	if not field_officer:
-		frappe.throw(_("No Field Officer on this form. Set TIF Representative first, then send."))
+		frappe.throw(_("No Field Officer found for this school. Select one, then send."))
 
 	fo_label = _resolve_fo_label(field_officer)
 	note = cstr(note or "").strip()
@@ -1902,6 +2000,12 @@ def _view_from_application(app):
 	can_edit = can_edit_school_opening_form(application=app.name)
 	dup_map = _duplicate_map_for_keys([app.school_name])
 	dup_info = dup_map.get(_school_dup_key(app.school_name)) or {}
+	fo_default = _default_field_officer(
+		customer=app.customer,
+		school_name=app.school_name,
+		owner=getattr(app, "owner", None),
+		existing=app.tif_representative,
+	)
 	return {
 		"source": "application",
 		"application": app.name,
@@ -1918,13 +2022,13 @@ def _view_from_application(app):
 		"form_date_display": formatdate(form_date, "dd/mm/yyyy"),
 		"visit_type": getattr(app, "visit_type", None) or "Visit with enrollment",
 		"school_name": app.school_name,
-		"tif_representative": app.tif_representative or "",
+		"tif_representative": fo_default or (app.tif_representative or ""),
 		"fo_review_status": getattr(app, "fo_review_status", None) or "",
 		"sent_to_fo_on": cstr(getattr(app, "sent_to_fo_on", None) or ""),
 		"sent_to_fo_by": cstr(getattr(app, "sent_to_fo_by", None) or ""),
 		"fo_action_trail": cstr(getattr(app, "fo_action_trail", None) or ""),
 		"ho_to_fo_note": cstr(getattr(app, "ho_to_fo_note", None) or ""),
-		"field_officer": getattr(app, "tif_representative", None) or "",
+		"field_officer": fo_default or (getattr(app, "tif_representative", None) or ""),
 		"duplicate_count": cint(dup_info.get("count") or 0),
 		"duplicate_applications": dup_info.get("applications") or [],
 		"institution_types": _csv_to_list(app.institution_types),
@@ -1978,6 +2082,12 @@ def _view_from_customer(cust):
 
 	addr = _primary_address(cust.name)
 	contacts = _customer_contacts(cust.name)
+	fo_default = _default_field_officer(
+		customer=cust.name,
+		school_name=cust.customer_name,
+		owner=getattr(cust, "owner", None),
+		existing="",
+	)
 
 	return {
 		"source": "customer",
@@ -2002,7 +2112,8 @@ def _view_from_customer(cust):
 		"form_date_display": formatdate(form_date, "dd/mm/yyyy"),
 		"visit_type": "Visit with enrollment",
 		"school_name": cust.customer_name,
-		"tif_representative": "",
+		"tif_representative": fo_default,
+		"field_officer": fo_default,
 		"institution_types": ["School"] if cust.customer_type == "School" else [],
 		"institution_category": "Private" if govt == "Private" else "Provincial Govt." if govt == "Govt" else "",
 		"educational_system": [],
