@@ -80,6 +80,12 @@ onMounted(load);
 						<td>
 							<strong>{{ r.school_name || r.application }}</strong>
 							<div class="portal-muted">{{ r.application }}</div>
+							<div v-if="r.ho_to_fo_note" class="soa-ho-note">
+								<strong>
+									<Bi :mode="lang" en="HO note" ur="ہیڈ آفس نوٹ" />:
+								</strong>
+								{{ r.ho_to_fo_note }}
+							</div>
 						</td>
 						<td>{{ r.city || "—" }}</td>
 						<td>{{ r.sent_to_fo_on || r.modified || "—" }}</td>
@@ -114,5 +120,15 @@ onMounted(load);
 	text-transform: uppercase;
 	letter-spacing: 0.04em;
 	color: #64748b;
+}
+.soa-ho-note {
+	margin-top: 6px;
+	padding: 8px 10px;
+	border-radius: 8px;
+	background: #fff7ed;
+	border: 1px solid #fdba74;
+	color: #9a3412;
+	font-size: 12px;
+	line-height: 1.4;
 }
 </style>

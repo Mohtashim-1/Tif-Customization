@@ -19,6 +19,38 @@
 	border: 1px solid #93c5fd;
 	color: #1e40af;
 }
+.soa-fo-note-banner {
+	max-width: 820px;
+	margin: 0 auto 12px;
+	padding: 10px 14px;
+	border-radius: 8px;
+	font-size: 13px;
+	line-height: 1.45;
+	background: #fff7ed;
+	border: 1px solid #fdba74;
+	color: #9a3412;
+}
+.soa-print-toolbar .soa-fo-note {
+	width: 100%;
+	resize: vertical;
+}
+.soa-fo-trail {
+	max-width: 820px;
+	margin: 0 auto 12px;
+	padding: 10px 14px;
+	border-radius: 8px;
+	background: #f8fafc;
+	border: 1px solid #e2e8f0;
+	font-size: 12px;
+	color: #334155;
+}
+.soa-fo-trail pre {
+	margin: 6px 0 0;
+	white-space: pre-wrap;
+	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	font-size: 11px;
+	line-height: 1.45;
+}
 .soa-dup-links a {
 	margin-left: 4px;
 	font-weight: 600;

@@ -15,7 +15,7 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 	static PAGE_LENGTH_OPTIONS = [20, 50, 100, 200];
 	static PAGE_LENGTH_STORAGE_KEY = "soa_registry_page_length";
 	static FILTER_STORAGE_KEY = "soa_registry_print_filters";
-	static TABLE_COLS = 12;
+	static TABLE_COLS = 13;
 
 	static clear_stuck_freeze() {
 		while (frappe.dom.freeze_count > 0) {
@@ -96,7 +96,7 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 			label: __("Form Data"),
 			fieldtype: "Select",
 			fieldname: "form_data",
-			options: ["", "Full SC-1.2", "Customer only", "Pending approval"].join("\n"),
+			options: ["", "Full SC-1.2", "Customer only", "Pending approval", "Duplicates only"].join("\n"),
 		});
 
 		this.filter_fields.city = this.make_filter({
@@ -170,6 +170,8 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 		if (key === "customer_only" || key === "customer-only" || label === "Customer only")
 			return "customer_only";
 		if (key === "pending" || label === "Pending approval") return "pending";
+		if (key === "duplicates" || key === "duplicates_only" || label === "Duplicates only")
+			return "duplicates";
 		return "";
 	}
 
@@ -228,7 +230,7 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 					</p>
 				</div>
 				<p class="text-muted small">${__(
-					"Open a school to view the SC-1.2 form. Use Form Data → Pending approval to review drafts, then Approve / Previous / Next on the form page."
+					"Duplicate entry shows as an orange badge under School Name (and in the Duplicate column) when the same school has multiple forms/customers. Filter: Form Data → Duplicates only."
 				)}</p>
 				<div id="soa-registry-pager" class="flex justify-between align-center text-muted small" style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;"></div>
 				<div class="table-responsive" style="background:#fff;border:1px solid #d1d8dd;border-radius:8px;">
@@ -240,6 +242,7 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 								</th>
 								<th>${__("Customer")}</th>
 								<th>${__("School Name")}</th>
+								<th>${__("Duplicate")}</th>
 								<th>${__("Address")}</th>
 								<th>${__("City")}</th>
 								<th>${__("Govt / Private")}</th>
@@ -605,9 +608,9 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 				const dupBadge =
 					dupCount > 1
 						? `<span class="indicator-pill orange" title="${__(
-								"Multiple School Opening forms for the same school"
-						  )}">${__("Duplicate")} ×${dupCount}</span>`
-						: "";
+								"Multiple School Opening forms / customers for the same school"
+						  )}">${__("Duplicate entry")} ×${dupCount}</span>`
+						: `<span class="text-muted">—</span>`;
 				const foStatus = (row.fo_review_status || "").trim();
 				const foBadge =
 					foStatus === "Sent to Field Officer"
@@ -628,13 +631,15 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 				const pdfAttrs = isPending
 					? `data-application="${appEnc}" data-customer=""`
 					: `data-customer="${custEnc}" data-application=""`;
-				return `<tr class="${dupCount > 1 ? "soa-dup-row" : ""}">
+				return `<tr class="${dupCount > 1 ? "soa-dup-row" : ""}" style="${
+					dupCount > 1 ? "background:#fff7ed;" : ""
+				}">
 					<td>${checkbox}</td>
 					<td>${idCell}</td>
 					<td>${frappe.utils.escape_html(row.customer_name || "")}
-						${dupBadge ? `<div style="margin-top:4px">${dupBadge}</div>` : ""}
 						${foBadge ? `<div style="margin-top:4px">${foBadge}</div>` : ""}
 					</td>
+					<td>${dupBadge}</td>
 					<td class="small">${this.format_address_cell(row)}</td>
 					<td class="small">${this.format_city_cell(row)}</td>
 					<td>${frappe.utils.escape_html(row.govt_private || "")}</td>

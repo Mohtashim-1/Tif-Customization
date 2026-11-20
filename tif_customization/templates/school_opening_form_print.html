@@ -67,11 +67,24 @@
 		{% endif %}
 	</div>
 	{% endif %}
-	{% if not print_mode and data.fo_review_status == "Sent to Field Officer" %}
+	{% if not print_mode and data.fo_review_status %}
 	<div class="soa-fo-banner no-print">
-		<strong>{{ _("Sent to Field Officer") }}</strong>
+		<strong>{{ data.fo_review_status }}</strong>
 		{% if data.tif_representative %} — {{ data.tif_representative }}{% endif %}
 		{% if data.sent_to_fo_on %} · {{ data.sent_to_fo_on }}{% endif %}
+		{% if data.sent_to_fo_by %} · {{ _("by") }} {{ data.sent_to_fo_by }}{% endif %}
+	</div>
+	{% endif %}
+	{% if not print_mode and data.ho_to_fo_note %}
+	<div class="soa-fo-note-banner no-print">
+		<strong>{{ _("Note to Field Officer") }}:</strong>
+		{{ data.ho_to_fo_note }}
+	</div>
+	{% endif %}
+	{% if not print_mode and data.fo_action_trail %}
+	<div class="soa-fo-trail no-print">
+		<strong>{{ _("FO trail") }}</strong>
+		<pre>{{ data.fo_action_trail }}</pre>
 	</div>
 	{% endif %}
 
@@ -353,7 +366,8 @@
 		data-can-approve="{{ 1 if data.can_approve else 0 }}"
 		data-can-edit="{{ 1 if data.can_edit else 0 }}"
 		data-is-approved="{{ 1 if data.is_approved else 0 }}"
-		data-fo-status="{{ data.fo_review_status or '' }}">
+		data-fo-status="{{ data.fo_review_status or '' }}"
+		data-default-fo="{{ (data.tif_representative or data.field_officer or '') | e }}">
 		<button type="button" class="btn btn-success btn-sm soa-approve-btn"
 			{% if data.is_approved %}disabled{% elif not data.can_approve %}disabled{% endif %}>
 			{% if data.is_approved %}{{ _("Approved") }}{% else %}{{ _("Approve") }}{% endif %}
@@ -361,11 +375,22 @@
 		{% if editable %}
 		<button type="button" class="btn btn-primary btn-sm soa-save-btn">{{ _("Save Changes") }}</button>
 		{% endif %}
-		{% if data.application and not data.is_approved %}
-		<select class="form-control input-sm soa-fo-select" style="width:auto;min-width:160px;display:inline-block">
+		{% if data.application or data.customer %}
+		<label class="soa-fo-label text-muted small" style="margin:0 4px 0 8px">{{ _("Field Officer") }}</label>
+		<select class="form-control input-sm soa-fo-select" style="width:auto;min-width:180px;display:inline-block"
+			title="{{ _('Defaults to TIF Representative on the form') }}">
+			{% if data.tif_representative %}
+			<option value="{{ data.tif_representative | e }}" selected>{{ data.tif_representative }}</option>
+			{% else %}
 			<option value="">{{ _("Select Field Officer…") }}</option>
+			{% endif %}
 		</select>
-		<button type="button" class="btn btn-warning btn-sm soa-send-fo-btn">{{ _("Send to Field Officer") }}</button>
+		<button type="button" class="btn btn-warning btn-sm soa-send-fo-btn">
+			{% if data.fo_review_status %}{{ _("Send again to Field Officer") }}{% else %}{{ _("Send to Field Officer") }}{% endif %}
+		</button>
+		<textarea class="form-control input-sm soa-fo-note" rows="2"
+			placeholder="{{ _('Tell the Field Officer what to correct (e.g. these values are not proper…)') }}"
+			style="flex:1 1 100%;min-width:220px;margin-top:4px">{% if data.ho_to_fo_note %}{{ data.ho_to_fo_note }}{% endif %}</textarea>
 		{% endif %}
 		<button type="button" class="btn btn-default btn-sm soa-prev-doc" disabled>{{ _("Previous document") }}</button>
 		<span class="soa-nav-label text-muted small" aria-live="polite"></span>

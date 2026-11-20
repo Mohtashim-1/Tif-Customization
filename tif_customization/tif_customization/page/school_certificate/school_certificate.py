@@ -13,16 +13,16 @@ PAGE_ROLES = ("System Manager", "School Approval", "Field Staff Manager", "SME M
 # ~20s for 767 pages; keep well under the 120s gunicorn timeout (mirrored in school_certificate.js)
 MAX_DOWNLOAD = 1500
 CERT_DOCTYPE = "Mission Partner Certificate"
-_CERT_NO_RE = re.compile(r"^(SR TIF-MP)(\d+)$", re.I)
+_CERT_NO_RE = re.compile(r"^(?:SR\s+)?TIF-MP(\d+)$", re.I)
 
 
 def _format_certificate_no(name):
-	"""Always show 5-digit serial: SR TIF-MP00001 (legacy 4-digit names are padded)."""
+	"""Always show 5-digit serial without SR prefix: TIF-MP00001 (legacy 4-digit names are padded)."""
 	name = cstr(name).strip()
 	m = _CERT_NO_RE.match(name)
 	if not m:
 		return name
-	return f"SR TIF-MP{int(m.group(2)):05d}"
+	return f"TIF-MP{int(m.group(1)):05d}"
 
 
 def _check_access():
@@ -103,7 +103,7 @@ def _issued_numbers(schools):
 
 
 def _assign_numbers(rows, cert_date):
-	"""Same school always keeps its first certificate number (SR TIF-MP00001, ...)."""
+	"""Same school always keeps its first certificate number (TIF-MP00001, ...)."""
 	issued = _issued_numbers([r["school"] for r in rows])
 	out = {}
 	for r in rows:

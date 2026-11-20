@@ -317,32 +317,72 @@
 
 		const $foSelect = toolbar.querySelector(".soa-fo-select");
 		const $sendFo = toolbar.querySelector(".soa-send-fo-btn");
+		const defaultFo = (
+			toolbar.getAttribute("data-default-fo") ||
+			(document.querySelector('#soa-print-form [name="tif_representative"]') || {}).value ||
+			""
+		).trim();
+
+		function pickDefaultFo(officers, current) {
+			if (!current) return "";
+			const cur = current.toLowerCase();
+			const exact = officers.find((o) => String(o).toLowerCase() === cur);
+			if (exact) return exact;
+			const starts = officers.find((o) => String(o).toLowerCase().startsWith(cur));
+			if (starts) return starts;
+			const includes = officers.find((o) => String(o).toLowerCase().includes(cur));
+			return includes || current;
+		}
+
 		if ($foSelect) {
-			const currentFo = (document.querySelector('#soa-print-form [name="tif_representative"]') || {})
-				.value;
 			callMethod(FO_OPTS_API, {})
 				.then((opts) => {
 					const officers = (opts && opts.field_officers) || [];
+					const chosen = pickDefaultFo(officers, defaultFo);
+					// Keep existing selected option if already set from template
+					const existing = new Set(
+						Array.from($foSelect.options).map((o) => o.value).filter(Boolean)
+					);
 					officers.forEach((label) => {
+						if (existing.has(label)) return;
 						const opt = document.createElement("option");
 						opt.value = label;
 						opt.textContent = label;
-						if (currentFo && label.toLowerCase().includes(String(currentFo).toLowerCase())) {
-							opt.selected = true;
-						}
 						$foSelect.appendChild(opt);
 					});
+					if (chosen) {
+						$foSelect.value = chosen;
+						if ($foSelect.value !== chosen) {
+							// chosen not in list — keep as custom option
+							const opt = document.createElement("option");
+							opt.value = chosen;
+							opt.textContent = chosen;
+							opt.selected = true;
+							$foSelect.insertBefore(opt, $foSelect.firstChild);
+						}
+					}
 				})
-				.catch(() => {});
+				.catch(() => {
+					if (defaultFo && !$foSelect.value) {
+						$foSelect.value = defaultFo;
+					}
+				});
 		}
-		if ($sendFo && application) {
+		const $foNote = toolbar.querySelector(".soa-fo-note");
+		if ($sendFo && (application || customer)) {
 			$sendFo.addEventListener("click", () => {
-				const fo = ($foSelect && $foSelect.value) || "";
+				const fromSelect = ($foSelect && $foSelect.value) || "";
+				const fromForm = (
+					(document.querySelector('#soa-print-form [name="tif_representative"]') || {})
+						.value || ""
+				).trim();
+				const fo = fromSelect || fromForm || defaultFo;
+				const note = ($foNote && $foNote.value) || "";
 				if (!fo) {
 					toast(
 						typeof __ !== "undefined"
-							? __("Select a Field Officer first.")
-							: "Select a Field Officer first.",
+							? __("Set TIF Representative on the form first.")
+							: "Set TIF Representative on the form first.",
 						"red"
 					);
 					return;
@@ -351,14 +391,28 @@
 				const original = $sendFo.textContent;
 				$sendFo.textContent =
 					typeof __ !== "undefined" ? __("Sending…") : "Sending…";
-				callMethod(SEND_FO_API, { application, field_officer: fo })
+				callMethod(SEND_FO_API, {
+					application: application || "",
+					customer: customer || "",
+					field_officer: fo,
+					note,
+				})
 					.then((result) => {
 						toast(
 							(result && result.message) ||
 								(typeof __ !== "undefined" ? __("Sent") : "Sent"),
 							"green"
 						);
-						setTimeout(() => window.location.reload(), 700);
+						const app = (result && result.application) || application;
+						setTimeout(() => {
+							if (app) {
+								window.location.href = `/school-opening-print?application=${encodeURIComponent(
+									app
+								)}`;
+							} else {
+								window.location.reload();
+							}
+						}, 700);
 					})
 					.catch((err) => {
 						$sendFo.disabled = false;

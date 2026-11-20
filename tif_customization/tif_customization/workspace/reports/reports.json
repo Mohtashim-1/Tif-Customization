@@ -84,7 +84,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "School Database Dashboard New (UAT)",
+   "label": "School Database Dashboard New",
    "link_count": 0,
    "link_to": "school-visit-dashboard",
    "link_type": "Page",
@@ -104,7 +104,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Mission Partner Certificate (UAT)",
+   "label": "Mission Partner Certificate",
    "link_count": 0,
    "link_to": "school-certificate",
    "link_type": "Page",
@@ -612,7 +612,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-11-19 15:41:49.270577",
+ "modified": "2026-11-20 14:10:24.963676",
  "modified_by": "farhan.hussain@tif.edu.pk",
  "module": "Tif Customization",
  "name": "Reports",

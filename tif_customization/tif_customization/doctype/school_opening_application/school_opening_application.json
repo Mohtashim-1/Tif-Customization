@@ -60,6 +60,9 @@
   "erp_school_code",
   "fo_review_status",
   "sent_to_fo_on",
+  "sent_to_fo_by",
+  "ho_to_fo_note",
+  "fo_action_trail",
   "approved_by",
   "approved_on",
   "amended_from"
@@ -370,6 +373,25 @@
    "fieldname": "sent_to_fo_on",
    "fieldtype": "Datetime",
    "label": "Sent to FO On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sent_to_fo_by",
+   "fieldtype": "Link",
+   "label": "Sent to FO By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ho_to_fo_note",
+   "fieldtype": "Small Text",
+   "label": "Note to Field Officer",
+   "description": "Head Office message when returning / sending the form to the Field Officer"
+  },
+  {
+   "fieldname": "fo_action_trail",
+   "fieldtype": "Long Text",
+   "label": "FO Action Trail",
    "read_only": 1
   },
   {
