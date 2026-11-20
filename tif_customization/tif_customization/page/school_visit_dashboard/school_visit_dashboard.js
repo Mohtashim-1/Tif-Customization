@@ -364,7 +364,7 @@ class SchoolDashboard {
 			[
 				kpi({ label: __("Total Schools"), val: total, color: SD_COLORS.total, icon: "school", hint: __("Active + Active New + Model 0"), field: "bucket", value: "" }),
 				kpi({ label: __("Active Schools"), val: running, color: SD_COLORS.active, icon: "check", hint: __("Active + Active New · program running"), field: "bucket", value: "Active", pct: pct(running) }),
-				kpi({ label: __("Active New"), val: s.active_new, color: SD_COLORS.active_new, icon: "spark", hint: __("New school, program running"), field: "bucket", value: "Active New", pct: pct(s.active_new) }),
+				kpi({ label: __("Active New"), val: s.active_new, color: SD_COLORS.active_new, icon: "spark", hint: __("From 01-July-2026 · new school, program running"), field: "bucket", value: "Active New", pct: pct(s.active_new) }),
 				kpi({ label: __("Model 0"), val: s.model_0, color: SD_COLORS.model_0, icon: "pause", hint: __("Visited, no program running"), field: "bucket", value: "Model 0", pct: pct(s.model_0) }),
 				kpi({ label: __("Field Visits"), val: s.visits, color: SD_COLORS.visits, icon: "pin", hint: total ? __("{0} visits per school", [(s.visits / total).toFixed(1)]) : "" }),
 			].join("")

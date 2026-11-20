@@ -54,28 +54,24 @@
 {%- endmacro %}
 
 <div id="school-opening-portal" class="school-opening-portal soa-v2{% if editable %} soa-editable{% endif %}">
-	{% if not print_mode %}
-	<div class="soa-print-toolbar no-print"
-		data-customer="{{ data.customer or '' }}"
-		data-application="{{ data.application or '' }}"
-		data-can-approve="{{ 1 if data.can_approve else 0 }}"
-		data-can-edit="{{ 1 if data.can_edit else 0 }}"
-		data-is-approved="{{ 1 if data.is_approved else 0 }}">
-		<button type="button" class="btn btn-success btn-sm soa-approve-btn"
-			{% if data.is_approved %}disabled{% elif not data.can_approve %}disabled{% endif %}>
-			{% if data.is_approved %}{{ _("Approved") }}{% else %}{{ _("Approve") }}{% endif %}
-		</button>
-		{% if editable %}
-		<button type="button" class="btn btn-primary btn-sm soa-save-btn">{{ _("Save Changes") }}</button>
+	{% if not print_mode and (data.duplicate_count or 0) > 1 %}
+	<div class="soa-dup-banner no-print">
+		<strong>{{ _("Possible duplicate") }}</strong>
+		— {{ _("There are {0} School Opening forms for “{1}”.").format(data.duplicate_count, data.school_name or _("this school")) }}
+		{% if data.duplicate_applications %}
+		<span class="soa-dup-links">
+			{% for d in data.duplicate_applications %}
+			<a href="/school-opening-print?application={{ d.name | e }}">{{ d.name }}</a>{% if not loop.last %} · {% endif %}
+			{% endfor %}
+		</span>
 		{% endif %}
-		<button type="button" class="btn btn-default btn-sm soa-prev-doc" disabled>{{ _("Previous document") }}</button>
-		<span class="soa-nav-label text-muted small" aria-live="polite"></span>
-		<button type="button" class="btn btn-default btn-sm soa-next-doc" disabled>{{ _("Next document") }}</button>
-		<button type="button" class="btn btn-primary btn-sm" onclick="window.print()">{{ _("Print") }}</button>
-		<a class="btn btn-default btn-sm soa-pdf-download" href="#"
-			data-customer="{{ data.customer or '' }}"
-			data-application="{{ data.application or '' }}">{{ _("Download PDF") }}</a>
-		<a class="btn btn-default btn-sm" href="/app/school-opening-registry">{{ _("Back to list") }}</a>
+	</div>
+	{% endif %}
+	{% if not print_mode and data.fo_review_status == "Sent to Field Officer" %}
+	<div class="soa-fo-banner no-print">
+		<strong>{{ _("Sent to Field Officer") }}</strong>
+		{% if data.tif_representative %} — {{ data.tif_representative }}{% endif %}
+		{% if data.sent_to_fo_on %} · {{ data.sent_to_fo_on }}{% endif %}
 	</div>
 	{% endif %}
 
@@ -349,4 +345,36 @@
 
 		<div class="v2-page">Page 3 of 3</div>
 	</div>
+
+	{% if not print_mode %}
+	<div class="soa-print-toolbar soa-print-toolbar-bottom no-print"
+		data-customer="{{ data.customer or '' }}"
+		data-application="{{ data.application or '' }}"
+		data-can-approve="{{ 1 if data.can_approve else 0 }}"
+		data-can-edit="{{ 1 if data.can_edit else 0 }}"
+		data-is-approved="{{ 1 if data.is_approved else 0 }}"
+		data-fo-status="{{ data.fo_review_status or '' }}">
+		<button type="button" class="btn btn-success btn-sm soa-approve-btn"
+			{% if data.is_approved %}disabled{% elif not data.can_approve %}disabled{% endif %}>
+			{% if data.is_approved %}{{ _("Approved") }}{% else %}{{ _("Approve") }}{% endif %}
+		</button>
+		{% if editable %}
+		<button type="button" class="btn btn-primary btn-sm soa-save-btn">{{ _("Save Changes") }}</button>
+		{% endif %}
+		{% if data.application and not data.is_approved %}
+		<select class="form-control input-sm soa-fo-select" style="width:auto;min-width:160px;display:inline-block">
+			<option value="">{{ _("Select Field Officer…") }}</option>
+		</select>
+		<button type="button" class="btn btn-warning btn-sm soa-send-fo-btn">{{ _("Send to Field Officer") }}</button>
+		{% endif %}
+		<button type="button" class="btn btn-default btn-sm soa-prev-doc" disabled>{{ _("Previous document") }}</button>
+		<span class="soa-nav-label text-muted small" aria-live="polite"></span>
+		<button type="button" class="btn btn-default btn-sm soa-next-doc" disabled>{{ _("Next document") }}</button>
+		<button type="button" class="btn btn-primary btn-sm" onclick="window.print()">{{ _("Print") }}</button>
+		<a class="btn btn-default btn-sm soa-pdf-download" href="#"
+			data-customer="{{ data.customer or '' }}"
+			data-application="{{ data.application or '' }}">{{ _("Download PDF") }}</a>
+		<a class="btn btn-default btn-sm" href="/app/school-opening-registry">{{ _("Back to list") }}</a>
+	</div>
+	{% endif %}
 </div>

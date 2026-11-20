@@ -12,6 +12,7 @@ import AttachDrop from "./components/AttachDrop.vue";
 import SchoolOpeningPanel from "./components/SchoolOpeningPanel.vue";
 import PortalNav from "./components/PortalNav.vue";
 import PortalDashboard from "./components/PortalDashboard.vue";
+import SchoolOpeningTasks from "./components/SchoolOpeningTasks.vue";
 import PortalVisitList from "./components/PortalVisitList.vue";
 import PortalApprovals from "./components/PortalApprovals.vue";
 import { apiGet, apiPost, uploadFile, METHOD, TRAVEL_METHOD } from "./lib/api";
@@ -2579,6 +2580,11 @@ const steps = [
 				:lang="lang"
 				@navigate="navigatePortal"
 				@open-visit="openVisit"
+			/>
+
+			<SchoolOpeningTasks
+				v-else-if="portalPage === 'school-forms'"
+				:lang="lang"
 			/>
 
 			<PortalVisitList

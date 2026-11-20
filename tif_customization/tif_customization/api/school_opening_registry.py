@@ -6,7 +6,7 @@ import re
 
 import frappe
 from frappe import _
-from frappe.utils import escape_html, formatdate, getdate, cstr
+from frappe.utils import cint, escape_html, formatdate, getdate, cstr, now_datetime
 
 from tif_customization.tif_customization.api.school_opening_form import CONTACT_ROLES
 
@@ -556,6 +556,7 @@ def list_school_customers(
 	customers = [row.customer for row in rows]
 	addr_map = _addresses_for_customers(customers)
 	owner_names = _user_display_names([row.get("created_by_user") for row in rows])
+	dup_map = _duplicate_map_for_keys([row.customer_name for row in rows])
 	for row in rows:
 		row.has_application = bool(row.pop("has_application", 0))
 		row.application = None
@@ -566,6 +567,7 @@ def list_school_customers(
 		row.doc_status = "approved" if row.has_application else "customer_only"
 		row.doc_status_label = _("Approved") if row.has_application else ""
 		_apply_registry_location(row, addr_map.get(row.customer))
+		_apply_duplicate_info(row, row.customer_name, dup_map)
 
 	return {"rows": rows, "total": total, "start": start, "page_length": limit, "mode": "customer"}
 
@@ -681,6 +683,21 @@ def _list_pending_applications(
 	)
 
 	owner_names = _user_display_names([row.get("created_by_user") for row in rows])
+	dup_map = _duplicate_map_for_keys([row.customer_name for row in rows])
+	meta = frappe.get_meta("School Opening Application")
+	has_fo_status = meta.has_field("fo_review_status")
+	fo_status_by_app = {}
+	if has_fo_status and rows:
+		fo_status_by_app = dict(
+			frappe.db.sql(
+				"""
+				SELECT name, IFNULL(fo_review_status, '')
+				FROM `tabSchool Opening Application`
+				WHERE name IN %(names)s
+				""",
+				{"names": tuple(r.application for r in rows)},
+			)
+		)
 	for row in rows:
 		row.customer = ""
 		row.has_application = False
@@ -690,9 +707,11 @@ def _list_pending_applications(
 		row.field_officer = cstr(row.get("field_officer") or "").strip() or row.created_by or ""
 		row.doc_status = "draft"
 		row.doc_status_label = _("Draft")
+		row.fo_review_status = fo_status_by_app.get(row.application) or ""
 		row.full_address = ", ".join(
 			p for p in [row.address, row.area, row.city, row.province, row.country] if p
 		)
+		_apply_duplicate_info(row, row.customer_name, dup_map)
 
 	return {"rows": rows, "total": total, "start": start, "page_length": limit, "mode": "pending"}
 
@@ -856,6 +875,181 @@ def _neighbor_payload(names, current, key_field="customer"):
 		"total": total,
 		"label": f"{idx + 1} / {total}" if total else "",
 	}
+
+
+def _school_dup_key(name):
+	return re.sub(r"\s+", " ", cstr(name or "").strip().lower())
+
+
+def _duplicate_map_for_keys(keys):
+	"""school_key → {count, applications:[{name, school_name, docstatus}]} for SOA rows."""
+	keys = [k for k in {_school_dup_key(k) for k in (keys or [])} if k]
+	if not keys:
+		return {}
+	rows = frappe.db.sql(
+		"""
+		SELECT name, school_name, docstatus, modified
+		FROM `tabSchool Opening Application`
+		WHERE LOWER(TRIM(IFNULL(school_name, ''))) IN %(keys)s
+		ORDER BY modified DESC
+		""",
+		{"keys": tuple(keys)},
+		as_dict=True,
+	)
+	out = {}
+	for r in rows:
+		key = _school_dup_key(r.school_name)
+		bucket = out.setdefault(key, {"count": 0, "applications": []})
+		bucket["count"] += 1
+		if len(bucket["applications"]) < 8:
+			bucket["applications"].append(
+				{
+					"name": r.name,
+					"school_name": r.school_name or "",
+					"docstatus": cint(r.docstatus),
+				}
+			)
+	return out
+
+
+def _apply_duplicate_info(row, school_label, dup_map):
+	key = _school_dup_key(school_label)
+	info = dup_map.get(key) or {}
+	row.duplicate_count = cint(info.get("count") or 0)
+	row.duplicate_applications = info.get("applications") or []
+	row.is_duplicate = row.duplicate_count > 1
+
+
+@frappe.whitelist()
+def send_school_opening_to_field_officer(application=None, field_officer=None):
+	"""Assign draft SOA to a Field Officer for completion on the Field Visit Portal."""
+	application = cstr(application or "").strip()
+	field_officer = cstr(field_officer or "").strip()
+	if not application:
+		frappe.throw(_("Application is required."))
+	if not field_officer:
+		frappe.throw(_("Select a Field Officer."))
+	if not frappe.db.exists("School Opening Application", application):
+		frappe.throw(_("School Opening Application {0} not found.").format(application))
+	if not frappe.has_permission("School Opening Application", "write", application):
+		frappe.throw(_("Not permitted to update this application."), frappe.PermissionError)
+
+	doc = frappe.get_doc("School Opening Application", application)
+	if cint(doc.docstatus) == 1:
+		frappe.throw(_("Approved applications cannot be sent to Field Officer."))
+
+	# Prefer Field Officer display name (name1) / employee label
+	fo_label = field_officer
+	if ":" in field_officer:
+		fo_label = field_officer.split(":", 1)[0].strip() or field_officer
+	fo_name = None
+	if frappe.db.exists("Field Officer", field_officer):
+		fo_name = field_officer
+	elif frappe.db.exists("Field Officer", {"name1": field_officer}):
+		fo_name = frappe.db.get_value("Field Officer", {"name1": field_officer}, "name")
+	if fo_name:
+		fo_label = (
+			frappe.db.get_value("Field Officer", fo_name, "name1")
+			or frappe.db.get_value("Field Officer", fo_name, "employee")
+			or fo_label
+		)
+
+	doc.tif_representative = fo_label
+	if frappe.get_meta("School Opening Application").has_field("fo_review_status"):
+		doc.fo_review_status = "Sent to Field Officer"
+	if frappe.get_meta("School Opening Application").has_field("sent_to_fo_on"):
+		doc.sent_to_fo_on = now_datetime()
+	doc.save(ignore_permissions=False)
+	frappe.db.commit()
+	return {
+		"ok": True,
+		"application": doc.name,
+		"field_officer": fo_label,
+		"fo_review_status": getattr(doc, "fo_review_status", None) or "Sent to Field Officer",
+		"message": _("Sent to Field Officer {0}. It will appear on their Field Visit Portal.").format(
+			fo_label
+		),
+	}
+
+
+@frappe.whitelist()
+def list_my_school_opening_tasks(limit=50):
+	"""Forms sent to the logged-in Field Officer (for Field Visit Portal)."""
+	if frappe.session.user in (None, "Guest"):
+		frappe.throw(_("Please log in."), frappe.PermissionError)
+
+	limit = max(1, min(cint(limit) or 50, 200))
+	aliases = set()
+	user = frappe.session.user
+	full_name = cstr(frappe.db.get_value("User", user, "full_name") or "").strip()
+	if full_name:
+		aliases.add(full_name)
+	aliases.add(user)
+
+	# Map user → Field Officer master names
+	if frappe.db.exists("DocType", "Field Officer"):
+		fo_rows = frappe.db.sql(
+			"""
+			SELECT name, name1, employee, user
+			FROM `tabField Officer`
+			WHERE IFNULL(status, 'Active') != 'Inactive'
+				AND (
+					user = %(user)s
+					OR employee = %(user)s
+					OR LOWER(TRIM(IFNULL(name1, ''))) = LOWER(%(full)s)
+					OR LOWER(TRIM(IFNULL(employee, ''))) = LOWER(%(full)s)
+				)
+			""",
+			{"user": user, "full": full_name or user},
+			as_dict=True,
+		)
+		for fo in fo_rows:
+			for key in ("name", "name1", "employee"):
+				val = cstr(fo.get(key) or "").strip()
+				if val:
+					aliases.add(val)
+
+	aliases = [a for a in aliases if a]
+	if not aliases:
+		return {"rows": [], "total": 0}
+
+	meta = frappe.get_meta("School Opening Application")
+	has_fo_status = meta.has_field("fo_review_status")
+	has_sent_on = meta.has_field("sent_to_fo_on")
+	status_filter = (
+		"AND IFNULL(fo_review_status, '') = 'Sent to Field Officer'" if has_fo_status else ""
+	)
+	fo_status_col = (
+		"IFNULL(fo_review_status, '') AS fo_review_status" if has_fo_status else "'' AS fo_review_status"
+	)
+	sent_on_col = "IFNULL(sent_to_fo_on, modified) AS sent_to_fo_on" if has_sent_on else "modified AS sent_to_fo_on"
+	order_col = "IFNULL(sent_to_fo_on, modified)" if has_sent_on else "modified"
+	rows = frappe.db.sql(
+		f"""
+		SELECT
+			name AS application,
+			school_name,
+			city,
+			area,
+			address,
+			tif_representative AS field_officer,
+			{fo_status_col},
+			{sent_on_col},
+			modified,
+			docstatus
+		FROM `tabSchool Opening Application`
+		WHERE docstatus = 0
+			{status_filter}
+			AND IFNULL(TRIM(tif_representative), '') IN %(aliases)s
+		ORDER BY {order_col} DESC, modified DESC
+		LIMIT %(limit)s
+		""",
+		{"aliases": tuple(aliases), "limit": limit},
+		as_dict=True,
+	)
+	for r in rows:
+		r["print_url"] = f"/school-opening-print?application={r.application}"
+	return {"rows": rows, "total": len(rows)}
 
 
 @frappe.whitelist()
@@ -1056,10 +1250,7 @@ def _sync_customer_from_payload(customer, data):
 
 @frappe.whitelist()
 def update_school_opening(application=None, customer=None, data=None):
-	"""HO edit of SC-1.2 (Farhan / Danish / Administrator / School Approval)."""
-	if not can_edit_school_opening_form():
-		frappe.throw(_("Not permitted to edit this form."), frappe.PermissionError)
-
+	"""HO or assigned Field Officer edit of SC-1.2."""
 	if isinstance(data, str):
 		import json
 
@@ -1082,6 +1273,9 @@ def update_school_opening(application=None, customer=None, data=None):
 			order_by="modified desc",
 		)
 
+	if not can_edit_school_opening_form(application=application):
+		frappe.throw(_("Not permitted to edit this form."), frappe.PermissionError)
+
 	if application:
 		if not frappe.db.exists("School Opening Application", application):
 			frappe.throw(_("School Opening Application {0} not found.").format(application))
@@ -1091,6 +1285,13 @@ def update_school_opening(application=None, customer=None, data=None):
 			if not data.get(key):
 				data[key] = doc.get(key)
 		_apply_school_opening_payload(doc, data)
+		# Assigned FO completing missing info
+		if (
+			frappe.get_meta("School Opening Application").has_field("fo_review_status")
+			and cstr(getattr(doc, "fo_review_status", None) or "") == "Sent to Field Officer"
+			and cstr(doc.tif_representative or "").strip().lower() in _current_user_fo_aliases()
+		):
+			doc.fo_review_status = "Completed by Field Officer"
 		doc.flags.ignore_permissions = True
 		doc.flags.ignore_validate_update_after_submit = True
 		doc.save()
@@ -1300,15 +1501,62 @@ SCHOOL_OPENING_EDIT_USERS = frozenset(
 SCHOOL_OPENING_EDIT_ROLES = frozenset({"System Manager", "School Approval", "Administrator"})
 
 
-def can_edit_school_opening_form(user=None):
-	"""HO editors: Administrator, Farhan, Danish, System Manager / School Approval."""
+def _current_user_fo_aliases(user=None):
+	user = user or frappe.session.user
+	aliases = set()
+	if not user or user == "Guest":
+		return aliases
+	full_name = cstr(frappe.db.get_value("User", user, "full_name") or "").strip()
+	if full_name:
+		aliases.add(full_name.lower())
+	aliases.add(user.lower())
+	if frappe.db.exists("DocType", "Field Officer"):
+		for fo in frappe.db.sql(
+			"""
+			SELECT name, name1, employee
+			FROM `tabField Officer`
+			WHERE IFNULL(status, 'Active') != 'Inactive'
+				AND (user = %(user)s OR employee = %(user)s
+					OR LOWER(TRIM(IFNULL(name1, ''))) = LOWER(%(full)s))
+			""",
+			{"user": user, "full": full_name or user},
+			as_dict=True,
+		):
+			for key in ("name", "name1", "employee"):
+				val = cstr(fo.get(key) or "").strip().lower()
+				if val:
+					aliases.add(val)
+	return aliases
+
+
+def can_edit_school_opening_form(user=None, application=None):
+	"""HO editors, or the Field Officer the form was sent to."""
 	user = user or frappe.session.user
 	if not user or user == "Guest":
 		return False
 	if user == "Administrator" or user.lower() in {u.lower() for u in SCHOOL_OPENING_EDIT_USERS}:
 		return True
 	roles = set(frappe.get_roles(user))
-	return bool(roles & SCHOOL_OPENING_EDIT_ROLES)
+	if roles & SCHOOL_OPENING_EDIT_ROLES:
+		return True
+	application = cstr(application or "").strip()
+	if not application or not frappe.db.exists("School Opening Application", application):
+		return False
+	app = frappe.db.get_value(
+		"School Opening Application",
+		application,
+		["tif_representative", "fo_review_status", "docstatus"],
+		as_dict=True,
+	)
+	if not app or cint(app.docstatus) == 1:
+		return False
+	fo_status = cstr(getattr(app, "fo_review_status", None) or "")
+	if fo_status and fo_status != "Sent to Field Officer":
+		# Still allow FO to finish if already marked completed but still draft
+		if fo_status != "Completed by Field Officer":
+			return False
+	rep = cstr(app.tif_representative or "").strip().lower()
+	return bool(rep and rep in _current_user_fo_aliases(user))
 
 
 @frappe.whitelist()
@@ -1325,7 +1573,9 @@ def build_school_opening_view_from_application(application):
 	"""Build SC-1.2 view from a School Opening Application (draft or submitted)."""
 	if not application or not frappe.db.exists("School Opening Application", application):
 		frappe.throw(_("School Opening Application {0} not found.").format(application))
-	if not frappe.has_permission("School Opening Application", "read", application):
+	can_read = frappe.has_permission("School Opening Application", "read", application)
+	can_fo = can_edit_school_opening_form(application=application)
+	if not can_read and not can_fo:
 		frappe.throw(_("Not permitted to view this application."), frappe.PermissionError)
 	app = frappe.get_doc("School Opening Application", application)
 	view = _view_from_application(app)
@@ -1368,7 +1618,9 @@ def _view_from_application(app):
 		"School Opening Application", "submit", app.name
 	)
 	is_approved = int(app.docstatus or 0) == 1 and bool(app.customer)
-	can_edit = can_edit_school_opening_form()
+	can_edit = can_edit_school_opening_form(application=app.name)
+	dup_map = _duplicate_map_for_keys([app.school_name])
+	dup_info = dup_map.get(_school_dup_key(app.school_name)) or {}
 	return {
 		"source": "application",
 		"application": app.name,
@@ -1386,6 +1638,10 @@ def _view_from_application(app):
 		"visit_type": getattr(app, "visit_type", None) or "Visit with enrollment",
 		"school_name": app.school_name,
 		"tif_representative": app.tif_representative or "",
+		"fo_review_status": getattr(app, "fo_review_status", None) or "",
+		"sent_to_fo_on": cstr(getattr(app, "sent_to_fo_on", None) or ""),
+		"duplicate_count": cint(dup_info.get("count") or 0),
+		"duplicate_applications": dup_info.get("applications") or [],
 		"institution_types": _csv_to_list(app.institution_types),
 		"institution_category": app.institution_category or "",
 		"educational_system": _csv_to_list(app.educational_system),
@@ -1447,6 +1703,10 @@ def _view_from_customer(cust):
 		"can_approve": False,
 		"can_edit": bool(can_edit_school_opening_form()),
 		"is_approved": True,
+		"fo_review_status": "",
+		"sent_to_fo_on": "",
+		"duplicate_count": 0,
+		"duplicate_applications": [],
 		"customer": cust.name,
 		"erp_school_code": cust.name,
 		"form_no": "SC-1.2",

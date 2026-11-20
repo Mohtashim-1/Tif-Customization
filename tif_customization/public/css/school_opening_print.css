@@ -1,16 +1,47 @@
 /* Print page: toolbar + readonly tweaks (main look = school_opening_form.css) */
 
-.soa-print-toolbar {
+.soa-dup-banner,
+.soa-fo-banner {
 	max-width: 820px;
 	margin: 0 auto 12px;
+	padding: 10px 14px;
+	border-radius: 8px;
+	font-size: 13px;
+	line-height: 1.45;
+}
+.soa-dup-banner {
+	background: #fff7ed;
+	border: 1px solid #fdba74;
+	color: #9a3412;
+}
+.soa-fo-banner {
+	background: #eff6ff;
+	border: 1px solid #93c5fd;
+	color: #1e40af;
+}
+.soa-dup-links a {
+	margin-left: 4px;
+	font-weight: 600;
+}
+
+.soa-print-toolbar {
+	max-width: 820px;
+	margin: 16px auto 28px;
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
 	gap: 8px;
-	padding: 10px 12px;
+	padding: 12px 14px;
 	background: #fff;
 	border: 1px solid #d1d8dd;
 	border-radius: 8px;
+	position: sticky;
+	bottom: 8px;
+	z-index: 20;
+	box-shadow: 0 -4px 18px rgba(15, 23, 42, 0.08);
+}
+.soa-print-toolbar-bottom {
+	margin-top: 18px;
 }
 
 .soa-print-toolbar .soa-nav-label {

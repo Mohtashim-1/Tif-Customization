@@ -10,6 +10,7 @@ const props = defineProps({
 defineEmits(["navigate"]);
 
 const badge = ref(0);
+const soaBadge = ref(0);
 
 async function refreshBadge() {
 	try {
@@ -21,19 +22,29 @@ async function refreshBadge() {
 	} catch {
 		badge.value = 0;
 	}
+	try {
+		const soa = await apiGet(
+			"tif_customization.tif_customization.api.school_opening_registry.list_my_school_opening_tasks",
+			{ limit: 50 }
+		);
+		soaBadge.value = Number(soa?.total || (soa?.rows || []).length || 0);
+	} catch {
+		soaBadge.value = 0;
+	}
 }
 
 onMounted(refreshBadge);
 watch(
 	() => props.page,
 	(p) => {
-		if (p === "approvals" || p === "dashboard") refreshBadge();
+		if (p === "approvals" || p === "dashboard" || p === "school-forms") refreshBadge();
 	}
 );
 
 const items = [
 	{ id: "dashboard", en: "Dashboard", ur: "ڈیش بورڈ", icon: "grid" },
 	{ id: "list", en: "My Visits", ur: "میرے وزٹ", icon: "list" },
+	{ id: "school-forms", en: "School Forms", ur: "اسکول فارم", icon: "school" },
 	{ id: "approvals", en: "Approvals", ur: "منظوری", icon: "bell" },
 	{ id: "new", en: "New Visit", ur: "نیا وزٹ", icon: "plus" },
 ];
@@ -63,6 +74,10 @@ const items = [
 					<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
 					<path d="M13.73 21a2 2 0 0 1-3.46 0" />
 				</svg>
+				<svg v-else-if="item.icon === 'school'" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+					<path d="M22 10 12 5 2 10l10 5 10-5z" />
+					<path d="M6 12v5c3 2 9 2 12 0v-5" />
+				</svg>
 				<svg v-else viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
 					<path d="M12 5v14M5 12h14" />
 				</svg>
@@ -73,6 +88,7 @@ const items = [
 				<template v-else>{{ item.en }} <span class="urdu portal-nav-ur">/ {{ item.ur }}</span></template>
 			</span>
 			<span v-if="item.id === 'approvals' && badge > 0" class="portal-nav-badge">{{ badge > 99 ? "99+" : badge }}</span>
+			<span v-if="item.id === 'school-forms' && soaBadge > 0" class="portal-nav-badge">{{ soaBadge > 99 ? "99+" : soaBadge }}</span>
 		</button>
 	</nav>
 </template>

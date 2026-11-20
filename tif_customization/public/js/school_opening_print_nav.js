@@ -6,6 +6,10 @@
 		"tif_customization.tif_customization.api.school_opening_registry.approve_school_opening";
 	const SAVE_API =
 		"tif_customization.tif_customization.api.school_opening_registry.update_school_opening";
+	const SEND_FO_API =
+		"tif_customization.tif_customization.api.school_opening_registry.send_school_opening_to_field_officer";
+	const FO_OPTS_API =
+		"tif_customization.tif_customization.api.school_opening_registry.get_school_registry_filter_options";
 
 	function getFilters() {
 		try {
@@ -306,6 +310,59 @@
 					.catch((err) => {
 						$save.disabled = false;
 						$save.textContent = original;
+						toast(err.message || String(err), "red");
+					});
+			});
+		}
+
+		const $foSelect = toolbar.querySelector(".soa-fo-select");
+		const $sendFo = toolbar.querySelector(".soa-send-fo-btn");
+		if ($foSelect) {
+			const currentFo = (document.querySelector('#soa-print-form [name="tif_representative"]') || {})
+				.value;
+			callMethod(FO_OPTS_API, {})
+				.then((opts) => {
+					const officers = (opts && opts.field_officers) || [];
+					officers.forEach((label) => {
+						const opt = document.createElement("option");
+						opt.value = label;
+						opt.textContent = label;
+						if (currentFo && label.toLowerCase().includes(String(currentFo).toLowerCase())) {
+							opt.selected = true;
+						}
+						$foSelect.appendChild(opt);
+					});
+				})
+				.catch(() => {});
+		}
+		if ($sendFo && application) {
+			$sendFo.addEventListener("click", () => {
+				const fo = ($foSelect && $foSelect.value) || "";
+				if (!fo) {
+					toast(
+						typeof __ !== "undefined"
+							? __("Select a Field Officer first.")
+							: "Select a Field Officer first.",
+						"red"
+					);
+					return;
+				}
+				$sendFo.disabled = true;
+				const original = $sendFo.textContent;
+				$sendFo.textContent =
+					typeof __ !== "undefined" ? __("Sending…") : "Sending…";
+				callMethod(SEND_FO_API, { application, field_officer: fo })
+					.then((result) => {
+						toast(
+							(result && result.message) ||
+								(typeof __ !== "undefined" ? __("Sent") : "Sent"),
+							"green"
+						);
+						setTimeout(() => window.location.reload(), 700);
+					})
+					.catch((err) => {
+						$sendFo.disabled = false;
+						$sendFo.textContent = original;
 						toast(err.message || String(err), "red");
 					});
 			});

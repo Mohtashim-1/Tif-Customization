@@ -601,6 +601,20 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 				const officerCell = officer
 					? frappe.utils.escape_html(officer)
 					: `<span class="text-muted">—</span>`;
+				const dupCount = Number(row.duplicate_count || 0);
+				const dupBadge =
+					dupCount > 1
+						? `<span class="indicator-pill orange" title="${__(
+								"Multiple School Opening forms for the same school"
+						  )}">${__("Duplicate")} ×${dupCount}</span>`
+						: "";
+				const foStatus = (row.fo_review_status || "").trim();
+				const foBadge =
+					foStatus === "Sent to Field Officer"
+						? `<span class="indicator-pill blue">${__("Sent to FO")}</span>`
+						: foStatus === "Completed by Field Officer"
+						? `<span class="indicator-pill green">${__("FO completed")}</span>`
+						: "";
 				const checked =
 					!isPending && row.customer && this.selectedCustomers.has(row.customer) ? "checked" : "";
 				const idCell = isPending
@@ -614,10 +628,13 @@ frappe.tif_customization.SchoolOpeningRegistry = class SchoolOpeningRegistry {
 				const pdfAttrs = isPending
 					? `data-application="${appEnc}" data-customer=""`
 					: `data-customer="${custEnc}" data-application=""`;
-				return `<tr>
+				return `<tr class="${dupCount > 1 ? "soa-dup-row" : ""}">
 					<td>${checkbox}</td>
 					<td>${idCell}</td>
-					<td>${frappe.utils.escape_html(row.customer_name || "")}</td>
+					<td>${frappe.utils.escape_html(row.customer_name || "")}
+						${dupBadge ? `<div style="margin-top:4px">${dupBadge}</div>` : ""}
+						${foBadge ? `<div style="margin-top:4px">${foBadge}</div>` : ""}
+					</td>
 					<td class="small">${this.format_address_cell(row)}</td>
 					<td class="small">${this.format_city_cell(row)}</td>
 					<td>${frappe.utils.escape_html(row.govt_private || "")}</td>

@@ -18,6 +18,7 @@ const approvals = ref({
 	total_count: 0,
 	is_supervisor: false,
 });
+const schoolForms = ref({ total: 0 });
 
 async function load() {
 	loading.value = true;
@@ -31,6 +32,14 @@ async function load() {
 			);
 		} catch {
 			approvals.value = { to_approve_count: 0, my_pending_count: 0, total_count: 0 };
+		}
+		try {
+			schoolForms.value = await apiGet(
+				"tif_customization.tif_customization.api.school_opening_registry.list_my_school_opening_tasks",
+				{ limit: 50 }
+			);
+		} catch {
+			schoolForms.value = { total: 0 };
 		}
 	} catch (e) {
 		error.value = e.message || "Could not load dashboard.";
@@ -101,6 +110,29 @@ function maxType() {
 					</div>
 				</div>
 			</div>
+
+			<button
+				type="button"
+				class="portal-panel"
+				style="width: 100%; margin: 16px 0 0; text-align: left; cursor: pointer; border: 1px solid #93c5fd; background: linear-gradient(135deg, #eff6ff, #fff)"
+				@click="emit('navigate', 'school-forms')"
+			>
+				<div class="portal-panel-h" style="margin-bottom: 0">
+					<div>
+						<strong style="color: #1e40af">
+							<Bi :mode="lang" en="School Opening forms" ur="اسکول اوپننگ فارم" />
+						</strong>
+						<div class="portal-muted" style="margin-top: 4px">
+							<Bi
+								:mode="lang"
+								:en="`${schoolForms.total || 0} form(s) need your update`"
+								:ur="`${schoolForms.total || 0} فارم آپ کی اپڈیٹ کے منتظر`"
+							/>
+						</div>
+					</div>
+					<span style="font-weight: 800; color: #1d4ed8">{{ schoolForms.total || 0 }}</span>
+				</div>
+			</button>
 
 			<button
 				type="button"

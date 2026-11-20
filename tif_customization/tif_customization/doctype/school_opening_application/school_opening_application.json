@@ -58,6 +58,8 @@
   "section_approval",
   "customer",
   "erp_school_code",
+  "fo_review_status",
+  "sent_to_fo_on",
   "approved_by",
   "approved_on",
   "amended_from"
@@ -354,6 +356,20 @@
    "fieldname": "erp_school_code",
    "fieldtype": "Data",
    "label": "ERP School Code Assigned",
+   "read_only": 1
+  },
+  {
+   "fieldname": "fo_review_status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Field Officer Review",
+   "options": "\nSent to Field Officer\nCompleted by Field Officer"
+  },
+  {
+   "fieldname": "sent_to_fo_on",
+   "fieldtype": "Datetime",
+   "label": "Sent to FO On",
    "read_only": 1
   },
   {
