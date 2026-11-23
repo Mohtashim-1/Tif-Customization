@@ -10,7 +10,20 @@
  "name": "variable-components",
  "owner": "Administrator",
  "page_name": "variable-components",
- "roles": [],
+ "roles": [
+  {
+   "role": "System Manager"
+  },
+  {
+   "role": "HR Manager"
+  },
+  {
+   "role": "HR User"
+  },
+  {
+   "role": "Accounts Manager"
+  }
+ ],
  "script": null,
  "standard": "Yes",
  "style": null,

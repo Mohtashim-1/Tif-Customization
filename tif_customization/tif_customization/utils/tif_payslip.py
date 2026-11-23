@@ -20,6 +20,31 @@ def _sum_rows(rows, keywords: list[str], skip_do_not_include: bool = True) -> fl
 	return total
 
 
+def _sum_allowance(rows) -> float:
+	"""Variable 'Allowance' column: Other Allowance / Fix_Allowance only.
+
+	Do not pull structure allowances (HRA, Medical, Utility, Daily, etc.).
+	"""
+	total = 0.0
+	for row in rows or []:
+		if getattr(row, "do_not_include_in_total", 0):
+			continue
+		name = (row.salary_component or "").strip().lower().replace(" ", "_")
+		# Exact-ish keys used on Variable Components sheet
+		if name in {
+			"other_allowance",
+			"fix_allowance",
+			"otherallowance",
+			"fixallowance",
+		} or name.replace("_", " ") in {"other allowance", "fix allowance"}:
+			total += flt(row.amount)
+			continue
+		# Fallback: component name equals "Allowance" only
+		if (row.salary_component or "").strip().lower() == "allowance":
+			total += flt(row.amount)
+	return total
+
+
 def get_payslip_display(doc) -> dict:
 	"""Return fixed-label amounts for the TIF Payslip design from a Salary Slip."""
 	earnings = doc.get("earnings") or []
@@ -29,8 +54,21 @@ def get_payslip_display(doc) -> dict:
 	mobile_earning = _sum_rows(earnings, ["mobile", "internet"])
 	overtime_earning = _sum_rows(earnings, ["overtime"])
 	daily_earning = _sum_rows(earnings, ["daily allowance", "daily allownce"])
+	# Variable Components "Allowance" (Other Allowance / Fix_Allowance)
+	allowance_earning = _sum_allowance(earnings)
+	bonus_earning = _sum_rows(earnings, ["bonus"])
+	reimbursement_earning = _sum_rows(earnings, ["reimbursement"])
 	arrears_earning = _sum_rows(earnings, ["arrear"])
-	mapped_earning = fuel_earning + mobile_earning + overtime_earning + daily_earning + arrears_earning
+	mapped_earning = (
+		fuel_earning
+		+ mobile_earning
+		+ overtime_earning
+		+ daily_earning
+		+ allowance_earning
+		+ bonus_earning
+		+ reimbursement_earning
+		+ arrears_earning
+	)
 	gross_salary = max(flt(doc.gross_pay) - mapped_earning, 0)
 
 	income_tax = _sum_rows(deductions, ["income tax", "withholding tax"])
@@ -39,6 +77,7 @@ def get_payslip_display(doc) -> dict:
 	fuel_ded = _sum_rows(deductions, ["fuel", "conveyance"])
 	leave_ded = _sum_rows(deductions, ["leave"])
 	advance_ded = _sum_rows(deductions, ["advance"])
+	other_ded = _sum_rows(deductions, ["other deduction"])
 	loan_from_comp = _sum_rows(deductions, ["loan"])
 	loan_amt = flt(doc.total_loan_repayment) or loan_from_comp
 
@@ -53,6 +92,9 @@ def get_payslip_display(doc) -> dict:
 		"mobile_earning": mobile_earning,
 		"overtime_earning": overtime_earning,
 		"daily_earning": daily_earning,
+		"allowance_earning": allowance_earning,
+		"bonus_earning": bonus_earning,
+		"reimbursement_earning": reimbursement_earning,
 		"arrears_earning": arrears_earning,
 		"earnings_total": flt(doc.gross_pay),
 		"income_tax": income_tax,
@@ -62,6 +104,7 @@ def get_payslip_display(doc) -> dict:
 		"advance_ded": advance_ded,
 		"fuel_ded": fuel_ded,
 		"leave_ded": leave_ded,
+		"other_ded": other_ded,
 		"total_deductions": total_deductions,
 		"net_pay": flt(doc.net_pay),
 	}

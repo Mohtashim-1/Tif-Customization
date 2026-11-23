@@ -68,6 +68,44 @@ def get_active_employees(company, start_date, end_date):
 	return out
 
 
+def employee_payroll_block_reason(emp, payroll_date):
+	"""
+	Why Additional Salary / payroll transactions cannot be created for this employee.
+	Returns a short reason string, or None when the employee is eligible.
+	"""
+	if not emp:
+		return _("Employee not found")
+
+	if isinstance(emp, str):
+		row = frappe.db.get_value(
+			"Employee",
+			emp,
+			["name", "employee_name", "status", "relieving_date"],
+			as_dict=True,
+		)
+	else:
+		row = emp
+
+	if not row:
+		return _("Employee not found")
+
+	status = (row.get("status") or "").strip()
+	payroll_date = getdate(payroll_date)
+	relieving = row.get("relieving_date")
+
+	if status and status != "Active":
+		return _("Transactions cannot be created for an Inactive Employee ({0})").format(
+			row.get("name") or emp
+		)
+
+	if relieving and getdate(relieving) < payroll_date:
+		return _("Payroll date can not be greater than employee's relieving date ({0})").format(
+			formatdate(relieving)
+		)
+
+	return None
+
+
 def roster_count(company, start_date, end_date):
 	if not _roster_doctype_exists():
 		return 0

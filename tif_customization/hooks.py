@@ -9,7 +9,10 @@ app_license = "mit"
 # ------------------
 fixtures = [
 	{"dt": "Custom HTML Block", "filters": [["name", "in", ["Trustee Easy Menu", "Reports Menu"]]]},
-	{"dt": "Workspace", "filters": [["name", "in", ["Provident Fund", "Reports"]]]},
+	{
+		"dt": "Workspace",
+		"filters": [["name", "in", ["Provident Fund", "Reports", "ILM Foundation Portal"]]],
+	},
 ]
 
 # Apps
@@ -341,6 +344,9 @@ website_route_rules = [
 	{"from_route": "/training-schedule/<path:app_path>", "to_route": "training-schedule"},
 	{"from_route": "/field-visit-easy/<path:app_path>", "to_route": "field-visit-easy"},
 	{"from_route": "/training-lms/<path:app_path>", "to_route": "training-lms"},
+	{"from_route": "/payroll-portal/<path:app_path>", "to_route": "payroll-portal"},
+	{"from_route": "/ilm-portal/<path:app_path>", "to_route": "payroll-portal"},
+	{"from_route": "/ilm-portal", "to_route": "payroll-portal"},
 	{"from_route": "/school_opening_print", "to_route": "school-opening-print"},
 	{"from_route": "/feedback/<token>", "to_route": "feedback"},
 	{"from_route": "/feedback-share/<token>", "to_route": "feedback_share"},

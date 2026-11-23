@@ -1,5 +1,11 @@
 frappe.ui.form.on("Leave Application", {
+	onload(frm) {
+		setup_employee_field(frm);
+	},
 	refresh(frm) {
+		setup_employee_field(frm);
+		autofill_own_employee(frm);
+
 		frm.set_query("custom_substitute_name", () => {
 			const filters = { is_active: 1 };
 			if (frm.doc.employee) {
@@ -46,6 +52,44 @@ frappe.ui.form.on("Leave Application", {
 		}
 	},
 });
+
+function is_hr_leave_user() {
+	const roles = frappe.user_roles || [];
+	return roles.includes("HR Manager") || roles.includes("HR User") || roles.includes("System Manager");
+}
+
+function setup_employee_field(frm) {
+	// Avoid User Permission AND-logic hiding the applicant's own Employee
+	// or blocking Leave Approver (e.g. shahid.khan@…) on create/save.
+	frm.set_df_property("employee", "ignore_user_permissions", 1);
+	frm.set_df_property("leave_approver", "ignore_user_permissions", 1);
+
+	if (is_hr_leave_user()) {
+		frm.set_query("employee", () => ({ filters: { status: "Active" } }));
+		return;
+	}
+
+	// Non-HR: own record + staff where this user is Leave Approver
+	frm.set_query("employee", () => ({
+		query: "tif_customization.tif_customization.doctype.leave_application.leave_application.employee_query",
+	}));
+}
+
+function autofill_own_employee(frm) {
+	if (!frm.is_new() || frm.doc.employee || is_hr_leave_user()) {
+		return;
+	}
+	frappe.db.get_value(
+		"Employee",
+		{ user_id: frappe.session.user, status: "Active" },
+		"name",
+		(r) => {
+			if (r && r.name && frm.is_new() && !frm.doc.employee) {
+				frm.set_value("employee", r.name);
+			}
+		}
+	);
+}
 
 function snap_leave_display(value) {
 	const v = flt(value || 0);

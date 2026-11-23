@@ -52,6 +52,9 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 								<button class="btn btn-default btn-sm btn-reload">
 									<i class="fa fa-refresh"></i> ${__("Reload")}
 								</button>
+								<button class="btn btn-default btn-sm btn-import-sheet" title="${__("Import Staff Salary Sheet Excel (e.g. July 2026) into this period")}">
+									<i class="fa fa-upload"></i> ${__("Import salary sheet")}
+								</button>
 								<button class="btn btn-primary btn-sm btn-save-draft" title="${__("Save variables, bank/mode, and payable amounts (no salary slips)")}">
 									<i class="fa fa-save"></i> ${__("Save draft")}
 								</button>
@@ -117,11 +120,6 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 							<span><i class="swatch-dirty"></i> ${__("Edited (not saved)")}</span>
 							<span><i class="swatch-payroll"></i> ${__("Included in payroll run")}</span>
 						</div>
-						<div class="vc-dept-chart-panel">
-							<div class="vc-dept-chart-panel__title">${__("Department (active count by employment type)")}</div>
-							<p class="vc-dept-chart-panel__hint">${__("Each bar shows total active employees per department, split by employment type.")}</p>
-							<div id="vc-dept-employment-chart"></div>
-						</div>
 						<div class="vc-payroll-register-summary-wrap">
 							<div class="vc-payroll-register-summary"></div>
 						</div>
@@ -156,6 +154,7 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 
 			bind_events() {
 				this.page.main.find(".btn-reload").on("click", () => this.confirm_reload(() => this.load_sheet()));
+				this.page.main.find(".btn-import-sheet").on("click", () => this.import_salary_sheet());
 				this.page.main.find(".btn-load-period").on("click", () => {
 					if (!this._can_manage_roster()) {
 						this._roster_permission_alert();
@@ -188,6 +187,104 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 				this.page.main.find(".btn-payroll-none").on("click", () => this.set_all_payroll_checkboxes(false));
 				this.$period.on("change", () => this.confirm_reload(() => this.load_sheet()));
 				this.$company.on("change", () => this.confirm_reload(() => this.load_sheet()));
+			}
+
+			import_salary_sheet() {
+				if (
+					!(
+						frappe.user.has_role("System Manager") ||
+						frappe.user.has_role("HR Manager") ||
+						frappe.user.has_role("HR User") ||
+						frappe.user.has_role("Accounts Manager")
+					)
+				) {
+					frappe.msgprint(__("Only HR Manager / System Manager can import the salary sheet."));
+					return;
+				}
+				const period = this.$period.val() || "";
+				// period value is usually start|end
+				const parts = String(period).split("|");
+				let month = 7;
+				let year = 2026;
+				if (parts.length >= 2 && parts[1]) {
+					const end = frappe.datetime.str_to_obj(parts[1]);
+					if (end) {
+						month = end.getMonth() + 1;
+						year = end.getFullYear();
+					}
+				}
+				const d = new frappe.ui.Dialog({
+					title: __("Import Staff Salary Sheet"),
+					fields: [
+						{
+							fieldtype: "HTML",
+							options: `<p class="text-muted">${__(
+								"Loads the Excel salary sheet into Variable Components for the selected 26–25 payroll month. HR can edit values here, then Submit for COO and Finalize (creates Payroll Entry + Salary Slips)."
+							)}</p>`,
+						},
+						{
+							fieldname: "payroll_month",
+							label: __("Payroll Month"),
+							fieldtype: "Int",
+							default: month,
+							reqd: 1,
+						},
+						{
+							fieldname: "payroll_year",
+							label: __("Payroll Year"),
+							fieldtype: "Int",
+							default: year,
+							reqd: 1,
+						},
+						{
+							fieldname: "file_url",
+							label: __("Salary Sheet File"),
+							fieldtype: "Attach",
+							default: "/files/Salary Sheet 2026-2027.xlsx",
+						},
+						{
+							fieldname: "sheet_names",
+							label: __("Sheet names (comma-separated)"),
+							fieldtype: "Data",
+							default: "July 2026 increment, Sp Edu July 2026",
+						},
+					],
+					primary_action_label: __("Import"),
+					primary_action: (values) => {
+						d.hide();
+						frappe.call({
+							method:
+								"tif_customization.tif_customization.page.variable_components.import_salary_sheet.import_salary_sheet_to_variable_components",
+							args: {
+								payroll_month: values.payroll_month,
+								payroll_year: values.payroll_year,
+								company: this.$company.val(),
+								file_url: values.file_url,
+								sheet_names: values.sheet_names,
+								force_roster: 0,
+							},
+							freeze: true,
+							freeze_message: __("Importing salary sheet…"),
+							callback: (r) => {
+								const msg = (r.message && r.message.message) || __("Imported");
+								const unmatched = (r.message && r.message.unmatched) || [];
+								frappe.msgprint({
+									title: __("Import complete"),
+									indicator: "green",
+									message:
+										msg +
+										(unmatched.length
+											? `<br><br><b>${__("Unmatched")}:</b> ${frappe.utils.escape_html(
+													unmatched.slice(0, 30).join(", ")
+											  )}${unmatched.length > 30 ? "…" : ""}`
+											: ""),
+								});
+								this.load_periods(() => this.load_sheet());
+							},
+						});
+					},
+				});
+				d.show();
 			}
 
 			_vc_log(label, data) {
@@ -469,7 +566,6 @@ frappe.pages["variable-components"].on_page_load = function (wrapper) {
 						this.update_roster_panel();
 						this.update_period_status_badge();
 						this.update_save_state();
-						this.load_dept_employment_chart();
 					},
 				});
 			}

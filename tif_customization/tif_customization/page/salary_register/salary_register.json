@@ -12,7 +12,16 @@
  "page_name": "salary-register",
  "roles": [
   {
+   "role": "System Manager"
+  },
+  {
    "role": "HR Manager"
+  },
+  {
+   "role": "HR User"
+  },
+  {
+   "role": "Accounts Manager"
   }
  ],
  "script": null,

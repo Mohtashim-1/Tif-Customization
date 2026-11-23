@@ -26,6 +26,7 @@ from tif_customization.tif_customization.page.variable_components.variable_compo
 	apply_attendance_to_amounts,
 	attendance_by_employee,
 	create_custom_period,
+	employee_payroll_block_reason,
 	ensure_period_roster,
 	extended_period_options,
 	get_excluded_employee_ids,
@@ -448,7 +449,8 @@ def get_variable_sheet_data(month=None, year=None, company=None, start_date=None
 			roster_meta=roster_meta,
 		)
 
-	emp_filters = {"name": ["in", employee_ids], "status": "Active"}
+	# Include roster employees even if Inactive/Left so import issues stay visible on the sheet.
+	emp_filters = {"name": ["in", employee_ids]}
 	if company:
 		emp_filters["company"] = company
 
@@ -462,6 +464,8 @@ def get_variable_sheet_data(month=None, year=None, company=None, start_date=None
 		"company",
 		"bank_name",
 		"bank_ac_no",
+		"status",
+		"relieving_date",
 	]
 	if frappe.db.has_column("Employee", "income_tax"):
 		emp_fields.append("income_tax")
@@ -550,6 +554,10 @@ def get_variable_sheet_data(month=None, year=None, company=None, start_date=None
 		default_bank = (emp.bank_name or "").strip()
 		default_mode = "Bank" if default_bank else "Cheque"
 		saved_payment = payment_by_emp.get(emp.name) or {}
+		issue = employee_payroll_block_reason(emp, payroll_date)
+		payable = totals["net_pay"]
+		if saved_payment.get("payable_amount") not in (None, ""):
+			payable = flt(saved_payment.get("payable_amount"))
 		rows.append(
 			{
 				"employee": emp.name,
@@ -561,6 +569,10 @@ def get_variable_sheet_data(month=None, year=None, company=None, start_date=None
 				"company": emp.company,
 				"bank_ac_no": emp.bank_ac_no or "",
 				"default_bank_name": default_bank,
+				"employee_status": emp.status or "",
+				"relieving_date": str(emp.relieving_date) if emp.relieving_date else "",
+				"has_issue": bool(issue),
+				"issue_message": issue or "",
 				"section_key": section_key,
 				"_section_sort": section_sort,
 				"amounts": amounts,
@@ -574,11 +586,11 @@ def get_variable_sheet_data(month=None, year=None, company=None, start_date=None
 				"projected_gross": totals["projected_gross"],
 				"projected_gross_pay": totals["gross_pay"],
 				"projected_total_deduction": totals["total_deduction"],
-				"projected_net_pay": totals["net_pay"],
+				"projected_net_pay": payable if issue else totals["net_pay"],
 				"payment": {
 					"payment_mode": saved_payment.get("payment_mode") or default_mode,
 					"bank_name": saved_payment.get("bank_name") or default_bank,
-					"payable_amount": totals["net_pay"],
+					"payable_amount": payable if issue else totals["net_pay"],
 				},
 			}
 		)
@@ -671,6 +683,16 @@ def get_variable_sheet_data(month=None, year=None, company=None, start_date=None
 	payroll_eligible = _get_payroll_eligible_employees(company, start_date, end_date)
 	period_status = get_period_status(company, start_date, end_date)
 
+	employee_issues = [
+		{
+			"employee": r["employee"],
+			"employee_name": r["employee_name"],
+			"message": r["issue_message"],
+		}
+		for r in rows
+		if r.get("has_issue") and r.get("issue_message")
+	]
+
 	return {
 		"title": _("THE ILM FOUNDATION - VARIABLE COMPONENTS"),
 		"subtitle": _("For the Month of {0}").format(month_label),
@@ -686,6 +708,8 @@ def get_variable_sheet_data(month=None, year=None, company=None, start_date=None
 		"deductions": deductions,
 		"salary_columns": salary_columns,
 		"sections": sections,
+		"employee_issues": employee_issues,
+		"issue_count": len(employee_issues),
 		"grand_totals": dict(grand) if grand else {k: 0 for k in all_keys},
 		"employee_count": sr,
 		"payroll_info": payroll_info,
@@ -723,6 +747,8 @@ def _empty_response(month_label, start_date, end_date, company, earnings, deduct
 		"deductions": deductions,
 		"salary_columns": _salary_columns_for_sheet(),
 		"sections": [],
+		"employee_issues": [],
+		"issue_count": 0,
 		"grand_totals": {},
 		"employee_count": 0,
 		"payroll_info": payroll_info,
@@ -1563,10 +1589,19 @@ def save_variable_components(company, payroll_date, entries):
 			frappe.db.rollback()
 			err_msg = str(e)
 			if frappe.message_log:
-				err_msg = frappe.message_log[-1].get("message") or err_msg
+				try:
+					last = frappe.message_log[-1]
+					if isinstance(last, dict):
+						err_msg = last.get("message") or err_msg
+					elif isinstance(last, str):
+						err_msg = last
+				except Exception:
+					pass
 			errors.append(f"{employee} / {component}: {frappe.utils.strip_html(err_msg)}")
+			frappe.clear_messages()
 			frappe.log_error(frappe.get_traceback(), "Variable Components Save")
 
+	frappe.clear_messages()
 	return {
 		"created": created,
 		"updated": updated,

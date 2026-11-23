@@ -338,7 +338,10 @@ def sync_leave_approver_todo(doc, method=None):
 
 
 def prevent_non_hr_submit(doc, method=None):
-	"""Only HR Manager / HR User may submit Leave Applications."""
+	"""Only HR Manager / HR User may document-submit (final Approved docstatus=1).
+
+	Employees still use workflow Action → Submit from Draft (docstatus stays 0).
+	"""
 	if frappe.flags.in_install or frappe.flags.in_patch or frappe.flags.in_migrate:
 		return
 
@@ -349,6 +352,51 @@ def prevent_non_hr_submit(doc, method=None):
 	frappe.throw(
 		frappe._("Only HR Manager or HR User can submit Leave Applications."),
 		frappe.PermissionError,
+	)
+
+
+@frappe.whitelist()
+@frappe.validate_and_sanitize_search_inputs
+def employee_query(doctype, txt, searchfield, start, page_len, filters):
+	"""Employees the current user may pick on Leave Application (self + approver team)."""
+	user = frappe.session.user
+	roles = set(frappe.get_roles(user))
+	txt = (txt or "").strip()
+	like = f"%{txt}%"
+
+	if roles & {"HR Manager", "HR User", "System Manager", "Administrator"}:
+		return frappe.db.sql(
+			f"""
+			SELECT name, employee_name
+			FROM `tabEmployee`
+			WHERE status = 'Active'
+				AND ({searchfield} LIKE %(txt)s OR employee_name LIKE %(txt)s OR name LIKE %(txt)s)
+			ORDER BY employee_name
+			LIMIT %(start)s, %(page_len)s
+			""",
+			{"txt": like, "start": start, "page_len": page_len},
+		)
+
+	return frappe.db.sql(
+		"""
+		SELECT name, employee_name
+		FROM `tabEmployee`
+		WHERE status = 'Active'
+			AND (
+				user_id = %(user)s
+				OR leave_approver = %(user)s
+			)
+			AND (
+				name LIKE %(txt)s
+				OR employee_name LIKE %(txt)s
+				OR IFNULL(user_id, '') LIKE %(txt)s
+			)
+		ORDER BY
+			CASE WHEN user_id = %(user)s THEN 0 ELSE 1 END,
+			employee_name
+		LIMIT %(start)s, %(page_len)s
+		""",
+		{"user": user, "txt": like, "start": start, "page_len": page_len},
 	)
 
 
