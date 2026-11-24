@@ -16,6 +16,9 @@ const filter = reactive({
 	year: now.getFullYear(),
 	month: now.getMonth() + 1,
 	status: "all",
+	department: "",
+	branch: "",
+	designation: "",
 	search: "",
 });
 
@@ -38,12 +41,38 @@ const years = [now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1];
 const slips = computed(() => data.value?.slips || []);
 const totals = computed(() => data.value?.totals || { count: 0, gross: 0, deduction: 0, net: 0 });
 const period = computed(() => data.value?.period);
+const options = computed(
+	() =>
+		data.value?.filter_options || {
+			departments: [],
+			branches: [],
+			designations: [],
+		}
+);
+
+const activeFilterCount = computed(() => {
+	let n = 0;
+	if (filter.status !== "all") n += 1;
+	if (filter.department) n += 1;
+	if (filter.branch) n += 1;
+	if (filter.designation) n += 1;
+	if (filter.search.trim()) n += 1;
+	return n;
+});
 
 function badgeClass(label) {
 	const s = (label || "").toLowerCase();
 	if (s.includes("submit")) return "finalized";
 	if (s.includes("cancel")) return "rejected";
 	return "draft";
+}
+
+function clearExtraFilters() {
+	filter.status = "all";
+	filter.department = "";
+	filter.branch = "";
+	filter.designation = "";
+	filter.search = "";
 }
 
 async function load({ soft = false } = {}) {
@@ -56,6 +85,9 @@ async function load({ soft = false } = {}) {
 			year: filter.year,
 			month: filter.month,
 			status: filter.status,
+			department: filter.department || undefined,
+			branch: filter.branch || undefined,
+			designation: filter.designation || undefined,
 			search: filter.search,
 		});
 		if (data.value?.period?.year) filter.year = data.value.period.year;
@@ -70,7 +102,7 @@ async function load({ soft = false } = {}) {
 
 let searchTimer = null;
 watch(
-	() => [filter.year, filter.month, filter.status],
+	() => [filter.year, filter.month, filter.status, filter.department, filter.branch, filter.designation],
 	() => load({ soft: true })
 );
 watch(
@@ -124,14 +156,35 @@ onMounted(() => load());
 
 		<div v-if="error" class="pp-alert error">{{ error }}</div>
 
-		<div class="pp-toolbar">
+		<div class="pp-toolbar slips-toolbar">
 			<input
 				v-model="filter.search"
 				class="pp-search"
 				type="search"
-				placeholder="Search employee / dept…"
+				placeholder="Search employee / dept / branch…"
 			/>
-			<div class="pp-kpi-row" style="margin: 0">
+			<select v-model="filter.department" class="dash-select slips-filter">
+				<option value="">All departments</option>
+				<option v-for="d in options.departments" :key="d" :value="d">{{ d }}</option>
+			</select>
+			<select v-model="filter.branch" class="dash-select slips-filter">
+				<option value="">All branches</option>
+				<option v-for="b in options.branches" :key="b" :value="b">{{ b }}</option>
+			</select>
+			<select v-model="filter.designation" class="dash-select slips-filter">
+				<option value="">All designations</option>
+				<option v-for="d in options.designations" :key="d" :value="d">{{ d }}</option>
+			</select>
+			<button
+				v-if="activeFilterCount"
+				class="pp-btn pp-btn-ghost"
+				type="button"
+				@click="clearExtraFilters"
+			>
+				Clear filters
+				<span class="wb-filter-count">{{ activeFilterCount }}</span>
+			</button>
+			<div class="pp-kpi-row slips-kpi">
 				<span><strong>{{ totals.count }}</strong> slips</span>
 				<span>Gross <strong>{{ money(totals.gross) }}</strong></span>
 				<span>Deductions <strong>{{ money(totals.deduction) }}</strong></span>
@@ -148,6 +201,8 @@ onMounted(() => load());
 						<tr>
 							<th>Employee</th>
 							<th>Department</th>
+							<th>Branch</th>
+							<th>Designation</th>
 							<th>Period</th>
 							<th>Status</th>
 							<th class="num">Gross</th>
@@ -163,9 +218,9 @@ onMounted(() => load());
 								<div class="pp-hint">{{ s.employee }}</div>
 							</td>
 							<td>{{ s.department || "—" }}</td>
-							<td>
-								{{ s.start_date }} → {{ s.end_date }}
-							</td>
+							<td>{{ s.branch || "—" }}</td>
+							<td>{{ s.designation || "—" }}</td>
+							<td>{{ s.start_date }} → {{ s.end_date }}</td>
 							<td>
 								<span class="pp-badge" :class="badgeClass(s.status_label)">{{
 									s.status_label
@@ -190,7 +245,7 @@ onMounted(() => load());
 							</td>
 						</tr>
 						<tr v-if="!slips.length">
-							<td colspan="8" class="pp-empty">No salary slips for this period.</td>
+							<td colspan="10" class="pp-empty">No salary slips match these filters.</td>
 						</tr>
 					</tbody>
 				</table>

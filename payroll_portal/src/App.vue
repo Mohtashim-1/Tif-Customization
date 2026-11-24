@@ -19,16 +19,22 @@ const session = ref({
 });
 const activePeriod = ref(null);
 const bootError = ref("");
+const navCollapsed = ref(localStorage.getItem("pp_nav_collapsed") === "1");
 
 const menus = [
-	{ id: "dashboard", title: "Dashboard", sub: "Payroll Register" },
-	{ id: "create", title: "Run Payroll", sub: "New 26–25 cycle" },
-	{ id: "workbench", title: "Amend Payroll", sub: "Adjust & finalize" },
-	{ id: "slips", title: "Salary Slips", sub: "View & print slips" },
+	{ id: "dashboard", title: "Dashboard", sub: "Payroll Register", short: "Dash" },
+	{ id: "create", title: "Run Payroll", sub: "New 26–25 cycle", short: "Run" },
+	{ id: "workbench", title: "Amend Payroll", sub: "Adjust & finalize", short: "Amend" },
+	{ id: "slips", title: "Salary Slips", sub: "View & print slips", short: "Slips" },
 ];
 
 function go(id) {
 	page.value = id;
+}
+
+function toggleNav() {
+	navCollapsed.value = !navCollapsed.value;
+	localStorage.setItem("pp_nav_collapsed", navCollapsed.value ? "1" : "0");
 }
 
 function openPeriod(p) {
@@ -53,14 +59,26 @@ onMounted(async () => {
 </script>
 
 <template>
-	<div class="pp-shell" :class="{ 'is-workbench': page === 'workbench' }">
-		<aside class="pp-nav">
+	<div
+		class="pp-shell"
+		:class="{ 'is-workbench': page === 'workbench', 'nav-collapsed': navCollapsed }"
+	>
+		<aside class="pp-nav" :class="{ 'is-collapsed': navCollapsed }">
 			<div class="pp-brand">
 				<img class="pp-brand__logo" :src="tifLogo" alt="The ILM Foundation" />
 				<div class="pp-brand__text">
 					<p class="pp-brand__eyebrow">The ILM Foundation</p>
 					<h1 class="pp-brand__name">ILM Portal</h1>
 				</div>
+				<button
+					class="pp-nav__collapse"
+					type="button"
+					:title="navCollapsed ? 'Expand menu' : 'Collapse menu'"
+					:aria-label="navCollapsed ? 'Expand menu' : 'Collapse menu'"
+					@click="toggleNav"
+				>
+					{{ navCollapsed ? "»" : "«" }}
+				</button>
 			</div>
 
 			<nav class="pp-nav__list">
@@ -70,16 +88,17 @@ onMounted(async () => {
 					type="button"
 					class="pp-nav__btn"
 					:class="{ 'is-active': page === item.id }"
+					:title="navCollapsed ? `${item.title} — ${item.sub}` : undefined"
 					@click="go(item.id)"
 				>
-					<strong>{{ item.title }}</strong>
-					<span>{{ item.sub }}</span>
+					<strong>{{ navCollapsed ? item.short : item.title }}</strong>
+					<span v-if="!navCollapsed">{{ item.sub }}</span>
 				</button>
 			</nav>
 
 			<div class="pp-nav__user">
 				<strong>{{ session.full_name || "User" }}</strong>
-				<span>{{ session.user }}</span>
+				<span v-if="!navCollapsed">{{ session.user }}</span>
 			</div>
 		</aside>
 

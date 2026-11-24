@@ -70,8 +70,11 @@ def get_active_employees(company, start_date, end_date):
 
 def employee_payroll_block_reason(emp, payroll_date):
 	"""
-	Why Additional Salary / payroll transactions cannot be created for this employee.
-	Returns a short reason string, or None when the employee is eligible.
+	Why payroll / Additional Salary cannot be created for this employee in this period.
+
+	Uses period dates (joining / relieving), not today's roster status alone.
+	Someone who Left in October must still be editable for a July cycle.
+	HRMS only hard-blocks status == "Inactive" (not "Left").
 	"""
 	if not emp:
 		return _("Employee not found")
@@ -80,28 +83,45 @@ def employee_payroll_block_reason(emp, payroll_date):
 		row = frappe.db.get_value(
 			"Employee",
 			emp,
-			["name", "employee_name", "status", "relieving_date"],
+			["name", "employee_name", "status", "date_of_joining", "relieving_date"],
 			as_dict=True,
 		)
 	else:
 		row = emp
+		# Name-index matches may omit dates — refresh when needed
+		if row and (row.get("relieving_date") is None and row.get("date_of_joining") is None):
+			full = frappe.db.get_value(
+				"Employee",
+				row.get("name") or emp,
+				["name", "employee_name", "status", "date_of_joining", "relieving_date"],
+				as_dict=True,
+			)
+			if full:
+				row = full
 
 	if not row:
 		return _("Employee not found")
 
+	emp_id = row.get("name") or emp
 	status = (row.get("status") or "").strip()
 	payroll_date = getdate(payroll_date)
+	joining = row.get("date_of_joining")
 	relieving = row.get("relieving_date")
 
-	if status and status != "Active":
-		return _("Transactions cannot be created for an Inactive Employee ({0})").format(
-			row.get("name") or emp
+	if joining and payroll_date < getdate(joining):
+		return _("Payroll date can not be less than employee's joining date ({0})").format(
+			formatdate(joining)
 		)
 
-	if relieving and getdate(relieving) < payroll_date:
+	# Match HRMS Additional Salary: block only when payroll_date > relieving_date
+	if relieving and payroll_date > getdate(relieving):
 		return _("Payroll date can not be greater than employee's relieving date ({0})").format(
 			formatdate(relieving)
 		)
+
+	# validate_active_employee() only rejects status "Inactive" (Left is OK if dates pass)
+	if status == "Inactive":
+		return _("Transactions cannot be created for an Inactive Employee ({0})").format(emp_id)
 
 	return None
 

@@ -157,6 +157,25 @@ const totals = computed(() => {
 	return { n, net, gross };
 });
 
+/** Footer totals for currently visible (filtered) employee rows */
+const tableTotals = computed(() => {
+	const amounts = {};
+	for (const col of editableKeys.value) amounts[col.key] = 0;
+	let gross = 0;
+	let net = 0;
+	let n = 0;
+	for (const r of filteredRows.value) {
+		if (r._type !== "row") continue;
+		n += 1;
+		gross += Number(r.projected_gross_pay || 0);
+		net += Number(r.projected_net_pay || 0);
+		for (const col of editableKeys.value) {
+			amounts[col.key] += Number(r.amounts?.[col.key] || 0);
+		}
+	}
+	return { n, gross, net, amounts };
+});
+
 const colSpan = computed(() => 6 + editableKeys.value.length);
 
 function badgeClass(s) {
@@ -799,6 +818,26 @@ onMounted(async () => {
 								</tr>
 							</template>
 						</tbody>
+						<tfoot v-if="tableTotals.n">
+							<tr class="wb-total-row">
+								<td class="wb-sticky wb-sticky-1"></td>
+								<td class="wb-sticky wb-sticky-2">
+									<strong>Total</strong>
+									<div class="pp-hint">{{ tableTotals.n }} employees</div>
+								</td>
+								<td class="wb-sticky wb-sticky-3"></td>
+								<td
+									v-for="col in editableKeys"
+									:key="'t-' + col.key"
+									class="num"
+								>
+									<strong>{{ money(tableTotals.amounts[col.key]) }}</strong>
+								</td>
+								<td class="num"><strong>{{ money(tableTotals.gross) }}</strong></td>
+								<td class="num"><strong>{{ money(tableTotals.net) }}</strong></td>
+								<td></td>
+							</tr>
+						</tfoot>
 					</table>
 					<div v-if="!filteredRows.length" class="pp-empty">
 						No employees match these filters.

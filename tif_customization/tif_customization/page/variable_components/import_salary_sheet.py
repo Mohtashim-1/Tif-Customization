@@ -46,11 +46,78 @@ TITLE_PREFIXES = re.compile(
 	re.IGNORECASE,
 )
 
+# Excel name (normalized) → Employee ID when spellings differ too much for fuzzy match
+EXCEL_NAME_ALIASES = {
+	"nadeem ullah": "HR-EMP-00230",  # Nadeemullah
+	"danish awan": "HR-EMP-00009",  # Muhammad Danish
+	"hassan ameer uddin": "HR-EMP-00167",  # Hasan Ameer Uddin
+	"sumera irfan": "HR-EMP-00217",  # Sumaira Irfan
+	"hafiz muhammad hamza": "HR-EMP-00242",  # Muhammad Hamza Ahmed
+	"muhammad hamza": "HR-EMP-00242",
+	"mansoor ahmed awan": "HR-EMP-00160",  # Mansoor Ahmad Awan
+	"mansoor ahmad awan": "HR-EMP-00160",
+	"s rehman haider": "HR-EMP-00012",  # S. Rahman Haider
+	"rehman haider": "HR-EMP-00012",
+	"rahman uddin": "HR-EMP-00028",  # Rahmanuddin
+	"rahmanuddin": "HR-EMP-00028",
+	"afroz anees": "HR-EMP-00288",  # Afroz Yasmeen
+	"sheema m attalluah": "HR-EMP-00182",  # Sheema M Attaullah
+	"sheema m attaullah": "HR-EMP-00182",
+	"sadia bilal": "HR-EMP-00127",  # Sadia Muhammad Bilal
+	"rabia bibi younis": "HR-EMP-00129",  # Rabia Bibi Muhammad Younis
+	"saba kaleem ud din": "HR-EMP-00143",  # Saba Kaleem Uddin
+	"saba kaleem uddin": "HR-EMP-00143",
+	"asia mir samad": "HR-EMP-00138",  # Asia Meer Samad
+	"fatima nazam uddin": "HR-EMP-00134",  # Fatima Nizam ud din
+	"fatima nizam uddin": "HR-EMP-00134",
+	"rabia a ghaffar": "HR-EMP-00318",  # Rabia Adul Ghaffar
+	"muhammad aziz khan": "HR-EMP-00145",  # Muhammad Aziz Yaqoob Khan
+	"saima noor ahmed": "HR-EMP-00090",  # Saima Noor Muhammad
+	"amreen shafique rehman": "HR-EMP-00123",  # Amreen Shafiq-ur-Rehman
+	"uzma hakeemullah": "HR-EMP-00212",  # Uzma Hakimullah
+	"uzma hakimullah": "HR-EMP-00212",
+	"shadab tabassum": "HR-EMP-00266",  # Shahdab Tabassum
+	"shahdab tabassum": "HR-EMP-00266",
+	"nadia sultan": "HR-EMP-00079",  # Nadia Muhammad Sultan
+	"kosar amir": "HR-EMP-00140",  # Kosar M Amir
+	"shakila anwer": "HR-EMP-00171",  # Shakila Anwar saeed
+	"shakila anwar": "HR-EMP-00171",
+	"warisha jamil": "HR-EMP-00146",  # Warisha Jameel Ashraf
+	"ayesha siddiqa": "HR-EMP-00170",  # Aisha Siddiqa
+	"aisha siddiqa": "HR-EMP-00170",
+	"zaynep alp": "HR-EMP-00235",  # Ayse Zenep Alp
+	"atiqa faheem": "HR-EMP-00228",  # Ateeqa Faheem
+	"ateeqa faheem": "HR-EMP-00228",
+	"fatima dar": "HR-EMP-00259",  # Dr. Fatima Rehan Dar
+	"omaira alam": "HR-EMP-00257",  # Omaira Tabbasum Alam
+	"arobah malik": "HR-EMP-00234",  # Arubah Malik
+	"arubah malik": "HR-EMP-00234",
+}
+
 
 def _norm_name(value):
-	text = re.sub(r"\s+", " ", str(value or "").strip())
+	text = str(value or "").strip().lower()
 	text = TITLE_PREFIXES.sub("", text).strip()
-	return text.lower()
+	text = text.replace(".", " ")
+	text = re.sub(r"[-_/']+", " ", text)
+	# Common Urdu/roman spelling collapses
+	text = re.sub(r"\budd?\s*in\b", "uddin", text)
+	text = re.sub(r"\bud\s*din\b", "uddin", text)
+	text = re.sub(r"\bahmed\b", "ahmad", text)
+	text = re.sub(r"\bhakeemullah\b", "hakimullah", text)
+	text = re.sub(r"\battalluah\b", "attaullah", text)
+	text = re.sub(r"\bjameel\b", "jamil", text)
+	text = re.sub(r"\bnazam\b", "nizam", text)
+	text = re.sub(r"\bmeer\b", "mir", text)
+	text = re.sub(r"\bhafiz\b", " ", text)
+	text = re.sub(r"[^a-z0-9\s]", " ", text)
+	text = re.sub(r"\s+", " ", text).strip()
+	return text
+
+
+def _name_tokens(value):
+	stop = {"m", "s", "md", "bin", "binti", "ur", "al"}
+	return [t for t in _norm_name(value).split() if len(t) > 1 and t not in stop]
 
 
 def _cell_num(ws, row, col):
@@ -115,32 +182,111 @@ def _employee_name_index():
 	rows = frappe.get_all(
 		"Employee",
 		filters={"status": ("in", ["Active", "Left", "Suspended", "Inactive"])},
-		fields=["name", "employee_name", "status", "bank_name", "bank_ac_no"],
+		fields=[
+			"name",
+			"employee_name",
+			"status",
+			"bank_name",
+			"bank_ac_no",
+			"date_of_joining",
+			"relieving_date",
+		],
 	)
 	index = defaultdict(list)
+	by_id = {}
 	for row in rows:
+		by_id[row.name] = row
 		key = _norm_name(row.employee_name)
 		if key:
 			index[key].append(row)
+		# Also index without first/middle fillers for reverse lookup
+		tokens = _name_tokens(row.employee_name)
+		if tokens:
+			index[" ".join(tokens)].append(row)
+	index["_all"] = rows
+	index["_by_id"] = by_id
 	return index
+
+
+def _pick_best(hits):
+	if not hits:
+		return None
+	if len(hits) == 1:
+		return hits[0]
+	active = [h for h in hits if h.status == "Active"]
+	return (active or hits)[0]
+
+
+def _token_score(excel_tokens, emp_tokens):
+	if not excel_tokens or not emp_tokens:
+		return 0.0
+	ex, em = set(excel_tokens), set(emp_tokens)
+	overlap = ex & em
+	if not overlap:
+		# prefix soft match (jamil/jameel already normalized)
+		soft = 0
+		for a in ex:
+			for b in em:
+				if a.startswith(b) or b.startswith(a) or (len(a) > 3 and len(b) > 3 and a[:4] == b[:4]):
+					soft += 1
+					break
+		if not soft:
+			return 0.0
+		overlap_n = soft
+	else:
+		overlap_n = len(overlap)
+	return overlap_n / max(len(ex), 1) + 0.15 * (overlap_n / max(len(em), 1))
 
 
 def _match_employee(name, index):
 	key = _norm_name(name)
 	if not key:
 		return None
+
+	# 1) Explicit alias (known Excel ↔ ERP spelling gaps)
+	alias_id = EXCEL_NAME_ALIASES.get(key)
+	if not alias_id:
+		alias_id = EXCEL_NAME_ALIASES.get(" ".join(_name_tokens(name)))
+	if alias_id:
+		hit = (index.get("_by_id") or {}).get(alias_id)
+		if hit:
+			return hit
+
 	hits = index.get(key) or []
-	if len(hits) == 1:
-		return hits[0]
-	if len(hits) > 1:
-		# Prefer Active
-		active = [h for h in hits if h.status == "Active"]
-		return (active or hits)[0]
-	# Fuzzy: startswith / contains
+	picked = _pick_best(hits)
+	if picked:
+		return picked
+
+	# 2) Contains / startswith on normalized full name
 	for emp_key, emps in index.items():
+		if emp_key.startswith("_"):
+			continue
 		if key in emp_key or emp_key in key:
-			active = [h for h in emps if h.status == "Active"]
-			return (active or emps)[0]
+			picked = _pick_best(emps)
+			if picked:
+				return picked
+
+	# 3) Token overlap scoring across all employees
+	excel_tokens = _name_tokens(name)
+	if len(excel_tokens) < 1:
+		return None
+	best = None
+	best_score = 0.0
+	for emp in index.get("_all") or []:
+		score = _token_score(excel_tokens, _name_tokens(emp.employee_name))
+		# Prefer Active on ties
+		if score > best_score or (
+			score == best_score
+			and score >= 0.6
+			and best
+			and best.status != "Active"
+			and emp.status == "Active"
+		):
+			best_score = score
+			best = emp
+	# Require strong overlap (e.g. 2/2 or 2/3+)
+	if best and best_score >= 0.66:
+		return best
 	return None
 
 

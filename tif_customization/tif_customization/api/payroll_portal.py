@@ -329,7 +329,10 @@ def list_salary_slips(
 	end_date=None,
 	status=None,
 	search=None,
-	limit=200,
+	department=None,
+	branch=None,
+	designation=None,
+	limit=500,
 ):
 	"""Salary Slips menu: list slips for a TIF payroll month / period."""
 	_assert_portal_access()
@@ -337,7 +340,7 @@ def list_salary_slips(
 
 	company = _company(company)
 	start, end = _tif_period(year, month, start_date, end_date)
-	limit = min(cint(limit) or 200, 500)
+	limit = min(cint(limit) or 500, 1000)
 
 	filters = {
 		"company": company,
@@ -377,12 +380,30 @@ def list_salary_slips(
 		limit_page_length=limit,
 	)
 
+	# Options from period+status set (before dept/branch/designation/search filters)
+	departments = sorted({(r.department or "").strip() for r in rows if (r.department or "").strip()})
+	branches = sorted({(r.branch or "").strip() for r in rows if (r.branch or "").strip()})
+	designations = sorted(
+		{(r.designation or "").strip() for r in rows if (r.designation or "").strip()}
+	)
+
+	dept_f = (department or "").strip()
+	branch_f = (branch or "").strip()
+	desig_f = (designation or "").strip()
 	q = (search or "").strip().lower()
+
+	if dept_f:
+		rows = [r for r in rows if (r.department or "").strip() == dept_f]
+	if branch_f:
+		rows = [r for r in rows if (r.branch or "").strip() == branch_f]
+	if desig_f:
+		rows = [r for r in rows if (r.designation or "").strip() == desig_f]
 	if q:
 		rows = [
 			r
 			for r in rows
-			if q in f"{r.employee or ''} {r.employee_name or ''} {r.department or ''}".lower()
+			if q
+			in f"{r.employee or ''} {r.employee_name or ''} {r.department or ''} {r.designation or ''} {r.branch or ''}".lower()
 		]
 
 	def _status_label(r):
@@ -429,6 +450,11 @@ def list_salary_slips(
 			"label": f"{frappe.utils.formatdate(start)} – {frappe.utils.formatdate(end)}",
 			"year": end.year,
 			"month": end.month,
+		},
+		"filter_options": {
+			"departments": departments,
+			"branches": branches,
+			"designations": designations,
 		},
 		"slips": slips,
 		"totals": totals,
