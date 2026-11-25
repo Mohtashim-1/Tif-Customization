@@ -33,11 +33,15 @@ class BankDeposit(Document):
 	def validate(self):
 		self._set_defaults()
 		self._sync_bank_account_details()
-		if self.has_value_changed("workflow_state"):
+		prev = self.get_doc_before_save()
+		prev_ws = (prev.workflow_state if prev else None) or ""
+		curr_ws = self.workflow_state or ""
+		# Workflow Actions change workflow_state — always allow those saves
+		if prev and curr_ws and curr_ws != prev_ws:
 			self.flags.from_approval_action = True
 			self._apply_workflow_side_effects()
 		if not self.flags.from_approval_action:
-			self._ensure_editable()
+			self._ensure_editable(prev)
 		self._validate_accounts()
 		self._validate_donations()
 		self._calculate_total()
@@ -51,18 +55,23 @@ class BankDeposit(Document):
 		):
 			self.status = self.workflow_state
 
-	def _ensure_editable(self):
+	def _ensure_editable(self, prev=None):
 		if self.is_new() or self.docstatus != 0:
 			return
-		prev = self.get_doc_before_save()
+		prev = prev or self.get_doc_before_save()
 		if not prev:
 			return
+		# Do not block Workflow Action transitions
+		prev_ws = prev.workflow_state or ""
+		curr_ws = self.workflow_state or ""
+		if curr_ws and curr_ws != prev_ws:
+			return
 		locked = ("Pending COO Approval", "Approved", "Submitted")
-		if prev.status in locked or (prev.workflow_state or "") in locked:
+		if prev.status in locked or prev_ws in locked:
 			frappe.throw(
-				_("Bank Deposit is {0}. Use Workflow Actions to Approve / Reject / Withdraw / Submit.").format(
-					prev.workflow_state or prev.status
-				)
+				_(
+					"Bank Deposit is {0}. Use Actions → Approve / Reject / Withdraw / Submit (do not Save)."
+				).format(prev_ws or prev.status)
 			)
 
 	def _apply_workflow_side_effects(self):
