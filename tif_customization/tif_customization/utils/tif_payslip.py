@@ -10,12 +10,25 @@ def _match(name: str, keywords: list[str]) -> bool:
 	return any(kw in n for kw in keywords)
 
 
-def _sum_rows(rows, keywords: list[str], skip_do_not_include: bool = True) -> float:
+def _is_deduction_label(name: str) -> bool:
+	n = (name or "").lower()
+	return "deduct" in n or "deduction" in n
+
+
+def _sum_rows(
+	rows,
+	keywords: list[str],
+	skip_do_not_include: bool = True,
+	exclude_deduction_labels: bool = False,
+) -> float:
 	total = 0.0
 	for row in rows or []:
 		if skip_do_not_include and getattr(row, "do_not_include_in_total", 0):
 			continue
-		if _match(row.salary_component, keywords):
+		comp = row.salary_component or ""
+		if exclude_deduction_labels and _is_deduction_label(comp):
+			continue
+		if _match(comp, keywords):
 			total += flt(row.amount)
 	return total
 
@@ -50,15 +63,22 @@ def get_payslip_display(doc) -> dict:
 	earnings = doc.get("earnings") or []
 	deductions = doc.get("deductions") or []
 
-	fuel_earning = _sum_rows(earnings, ["fuel", "conveyance", "travelling", "traveling"])
-	mobile_earning = _sum_rows(earnings, ["mobile", "internet"])
-	overtime_earning = _sum_rows(earnings, ["overtime"])
-	daily_earning = _sum_rows(earnings, ["daily allowance", "daily allownce"])
+	# Never treat "Fuel Deducted" (wrongly parked in earnings) as fuel earning
+	fuel_earning = _sum_rows(
+		earnings,
+		["fuel", "conveyance", "travelling", "traveling"],
+		exclude_deduction_labels=True,
+	)
+	mobile_earning = _sum_rows(earnings, ["mobile", "internet"], exclude_deduction_labels=True)
+	overtime_earning = _sum_rows(earnings, ["overtime"], exclude_deduction_labels=True)
+	daily_earning = _sum_rows(
+		earnings, ["daily allowance", "daily allownce"], exclude_deduction_labels=True
+	)
 	# Variable Components "Allowance" (Other Allowance / Fix_Allowance)
 	allowance_earning = _sum_allowance(earnings)
-	bonus_earning = _sum_rows(earnings, ["bonus"])
-	reimbursement_earning = _sum_rows(earnings, ["reimbursement"])
-	arrears_earning = _sum_rows(earnings, ["arrear"])
+	bonus_earning = _sum_rows(earnings, ["bonus"], exclude_deduction_labels=True)
+	reimbursement_earning = _sum_rows(earnings, ["reimbursement"], exclude_deduction_labels=True)
+	arrears_earning = _sum_rows(earnings, ["arrear"], exclude_deduction_labels=True)
 	mapped_earning = (
 		fuel_earning
 		+ mobile_earning
@@ -69,12 +89,20 @@ def get_payslip_display(doc) -> dict:
 		+ reimbursement_earning
 		+ arrears_earning
 	)
-	gross_salary = max(flt(doc.gross_pay) - mapped_earning, 0)
+	# If Fuel Deducted was wrongly added under earnings, keep it out of "Gross Salary" too
+	misplaced_fuel_ded = _sum_rows(
+		earnings, ["fuel deduct", "fuel deducted", "conveyance allowance deduction"]
+	)
+	gross_salary = max(flt(doc.gross_pay) - mapped_earning - misplaced_fuel_ded, 0)
 
 	income_tax = _sum_rows(deductions, ["income tax", "withholding tax"])
 	pf_eobi = _sum_rows(deductions, ["provident", "eobi"])
 	late_absent = _sum_rows(deductions, ["late", "absent", "halfday", "half day"])
 	fuel_ded = _sum_rows(deductions, ["fuel", "conveyance"])
+	# Prefer Additional Salary amount when deduction row is inflated / duplicated
+	if misplaced_fuel_ded > 0 and fuel_ded != misplaced_fuel_ded:
+		# ADS amount often sits on the misplaced earning row; use that as display fuel ded
+		fuel_ded = misplaced_fuel_ded
 	leave_ded = _sum_rows(deductions, ["leave"])
 	advance_ded = _sum_rows(deductions, ["advance"])
 	other_ded = _sum_rows(deductions, ["other deduction"])

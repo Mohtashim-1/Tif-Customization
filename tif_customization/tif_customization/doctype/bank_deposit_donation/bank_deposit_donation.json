@@ -1,0 +1,74 @@
+{
+ "actions": [],
+ "creation": "2026-11-25 10:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "donation",
+  "donation_date",
+  "donor_name",
+  "payment_method",
+  "amount",
+  "remarks"
+ ],
+ "fields": [
+  {
+   "fieldname": "donation",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Donation Slip",
+   "options": "Donation",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "donation.donation_date",
+   "fieldname": "donation_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Donation Date",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "donation.donor_name",
+   "fieldname": "donor_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Donor Name",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "donation.payment_method",
+   "fieldname": "payment_method",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Payment Method",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "donation.received_amount",
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Amount",
+   "options": "Company:company:default_currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-11-25 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Tif Customization",
+ "name": "Bank Deposit Donation",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

@@ -8,8 +8,27 @@ const props = defineProps({
 	canEdit: { type: Boolean, default: true },
 	canApprove: { type: Boolean, default: false },
 	canFinalize: { type: Boolean, default: true },
+	/** all | main | special_education */
+	segment: { type: String, default: "all" },
 });
 const emit = defineEmits(["back"]);
+
+function isSpecialEducationRow(r) {
+	const hay = `${r.department || ""} ${r.designation || ""} ${r.branch || ""}`.toLowerCase();
+	return (
+		hay.includes("special education") ||
+		hay.includes("special child") ||
+		hay.includes("sp.edu") ||
+		hay.includes("sp.ed") ||
+		hay.includes("s.edu") ||
+		hay.includes("sp edu")
+	);
+}
+
+function isSpecialEducationSection(label) {
+	const t = String(label || "").toLowerCase();
+	return t.includes("special") && (t.includes("education") || t.includes("child"));
+}
 
 const loading = ref(true);
 const saving = ref(false);
@@ -47,18 +66,39 @@ const canSave = computed(() => props.canEdit && !locked.value && status.value !=
 const flatRows = computed(() => {
 	const sections = sheet.value?.sections || [];
 	const out = [];
+	const segment = props.segment || "all";
 	for (const sec of sections) {
-		if (sec.header_only && !(sec.rows || []).length) {
+		const secIsSp = isSpecialEducationSection(sec.label);
+		let rows = sec.rows || [];
+		if (segment === "special_education") {
+			rows = rows.filter((r) => isSpecialEducationRow(r) || secIsSp);
+			if (!rows.length && !(secIsSp && sec.header_only)) continue;
+		} else if (segment === "main") {
+			if (secIsSp) continue;
+			rows = rows.filter((r) => !isSpecialEducationRow(r));
+			if (!rows.length && !sec.header_only) continue;
+		}
+		if (sec.header_only && !rows.length) {
+			if (segment === "special_education" && !secIsSp) continue;
 			out.push({ _type: "section", label: sec.label });
 			continue;
 		}
-		if ((sec.rows || []).length) {
+		if (rows.length) {
 			out.push({ _type: "section", label: sec.label });
-			for (const r of sec.rows) out.push({ _type: "row", ...r });
+			for (const r of rows) out.push({ _type: "row", ...r });
 		}
 	}
 	return out;
 });
+
+const pageTitle = computed(() =>
+	props.segment === "special_education" ? "Special Education Payroll" : "Amend Payroll"
+);
+const pageSubtitle = computed(() =>
+	props.segment === "special_education"
+		? "Sp Edu staff only — amounts are editable; save keeps your adjustments."
+		: null
+);
 
 const activeFilterCount = computed(() => {
 	let n = 0;
@@ -484,7 +524,7 @@ onMounted(async () => {
 	<div class="wb-page">
 		<div class="pp-topbar wb-topbar">
 			<div>
-				<h1>Amend Payroll</h1>
+				<h1>{{ pageTitle }}</h1>
 				<p>
 					{{ sheet?.period_label || effectivePeriod?.label || "Select a period" }}
 					<span
@@ -496,6 +536,7 @@ onMounted(async () => {
 						{{ status }}
 					</span>
 				</p>
+				<p v-if="pageSubtitle" class="pp-hint" style="margin-top: 0.25rem">{{ pageSubtitle }}</p>
 			</div>
 			<button class="pp-btn pp-btn-ghost" type="button" @click="emit('back')">Dashboard</button>
 		</div>

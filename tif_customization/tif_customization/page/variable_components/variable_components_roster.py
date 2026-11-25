@@ -448,22 +448,77 @@ def attendance_by_employee(employees, end_date):
 	return out
 
 
+def _fuel_deduction_base_days(attendance):
+	"""
+	Per-day fuel rate uses calendar month days (30/31), matching the salary sheet.
+	Working days are used only to detect how many days were missed.
+	"""
+	month = flt(attendance.get("month_days"))
+	if month > 0:
+		return month
+	return flt(attendance.get("total_working_days"))
+
+
+def _fuel_absent_days(attendance):
+	"""
+	Days that should reduce fuel allowance.
+	Prefer attendance deduction_days (absents / half / late after leave credit).
+	If that is 0 but present < working days, use the gap (common when absents
+	are not flagged but days were not worked).
+	"""
+	deduction_days = flt(attendance.get("deduction_days"))
+	if deduction_days > 0:
+		return deduction_days
+
+	working = flt(attendance.get("total_working_days"))
+	present = flt(attendance.get("present_days"))
+	if working > 0 and present >= 0 and working > present:
+		return working - present
+	return 0.0
+
+
+def compute_fuel_deduction(fuel_amount, attendance):
+	"""
+	Fuel deduction = (fuel allowance / month days) × absent days.
+
+	Example: month 30 days, fuel 15,000, absent/leave 2 days
+	→ 15,000 / 30 × 2 = 1,000.
+	Absent days come from attendance (or working−present when absents are blank).
+	"""
+	fuel_amount = flt(fuel_amount)
+	if fuel_amount <= 0 or not attendance or not attendance.get("has_attendance"):
+		return 0.0
+	base_days = _fuel_deduction_base_days(attendance)
+	absent_days = _fuel_absent_days(attendance)
+	if base_days <= 0 or absent_days <= 0:
+		return 0.0
+	return round(fuel_amount / base_days * absent_days, 2)
+
+
 def apply_attendance_to_amounts(amounts, assigned_gross, attendance, earning_keys):
-	"""Pro-rate leave deduction from attendance when not already entered."""
+	"""
+	Pro-rate leave / fuel deductions from attendance.
+
+	Only fills empty values — if HR already entered (or saved) leave_ded / fuel_ded,
+	those manual adjustments are kept.
+	"""
 	if not attendance or not attendance.get("has_attendance"):
 		return amounts
 
 	month_days = flt(attendance.get("month_days"))
 	deduction_days = flt(attendance.get("deduction_days"))
-	if month_days <= 0 or deduction_days <= 0:
-		return amounts
 
-	if flt(amounts.get("leave_ded")) > 0:
-		return amounts
+	# Leave / absents deduction from gross (only when not already entered)
+	if month_days > 0 and deduction_days > 0 and flt(amounts.get("leave_ded")) <= 0:
+		per_day = flt(assigned_gross) / month_days if assigned_gross else 0
+		if per_day > 0:
+			amounts["leave_ded"] = per_day * deduction_days
 
-	per_day = flt(assigned_gross) / month_days if assigned_gross else 0
-	if per_day > 0:
-		amounts["leave_ded"] = per_day * deduction_days
+	# Fuel deduction suggestion from absents — do not overwrite HR adjustments
+	fuel = flt(amounts.get("fuel"))
+	if fuel > 0 and flt(amounts.get("fuel_ded")) <= 0:
+		amounts["fuel_ded"] = compute_fuel_deduction(fuel, attendance)
+
 	return amounts
 
 

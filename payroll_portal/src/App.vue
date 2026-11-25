@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { apiGet, m } from "./lib/api";
 import Dashboard from "./components/Dashboard.vue";
 import CreatePayroll from "./components/CreatePayroll.vue";
@@ -8,7 +8,7 @@ import SalarySlips from "./components/SalarySlips.vue";
 import tifLogo from "./assets/tif_logo.png";
 
 const boot = window.payroll_portal_boot || {};
-const page = ref("dashboard"); // dashboard | create | workbench | slips
+const page = ref("dashboard"); // dashboard | create | workbench | sp_edu | slips
 const company = ref(boot.company || "");
 const session = ref({
 	full_name: boot.full_name || boot.user || "",
@@ -24,9 +24,12 @@ const navCollapsed = ref(localStorage.getItem("pp_nav_collapsed") === "1");
 const menus = [
 	{ id: "dashboard", title: "Dashboard", sub: "Payroll Register", short: "Dash" },
 	{ id: "create", title: "Run Payroll", sub: "New 26–25 cycle", short: "Run" },
-	{ id: "workbench", title: "Amend Payroll", sub: "Adjust & finalize", short: "Amend" },
+	{ id: "workbench", title: "Amend Payroll", sub: "Main staff sheet", short: "Amend" },
+	{ id: "sp_edu", title: "Special Education", sub: "Sp Edu payroll", short: "SpEd" },
 	{ id: "slips", title: "Salary Slips", sub: "View & print slips", short: "Slips" },
 ];
+
+const isWorkbenchPage = computed(() => page.value === "workbench" || page.value === "sp_edu");
 
 function go(id) {
 	page.value = id;
@@ -61,7 +64,7 @@ onMounted(async () => {
 <template>
 	<div
 		class="pp-shell"
-		:class="{ 'is-workbench': page === 'workbench', 'nav-collapsed': navCollapsed }"
+		:class="{ 'is-workbench': isWorkbenchPage, 'nav-collapsed': navCollapsed }"
 	>
 		<aside class="pp-nav" :class="{ 'is-collapsed': navCollapsed }">
 			<div class="pp-brand">
@@ -104,7 +107,7 @@ onMounted(async () => {
 
 		<main
 			class="pp-main"
-			:class="{ 'is-workbench': page === 'workbench', 'is-create': page === 'create' }"
+			:class="{ 'is-workbench': isWorkbenchPage, 'is-create': page === 'create' }"
 		>
 			<div v-if="bootError" class="pp-alert error">{{ bootError }}</div>
 
@@ -122,12 +125,23 @@ onMounted(async () => {
 			/>
 			<SalarySlips v-else-if="page === 'slips'" :company="company" />
 			<Workbench
+				v-else-if="page === 'sp_edu'"
+				:company="company"
+				:period="activePeriod"
+				:can-edit="session.can_edit"
+				:can-approve="session.can_approve"
+				:can-finalize="session.can_finalize"
+				segment="special_education"
+				@back="go('dashboard')"
+			/>
+			<Workbench
 				v-else
 				:company="company"
 				:period="activePeriod"
 				:can-edit="session.can_edit"
 				:can-approve="session.can_approve"
 				:can-finalize="session.can_finalize"
+				segment="main"
 				@back="go('dashboard')"
 			/>
 		</main>

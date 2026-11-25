@@ -11,6 +11,8 @@ from frappe import _
 from frappe.utils import cint, flt, getdate
 
 from tif_customization.tif_customization.page.variable_components.variable_components_roster import (
+	attendance_by_employee,
+	compute_fuel_deduction,
 	employee_payroll_block_reason,
 	initialize_period_roster,
 	set_roster_excluded,
@@ -92,6 +94,7 @@ EXCEL_NAME_ALIASES = {
 	"omaira alam": "HR-EMP-00257",  # Omaira Tabbasum Alam
 	"arobah malik": "HR-EMP-00234",  # Arubah Malik
 	"arubah malik": "HR-EMP-00234",
+	"ayesha naseer": "HR-EMP-00323",
 }
 
 
@@ -295,10 +298,11 @@ def parse_salary_sheet_file(file_path, sheet_names=None):
 	import openpyxl
 
 	wb = openpyxl.load_workbook(file_path, data_only=True)
-	wanted = set(sheet_names) if sheet_names else None
+	# Normalize sheet filters — workbook tabs often have trailing spaces ("Aug 2026 ")
+	wanted = {str(s).strip().lower() for s in sheet_names} if sheet_names else None
 	rows_out = []
 	for sheet_name in wb.sheetnames:
-		if wanted is not None and sheet_name not in wanted:
+		if wanted is not None and str(sheet_name).strip().lower() not in wanted:
 			continue
 		# Prefer main month sheets + Sp Edu for that month
 		ws = wb[sheet_name]
@@ -446,21 +450,30 @@ def import_salary_sheet_to_variable_components(
 	payment_entries = []
 	employee_ids = []
 
+	# Preload attendance so fuel deduction can follow absent days
+	# (fuel / working days × absent days) instead of a static Excel column.
+	matched_emps = []
+	parsed_matched = []
+	for row in parsed:
+		emp = _match_employee(row["excel_name"], index)
+		if not emp:
+			unmatched.append(row["excel_name"])
+			continue
+		matched_emps.append(emp)
+		parsed_matched.append((row, emp))
+
+	att_map = attendance_by_employee(matched_emps, payroll_date) if matched_emps else {}
+
 	component_keys = (
 		("fuel", "fuel"),
 		("mobile", "mobile"),
 		("overtime", "overtime"),
 		("allowance", "other_allowance"),
 		("leave_ded", "leave_ded"),
-		("fuel_ded", "fuel_ded"),
 		("tax", "tax"),
 	)
 
-	for row in parsed:
-		emp = _match_employee(row["excel_name"], index)
-		if not emp:
-			unmatched.append(row["excel_name"])
-			continue
+	for row, emp in parsed_matched:
 		matched.append(
 			{
 				"excel_name": row["excel_name"],
@@ -492,6 +505,20 @@ def import_salary_sheet_to_variable_components(
 						"amount": amount,
 					}
 				)
+
+			# Fuel deduction from attendance absents (fallback to Excel if no attendance)
+			fuel_amt = flt(row.get("fuel"))
+			att = att_map.get(emp.name) or {}
+			fuel_ded_amt = compute_fuel_deduction(fuel_amt, att)
+			if fuel_ded_amt <= 0:
+				fuel_ded_amt = flt(row.get("fuel_ded"))
+			variable_entries.append(
+				{
+					"employee": emp.name,
+					"component_key": "fuel_ded",
+					"amount": fuel_ded_amt,
+				}
+			)
 
 		# Keep payment / payable from sheet so the row still appears with amounts
 		mode = row["payment_mode"]

@@ -1462,10 +1462,17 @@ def _find_existing_additional_salary(employee, component, payroll_date):
 	)
 
 
+def _component_additional_salary_type(component):
+	"""Additional Salary.type must match Salary Component.type (Earning / Deduction)."""
+	comp_type = frappe.db.get_value("Salary Component", component, "type") or "Earning"
+	return "Deduction" if comp_type == "Deduction" else "Earning"
+
+
 def _upsert_additional_salary(employee, company, component, amount, payroll_date, ads_name=None):
 	"""Create or update one Additional Salary; returns action label."""
 	amount = flt(amount)
 	ads_name = ads_name or _find_existing_additional_salary(employee, component, payroll_date)
+	ads_type = _component_additional_salary_type(component)
 
 	if amount <= 0:
 		if not ads_name or not frappe.db.exists("Additional Salary", ads_name):
@@ -1483,7 +1490,8 @@ def _upsert_additional_salary(employee, company, component, amount, payroll_date
 	if ads_name and frappe.db.exists("Additional Salary", ads_name):
 		doc = frappe.get_doc("Additional Salary", ads_name)
 		if doc.docstatus == 1:
-			if flt(doc.amount) == amount:
+			# Amount OK but wrong type (e.g. Fuel Deducted saved as Earning) → recreate
+			if flt(doc.amount) == amount and (doc.type or "Earning") == ads_type:
 				return "skipped"
 			doc.flags.ignore_permissions = True
 			doc.cancel()
@@ -1491,6 +1499,7 @@ def _upsert_additional_salary(employee, company, component, amount, payroll_date
 		else:
 			doc.amount = amount
 			doc.payroll_date = payroll_date
+			doc.type = ads_type
 			doc.save(ignore_permissions=True)
 			doc.flags.ignore_permissions = True
 			doc.submit()
@@ -1502,6 +1511,7 @@ def _upsert_additional_salary(employee, company, component, amount, payroll_date
 		doc.employee = employee
 		doc.company = emp_company
 		doc.salary_component = component
+		doc.type = ads_type
 		doc.amount = amount
 		doc.payroll_date = payroll_date
 		doc.overwrite_salary_structure_amount = 1
