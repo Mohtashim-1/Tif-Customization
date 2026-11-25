@@ -36,6 +36,8 @@ def get_report_data(filters=None):
 	totals = _totals(rows)
 	by_category = _sum_by(rows, "donation_category")
 	by_method = _sum_by(rows, "payment_method")
+	cash_summary = _cash_bank_summary(rows)
+	bank_deposits = _bank_deposit_summary(company, from_date, to_date)
 
 	return {
 		"mode": mode,
@@ -48,6 +50,8 @@ def get_report_data(filters=None):
 		"totals": totals,
 		"by_category": by_category,
 		"by_method": by_method,
+		"cash_summary": cash_summary,
+		"bank_deposits": bank_deposits,
 		"rows": detail_rows,
 		"summary_rows": grouped,
 	}
@@ -131,9 +135,26 @@ def _fetch_donations(where, params):
 			d.payment_reference,
 			d.cost_center,
 			d.remarks,
-			d.company
+			d.company,
+			dep.bank_deposit,
+			dep.deposit_date,
+			dep.deposit_bank_account,
+			dep.deposit_gl_account,
+			dep.bd_status
 		FROM `tabDonation` d
 		LEFT JOIN `tabDonation Type` dt ON dt.name = d.donation_type
+		LEFT JOIN (
+			SELECT
+				bdd.donation,
+				bd.name AS bank_deposit,
+				bd.deposit_date,
+				bd.bank_account AS deposit_bank_account,
+				bd.gl_account AS deposit_gl_account,
+				bd.status AS bd_status
+			FROM `tabBank Deposit Donation` bdd
+			INNER JOIN `tabBank Deposit` bd ON bd.name = bdd.parent
+			WHERE bd.docstatus = 1
+		) dep ON dep.donation = d.name
 		WHERE {where}
 		ORDER BY d.donation_date DESC, d.name DESC
 		""",
@@ -143,6 +164,15 @@ def _fetch_donations(where, params):
 
 
 def _detail_row(r):
+	is_cash = (r.payment_method or "").strip().lower() == "cash"
+	deposited = bool(r.bank_deposit)
+	if is_cash:
+		deposit_status = _("Deposited") if deposited else _("Pending Bank Deposit")
+	elif (r.payment_method or "").strip():
+		deposit_status = _("N/A — {0}").format(r.payment_method)
+	else:
+		deposit_status = "—"
+
 	return {
 		"name": r.name,
 		"donation_date": str(r.donation_date) if r.donation_date else "",
@@ -159,6 +189,13 @@ def _detail_row(r):
 		"payment_reference": r.payment_reference or "",
 		"cost_center": r.cost_center or "",
 		"remarks": r.remarks or "",
+		"is_cash": is_cash,
+		"bank_deposit": r.bank_deposit or "",
+		"deposit_date": str(r.deposit_date) if r.deposit_date else "",
+		"deposit_bank_account": r.deposit_bank_account or "",
+		"deposit_gl_account": r.deposit_gl_account or "",
+		"deposit_status": deposit_status,
+		"deposited": deposited,
 	}
 
 
@@ -225,6 +262,106 @@ def _totals(rows):
 		"outstanding_amount": flt(sum(flt(r.outstanding_amount) for r in rows), 2),
 		"zakat_amount": flt(zakat, 2),
 		"other_amount": flt(sum(flt(r.received_amount) for r in rows) - zakat, 2),
+	}
+
+
+def _cash_bank_summary(rows):
+	"""Cash received vs deposited to bank (via submitted Bank Deposit)."""
+	cash_rows = [r for r in rows if (r.payment_method or "").strip().lower() == "cash"]
+	cash_received = sum(flt(r.received_amount) for r in cash_rows)
+	cash_deposited = sum(flt(r.received_amount) for r in cash_rows if r.bank_deposit)
+	cash_pending = cash_received - cash_deposited
+	non_cash = sum(
+		flt(r.received_amount) for r in rows if (r.payment_method or "").strip().lower() != "cash"
+	)
+
+	by_deposit_bank = {}
+	for r in cash_rows:
+		if not r.bank_deposit:
+			continue
+		label = r.deposit_bank_account or r.deposit_gl_account or _("Unknown Bank")
+		bucket = by_deposit_bank.get(label)
+		if not bucket:
+			bucket = {"label": label, "amount": 0.0, "count": 0, "deposits": set()}
+			by_deposit_bank[label] = bucket
+		bucket["amount"] += flt(r.received_amount)
+		bucket["count"] += 1
+		bucket["deposits"].add(r.bank_deposit)
+
+	return {
+		"cash_received": flt(cash_received, 2),
+		"cash_deposited": flt(cash_deposited, 2),
+		"cash_pending_deposit": flt(cash_pending, 2),
+		"cash_receipt_count": len(cash_rows),
+		"cash_deposited_count": sum(1 for r in cash_rows if r.bank_deposit),
+		"cash_pending_count": sum(1 for r in cash_rows if not r.bank_deposit),
+		"non_cash_received": flt(non_cash, 2),
+		"by_deposit_bank": [
+			{
+				"label": b["label"],
+				"amount": flt(b["amount"], 2),
+				"count": b["count"],
+				"deposit_count": len(b["deposits"]),
+			}
+			for b in sorted(by_deposit_bank.values(), key=lambda x: -x["amount"])
+		],
+	}
+
+
+def _bank_deposit_summary(company, from_date, to_date):
+	"""Submitted Bank Deposit vouchers in the period (by deposit date)."""
+	if not frappe.db.exists("DocType", "Bank Deposit"):
+		return {"rows": [], "total_amount": 0.0, "count": 0}
+
+	rows = frappe.db.sql(
+		"""
+		SELECT
+			bd.name,
+			bd.deposit_date,
+			bd.deposit_slip_no,
+			bd.bank_account,
+			bd.gl_account,
+			bd.bank_account_no,
+			bd.total_amount,
+			bd.journal_entry,
+			bd.status,
+			(
+				SELECT COUNT(*)
+				FROM `tabBank Deposit Donation` bdd
+				WHERE bdd.parent = bd.name
+			) AS donation_count
+		FROM `tabBank Deposit` bd
+		WHERE bd.docstatus = 1
+			AND bd.company = %s
+			AND bd.deposit_date BETWEEN %s AND %s
+		ORDER BY bd.deposit_date DESC, bd.name DESC
+		""",
+		(company, str(from_date), str(to_date)),
+		as_dict=True,
+	)
+	out = []
+	total = 0.0
+	for r in rows:
+		amt = flt(r.total_amount)
+		total += amt
+		out.append(
+			{
+				"name": r.name,
+				"deposit_date": str(r.deposit_date) if r.deposit_date else "",
+				"deposit_slip_no": r.deposit_slip_no or "",
+				"bank_account": r.bank_account or "",
+				"gl_account": r.gl_account or "",
+				"bank_account_no": r.bank_account_no or "",
+				"total_amount": flt(amt, 2),
+				"journal_entry": r.journal_entry or "",
+				"donation_count": int(r.donation_count or 0),
+				"status": r.status or "",
+			}
+		)
+	return {
+		"rows": out,
+		"total_amount": flt(total, 2),
+		"count": len(out),
 	}
 
 

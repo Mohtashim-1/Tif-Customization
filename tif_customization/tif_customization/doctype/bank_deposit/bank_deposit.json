@@ -78,17 +78,19 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Status",
-   "options": "Draft\nPending COO Approval\nApproved\nRejected\nSubmitted",
+   "options": "Draft\nPending COO Approval\nApproved\nRejected\nSubmitted\nCancelled",
    "read_only": 1
   },
   {
    "allow_on_submit": 1,
    "fieldname": "workflow_state",
    "fieldtype": "Link",
-   "hidden": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Workflow State",
    "no_copy": 1,
-   "options": "Workflow State"
+   "options": "Workflow State",
+   "read_only": 1
   },
   {
    "description": "Bank deposit slip / voucher number from the bank.",
@@ -273,7 +275,7 @@
    "link_fieldname": "bank_deposit"
   }
  ],
- "modified": "2026-11-25 12:00:00.000000",
+ "modified": "2026-11-25 12:10:00.000000",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Bank Deposit",
@@ -358,6 +360,10 @@
   {
    "color": "Green",
    "title": "Submitted"
+  },
+  {
+   "color": "Red",
+   "title": "Cancelled"
   }
  ],
  "track_changes": 1

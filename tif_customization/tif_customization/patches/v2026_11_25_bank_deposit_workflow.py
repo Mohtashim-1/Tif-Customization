@@ -51,6 +51,15 @@ STATES = [
 		"is_optional_state": 0,
 		"idx": 5,
 	},
+	{
+		"state": "Cancelled",
+		"doc_status": "2",
+		"allow_edit": "System Manager",
+		"update_field": "status",
+		"update_value": "Cancelled",
+		"is_optional_state": 0,
+		"idx": 6,
+	},
 ]
 
 # Roles that can send for COO approval / withdraw / final submit

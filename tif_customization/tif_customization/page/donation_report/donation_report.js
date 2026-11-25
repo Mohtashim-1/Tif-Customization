@@ -58,6 +58,21 @@ frappe.tif_customization.DonationReport = class DonationReport {
 					.dnr-kpi{border:1px solid #e5e7eb;border-radius:10px;padding:12px 14px;background:#fff}
 					.dnr-kpi .lbl{font-size:10px;color:#6b7280;font-weight:700;text-transform:uppercase;letter-spacing:.4px}
 					.dnr-kpi .val{font-size:15px;font-weight:800;margin-top:4px;font-variant-numeric:tabular-nums;color:#123524}
+					.dnr-kpi.cash{border-color:#bbf7d0;background:#f0fdf4}
+					.dnr-kpi.warn{border-color:#fde68a;background:#fffbeb}
+					.dnr-kpi.bank{border-color:#bfdbfe;background:#eff6ff}
+					.dnr-section{padding:4px 20px 16px}
+					.dnr-section h3{margin:8px 0 10px;font-size:13px;font-weight:800;color:#1b5e3b;
+						text-transform:uppercase;letter-spacing:.4px}
+					.dnr-method-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px}
+					.dnr-method-card{border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;background:#fff}
+					.dnr-method-card .lbl{font-size:11px;font-weight:700;color:#334155}
+					.dnr-method-card .val{font-size:14px;font-weight:800;margin-top:4px;color:#123524;
+						font-variant-numeric:tabular-nums}
+					.dnr-badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700}
+					.dnr-badge.ok{background:#dcfce7;color:#166534}
+					.dnr-badge.pending{background:#fef3c7;color:#92400e}
+					.dnr-badge.na{background:#f1f5f9;color:#475569}
 					.dnr-table-wrap{padding:0 12px 16px;overflow:auto}
 					.dnr-table{width:100%;border-collapse:collapse;font-size:12px;min-width:980px}
 					.dnr-table th,.dnr-table td{padding:8px;border:1px solid #e5e7eb;vertical-align:top}
@@ -90,9 +105,10 @@ frappe.tif_customization.DonationReport = class DonationReport {
 					}
 				</style>
 				<p class="dnr-note no-print">
-					Submitted donation receipts for the selected period.
-					Use <strong>Group By</strong> for donor / type / bank summaries.
-					<strong>Print / PDF</strong> opens a professional statement.
+					Submitted donation receipts for the selected period, with
+					<strong>mode of payment</strong>, <strong>cash received</strong>, and
+					<strong>cash deposited to bank</strong> (via Bank Deposit).
+					Use <strong>Group By</strong> for summaries. <strong>Print / PDF</strong> for statement.
 				</p>
 				<div id="dnr-filters" class="dnr-filters row no-print"></div>
 				<div id="dnr-body"></div>
@@ -261,6 +277,7 @@ frappe.tif_customization.DonationReport = class DonationReport {
 			.map((c) => `<span class="dnr-chip">${this.esc(c.label)}: ${this.fmt_cur(c.amount)}</span>`)
 			.join("");
 
+		const cash = data.cash_summary || {};
 		const table =
 			data.mode === "summary"
 				? this.render_summary_table(data.summary_rows || [], data.group_by, t)
@@ -309,29 +326,35 @@ frappe.tif_customization.DonationReport = class DonationReport {
 				</div>
 
 				<div class="dnr-kpis">
-					<div class="dnr-kpi"><div class="lbl">${__("Received")}</div><div class="val">${this.fmt_cur(
+					<div class="dnr-kpi"><div class="lbl">${__("Total Received")}</div><div class="val">${this.fmt_cur(
 						t.received_amount
 					)}</div></div>
-					<div class="dnr-kpi"><div class="lbl">${__("Receipts")}</div><div class="val">${
-						t.donation_count || 0
-					}</div></div>
-					<div class="dnr-kpi"><div class="lbl">${__("Donors")}</div><div class="val">${
-						t.unique_donors || 0
-					}</div></div>
-					<div class="dnr-kpi"><div class="lbl">${__("Zakat")}</div><div class="val">${this.fmt_cur(
-						t.zakat_amount
+					<div class="dnr-kpi cash"><div class="lbl">${__("Cash Received")}</div><div class="val">${this.fmt_cur(
+						cash.cash_received
 					)}</div></div>
-					<div class="dnr-kpi"><div class="lbl">${__("Outstanding")}</div><div class="val">${this.fmt_cur(
-						t.outstanding_amount
+					<div class="dnr-kpi bank"><div class="lbl">${__("Cash Deposited to Bank")}</div><div class="val">${this.fmt_cur(
+						cash.cash_deposited
+					)}</div></div>
+					<div class="dnr-kpi warn"><div class="lbl">${__("Cash Pending Deposit")}</div><div class="val">${this.fmt_cur(
+						cash.cash_pending_deposit
+					)}</div></div>
+					<div class="dnr-kpi"><div class="lbl">${__("Non-Cash Received")}</div><div class="val">${this.fmt_cur(
+						cash.non_cash_received
 					)}</div></div>
 				</div>
+
+				${this.render_payment_methods(data.by_method || [])}
+				${this.render_cash_to_bank(cash)}
+				${this.render_bank_deposits(data.bank_deposits || {})}
 
 				${table}
 
 				<div class="dnr-footer">
 					<div>
 						<strong>${__("Note")}:</strong>
-						${__("Only submitted Donation documents are included. Amounts use Received Amount.")}
+						${__(
+							"Only submitted Donations are included. Cash deposited = linked to a submitted Bank Deposit."
+						)}
 					</div>
 					<div>${__("Generated from Ilm ERP")}</div>
 				</div>
@@ -342,14 +365,162 @@ frappe.tif_customization.DonationReport = class DonationReport {
 			.find(".dnr-open")
 			.on("click", (e) => {
 				const name = $(e.currentTarget).data("name");
-				if (name) frappe.set_route("Form", "Donation", name);
+				const dt = $(e.currentTarget).data("doctype") || "Donation";
+				if (name) frappe.set_route("Form", dt, name);
 			});
+	}
+
+	render_payment_methods(methods) {
+		if (!methods.length) {
+			return "";
+		}
+		const cards = methods
+			.map(
+				(m) => `<div class="dnr-method-card">
+				<div class="lbl">${this.esc(m.label || "—")}</div>
+				<div class="val">${this.fmt_cur(m.amount)}</div>
+			</div>`
+			)
+			.join("");
+		return `
+			<div class="dnr-section">
+				<h3>${__("Mode of Payment")}</h3>
+				<div class="dnr-method-grid">${cards}</div>
+			</div>`;
+	}
+
+	render_cash_to_bank(cash) {
+		const banks = cash.by_deposit_bank || [];
+		if (!banks.length && !(cash.cash_received > 0)) {
+			return "";
+		}
+		let bankRows = "";
+		if (!banks.length) {
+			bankRows = `<tr><td colspan="3" class="text-muted text-center">${__(
+				"No cash deposited to bank in this period yet."
+			)}</td></tr>`;
+		} else {
+			bankRows = banks
+				.map(
+					(b) => `<tr>
+					<td>${this.esc(b.label)}</td>
+					<td class="num">${b.count} ${__("slips")} / ${b.deposit_count} ${__("deposits")}</td>
+					<td class="num">${this.fmt_cur(b.amount)}</td>
+				</tr>`
+				)
+				.join("");
+			bankRows += `<tr class="dnr-total">
+				<td colspan="2">${__("Total Cash Deposited")}</td>
+				<td class="num">${this.fmt_cur(cash.cash_deposited)}</td>
+			</tr>`;
+		}
+		return `
+			<div class="dnr-section">
+				<h3>${__("Cash → Bank Summary")}</h3>
+				<div class="dnr-kpis" style="padding:0 0 10px;grid-template-columns:repeat(3,1fr)">
+					<div class="dnr-kpi cash"><div class="lbl">${__("Cash Receipts")}</div>
+						<div class="val">${cash.cash_receipt_count || 0}</div></div>
+					<div class="dnr-kpi bank"><div class="lbl">${__("Deposited Slips")}</div>
+						<div class="val">${cash.cash_deposited_count || 0}</div></div>
+					<div class="dnr-kpi warn"><div class="lbl">${__("Pending Slips")}</div>
+						<div class="val">${cash.cash_pending_count || 0}</div></div>
+				</div>
+				<div class="dnr-table-wrap" style="padding:0">
+					<table class="dnr-table" style="min-width:520px">
+						<thead>
+							<tr>
+								<th>${__("Bank Account (Deposit)")}</th>
+								<th class="num">${__("Slips / Deposits")}</th>
+								<th class="num">${__("Amount")}</th>
+							</tr>
+						</thead>
+						<tbody>${bankRows}</tbody>
+					</table>
+				</div>
+			</div>`;
+	}
+
+	render_bank_deposits(bd) {
+		const rows = bd.rows || [];
+		if (!rows.length) {
+			return `
+				<div class="dnr-section">
+					<h3>${__("Bank Deposits (Period)")}</h3>
+					<p class="text-muted" style="margin:0;font-size:12px">${__(
+						"No submitted Bank Deposit vouchers in this deposit-date period."
+					)}</p>
+				</div>`;
+		}
+		const body = rows
+			.map(
+				(r) => `<tr>
+				<td><a class="dnr-link dnr-open" data-doctype="Bank Deposit" data-name="${this.esc(
+					r.name
+				)}">${this.esc(r.name)}</a></td>
+				<td>${this.esc(frappe.datetime.str_to_user(r.deposit_date))}</td>
+				<td>${this.esc(r.deposit_slip_no || "—")}</td>
+				<td>${this.esc(r.bank_account || "—")}
+					${
+						r.bank_account_no
+							? `<div style="color:#64748b;font-size:10px">${this.esc(r.bank_account_no)}</div>`
+							: ""
+					}
+				</td>
+				<td class="num">${r.donation_count || 0}</td>
+				<td class="num">${this.fmt_cur(r.total_amount)}</td>
+				<td>${
+					r.journal_entry
+						? `<a class="dnr-link dnr-open" data-doctype="Journal Entry" data-name="${this.esc(
+								r.journal_entry
+						  )}">${this.esc(r.journal_entry)}</a>`
+						: "—"
+				}</td>
+			</tr>`
+			)
+			.join("");
+		return `
+			<div class="dnr-section">
+				<h3>${__("Bank Deposits Submitted")} (${bd.count || 0} · ${this.fmt_cur(bd.total_amount)})</h3>
+				<div class="dnr-table-wrap" style="padding:0">
+					<table class="dnr-table" style="min-width:760px">
+						<thead>
+							<tr>
+								<th>${__("Bank Deposit")}</th>
+								<th>${__("Date")}</th>
+								<th>${__("Slip No")}</th>
+								<th>${__("Bank Account")}</th>
+								<th class="num">${__("Slips")}</th>
+								<th class="num">${__("Amount")}</th>
+								<th>${__("Journal Entry")}</th>
+							</tr>
+						</thead>
+						<tbody>
+							${body}
+							<tr class="dnr-total">
+								<td colspan="5">${__("Total Deposited to Bank")}</td>
+								<td class="num">${this.fmt_cur(bd.total_amount)}</td>
+								<td></td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+			</div>`;
+	}
+
+	deposit_badge(r) {
+		if (r.deposited) {
+			return `<span class="dnr-badge ok">${__("Deposited")}</span>`;
+		}
+		if (r.is_cash) {
+			return `<span class="dnr-badge pending">${__("Pending Deposit")}</span>`;
+		}
+		return `<span class="dnr-badge na">${this.esc(r.payment_method || "—")}</span>`;
 	}
 
 	render_detail_table(rows, totals) {
 		let body = "";
 		if (!rows.length) {
-			body = `<tr><td colspan="10" class="text-center text-muted">${__("No donations found.")}</td></tr>`;
+			body = `<tr><td colspan="11" class="text-center text-muted">${__("No donations found.")}</td></tr>`;
 		} else {
 			body = rows
 				.map(
@@ -370,7 +541,16 @@ frappe.tif_customization.DonationReport = class DonationReport {
 					</td>
 					<td class="num">${this.fmt_cur(r.received_amount)}</td>
 					<td>${this.esc(r.payment_method || "—")}</td>
-					<td>${this.esc(r.bank_account || "—")}</td>
+					<td>${this.deposit_badge(r)}
+						${
+							r.bank_deposit
+								? `<div style="margin-top:3px"><a class="dnr-link dnr-open" data-doctype="Bank Deposit" data-name="${this.esc(
+										r.bank_deposit
+								  )}">${this.esc(r.bank_deposit)}</a></div>`
+								: ""
+						}
+					</td>
+					<td>${this.esc(r.deposit_bank_account || r.bank_account || "—")}</td>
 					<td>${this.esc(r.cost_center || "—")}</td>
 					<td class="num">${this.fmt_cur(r.outstanding_amount)}</td>
 					<td>${this.esc(r.remarks || "")}</td>
@@ -380,15 +560,18 @@ frappe.tif_customization.DonationReport = class DonationReport {
 			body += `<tr class="dnr-total">
 				<td colspan="4">${__("Total")} (${totals.donation_count || 0})</td>
 				<td class="num">${this.fmt_cur(totals.received_amount)}</td>
-				<td colspan="3"></td>
+				<td colspan="4"></td>
 				<td class="num">${this.fmt_cur(totals.outstanding_amount)}</td>
 				<td></td>
 			</tr>`;
 		}
 
 		return `
+			<div class="dnr-section" style="padding-top:0">
+				<h3>${__("Donation Receipts")}</h3>
+			</div>
 			<div class="dnr-table-wrap">
-				<table class="dnr-table">
+				<table class="dnr-table" style="min-width:1100px">
 					<thead>
 						<tr>
 							<th>${__("Receipt")}</th>
@@ -396,8 +579,9 @@ frappe.tif_customization.DonationReport = class DonationReport {
 							<th>${__("Donor")}</th>
 							<th>${__("Type")}</th>
 							<th class="num">${__("Received")}</th>
-							<th>${__("Method")}</th>
-							<th>${__("Bank")}</th>
+							<th>${__("Mode of Payment")}</th>
+							<th>${__("Bank Deposit Status")}</th>
+							<th>${__("Bank Account")}</th>
 							<th>${__("Cost Center")}</th>
 							<th class="num">${__("Outstanding")}</th>
 							<th>${__("Remarks")}</th>
@@ -531,8 +715,10 @@ frappe.tif_customization.DonationReport = class DonationReport {
 				"Category",
 				"Received",
 				"Outstanding",
-				"Method",
-				"Bank",
+				"Mode of Payment",
+				"Bank Deposit Status",
+				"Bank Deposit",
+				"Deposit Bank Account",
 				"Cost Center",
 				"Reference",
 				"Remarks",
@@ -548,7 +734,9 @@ frappe.tif_customization.DonationReport = class DonationReport {
 					r.received_amount,
 					r.outstanding_amount,
 					r.payment_method,
-					r.bank_account,
+					r.deposit_status,
+					r.bank_deposit,
+					r.deposit_bank_account || r.bank_account,
 					r.cost_center,
 					r.payment_reference,
 					r.remarks,

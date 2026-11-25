@@ -52,6 +52,7 @@ class BankDeposit(Document):
 			"Approved",
 			"Rejected",
 			"Submitted",
+			"Cancelled",
 		):
 			self.status = self.workflow_state
 
@@ -115,14 +116,40 @@ class BankDeposit(Document):
 		je = self._create_cash_to_bank_jv()
 		self.db_set("journal_entry", je.name, update_modified=False)
 
+	def before_cancel(self):
+		# Bidirectional link (JE.bank_deposit ↔ BD.journal_entry) blocks cancel otherwise
+		self.ignore_linked_doctypes = ["Journal Entry"]
+		self.status = "Cancelled"
+		self.workflow_state = "Cancelled"
+
 	def on_cancel(self):
-		if not self.journal_entry:
+		self.db_set(
+			{"status": "Cancelled", "workflow_state": "Cancelled"},
+			update_modified=False,
+		)
+		self._cancel_linked_journal_entry()
+
+	def _cancel_linked_journal_entry(self):
+		je_name = self.journal_entry
+		if not je_name and frappe.get_meta("Journal Entry").has_field("bank_deposit"):
+			je_name = frappe.db.get_value(
+				"Journal Entry", {"bank_deposit": self.name, "docstatus": 1}, "name"
+			)
+		if not je_name or not frappe.db.exists("Journal Entry", je_name):
 			return
-		if not frappe.db.exists("Journal Entry", self.journal_entry):
+
+		# Clear reverse link first
+		if frappe.get_meta("Journal Entry").has_field("bank_deposit"):
+			frappe.db.set_value("Journal Entry", je_name, "bank_deposit", None, update_modified=False)
+
+		je = frappe.get_doc("Journal Entry", je_name)
+		if je.docstatus != 1:
 			return
-		je = frappe.get_doc("Journal Entry", self.journal_entry)
-		if je.docstatus == 1:
-			je.cancel()
+
+		# Bank Deposit.journal_entry still points at this JE — ignore that link on cancel
+		je.ignore_linked_doctypes = ["Bank Deposit"]
+		je.flags.ignore_permissions = True
+		je.cancel()
 
 	def _set_defaults(self):
 		settings = _get_donation_settings()
