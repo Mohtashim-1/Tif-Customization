@@ -98,13 +98,13 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Deposit Slip No",
-   "reqd": 1
+   "mandatory_depends_on": "eval:doc.status=='Pending COO Approval' || doc.status=='Approved' || doc.status=='Submitted'"
   },
   {
    "fieldname": "deposit_slip_attachment",
    "fieldtype": "Attach",
    "label": "Deposit Slip Attachment",
-   "reqd": 1
+   "mandatory_depends_on": "eval:doc.status=='Pending COO Approval' || doc.status=='Approved' || doc.status=='Submitted'"
   },
   {
    "fieldname": "section_accounts",

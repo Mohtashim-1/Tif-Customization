@@ -109,12 +109,16 @@ class BankDeposit(Document):
 		if flt(self.total_amount) <= 0:
 			frappe.throw(_("Total amount must be greater than zero."))
 
+	def on_update(self):
+		self._sync_donation_bank_deposit_links()
+
 	def on_submit(self):
 		self.db_set("status", "Submitted", update_modified=False)
 		if self.workflow_state != "Submitted":
 			self.db_set("workflow_state", "Submitted", update_modified=False)
 		je = self._create_cash_to_bank_jv()
 		self.db_set("journal_entry", je.name, update_modified=False)
+		self._sync_donation_bank_deposit_links()
 
 	def before_cancel(self):
 		# Bidirectional link (JE.bank_deposit ↔ BD.journal_entry) blocks cancel otherwise
@@ -127,7 +131,39 @@ class BankDeposit(Document):
 			{"status": "Cancelled", "workflow_state": "Cancelled"},
 			update_modified=False,
 		)
+		self._clear_donation_bank_deposit_links()
 		self._cancel_linked_journal_entry()
+
+	def _sync_donation_bank_deposit_links(self):
+		"""Keep Donation.bank_deposit pointing at this voucher for selected slips."""
+		if not frappe.get_meta("Donation").has_field("bank_deposit"):
+			return
+		current = {row.donation for row in (self.donations or []) if row.donation}
+		# Clear donations previously linked to this BD but removed from table
+		previous = set(
+			frappe.get_all(
+				"Donation",
+				filters={"bank_deposit": self.name},
+				pluck="name",
+			)
+		)
+		for donation in previous - current:
+			frappe.db.set_value("Donation", donation, "bank_deposit", None, update_modified=False)
+		if self.docstatus == 2:
+			return
+		for donation in current:
+			frappe.db.set_value("Donation", donation, "bank_deposit", self.name, update_modified=False)
+
+	def _clear_donation_bank_deposit_links(self):
+		if not frappe.get_meta("Donation").has_field("bank_deposit"):
+			return
+		for row in self.donations or []:
+			if row.donation:
+				frappe.db.set_value("Donation", row.donation, "bank_deposit", None, update_modified=False)
+		frappe.db.sql(
+			"UPDATE `tabDonation` SET bank_deposit = NULL WHERE bank_deposit = %s",
+			self.name,
+		)
 
 	def _cancel_linked_journal_entry(self):
 		je_name = self.journal_entry
@@ -190,10 +226,13 @@ class BankDeposit(Document):
 		self.iban = details.iban
 
 	def _validate_accounts(self):
-		if not self.deposit_slip_no:
-			frappe.throw(_("Deposit Slip No is mandatory."))
-		if not self.deposit_slip_attachment:
-			frappe.throw(_("Deposit Slip Attachment is mandatory."))
+		# Slip details required before COO approval / submit, not on first Draft save
+		needs_slip = self.status in ("Pending COO Approval", "Approved", "Submitted") or self.docstatus > 0
+		if needs_slip:
+			if not self.deposit_slip_no:
+				frappe.throw(_("Deposit Slip No is mandatory."))
+			if not self.deposit_slip_attachment:
+				frappe.throw(_("Deposit Slip Attachment is mandatory."))
 		if not self.bank_account:
 			frappe.throw(_("Bank Account is mandatory."))
 		if not self.gl_account:
@@ -538,3 +577,94 @@ def reject_bank_deposit(name, reason=None):
 	doc.flags.from_approval_action = True
 	doc.save()
 	return {"message": _("Bank Deposit rejected."), "status": doc.status}
+
+
+def _get_cash_donation_or_throw(donation):
+	if not frappe.has_permission("Donation", "read", donation):
+		frappe.throw(_("Not permitted to read Donation {0}.").format(donation))
+	don = frappe.get_doc("Donation", donation)
+	if don.docstatus != 1:
+		frappe.throw(_("Donation {0} must be submitted.").format(donation))
+	if (don.payment_method or "").strip().lower() != "cash":
+		frappe.throw(_("Only Cash donation slips can be added to Bank Deposit."))
+	existing = _find_existing_deposit_for_donation(donation)
+	if existing:
+		frappe.throw(
+			_("Donation {0} is already on Bank Deposit {1}.").format(donation, existing)
+		)
+	return don
+
+
+@frappe.whitelist()
+def create_bank_deposit_from_donation(donation):
+	"""Create a Draft Bank Deposit with the selected cash Donation slip."""
+	don = _get_cash_donation_or_throw(donation)
+	if not frappe.has_permission("Bank Deposit", "create"):
+		frappe.throw(_("Not permitted to create Bank Deposit."))
+
+	settings = _get_donation_settings()
+	bank_account = None
+	if settings and settings.bank_account:
+		bank_account = _find_bank_account_for_gl(settings.bank_account, don.company)
+
+	doc = frappe.get_doc(
+		{
+			"doctype": "Bank Deposit",
+			"company": don.company,
+			"deposit_date": frappe.utils.today(),
+			"cash_account": settings.cash_account if settings else None,
+			"bank_account": bank_account,
+			"cost_center": don.cost_center
+			or (settings.default_cost_center if settings else None),
+			"status": "Draft",
+			"workflow_state": "Draft",
+			"donations": [
+				{
+					"donation": don.name,
+					"donation_date": don.donation_date,
+					"donor_name": don.donor_name,
+					"payment_method": don.payment_method,
+					"amount": don.received_amount,
+					"remarks": don.remarks,
+				}
+			],
+		}
+	)
+	doc.insert()
+	return {"name": doc.name, "total_amount": doc.total_amount}
+
+
+@frappe.whitelist()
+def add_donation_to_bank_deposit(donation, bank_deposit):
+	"""Add selected cash Donation slip to an existing Draft/Rejected Bank Deposit."""
+	don = _get_cash_donation_or_throw(donation)
+	doc = frappe.get_doc("Bank Deposit", bank_deposit)
+	doc.check_permission("write")
+	if doc.docstatus != 0:
+		frappe.throw(_("Can only add slips to a draft Bank Deposit."))
+	if doc.status not in ("Draft", "Rejected"):
+		frappe.throw(
+			_("Bank Deposit {0} is {1}. Withdraw or wait until Draft/Rejected.").format(
+				doc.name, doc.status
+			)
+		)
+	if doc.company and don.company and doc.company != don.company:
+		frappe.throw(_("Donation company does not match Bank Deposit company."))
+
+	for row in doc.donations or []:
+		if row.donation == don.name:
+			frappe.throw(_("Donation {0} is already on this Bank Deposit.").format(don.name))
+
+	doc.append(
+		"donations",
+		{
+			"donation": don.name,
+			"donation_date": don.donation_date,
+			"donor_name": don.donor_name,
+			"payment_method": don.payment_method,
+			"amount": don.received_amount,
+			"remarks": don.remarks,
+		},
+	)
+	doc.save()
+	return {"name": doc.name, "total_amount": doc.total_amount}
