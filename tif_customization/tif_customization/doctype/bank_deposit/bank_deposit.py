@@ -250,33 +250,36 @@ class BankDeposit(Document):
 
 		donation_refs = ", ".join(row.donation for row in self.donations if row.donation)
 
-		je = frappe.get_doc(
-			{
-				"doctype": "Journal Entry",
-				"voucher_type": "Bank Entry",
-				"company": self.company,
-				"posting_date": self.deposit_date,
-				"cheque_no": self.deposit_slip_no or self.name,
-				"cheque_date": self.deposit_date,
-				"user_remark": user_remark,
-				"accounts": [
-					{
-						"account": self.gl_account,
-						"debit_in_account_currency": amount,
-						"credit_in_account_currency": 0,
-						"cost_center": cost_center,
-						"user_remark": f"Deposit of cash donations: {donation_refs}",
-					},
-					{
-						"account": self.cash_account,
-						"debit_in_account_currency": 0,
-						"credit_in_account_currency": amount,
-						"cost_center": cost_center,
-						"user_remark": f"Cash deposited to bank via {self.name}",
-					},
-				],
-			}
-		)
+		je_data = {
+			"doctype": "Journal Entry",
+			"voucher_type": "Bank Entry",
+			"company": self.company,
+			"posting_date": self.deposit_date,
+			"cheque_no": self.deposit_slip_no or self.name,
+			"cheque_date": self.deposit_date,
+			"user_remark": user_remark,
+			"accounts": [
+				{
+					"account": self.gl_account,
+					"debit_in_account_currency": amount,
+					"credit_in_account_currency": 0,
+					"cost_center": cost_center,
+					"user_remark": f"Deposit of cash donations: {donation_refs}",
+				},
+				{
+					"account": self.cash_account,
+					"debit_in_account_currency": 0,
+					"credit_in_account_currency": amount,
+					"cost_center": cost_center,
+					"user_remark": f"Cash deposited to bank via {self.name}",
+				},
+			],
+		}
+		# Connection field (Custom Field) — ignore if not yet migrated
+		if frappe.get_meta("Journal Entry").has_field("bank_deposit"):
+			je_data["bank_deposit"] = self.name
+
+		je = frappe.get_doc(je_data)
 		je.insert(ignore_permissions=True)
 		je.submit()
 		return je
