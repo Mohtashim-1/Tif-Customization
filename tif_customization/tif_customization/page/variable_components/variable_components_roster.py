@@ -421,12 +421,13 @@ def attendance_by_employee(employees, end_date):
 			continue
 
 		doc = frappe.get_doc("Employee Attendance", ea_name)
-		# Align with Monthly Attendance Summary: ignore days before DOJ / after relieving
+		# Align with Monthly Attendance Summary: only adjust mid-cycle join/exit
 		try:
 			from hr_vfg.hr_ventureforce_global.report.monthly_attendance_summary.monthly_attendance_summary import (
 				_count_flag_in_period,
 				_eligible_days_in_period,
 				_employment_bounds,
+				_is_mid_cycle_join_or_exit,
 				_lates_for_absent_in_period,
 				_uncovered_half_day_deduction as _mas_half,
 			)
@@ -434,15 +435,17 @@ def attendance_by_employee(employees, end_date):
 			bounds = _employment_bounds(emp_name)
 			doj = bounds.get("date_of_joining")
 			relieving = bounds.get("relieving_date")
-			eligible = _eligible_days_in_period(doc, doj, relieving)
-			month_days = flt(eligible) if (doj or relieving) and eligible > 0 else flt(doc.month_days)
-			half_day_deduction = _mas_half(doc, doj, relieving)
-			absents = (
-				_count_flag_in_period(doc, "absent", doj, relieving)
-				if (doj or relieving)
-				else flt(doc.total_absents)
-			)
-			lates_for_absent = _lates_for_absent_in_period(doc, doj, relieving)
+			if _is_mid_cycle_join_or_exit(doc, doj, relieving):
+				eligible = _eligible_days_in_period(doc, doj, relieving)
+				month_days = flt(eligible) if eligible > 0 else flt(doc.month_days)
+				half_day_deduction = _mas_half(doc, doj, relieving)
+				absents = _count_flag_in_period(doc, "absent", doj, relieving)
+				lates_for_absent = _lates_for_absent_in_period(doc, doj, relieving)
+			else:
+				month_days = flt(doc.month_days)
+				half_day_deduction = _mas_half(doc)
+				absents = flt(doc.total_absents)
+				lates_for_absent = flt(doc.lates_for_absent)
 		except Exception:
 			half_day_deduction = _uncovered_half_day_deduction(doc)
 			absents = flt(doc.total_absents)
