@@ -13,8 +13,7 @@ frappe.ui.form.on("Bank Deposit", {
 		frm.set_query("bank_account", () => ({
 			filters: {
 				company: frm.doc.company,
-				account_type: "Bank",
-				is_group: 0,
+				is_company_account: 1,
 			},
 		}));
 		frm.set_query("cost_center", () => ({
@@ -34,56 +33,97 @@ frappe.ui.form.on("Bank Deposit", {
 
 	refresh(frm) {
 		frm.trigger("toggle_editable");
-		if (frm.doc.docstatus === 0 && !["Pending COO Approval", "Approved"].includes(frm.doc.status)) {
+		const state = frm.doc.workflow_state || frm.doc.status;
+		if (frm.doc.docstatus === 0 && !["Pending COO Approval", "Approved", "Submitted"].includes(state)) {
 			frm.add_custom_button(__("Get Cash Donation Slips"), () => {
 				frm.trigger("get_cash_donations");
 			});
-		}
-		if (!frm.is_new() && frm.doc.docstatus === 0) {
-			frm.trigger("render_approval_buttons");
 		}
 		if (frm.doc.journal_entry && frm.doc.docstatus === 1) {
 			frm.add_custom_button(__("Open Journal Entry"), () => {
 				frappe.set_route("Form", "Journal Entry", frm.doc.journal_entry);
 			});
 		}
-		if (frm.doc.status === "Approved" && frm.doc.docstatus === 0) {
+		if (state === "Approved" && frm.doc.docstatus === 0) {
 			frm.dashboard.set_headline_alert(
-				__("COO approved. Click Submit to create Cash → Bank Journal Entry."),
+				__("COO approved. Use Actions → Submit to create Cash → Bank Journal Entry."),
 				"green"
 			);
-		} else if (frm.doc.status === "Pending COO Approval") {
+		} else if (state === "Pending COO Approval") {
 			frm.dashboard.set_headline_alert(
-				__("Pending COO approval. Editing is locked until withdraw / approve / reject."),
+				__("Pending COO approval. Use Actions to Approve, Reject, or Withdraw."),
 				"orange"
+			);
+		} else if (state === "Draft" || state === "Rejected") {
+			frm.dashboard.set_headline_alert(
+				__("Use Actions → Submit for COO Approval after filling deposit details."),
+				"blue"
 			);
 		}
 	},
 
 	company(frm) {
 		if (!frm.doc.company) return;
-		frappe.db.get_value("Donation Settings", "Donation Settings", [
-			"cash_account",
-			"bank_account",
-			"default_cost_center",
-			"company",
-		]).then((r) => {
-			const s = r.message || {};
-			if (s.company && s.company !== frm.doc.company) return;
-			if (!frm.doc.cash_account && s.cash_account) {
-				frm.set_value("cash_account", s.cash_account);
+		frappe.db
+			.get_value("Donation Settings", "Donation Settings", [
+				"cash_account",
+				"bank_account",
+				"default_cost_center",
+				"company",
+			])
+			.then((r) => {
+				const s = r.message || {};
+				if (s.company && s.company !== frm.doc.company) return;
+				if (!frm.doc.cash_account && s.cash_account) {
+					frm.set_value("cash_account", s.cash_account);
+				}
+				if (!frm.doc.cost_center && s.default_cost_center) {
+					frm.set_value("cost_center", s.default_cost_center);
+				}
+				if (!frm.doc.bank_account && s.bank_account) {
+					frappe.db
+						.get_value("Bank Account", {
+							account: s.bank_account,
+							company: frm.doc.company,
+							is_company_account: 1,
+						}, "name")
+						.then((ba) => {
+							if (ba.message && ba.message.name) {
+								frm.set_value("bank_account", ba.message.name);
+							}
+						});
+				}
+			});
+	},
+
+	bank_account(frm) {
+		if (!frm.doc.bank_account) {
+			frm.set_value({
+				gl_account: null,
+				bank_account_no: null,
+				iban: null,
+			});
+			return;
+		}
+		frappe.db.get_value(
+			"Bank Account",
+			frm.doc.bank_account,
+			["account", "bank_account_no", "iban"],
+			(r) => {
+				if (!r) return;
+				frm.set_value({
+					gl_account: r.account,
+					bank_account_no: r.bank_account_no,
+					iban: r.iban,
+				});
 			}
-			if (!frm.doc.bank_account && s.bank_account) {
-				frm.set_value("bank_account", s.bank_account);
-			}
-			if (!frm.doc.cost_center && s.default_cost_center) {
-				frm.set_value("cost_center", s.default_cost_center);
-			}
-		});
+		);
 	},
 
 	toggle_editable(frm) {
-		const locked = ["Pending COO Approval", "Approved"].includes(frm.doc.status) || frm.doc.docstatus > 0;
+		const state = frm.doc.workflow_state || frm.doc.status;
+		const locked =
+			["Pending COO Approval", "Approved", "Submitted"].includes(state) || frm.doc.docstatus > 0;
 		frm.toggle_enable(
 			[
 				"company",
@@ -98,112 +138,6 @@ frappe.ui.form.on("Bank Deposit", {
 			],
 			!locked
 		);
-	},
-
-	render_approval_buttons(frm) {
-		frappe.call({
-			method:
-				"tif_customization.tif_customization.doctype.bank_deposit.bank_deposit.get_approval_actions",
-			args: { name: frm.doc.name },
-			callback(r) {
-				const a = r.message || {};
-				if (a.can_submit_for_approval) {
-					frm.add_custom_button(
-						__("Submit for COO Approval"),
-						() => {
-							frappe.call({
-								method:
-									"tif_customization.tif_customization.doctype.bank_deposit.bank_deposit.submit_for_coo_approval",
-								args: { name: frm.doc.name },
-								freeze: true,
-								callback() {
-									frm.reload_doc();
-								},
-							});
-						},
-						__("Approval")
-					);
-				}
-				if (a.can_withdraw_approval) {
-					frm.add_custom_button(
-						__("Withdraw Approval"),
-						() => {
-							frappe.call({
-								method:
-									"tif_customization.tif_customization.doctype.bank_deposit.bank_deposit.withdraw_coo_approval",
-								args: { name: frm.doc.name },
-								freeze: true,
-								callback() {
-									frm.reload_doc();
-								},
-							});
-						},
-						__("Approval")
-					);
-				}
-				if (a.can_approve) {
-					frm.add_custom_button(
-						__("Approve"),
-						() => {
-							frappe.prompt(
-								[
-									{
-										fieldname: "remarks",
-										fieldtype: "Small Text",
-										label: __("Approval Remarks"),
-									},
-								],
-								(values) => {
-									frappe.call({
-										method:
-											"tif_customization.tif_customization.doctype.bank_deposit.bank_deposit.approve_bank_deposit",
-										args: { name: frm.doc.name, remarks: values.remarks },
-										freeze: true,
-										callback() {
-											frm.reload_doc();
-										},
-									});
-								},
-								__("Approve Bank Deposit"),
-								__("Approve")
-							);
-						},
-						__("Approval")
-					);
-				}
-				if (a.can_reject) {
-					frm.add_custom_button(
-						__("Reject"),
-						() => {
-							frappe.prompt(
-								[
-									{
-										fieldname: "reason",
-										fieldtype: "Small Text",
-										label: __("Rejection Reason"),
-										reqd: 1,
-									},
-								],
-								(values) => {
-									frappe.call({
-										method:
-											"tif_customization.tif_customization.doctype.bank_deposit.bank_deposit.reject_bank_deposit",
-										args: { name: frm.doc.name, reason: values.reason },
-										freeze: true,
-										callback() {
-											frm.reload_doc();
-										},
-									});
-								},
-								__("Reject Bank Deposit"),
-								__("Reject")
-							);
-						},
-						__("Approval")
-					);
-				}
-			},
-		});
 	},
 
 	get_cash_donations(frm) {

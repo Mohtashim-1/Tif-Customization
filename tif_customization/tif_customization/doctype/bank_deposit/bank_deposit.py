@@ -32,10 +32,24 @@ class BankDeposit(Document):
 
 	def validate(self):
 		self._set_defaults()
+		self._sync_bank_account_details()
+		if self.has_value_changed("workflow_state"):
+			self.flags.from_approval_action = True
+			self._apply_workflow_side_effects()
 		if not self.flags.from_approval_action:
 			self._ensure_editable()
+		self._validate_accounts()
 		self._validate_donations()
 		self._calculate_total()
+		# Keep status aligned with workflow when present
+		if self.workflow_state and self.workflow_state in (
+			"Draft",
+			"Pending COO Approval",
+			"Approved",
+			"Rejected",
+			"Submitted",
+		):
+			self.status = self.workflow_state
 
 	def _ensure_editable(self):
 		if self.is_new() or self.docstatus != 0:
@@ -43,18 +57,41 @@ class BankDeposit(Document):
 		prev = self.get_doc_before_save()
 		if not prev:
 			return
-		if prev.status in ("Pending COO Approval", "Approved"):
+		locked = ("Pending COO Approval", "Approved", "Submitted")
+		if prev.status in locked or (prev.workflow_state or "") in locked:
 			frappe.throw(
-				_("Bank Deposit is {0}. Withdraw / reject (if pending) or ask COO before editing.").format(
-					prev.status
+				_("Bank Deposit is {0}. Use Workflow Actions to Approve / Reject / Withdraw / Submit.").format(
+					prev.workflow_state or prev.status
 				)
 			)
 
+	def _apply_workflow_side_effects(self):
+		ws = self.workflow_state
+		if ws == "Pending COO Approval":
+			self.submitted_by = frappe.session.user
+			self.submitted_for_approval_on = now_datetime()
+			self.approved_by = None
+			self.approved_on = None
+			self.rejection_reason = None
+			self.approval_remarks = None
+			_notify_coo(self)
+		elif ws == "Approved":
+			self.approved_by = frappe.session.user
+			self.approved_on = now_datetime()
+			self.rejection_reason = None
+		elif ws == "Rejected":
+			self.approved_by = frappe.session.user
+			self.approved_on = now_datetime()
+		elif ws == "Draft":
+			self.submitted_by = None
+			self.submitted_for_approval_on = None
+
 	def before_submit(self):
-		if self.status != "Approved":
+		state = self.workflow_state or self.status
+		if state not in ("Approved", "Submitted"):
 			frappe.throw(
-				_("COO must approve this Bank Deposit before submit. Current status: {0}").format(
-					self.status
+				_("COO must approve this Bank Deposit via Workflow before submit. Current state: {0}").format(
+					state
 				)
 			)
 		if not self.donations:
@@ -63,6 +100,9 @@ class BankDeposit(Document):
 			frappe.throw(_("Total amount must be greater than zero."))
 
 	def on_submit(self):
+		self.db_set("status", "Submitted", update_modified=False)
+		if self.workflow_state != "Submitted":
+			self.db_set("workflow_state", "Submitted", update_modified=False)
 		je = self._create_cash_to_bank_jv()
 		self.db_set("journal_entry", je.name, update_modified=False)
 
@@ -82,7 +122,7 @@ class BankDeposit(Document):
 		if not self.cash_account and settings and settings.cash_account:
 			self.cash_account = settings.cash_account
 		if not self.bank_account and settings and settings.bank_account:
-			self.bank_account = settings.bank_account
+			self.bank_account = _find_bank_account_for_gl(settings.bank_account, self.company)
 		if not self.cost_center:
 			if settings and settings.default_cost_center:
 				self.cost_center = settings.default_cost_center
@@ -90,6 +130,52 @@ class BankDeposit(Document):
 				self.cost_center = frappe.get_cached_value("Company", self.company, "cost_center")
 		if not self.status:
 			self.status = "Draft"
+		if not self.workflow_state:
+			self.workflow_state = self.status if self.status != "Submitted" else "Submitted"
+			if self.status == "Draft":
+				self.workflow_state = "Draft"
+
+	def _sync_bank_account_details(self):
+		if not self.bank_account:
+			self.gl_account = None
+			self.bank_account_no = None
+			self.iban = None
+			return
+		details = frappe.db.get_value(
+			"Bank Account",
+			self.bank_account,
+			["account", "bank_account_no", "iban", "company", "is_company_account"],
+			as_dict=True,
+		)
+		if not details:
+			frappe.throw(_("Bank Account {0} does not exist.").format(self.bank_account))
+		self.gl_account = details.account
+		self.bank_account_no = details.bank_account_no
+		self.iban = details.iban
+
+	def _validate_accounts(self):
+		if not self.deposit_slip_no:
+			frappe.throw(_("Deposit Slip No is mandatory."))
+		if not self.deposit_slip_attachment:
+			frappe.throw(_("Deposit Slip Attachment is mandatory."))
+		if not self.bank_account:
+			frappe.throw(_("Bank Account is mandatory."))
+		if not self.gl_account:
+			frappe.throw(
+				_("GL Account is missing on Bank Account {0}. Set Account on the Bank Account master.").format(
+					self.bank_account
+				)
+			)
+		if self.cash_account and self.gl_account and self.cash_account == self.gl_account:
+			frappe.throw(_("Cash Account and GL Account must be different."))
+		if self.company and self.bank_account:
+			ba_company = frappe.db.get_value("Bank Account", self.bank_account, "company")
+			if ba_company and ba_company != self.company:
+				frappe.throw(
+					_("Bank Account {0} belongs to {1}, not {2}.").format(
+						self.bank_account, ba_company, self.company
+					)
+				)
 
 	def _validate_donations(self):
 		if not self.donations:
@@ -139,10 +225,10 @@ class BankDeposit(Document):
 	def _create_cash_to_bank_jv(self):
 		if not self.cash_account:
 			frappe.throw(_("Cash Account is required."))
-		if not self.bank_account:
-			frappe.throw(_("Bank Account is required."))
-		if self.cash_account == self.bank_account:
-			frappe.throw(_("Cash Account and Bank Account must be different."))
+		if not self.gl_account:
+			frappe.throw(_("GL Account is required."))
+		if self.cash_account == self.gl_account:
+			frappe.throw(_("Cash Account and GL Account must be different."))
 
 		cost_center = self.cost_center or frappe.get_cached_value("Company", self.company, "cost_center")
 		amount = flt(self.total_amount)
@@ -166,7 +252,7 @@ class BankDeposit(Document):
 				"user_remark": user_remark,
 				"accounts": [
 					{
-						"account": self.bank_account,
+						"account": self.gl_account,
 						"debit_in_account_currency": amount,
 						"credit_in_account_currency": 0,
 						"cost_center": cost_center,
@@ -194,6 +280,19 @@ def _get_donation_settings():
 		return frappe.get_single("Donation Settings")
 	except Exception:
 		return None
+
+
+def _find_bank_account_for_gl(gl_account, company=None):
+	if not gl_account:
+		return None
+	filters = {"account": gl_account, "is_company_account": 1}
+	if company:
+		filters["company"] = company
+	name = frappe.db.get_value("Bank Account", filters, "name")
+	if name:
+		return name
+	filters.pop("is_company_account", None)
+	return frappe.db.get_value("Bank Account", filters, "name")
 
 
 def _find_existing_deposit_for_donation(donation, exclude=None):
@@ -332,6 +431,10 @@ def submit_for_coo_approval(name):
 		frappe.throw(_("Add at least one Donation Slip before submitting for approval."))
 	if not doc.deposit_slip_no:
 		frappe.throw(_("Deposit Slip No is required before submitting for COO approval."))
+	if not doc.deposit_slip_attachment:
+		frappe.throw(_("Deposit Slip Attachment is required before submitting for COO approval."))
+	if not doc.bank_account or not doc.gl_account:
+		frappe.throw(_("Bank Account (with GL Account) is required before submitting for COO approval."))
 	if flt(doc.total_amount) <= 0:
 		frappe.throw(_("Total amount must be greater than zero."))
 

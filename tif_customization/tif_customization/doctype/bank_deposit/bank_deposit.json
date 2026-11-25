@@ -12,13 +12,17 @@
   "deposit_date",
   "column_break_main",
   "status",
+  "workflow_state",
   "deposit_slip_no",
   "deposit_slip_attachment",
   "section_accounts",
   "cash_account",
+  "cost_center",
   "column_break_accounts",
   "bank_account",
-  "cost_center",
+  "gl_account",
+  "bank_account_no",
+  "iban",
   "section_donations",
   "donations",
   "section_totals",
@@ -74,20 +78,31 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Status",
-   "options": "Draft\nPending COO Approval\nApproved\nRejected",
+   "options": "Draft\nPending COO Approval\nApproved\nRejected\nSubmitted",
    "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "workflow_state",
+   "fieldtype": "Link",
+   "hidden": 1,
+   "label": "Workflow State",
+   "no_copy": 1,
+   "options": "Workflow State"
   },
   {
    "description": "Bank deposit slip / voucher number from the bank.",
    "fieldname": "deposit_slip_no",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Deposit Slip No"
+   "label": "Deposit Slip No",
+   "reqd": 1
   },
   {
    "fieldname": "deposit_slip_attachment",
    "fieldtype": "Attach",
-   "label": "Deposit Slip Attachment"
+   "label": "Deposit Slip Attachment",
+   "reqd": 1
   },
   {
    "fieldname": "section_accounts",
@@ -103,22 +118,47 @@
    "reqd": 1
   },
   {
-   "fieldname": "column_break_accounts",
-   "fieldtype": "Column Break"
-  },
-  {
-   "description": "Bank account receiving the deposit (debit).",
-   "fieldname": "bank_account",
-   "fieldtype": "Link",
-   "label": "Bank Account",
-   "options": "Account",
-   "reqd": 1
-  },
-  {
    "fieldname": "cost_center",
    "fieldtype": "Link",
    "label": "Cost Center",
    "options": "Cost Center"
+  },
+  {
+   "fieldname": "column_break_accounts",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Company bank account receiving the deposit.",
+   "fieldname": "bank_account",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Bank Account",
+   "options": "Bank Account",
+   "reqd": 1
+  },
+  {
+   "description": "GL Account linked to the selected Bank Account (debit).",
+   "fetch_from": "bank_account.account",
+   "fieldname": "gl_account",
+   "fieldtype": "Link",
+   "label": "GL Account",
+   "options": "Account",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fetch_from": "bank_account.bank_account_no",
+   "fieldname": "bank_account_no",
+   "fieldtype": "Data",
+   "label": "Bank Account No",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "bank_account.iban",
+   "fieldname": "iban",
+   "fieldtype": "Data",
+   "label": "IBAN",
+   "read_only": 1
   },
   {
    "fieldname": "section_donations",
@@ -227,7 +267,7 @@
  "index_web_pages_for_search": 0,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-11-25 10:00:00.000000",
+ "modified": "2026-11-25 11:35:00.000000",
  "modified_by": "Administrator",
  "module": "Tif Customization",
  "name": "Bank Deposit",
@@ -308,6 +348,10 @@
   {
    "color": "Red",
    "title": "Rejected"
+  },
+  {
+   "color": "Green",
+   "title": "Submitted"
   }
  ],
  "track_changes": 1
