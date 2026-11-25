@@ -421,11 +421,37 @@ def attendance_by_employee(employees, end_date):
 			continue
 
 		doc = frappe.get_doc("Employee Attendance", ea_name)
-		half_day_deduction = _uncovered_half_day_deduction(doc)
-		charged_days = flt(doc.total_absents) + half_day_deduction + flt(doc.lates_for_absent)
+		# Align with Monthly Attendance Summary: ignore days before DOJ / after relieving
+		try:
+			from hr_vfg.hr_ventureforce_global.report.monthly_attendance_summary.monthly_attendance_summary import (
+				_count_flag_in_period,
+				_eligible_days_in_period,
+				_employment_bounds,
+				_lates_for_absent_in_period,
+				_uncovered_half_day_deduction as _mas_half,
+			)
+
+			bounds = _employment_bounds(emp_name)
+			doj = bounds.get("date_of_joining")
+			relieving = bounds.get("relieving_date")
+			eligible = _eligible_days_in_period(doc, doj, relieving)
+			month_days = flt(eligible) if (doj or relieving) and eligible > 0 else flt(doc.month_days)
+			half_day_deduction = _mas_half(doc, doj, relieving)
+			absents = (
+				_count_flag_in_period(doc, "absent", doj, relieving)
+				if (doj or relieving)
+				else flt(doc.total_absents)
+			)
+			lates_for_absent = _lates_for_absent_in_period(doc, doj, relieving)
+		except Exception:
+			half_day_deduction = _uncovered_half_day_deduction(doc)
+			absents = flt(doc.total_absents)
+			lates_for_absent = flt(doc.lates_for_absent)
+			month_days = flt(doc.month_days)
+
+		charged_days = flt(absents) + half_day_deduction + flt(lates_for_absent)
 		unsynced_leave_days = _unsynced_leave_credit(doc, leave_map.get(emp_name) or [])
 		deduction_days = max(0.0, charged_days - unsynced_leave_days)
-		month_days = flt(doc.month_days)
 		# Same payable rule as Monthly Attendance Summary (as-per-need = days worked)
 		payable_days = _payable_days_from_attendance(doc, month_days, deduction_days, unsynced_leave_days)
 
@@ -436,9 +462,9 @@ def attendance_by_employee(employees, end_date):
 			"payable_days": payable_days,
 			"present_days": flt(doc.present_days),
 			"deduction_days": deduction_days,
-			"total_absents": flt(doc.total_absents),
+			"total_absents": flt(absents),
 			"half_day_deduction": half_day_deduction,
-			"lates_for_absent": flt(doc.lates_for_absent),
+			"lates_for_absent": flt(lates_for_absent),
 			"leave_days": flt(doc.total_leaves) + unsynced_leave_days,
 			"unsynced_leave_days": unsynced_leave_days,
 			"total_working_days": flt(doc.total_working_days) or month_days,
