@@ -474,51 +474,117 @@ def attendance_by_employee(employees, end_date):
 			"attendance_month": month_str,
 			"attendance_year": year,
 		}
+		out[emp_name]["fuel_daily_off_days"] = _fuel_off_days_from_rows(doc, emp_name)
+		# Used by the portal to recompute Fuel Deduction live when Fuel is edited.
+		out[emp_name]["fuel_off_days"] = _fuel_absent_days(out[emp_name])
+		out[emp_name]["fuel_base_days"] = _fuel_deduction_base_days(out[emp_name])
 	return out
 
 
-def _fuel_deduction_base_days(attendance):
+FUEL_BASE_DAYS = 30
+
+
+def _fuel_deduction_base_days(attendance=None):
 	"""
-	Per-day fuel rate uses calendar month days (30/31), matching the salary sheet.
-	Working days are used only to detect how many days were missed.
+	Per-day fuel rate is always fuel / 30, whatever the month length (28/30/31).
+	e.g. fuel 15,000, 2 days leave → 15,000 / 30 × 2 = 1,000 deducted (28 days paid).
 	"""
-	month = flt(attendance.get("month_days"))
-	if month > 0:
-		return month
-	return flt(attendance.get("total_working_days"))
+	return FUEL_BASE_DAYS
+
+
+def _fuel_off_days_from_rows(doc, emp_name):
+	"""
+	Fuel off-days counted day by day from the attendance rows.
+
+	A day the employee was absent / on leave and never checked in counts as a
+	FULL day — including Saturday, even though Saturday is a half working day
+	(a Saturday leave is a 0.5 leave application, but no fuel was used at all).
+	A day they checked in but took a half-day leave counts 0.5.
+	A day they checked in without leave (late / early / missing checkout flagged
+	as half day) counts 0 — they came, so fuel was used.
+	Weekly offs, public holidays and days outside employment are skipped.
+	Returns None when the attendance has no daily rows.
+	"""
+	rows = doc.get("table1") or []
+	if not rows:
+		return None
+	doj, relieving = frappe.db.get_value(
+		"Employee", emp_name, ["date_of_joining", "relieving_date"]
+	) or (None, None)
+	days = 0.0
+	for r in rows:
+		if cint(r.get("weekly_off")) or cint(r.get("public_holiday")):
+			continue
+		day = getdate(r.get("date")) if r.get("date") else None
+		if day and ((doj and day < getdate(doj)) or (relieving and day > getdate(relieving))):
+			continue
+		missed = (
+			cint(r.get("absent"))
+			or cint(r.get("mark_absent"))
+			or cint(r.get("mark_leave"))
+			or cint(r.get("half_day"))
+			or cint(r.get("mark_half_day"))
+		)
+		if not missed:
+			continue
+		came_in = bool(str(r.get("check_in_1") or "").strip() or str(r.get("check_out_1") or "").strip())
+		if not came_in:
+			days += 1.0
+		elif cint(r.get("mark_leave")):
+			days += 0.5
+	return days
 
 
 def _fuel_absent_days(attendance):
 	"""
-	Days that should reduce fuel allowance.
-	Prefer attendance deduction_days (absents / half / late after leave credit).
-	If that is 0 but present < working days, use the gap (common when absents
-	are not flagged but days were not worked).
+	Days that should reduce fuel allowance: every day the employee did not come
+	to work, whether absent or on leave (fuel is not paid for those days).
+
+	Preferred: day-by-day count from attendance rows (_fuel_off_days_from_rows),
+	so a missed Saturday counts as a full day.
+	Fallback = absents + uncovered half days + leave days (full / half, paid or unpaid).
+	Unlike the salary deduction, approved leave is NOT credited back here.
+	Approved leave that attendance still marks absent (unsynced) is already in
+	the absents count, so it is not added twice. Lates-for-absent are excluded
+	because the employee did come in.
+	If nothing is flagged but present < working days, use the gap.
 	"""
-	deduction_days = flt(attendance.get("deduction_days"))
-	if deduction_days > 0:
-		return deduction_days
+	working = flt(attendance.get("total_working_days"))
+	daily = attendance.get("fuel_daily_off_days")
+	if daily is not None:
+		days = flt(daily)
+		return min(days, working) if working > 0 else days
+
+	absents = flt(attendance.get("total_absents"))
+	half_days = flt(attendance.get("half_day_deduction"))
+	leave_days = max(
+		0.0, flt(attendance.get("leave_days")) - flt(attendance.get("unsynced_leave_days"))
+	)
+	days = absents + half_days + leave_days
 
 	working = flt(attendance.get("total_working_days"))
-	present = flt(attendance.get("present_days"))
-	if working > 0 and present >= 0 and working > present:
-		return working - present
-	return 0.0
+	if days <= 0:
+		present = flt(attendance.get("present_days"))
+		if working > 0 and present >= 0 and working > present:
+			days = working - present
+	if working > 0:
+		days = min(days, working)
+	return days
 
 
 def compute_fuel_deduction(fuel_amount, attendance):
 	"""
-	Fuel deduction = (fuel allowance / month days) × absent days.
+	Fuel deduction = (fuel allowance / 30) × days absent or on leave.
 
-	Example: month 30 days, fuel 15,000, absent/leave 2 days
-	→ 15,000 / 30 × 2 = 1,000.
-	Absent days come from attendance (or working−present when absents are blank).
+	Always 30 days, even in a 31-day month: fuel 15,000, 2 days absent/leave
+	→ 15,000 / 30 × 2 = 1,000 deducted, employee paid for 28 days.
+	Days come from attendance (or working−present when nothing is flagged).
 	"""
 	fuel_amount = flt(fuel_amount)
 	if fuel_amount <= 0 or not attendance or not attendance.get("has_attendance"):
 		return 0.0
 	base_days = _fuel_deduction_base_days(attendance)
-	absent_days = _fuel_absent_days(attendance)
+	absent_days = min(_fuel_absent_days(attendance), base_days)
 	if base_days <= 0 or absent_days <= 0:
 		return 0.0
 	return round(fuel_amount / base_days * absent_days, 2)

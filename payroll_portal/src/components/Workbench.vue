@@ -319,7 +319,40 @@ function buildPayload() {
 	return { variable_entries, payment_entries, employees };
 }
 
+/** Fuel not paid for days absent / on leave: fuel ÷ 30 × off days (always 30). */
+function autoFuelDeduction(row, fuel) {
+	const att = row.attendance || {};
+	const base = Number(att.fuel_base_days || 30);
+	const off = Math.min(Number(att.fuel_off_days || 0), base);
+	if (!att.has_attendance || !(fuel > 0) || !(base > 0) || !(off > 0)) return 0;
+	return Math.round((fuel / base) * off * 100) / 100;
+}
+
+/** Remember loaded Fuel so a later Fuel edit can refresh the auto deduction. */
+function primeFuel(rows) {
+	for (const r of rows) {
+		if (!r || !r.amounts) continue;
+		r._lastFuel = Number(r.amounts.fuel || 0);
+	}
+}
+
+function syncFuelDeduction(row) {
+	const amounts = row.amounts || {};
+	if (!("fuel" in amounts) || !("fuel_ded" in amounts)) return;
+	const fuel = Number(amounts.fuel || 0);
+	const prevFuel = row._lastFuel ?? fuel;
+	if (fuel === prevFuel) return;
+	// Only replace the deduction if HR has not typed their own value.
+	const current = Number(amounts.fuel_ded || 0);
+	const expectedPrev = autoFuelDeduction(row, prevFuel);
+	if (current === 0 || Math.abs(current - expectedPrev) < 0.01) {
+		amounts.fuel_ded = autoFuelDeduction(row, fuel);
+	}
+	row._lastFuel = fuel;
+}
+
 function recalcRow(row) {
+	syncFuelDeduction(row);
 	const amounts = row.amounts || {};
 	const earnKeys = (sheet.value?.earnings || []).map((c) => c.key);
 	const dedKeys = (sheet.value?.deductions || []).map((c) => c.key).filter((k) => k !== "pf");
@@ -459,11 +492,57 @@ async function load() {
 		const ded = (sheet.value.deductions || []).filter((c) => !c.readonly && c.key !== "pf");
 		editableKeys.value = [...earn, ...ded];
 		ensureAmountFilters(editableKeys.value);
+		for (const sec of sheet.value.sections || []) primeFuel(sec.rows || []);
 	} catch (e) {
 		error.value = e.message || String(e);
 		sheet.value = null;
 	} finally {
 		loading.value = false;
+	}
+}
+
+/** Fill blank fixed allowances + recompute fuel / leave deductions from attendance. */
+async function computeSheet() {
+	if (!sheet.value) return;
+	saving.value = true;
+	error.value = "";
+	ok.value = "";
+	try {
+		const all = [];
+		for (const sec of sheet.value.sections || []) {
+			for (const r of sec.rows || []) {
+				if (r && r.employee && !r.has_issue) all.push(r);
+			}
+		}
+		const res = await apiPost(m("compute_sheet"), {
+			...periodArgs(),
+			rows: JSON.stringify(all.map((r) => ({ employee: r.employee, amounts: r.amounts || {} }))),
+		});
+		const byEmp = res?.rows || {};
+		for (const r of all) {
+			const c = byEmp[r.employee];
+			if (!c) continue;
+			r.amounts = { ...(r.amounts || {}), ...c.amounts };
+			if (c.attendance) r.attendance = c.attendance;
+			r._lastFuel = Number(r.amounts.fuel || 0);
+			recalcRow(r);
+		}
+		const s = res?.summary || {};
+		const parts = [];
+		if (s.fuel_filled) parts.push(`${s.fuel_filled} fuel filled`);
+		if (s.mobile_filled) parts.push(`${s.mobile_filled} mobile filled`);
+		if (s.other_allowance_filled) parts.push(`${s.other_allowance_filled} allowance filled`);
+		if (s.tax_filled) parts.push(`${s.tax_filled} tax filled`);
+		if (s.fuel_ded_updated) parts.push(`${s.fuel_ded_updated} fuel deductions updated`);
+		if (s.leave_ded_updated) parts.push(`${s.leave_ded_updated} leave deductions updated`);
+		if (s.no_attendance) parts.push(`${s.no_attendance} without attendance`);
+		ok.value =
+			(parts.length ? `Computed: ${parts.join(", ")}.` : "Computed: nothing to change.") +
+			" Click Save draft to keep these values.";
+	} catch (e) {
+		error.value = e.message || String(e);
+	} finally {
+		saving.value = false;
 	}
 }
 
@@ -617,6 +696,16 @@ onMounted(async () => {
 							@click="run('load_roster')"
 						>
 							Reload roster
+						</button>
+						<button
+							v-if="canSave"
+							class="pp-btn pp-btn-ghost"
+							type="button"
+							:disabled="saving || loading"
+							title="Fill blank Fuel / Mobile / Allowance from last month, and recompute Fuel and Leave deductions from attendance"
+							@click="computeSheet"
+						>
+							Compute
 						</button>
 						<button
 							v-if="canSave"

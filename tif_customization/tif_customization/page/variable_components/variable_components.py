@@ -3,7 +3,7 @@ from collections import defaultdict
 
 import frappe
 from frappe import _
-from frappe.utils import cint, flt, formatdate, getdate
+from frappe.utils import add_days, add_months, cint, flt, formatdate, getdate
 
 from tif_customization.tif_customization.page.salary_register.salary_register import (
 	_employment_status,
@@ -24,6 +24,7 @@ from tif_customization.tif_customization.page.variable_components.variable_compo
 )
 from tif_customization.tif_customization.page.variable_components.variable_components_roster import (
 	apply_attendance_to_amounts,
+	compute_fuel_deduction,
 	attendance_by_employee,
 	create_custom_period,
 	employee_payroll_block_reason,
@@ -730,6 +731,137 @@ def get_variable_sheet_data(month=None, year=None, company=None, start_date=None
 		"approval": _approval_flags(period_status),
 		"month_kpis": _payroll_register_month_kpis(company, start_date, end_date, limit=6),
 	}
+
+
+# Fixed monthly amounts carried forward from the employee's last payroll when blank.
+CARRY_FORWARD_KEYS = ("fuel", "mobile", "other_allowance")
+
+
+def _last_amounts_before(employee_ids, key_map, keys, before_date, company=None):
+	"""Latest submitted Additional Salary amount per employee/key in the previous cycle."""
+	comp_to_key = {key_map[k]: k for k in keys if key_map.get(k)}
+	if not comp_to_key or not employee_ids:
+		return {}
+	rows = frappe.get_all(
+		"Additional Salary",
+		filters={
+			"employee": ["in", employee_ids],
+			"salary_component": ["in", list(comp_to_key)],
+			# previous payroll cycle only, so stopped allowances are not revived
+			"payroll_date": ["between", [add_months(getdate(before_date), -1), add_days(getdate(before_date), -1)]],
+			"docstatus": 1,
+			"amount": [">", 0],
+			**({"company": company} if company else {}),
+		},
+		fields=["employee", "salary_component", "amount"],
+		order_by="payroll_date desc, modified desc",
+	)
+	out = defaultdict(dict)
+	for r in rows:
+		key = comp_to_key.get(r.salary_component)
+		if key and key not in out[r.employee]:
+			out[r.employee][key] = flt(r.amount)
+	return out
+
+
+def compute_period_amounts(company=None, start_date=None, end_date=None, rows=None):
+	"""
+	Recompute the Amend Payroll sheet for the rows the user has on screen.
+
+	- Fuel / Mobile / Allowance left blank → last month's amount (fixed allowances).
+	- Tax left blank → Employee income tax, else last month's tax.
+	- Fuel Deduction, Leave / Absents → always recomputed from attendance
+	  (fuel is not paid for absent / leave days).
+	- PF → recomputed from gross.
+	Nothing is saved; the user reviews and clicks Save draft.
+	"""
+	import json
+
+	if isinstance(rows, str):
+		rows = json.loads(rows or "[]")
+	rows = rows or []
+	start_date, end_date = _resolve_period_dates(None, None, start_date, end_date)
+	company = company or frappe.defaults.get_global_default("company")
+
+	earnings, deductions = resolve_component_names()
+	arrear_2_col = resolve_arrear_2_column()
+	key_map = _key_to_component(earnings, deductions, arrear_2_col)
+	earning_keys = [c["key"] for c in earnings]
+
+	employee_ids = [r.get("employee") for r in rows if r.get("employee")]
+	if not employee_ids:
+		return {"rows": {}, "summary": {}}
+
+	emp_fields = ["name", "employee_name"]
+	if frappe.db.has_column("Employee", "income_tax"):
+		emp_fields.append("income_tax")
+	employees = frappe.get_all("Employee", filters={"name": ["in", employee_ids]}, fields=emp_fields)
+	emp_by_name = {e.name: e for e in employees}
+
+	attendance_map = attendance_by_employee(employees, end_date)
+	slip_salary = _salary_reference_by_employee(employees, start_date, end_date, company)
+	last = _last_amounts_before(
+		employee_ids, key_map, CARRY_FORWARD_KEYS + ("tax",), start_date, company
+	)
+
+	summary = defaultdict(int)
+	out = {}
+	for row in rows:
+		emp_name = row.get("employee")
+		emp = emp_by_name.get(emp_name)
+		if not emp:
+			continue
+		amounts = {k: flt(v) for k, v in (row.get("amounts") or {}).items()}
+		changed = []
+
+		for key in CARRY_FORWARD_KEYS:
+			if key in key_map and amounts.get(key, 0) <= 0 and last.get(emp_name, {}).get(key):
+				amounts[key] = last[emp_name][key]
+				changed.append(key)
+				summary[f"{key}_filled"] += 1
+
+		if "tax" in key_map and amounts.get("tax", 0) <= 0:
+			tax = flt(getattr(emp, "income_tax", None) or 0) or last.get(emp_name, {}).get("tax", 0)
+			if tax > 0:
+				amounts["tax"] = tax
+				changed.append("tax")
+				summary["tax_filled"] += 1
+
+		salary_row = slip_salary.get(emp_name, {})
+		base_gross = (
+			flt(salary_row.get("assignment_gross"))
+			or flt(salary_row.get("perm_gross"))
+			or flt(salary_row.get("gross_pay"))
+		)
+		att = attendance_map.get(emp_name) or {}
+		if att.get("has_attendance"):
+			if "fuel_ded" in key_map:
+				new_fuel_ded = compute_fuel_deduction(amounts.get("fuel", 0), att)
+				if abs(new_fuel_ded - amounts.get("fuel_ded", 0)) >= 0.01:
+					changed.append("fuel_ded")
+					summary["fuel_ded_updated"] += 1
+				amounts["fuel_ded"] = new_fuel_ded
+			if "leave_ded" in key_map:
+				month_days = flt(att.get("month_days"))
+				deduction_days = flt(att.get("deduction_days"))
+				new_leave = 0.0
+				if month_days > 0 and deduction_days > 0 and base_gross:
+					new_leave = round(base_gross / month_days * deduction_days, 2)
+				if abs(new_leave - amounts.get("leave_ded", 0)) >= 0.01:
+					changed.append("leave_ded")
+					summary["leave_ded_updated"] += 1
+				amounts["leave_ded"] = new_leave
+		else:
+			summary["no_attendance"] += 1
+
+		gross_pay = base_gross + flt(amounts.get("arrear_2"))
+		amounts["pf"] = compute_pf_deduction_amount(emp_name, gross_pay, assigned_base=base_gross)
+
+		out[emp_name] = {"amounts": amounts, "changed": changed, "attendance": att}
+		if changed:
+			summary["rows_changed"] += 1
+
+	return {"rows": out, "summary": dict(summary)}
 
 
 def _empty_response(month_label, start_date, end_date, company, earnings, deductions, roster_meta=None):

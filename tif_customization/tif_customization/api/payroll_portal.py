@@ -214,6 +214,21 @@ def get_sheet(company=None, start_date=None, end_date=None, month=None, year=Non
 
 
 @frappe.whitelist()
+def compute_sheet(company=None, start_date=None, end_date=None, rows=None):
+	"""Fill blank fixed allowances and recompute attendance deductions (not saved)."""
+	_assert_portal_access()
+	roles = set(frappe.get_roles())
+	if not (
+		roles & {"System Manager", "HR Manager", "HR User", "Accounts Manager"}
+		or frappe.session.user == "Administrator"
+	):
+		frappe.throw(_("Not permitted to edit payroll."), frappe.PermissionError)
+	return _vc("compute_period_amounts")(
+		company=company, start_date=start_date, end_date=end_date, rows=rows
+	)
+
+
+@frappe.whitelist()
 def save_draft(
 	company=None,
 	start_date=None,
