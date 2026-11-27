@@ -2009,3 +2009,43 @@ table.pp-table input.cell:focus {
 		align-items: center;
 	}
 }
+
+/* Read-only (calculated / salary) columns in the amend-payroll workbench */
+.wb-table td.wb-ro-col,
+.wb-table th.wb-ro-col {
+	background: rgba(127, 127, 127, 0.06);
+	white-space: nowrap;
+}
+
+/* Sticky Employee/Dept header cells must sit above scrolled header cells.
+   `.wb-table thead tr:first-child th` (z 5) out-ranked `.wb-table thead .wb-sticky`. */
+.wb-table thead tr:first-child th.wb-sticky {
+	z-index: 9;
+	background: #f7f9fc;
+}
+.wb-table thead tr.wb-filter-row th.wb-sticky {
+	z-index: 9;
+	background: #eef3f8;
+}
+
+/* Field Officers (21–20) rows merged read-only into Amend Payroll */
+.wb-table td.pp-section-label.wb-fo-section {
+	background: #eef2ff;
+	color: #3730a3;
+}
+.wb-fo-note {
+	margin-left: 0.6rem;
+	font-weight: 400;
+	font-size: 0.78em;
+	opacity: 0.8;
+}
+.wb-fo-tag {
+	display: inline-block;
+	margin-left: 0.35rem;
+	padding: 0 0.4rem;
+	border-radius: 999px;
+	background: #e0e7ff;
+	color: #3730a3;
+	font-size: 0.72em;
+	font-weight: 600;
+}

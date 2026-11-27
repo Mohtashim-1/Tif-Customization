@@ -46,11 +46,12 @@ const years = computed(() => {
 	return [y - 1, y, y + 1];
 });
 
-const cycleHint = computed(() =>
-	form.cycle_type === "starts_on_26th"
-		? "Period starts on the 26th of the selected month."
-		: "Payroll month uses previous 26th → selected month 25th (TIF cycle)."
-);
+const cycleHint = computed(() => {
+	if (form.cycle_type === "starts_on_26th") return "Period starts on the 26th of the selected month.";
+	if (form.cycle_type === "field_officer")
+		return "Field officers only (OTR): previous 21st → selected month 20th. Opens in the Field Officers menu.";
+	return "Payroll month uses previous 26th → selected month 25th (TIF cycle). Field officers are not included.";
+});
 
 const importMonthLabel = computed(() => {
 	const mo = months.find((x) => x.v === importForm.month);
@@ -184,7 +185,7 @@ onMounted(refreshPreview);
 		<div class="pp-topbar">
 			<div>
 				<h1>Create Payroll</h1>
-				<p>Open a new 26th–25th cycle, load the employee roster, then amend amounts in the workbench.</p>
+				<p>Open a new 26th–25th cycle (or a 21st–20th Field Officers cycle), load the employee roster, then amend amounts in the workbench.</p>
 			</div>
 			<button class="pp-btn pp-btn-ghost" type="button" @click="emit('cancel')">Back</button>
 		</div>
@@ -216,6 +217,7 @@ onMounted(refreshPreview);
 							<select v-model="form.cycle_type">
 								<option value="tif_payroll_month">TIF payroll month (26 → 25)</option>
 								<option value="starts_on_26th">Starts on 26th of month</option>
+								<option value="field_officer">Field Officers (21 → 20)</option>
 							</select>
 							<p class="pp-hint" style="margin-top: 0.4rem">{{ cycleHint }}</p>
 						</div>

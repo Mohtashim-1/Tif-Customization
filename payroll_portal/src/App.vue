@@ -8,7 +8,7 @@ import SalarySlips from "./components/SalarySlips.vue";
 import tifLogo from "./assets/tif_logo.png";
 
 const boot = window.payroll_portal_boot || {};
-const page = ref("dashboard"); // dashboard | create | workbench | sp_edu | slips
+const page = ref("dashboard"); // dashboard | create | workbench | sp_edu | field | slips
 const company = ref(boot.company || "");
 const session = ref({
 	full_name: boot.full_name || boot.user || "",
@@ -18,18 +18,29 @@ const session = ref({
 	can_finalize: true,
 });
 const activePeriod = ref(null);
+const activeFieldPeriod = ref(null);
 const bootError = ref("");
 const navCollapsed = ref(localStorage.getItem("pp_nav_collapsed") === "1");
 
 const menus = [
 	{ id: "dashboard", title: "Dashboard", sub: "Payroll Register", short: "Dash" },
-	{ id: "create", title: "Run Payroll", sub: "New 26–25 cycle", short: "Run" },
+	{ id: "create", title: "Run Payroll", sub: "New 26–25 / 21–20 cycle", short: "Run" },
 	{ id: "workbench", title: "Amend Payroll", sub: "Main staff sheet", short: "Amend" },
 	{ id: "sp_edu", title: "Special Education", sub: "Sp Edu payroll", short: "SpEd" },
+	{ id: "field", title: "Field Officers", sub: "21–20 cycle", short: "Field" },
 	{ id: "slips", title: "Salary Slips", sub: "View & print slips", short: "Slips" },
 ];
 
-const isWorkbenchPage = computed(() => page.value === "workbench" || page.value === "sp_edu");
+const isWorkbenchPage = computed(() => ["workbench", "sp_edu", "field"].includes(page.value));
+
+/** 21st → 20th periods belong to the Field Officers menu. */
+function isFieldOfficerPeriod(p) {
+	if (!p) return false;
+	if (p.segment) return p.segment === "field_officer";
+	const s = String(p.start_date || "");
+	const e = String(p.end_date || "");
+	return s.slice(8, 10) === "21" && e.slice(8, 10) === "20";
+}
 
 function go(id) {
 	page.value = id;
@@ -41,13 +52,17 @@ function toggleNav() {
 }
 
 function openPeriod(p) {
+	if (isFieldOfficerPeriod(p)) {
+		activeFieldPeriod.value = p;
+		page.value = "field";
+		return;
+	}
 	activePeriod.value = p;
 	page.value = "workbench";
 }
 
 function onCreated(p) {
-	activePeriod.value = p;
-	page.value = "workbench";
+	openPeriod(p);
 }
 
 onMounted(async () => {
@@ -124,6 +139,16 @@ onMounted(async () => {
 				@cancel="go('dashboard')"
 			/>
 			<SalarySlips v-else-if="page === 'slips'" :company="company" />
+			<Workbench
+				v-else-if="page === 'field'"
+				:company="company"
+				:period="activeFieldPeriod"
+				:can-edit="session.can_edit"
+				:can-approve="session.can_approve"
+				:can-finalize="session.can_finalize"
+				segment="field_officer"
+				@back="go('dashboard')"
+			/>
 			<Workbench
 				v-else-if="page === 'sp_edu'"
 				:company="company"

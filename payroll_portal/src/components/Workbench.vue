@@ -37,6 +37,52 @@ const ok = ref("");
 const sheet = ref(null);
 const search = ref("");
 const editableKeys = ref([]);
+/** Field Officers (21–20) sheet shown read-only at the bottom of Amend Payroll. */
+const foSheet = ref(null);
+const foPeriod = ref(null);
+
+/**
+ * Every column of the sheet in Excel order:
+ * Gross (Perm) · Gross (Contract) · Arrear 2 · earnings · Gross · Days Worked ·
+ * deductions (incl. read-only PF) · Total Deduction.  (Net + Mode render after.)
+ * kind: info = r.salary[key], amount = r.amounts[key], calc = r[field].
+ */
+const displayCols = computed(() => {
+	const s = sheet.value;
+	if (!s) return [];
+	const editable = new Set(editableKeys.value.map((c) => c.key));
+	const navIdx = Object.create(null);
+	editableKeys.value.forEach((c, i) => (navIdx[c.key] = i));
+	const amt = (c) => ({
+		key: c.key,
+		label: c.label,
+		kind: "amount",
+		editable: editable.has(c.key),
+		navIdx: navIdx[c.key],
+	});
+	const salary = s.salary_columns || [];
+	const info = (key) => {
+		const c = salary.find((x) => x.key === key);
+		return c ? [{ key, label: c.label, kind: "info" }] : [];
+	};
+	const arrear2 = salary.find((x) => x.key === "arrear_2");
+	return [
+		...info("perm_gross"),
+		...info("contract_gross"),
+		...(arrear2 ? [amt(arrear2)] : []),
+		...(s.earnings || []).map(amt),
+		{ key: "_gross", label: "Gross", kind: "calc", field: "projected_gross_pay", strong: true },
+		...info("payment_days"),
+		...(s.deductions || []).map(amt),
+		{ key: "_total_ded", label: "Total Deduction", kind: "calc", field: "projected_total_deduction" },
+	];
+});
+
+function cellValue(r, col) {
+	if (col.kind === "amount") return r.amounts?.[col.key];
+	if (col.kind === "calc") return r[col.field];
+	return r.salary?.[col.key] ?? r.attendance?.[col.key];
+}
 const periodList = ref([]);
 const localPeriod = ref(null);
 const showFilters = ref(true);
@@ -85,19 +131,52 @@ const flatRows = computed(() => {
 		}
 		if (rows.length) {
 			out.push({ _type: "section", label: sec.label });
-			for (const r of rows) out.push({ _type: "row", ...r });
+			// Push the reactive row itself (not a copy) so recalcRow's gross/net
+			// updates re-render and survive recomputes of this list.
+			for (const r of rows) out.push(r);
+		}
+	}
+	if (segment === "main" && foSheet.value) {
+		const tag = `Field Officers (${foPeriod.value?.label || "21–20 cycle"})`;
+		for (const sec of foSheet.value.sections || []) {
+			const rows = (sec.rows || []).filter((r) => r && r.employee);
+			if (!rows.length) continue;
+			out.push({ _type: "section", label: `${tag} · ${sec.label}`, _fo: true });
+			for (const r of rows) out.push(r);
 		}
 	}
 	return out;
 });
 
+const isFieldSegment = computed(() => props.segment === "field_officer");
 const pageTitle = computed(() =>
-	props.segment === "special_education" ? "Special Education Payroll" : "Amend Payroll"
+	props.segment === "special_education"
+		? "Special Education Payroll"
+		: isFieldSegment.value
+			? "Field Officers Payroll"
+			: "Amend Payroll"
 );
 const pageSubtitle = computed(() =>
 	props.segment === "special_education"
 		? "Sp Edu staff only — amounts are editable; save keeps your adjustments."
-		: null
+		: isFieldSegment.value
+			? "Field officers (OTR) are paid on a 21st → 20th cycle."
+			: null
+);
+
+function isFieldOfficerPeriod(p) {
+	if (!p) return false;
+	if (p.segment) return p.segment === "field_officer";
+	const s = String(p.start_date || "");
+	const e = String(p.end_date || "");
+	return s.slice(8, 10) === "21" && e.slice(8, 10) === "20";
+}
+
+/** Field Officers menu lists only 21–20 periods; other menus hide them. */
+const visiblePeriods = computed(() =>
+	(periodList.value || []).filter((p) =>
+		isFieldSegment.value ? isFieldOfficerPeriod(p) : !isFieldOfficerPeriod(p)
+	)
 );
 
 const activeFilterCount = computed(() => {
@@ -147,12 +226,11 @@ function rowMatchesFilters(r) {
 	if (!matchText(`${r.employee_name || ""} ${r.employee || ""}`, colFilter.employee)) return false;
 	if (!matchText(r.department, colFilter.department)) return false;
 	if (!matchText(r.serial, colFilter.serial)) return false;
-	if (!matchNumber(r.projected_gross_pay, colFilter.gross)) return false;
 	if (!matchNumber(r.projected_net_pay, colFilter.net)) return false;
 	if (!matchText(r.payment?.payment_mode, colFilter.mode)) return false;
-	for (const col of editableKeys.value) {
+	for (const col of displayCols.value) {
 		const f = colFilter.amounts[col.key];
-		if (!matchNumber(r.amounts?.[col.key], f)) return false;
+		if (!matchNumber(cellValue(r, col), f)) return false;
 	}
 	const q = search.value.trim().toLowerCase();
 	if (q) {
@@ -188,19 +266,21 @@ const totals = computed(() => {
 	let net = 0;
 	let gross = 0;
 	let n = 0;
+	let fo = 0;
 	for (const r of flatRows.value) {
 		if (r._type !== "row") continue;
 		n += 1;
+		if (r._fo) fo += 1;
 		net += Number(r.projected_net_pay || 0);
 		gross += Number(r.projected_gross_pay || 0);
 	}
-	return { n, net, gross };
+	return { n, fo, net, gross };
 });
 
 /** Footer totals for currently visible (filtered) employee rows */
 const tableTotals = computed(() => {
 	const amounts = {};
-	for (const col of editableKeys.value) amounts[col.key] = 0;
+	for (const col of displayCols.value) amounts[col.key] = 0;
 	let gross = 0;
 	let net = 0;
 	let n = 0;
@@ -209,14 +289,14 @@ const tableTotals = computed(() => {
 		n += 1;
 		gross += Number(r.projected_gross_pay || 0);
 		net += Number(r.projected_net_pay || 0);
-		for (const col of editableKeys.value) {
-			amounts[col.key] += Number(r.amounts?.[col.key] || 0);
+		for (const col of displayCols.value) {
+			amounts[col.key] += num(cellValue(r, col));
 		}
 	}
 	return { n, gross, net, amounts };
 });
 
-const colSpan = computed(() => 6 + editableKeys.value.length);
+const colSpan = computed(() => 5 + displayCols.value.length);
 
 function badgeClass(s) {
 	const t = (s || "").toLowerCase();
@@ -284,7 +364,7 @@ function buildPayload() {
 	const hasArrear2 = (sheet.value?.salary_columns || []).some((c) => c.key === "arrear_2");
 
 	for (const r of flatRows.value) {
-		if (r._type !== "row") continue;
+		if (r._type !== "row" || r._fo) continue; // FO rows belong to their own 21–20 period
 		employees.push(r.employee);
 		for (const col of earnDed) {
 			if (col.key === "pf") continue;
@@ -351,24 +431,33 @@ function syncFuelDeduction(row) {
 	row._lastFuel = fuel;
 }
 
-function recalcRow(row) {
+/** Parse a typed cell value: accepts "1,500", " 200 ", "", "-50"; anything else → 0. */
+function num(v) {
+	if (typeof v === "number") return Number.isFinite(v) ? v : 0;
+	const n = parseFloat(String(v ?? "").replace(/[,\s]/g, ""));
+	return Number.isFinite(n) ? n : 0;
+}
+
+function recalcRow(row, src = sheet.value) {
+	if (!row || row._type !== "row") return;
+	if (!row.amounts) row.amounts = {};
 	syncFuelDeduction(row);
-	const amounts = row.amounts || {};
-	const earnKeys = (sheet.value?.earnings || []).map((c) => c.key);
-	const dedKeys = (sheet.value?.deductions || []).map((c) => c.key).filter((k) => k !== "pf");
+	const amounts = row.amounts;
+	const earnKeys = (src?.earnings || []).map((c) => c.key);
+	const dedKeys = (src?.deductions || []).map((c) => c.key).filter((k) => k !== "pf");
 	const base =
-		Number(row.salary?.assignment_gross || row.salary?.perm_gross || row.salary?.gross_pay || 0) ||
-		0;
-	const arrear2 = Number(amounts.arrear_2 || 0);
+		num(row.salary?.assignment_gross) || num(row.salary?.perm_gross) || num(row.salary?.gross_pay);
+	const arrear2 = num(amounts.arrear_2);
 	let varEarn = 0;
-	for (const k of earnKeys) varEarn += Number(amounts[k] || 0);
-	let varDed = Number(amounts.pf || 0) + Number(amounts.tax || 0);
+	for (const k of earnKeys) varEarn += num(amounts[k]);
+	let varDed = num(amounts.pf) + num(amounts.tax);
 	for (const k of dedKeys) {
 		if (k === "tax") continue;
-		varDed += Number(amounts[k] || 0);
+		varDed += num(amounts[k]);
 	}
 	const gross = base + arrear2 + varEarn;
-	const net = gross - varDed;
+	// Same rule as server (_compute_variable_row_totals): net never below 0.
+	const net = Math.max(0, gross - varDed);
 	row.projected_gross_pay = Math.round(gross);
 	row.projected_total_deduction = Math.round(varDed);
 	row.projected_net_pay = Math.round(net);
@@ -376,7 +465,7 @@ function recalcRow(row) {
 }
 
 /** Editable employee rows only (skip section headers) for Excel-style nav */
-const navRows = computed(() => filteredRows.value.filter((r) => r._type === "row"));
+const navRows = computed(() => filteredRows.value.filter((r) => r._type === "row" && !r._fo));
 
 const navIndexByEmployee = computed(() => {
 	const map = Object.create(null);
@@ -490,14 +579,79 @@ async function load() {
 		sheet.value = await apiGet(m("get_sheet"), args);
 		const earn = (sheet.value.earnings || []).filter((c) => !c.readonly);
 		const ded = (sheet.value.deductions || []).filter((c) => !c.readonly && c.key !== "pf");
-		editableKeys.value = [...earn, ...ded];
-		ensureAmountFilters(editableKeys.value);
-		for (const sec of sheet.value.sections || []) primeFuel(sec.rows || []);
+		const arrear2 = (sheet.value.salary_columns || []).find(
+			(c) => c.key === "arrear_2" && c.editable
+		);
+		editableKeys.value = [...(arrear2 ? [arrear2] : []), ...earn, ...ded];
+		ensureAmountFilters(displayCols.value);
+		for (const sec of sheet.value.sections || []) {
+			primeFuel(sec.rows || []);
+			// Server's projected_gross_pay excludes variable earnings; recompute so the
+			// Gross column uses the same formula on load as it does after an edit.
+			for (const r of sec.rows || []) {
+				if (!r) continue;
+				r._type = "row";
+				if (!r.amounts) r.amounts = {};
+				if (!r.payment) r.payment = { payment_mode: "Bank" };
+				if (r.employee && !r.has_issue) recalcRow(r);
+			}
+		}
+		await loadFieldOfficerSheet();
 	} catch (e) {
 		error.value = e.message || String(e);
 		sheet.value = null;
 	} finally {
 		loading.value = false;
+	}
+}
+
+/**
+ * Amend Payroll only: load the matching Field Officers period (same payroll month,
+ * 21st → 20th) read-only. Only periods that already exist are opened, so this never
+ * creates a roster. Field officers are still created, edited and submitted from the
+ * Field Officers menu.
+ */
+async function loadFieldOfficerSheet() {
+	foSheet.value = null;
+	foPeriod.value = null;
+	if (props.segment !== "main" || !sheet.value?.end_date) return;
+	const month = String(sheet.value.end_date).slice(0, 7);
+	const p = (periodList.value || []).find((x) => {
+		const fo = x.segment
+			? x.segment === "field_officer"
+			: String(x.start_date || "").slice(8, 10) === "21" &&
+			  String(x.end_date || "").slice(8, 10) === "20";
+		return fo && String(x.end_date || "").slice(0, 7) === month;
+	});
+	if (!p) return;
+	try {
+		const data = await apiGet(m("get_sheet"), {
+			company: props.company || sheet.value.company_id,
+			start_date: p.start_date,
+			end_date: p.end_date,
+		});
+		const st = data?.period_status?.status || p.status || "Draft";
+		const mainEmps = new Set();
+		for (const sec of sheet.value.sections || [])
+			for (const r of sec.rows || []) if (r?.employee) mainEmps.add(r.employee);
+		for (const sec of data.sections || []) {
+			// Someone on both sheets is shown once (main sheet wins).
+			sec.rows = (sec.rows || []).filter((r) => r?.employee && !mainEmps.has(r.employee));
+			for (const r of sec.rows) {
+				r._type = "row";
+				r._fo = true;
+				r._fo_status = st;
+				if (!r.amounts) r.amounts = {};
+				if (!r.payment) r.payment = { payment_mode: "Bank" };
+			}
+		}
+		foPeriod.value = { ...p, status: st };
+		foSheet.value = data;
+		// Gross/Net with the FO sheet's own components (same rule as the main sheet).
+		for (const sec of foSheet.value.sections || [])
+			for (const r of sec.rows) if (!r.has_issue) recalcRow(r, foSheet.value);
+	} catch {
+		foSheet.value = null;
 	}
 }
 
@@ -646,10 +800,14 @@ onMounted(async () => {
 		<div v-if="!effectivePeriod?.start_date" class="pp-card" style="margin-bottom: 1rem">
 			<div class="pp-section-head"><h2>Open a payroll period</h2></div>
 			<div class="pp-body">
-				<div v-if="!periodList.length" class="pp-empty">
-					No periods found. Create one from the Create Payroll menu.
+				<div v-if="!visiblePeriods.length" class="pp-empty">
+					<template v-if="isFieldSegment">
+						No field officer periods yet. Create one from Run Payroll → Cycle type
+						“Field Officers (21 → 20)”.
+					</template>
+					<template v-else>No periods found. Create one from the Create Payroll menu.</template>
 				</div>
-				<div v-for="p in periodList" :key="`${p.start_date}|${p.end_date}`" class="pp-period-row">
+				<div v-for="p in visiblePeriods" :key="`${p.start_date}|${p.end_date}`" class="pp-period-row">
 					<div>
 						<strong>{{ p.label }}</strong>
 						<div class="pp-hint">{{ p.start_date }} → {{ p.end_date }}</div>
@@ -767,6 +925,9 @@ onMounted(async () => {
 				<div class="pp-kpi-row wb-kpi">
 					<span
 						><strong>{{ totals.n }}</strong> employees
+						<template v-if="totals.fo">
+							({{ totals.n - totals.fo }} main + {{ totals.fo }} field officers)
+						</template>
 						<template v-if="activeFilterCount">
 							· showing <strong>{{ visibleEmployeeCount }}</strong>
 						</template>
@@ -785,10 +946,14 @@ onMounted(async () => {
 								<th class="wb-sticky wb-sticky-1">#</th>
 								<th class="wb-sticky wb-sticky-2">Employee</th>
 								<th class="wb-sticky wb-sticky-3">Dept</th>
-								<th v-for="col in editableKeys" :key="col.key" class="num">
+								<th
+									v-for="col in displayCols"
+									:key="col.key"
+									class="num"
+									:class="{ 'wb-ro-col': !col.editable }"
+								>
 									{{ col.label }}
 								</th>
-								<th class="num">Gross</th>
 								<th class="num">Net</th>
 								<th>Mode</th>
 							</tr>
@@ -820,21 +985,13 @@ onMounted(async () => {
 										title="Filter department"
 									/>
 								</th>
-								<th v-for="col in editableKeys" :key="'f-' + col.key" class="num">
+								<th v-for="col in displayCols" :key="'f-' + col.key" class="num">
 									<input
 										v-model="colFilter.amounts[col.key]"
 										class="wb-filter-input num"
 										type="text"
 										placeholder="e.g. >0"
 										:title="`Filter ${col.label} (supports >, <, >=, <=)`"
-									/>
-								</th>
-								<th class="num">
-									<input
-										v-model="colFilter.gross"
-										class="wb-filter-input num"
-										type="text"
-										placeholder="e.g. >100000"
 									/>
 								</th>
 								<th class="num">
@@ -861,7 +1018,16 @@ onMounted(async () => {
 								:key="r._type === 'section' ? r.label + idx : r.employee"
 							>
 								<tr v-if="r._type === 'section'">
-									<td class="pp-section-label" :colspan="colSpan">{{ r.label }}</td>
+									<td
+										class="pp-section-label"
+										:class="{ 'wb-fo-section': r._fo }"
+										:colspan="colSpan"
+									>
+										{{ r.label }}
+										<span v-if="r._fo" class="wb-fo-note">
+											read-only here · edit in Field Officers menu
+										</span>
+									</td>
 								</tr>
 								<tr
 									v-else
@@ -885,6 +1051,12 @@ onMounted(async () => {
 										<div class="pp-hint">
 											{{ r.employee }}
 											<span v-if="r.has_issue" class="wb-issue-tag">Issue</span>
+											<span
+												v-if="r._fo"
+												class="wb-fo-tag"
+												:title="`Edit in the Field Officers menu · period ${r._fo_status}`"
+												>Field Officer · 21–20</span
+											>
 										</div>
 										<div v-if="r.has_issue" class="wb-issue-msg">{{ r.issue_message }}</div>
 									</td>
@@ -892,40 +1064,42 @@ onMounted(async () => {
 										{{ r.department || "—" }}
 									</td>
 									<td
-										v-for="(col, colIdx) in editableKeys"
+										v-for="col in displayCols"
 										:key="col.key"
 										class="num"
+										:class="{ 'wb-ro-col': !col.editable }"
 									>
 										<input
-											v-if="canSave && !r.has_issue"
+											v-if="col.editable && canSave && !r.has_issue && !r._fo"
 											v-model.number="r.amounts[col.key]"
 											class="cell"
 											type="text"
 											inputmode="decimal"
 											autocomplete="off"
 											:data-nav-row="navIndexByEmployee[r.employee]"
-											:data-nav-col="colIdx"
+											:data-nav-col="col.navIdx"
 											@keydown="
 												onCellKeydown(
 													$event,
 													navIndexByEmployee[r.employee],
-													colIdx,
+													col.navIdx,
 													r
 												)
 											"
+											@input="recalcRow(r)"
 											@change="recalcRow(r)"
 											@focus="$event.target.select()"
 											@wheel="onCellWheel"
 										/>
-										<span v-else>{{ money(r.amounts?.[col.key]) }}</span>
+										<strong v-else-if="col.strong">{{ money(cellValue(r, col)) }}</strong>
+										<span v-else>{{ money(cellValue(r, col)) }}</span>
 									</td>
-									<td class="num">{{ money(r.projected_gross_pay) }}</td>
 									<td class="num">
 										<strong>{{ money(r.projected_net_pay) }}</strong>
 									</td>
 									<td>
 										<select
-											v-if="canSave"
+											v-if="canSave && !r._fo"
 											v-model="r.payment.payment_mode"
 											class="wb-mode"
 											:data-nav-row="navIndexByEmployee[r.employee]"
@@ -957,13 +1131,12 @@ onMounted(async () => {
 								</td>
 								<td class="wb-sticky wb-sticky-3"></td>
 								<td
-									v-for="col in editableKeys"
+									v-for="col in displayCols"
 									:key="'t-' + col.key"
 									class="num"
 								>
 									<strong>{{ money(tableTotals.amounts[col.key]) }}</strong>
 								</td>
-								<td class="num"><strong>{{ money(tableTotals.gross) }}</strong></td>
 								<td class="num"><strong>{{ money(tableTotals.net) }}</strong></td>
 								<td></td>
 							</tr>

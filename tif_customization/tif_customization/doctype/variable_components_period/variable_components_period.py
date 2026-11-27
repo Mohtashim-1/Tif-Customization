@@ -16,8 +16,10 @@ class VariableComponentsPeriod(Document):
 			frappe.throw(_("End Date cannot be before Start Date."))
 		if not self.period_label:
 			end = self.end_date
+			start = self.start_date
+			prefix = "Field Officers · " if (start.day == 21 and end.day == 20) else ""
 			self.period_label = (
-				f"{calendar.month_name[end.month]} {end.year} "
+				f"{prefix}{calendar.month_name[end.month]} {end.year} "
 				f"({formatdate(self.start_date)} – {formatdate(self.end_date)})"
 			)
 		self.payroll_month = self.end_date.month

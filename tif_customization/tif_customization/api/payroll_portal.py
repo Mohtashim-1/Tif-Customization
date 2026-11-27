@@ -34,6 +34,14 @@ def _vc(name):
 	return frappe.get_attr(f"{VC}.{name}")
 
 
+def _segment(start_date, end_date):
+	from tif_customization.tif_customization.page.variable_components.variable_components_roster import (
+		period_segment,
+	)
+
+	return period_segment(start_date, end_date)
+
+
 @frappe.whitelist()
 def portal_boot():
 	_assert_portal_access()
@@ -135,6 +143,7 @@ def get_dashboard(company=None):
 					"month": p.payroll_month,
 					"year": p.payroll_year,
 					"value": f"{p.start_date}|{p.end_date}",
+					"segment": _segment(p.start_date, p.end_date),
 				}
 			)
 
@@ -164,7 +173,7 @@ def get_dashboard(company=None):
 		"salary_slips_this_month": cint(slip_count),
 		"net_pay_this_month": flt(net),
 		"tips": [
-			"Create a 26th–25th payroll period",
+			"Create a 26th–25th payroll period (Field Officers: 21st–20th)",
 			"Load employees (or import Salary Sheet)",
 			"Adjust earnings & deductions, Save draft",
 			"Submit for COO → Approve → Finalize salary slips",
@@ -176,7 +185,10 @@ def get_dashboard(company=None):
 def list_periods(company=None):
 	_assert_portal_access()
 	company = company or frappe.defaults.get_global_default("company")
-	return _vc("get_period_options_for_variable")(company=company)
+	options = _vc("get_period_options_for_variable")(company=company) or []
+	for opt in options:
+		opt["segment"] = _segment(opt.get("start_date"), opt.get("end_date"))
+	return options
 
 
 @frappe.whitelist()

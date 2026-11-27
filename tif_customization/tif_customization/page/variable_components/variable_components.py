@@ -25,6 +25,8 @@ from tif_customization.tif_customization.page.variable_components.variable_compo
 from tif_customization.tif_customization.page.variable_components.variable_components_roster import (
 	apply_attendance_to_amounts,
 	compute_fuel_deduction,
+	field_officer_cycle_dates,
+	period_segment,
 	attendance_by_employee,
 	create_custom_period,
 	employee_payroll_block_reason,
@@ -155,10 +157,13 @@ def get_tif_cycle_dates(year, month, cycle_type="tif_payroll_month"):
 	cycle_type:
 	  - tif_payroll_month: June payroll => 26 May – 25 Jun
 	  - starts_on_26th: period starting 26 Jun => 26 Jun – 25 Jul
+	  - field_officer: Field Officers, Nov payroll => 21 Oct – 20 Nov
 	"""
 	year, month = int(year), int(month)
 	if cycle_type == "starts_on_26th":
 		start, end = period_starting_on_26th(year, month)
+	elif cycle_type == "field_officer":
+		start, end = field_officer_cycle_dates(year, month)
 	else:
 		start, end = tif_26th_cycle_dates(year, month)
 	return {
@@ -176,6 +181,8 @@ def create_variable_period(company=None, start_date=None, end_date=None, year=No
 	if cycle_type and year and month:
 		if cycle_type == "starts_on_26th":
 			start_date, end_date = period_starting_on_26th(year, month)
+		elif cycle_type == "field_officer":
+			start_date, end_date = field_officer_cycle_dates(year, month)
 		else:
 			start_date, end_date = tif_26th_cycle_dates(year, month)
 	elif not (start_date and end_date):
@@ -727,6 +734,7 @@ def get_variable_sheet_data(month=None, year=None, company=None, start_date=None
 			"can_manage": _user_can_manage_roster(),
 		},
 		"period_status": period_status,
+		"segment": period_segment(start_date, end_date),
 		"is_finalized": period_status.get("status") == "Finalized",
 		"approval": _approval_flags(period_status),
 		"month_kpis": _payroll_register_month_kpis(company, start_date, end_date, limit=6),
@@ -894,6 +902,7 @@ def _empty_response(month_label, start_date, end_date, company, earnings, deduct
 			"can_manage": _user_can_manage_roster(),
 		},
 		"period_status": period_status,
+		"segment": period_segment(start_date, end_date),
 		"is_finalized": period_status.get("status") == "Finalized",
 		"approval": _approval_flags(period_status),
 		"month_kpis": _payroll_register_month_kpis(company, start_date, end_date, limit=6),

@@ -31,6 +31,90 @@ def _roster_doctype_exists():
 	return frappe.db.exists("DocType", "Variable Components Roster")
 
 
+# ---------------------------------------------------------------------------
+# Field Officer payroll cycle (21st → 20th)
+# Field officers (OTR department / Field Officer records) are paid on a
+# 21st–20th cycle; everyone else stays on the 26th–25th cycle.
+# Main 26–25 periods ending on/after this date leave field officers out.
+# ---------------------------------------------------------------------------
+FIELD_OFFICER_DEPARTMENT_PREFIX = "Outreach Training"
+MAIN_CYCLE_EXCLUDES_FIELD_OFFICERS_FROM = getdate("2026-11-25")
+
+# OTR / Field Officer staff who stay on the regular 26th → 25th cycle
+# (HR instruction, Nov 2026). They are never moved to the 21–20 sheet.
+FIELD_OFFICERS_ON_MAIN_CYCLE = frozenset(
+	{
+		"HR-EMP-00010",  # Azeem Baig
+		"HR-EMP-00026",  # Naeem Saeed
+		"HR-EMP-00025",  # Abdul Raheem
+		"HR-EMP-00036",  # M. Adnan Munir
+		"HR-EMP-00162",  # Fida Hussain
+		"HR-EMP-00039",  # Muhammad Zubair
+		"HR-EMP-00013",  # Muhammad Zahid
+		"HR-EMP-00159",  # Muhammad Waqas Khan
+		"HR-EMP-00022",  # Muhammad Ajmal
+		"HR-EMP-00187",  # Sami Ullah
+		"HR-EMP-00033",  # Abdul Kabeer
+		"HR-EMP-00188",  # Shafiq ur Rehman
+		"HR-EMP-00255",  # Nazim Uddin
+	}
+)
+
+
+def is_field_officer_period(start_date, end_date):
+	"""A 21st → 20th period is a field officer payroll period."""
+	if not (start_date and end_date):
+		return False
+	start, end = getdate(start_date), getdate(end_date)
+	return start.day == 21 and end.day == 20
+
+
+def field_officer_cycle_dates(year, month):
+	"""Field officer payroll month (by end date): Nov 2026 => 21 Oct 2026 – 20 Nov 2026."""
+	year, month = int(year), int(month)
+	end = getdate(f"{year}-{month:02d}-20")
+	prev = add_months(getdate(f"{year}-{month:02d}-01"), -1)
+	start = getdate(f"{prev.year}-{prev.month:02d}-21")
+	return start, end
+
+
+def field_officer_employee_ids(company=None):
+	"""Active OTR department staff plus anyone linked on an active Field Officer record."""
+	filters = {"status": "Active", "department": ["like", f"{FIELD_OFFICER_DEPARTMENT_PREFIX}%"]}
+	if company:
+		filters["company"] = company
+	ids = set(frappe.get_all("Employee", filters=filters, pluck="name"))
+	if frappe.db.exists("DocType", "Field Officer"):
+		linked = frappe.get_all(
+			"Field Officer",
+			filters={"status": "Active", "employee": ["is", "set"]},
+			pluck="employee",
+		)
+		if linked:
+			emp_filters = {"name": ["in", linked], "status": "Active"}
+			if company:
+				emp_filters["company"] = company
+			ids.update(frappe.get_all("Employee", filters=emp_filters, pluck="name"))
+	return ids - FIELD_OFFICERS_ON_MAIN_CYCLE
+
+
+def period_segment(start_date, end_date):
+	"""'field_officer' for 21–20 periods, else 'main'."""
+	return "field_officer" if is_field_officer_period(start_date, end_date) else "main"
+
+
+def _roster_scope(company, start_date, end_date):
+	"""
+	Which employees belong on this period's roster.
+	Returns (keep_only, leave_out): sets of employee ids, or None.
+	"""
+	if is_field_officer_period(start_date, end_date):
+		return field_officer_employee_ids(company), None
+	if getdate(end_date) >= MAIN_CYCLE_EXCLUDES_FIELD_OFFICERS_FROM:
+		return None, field_officer_employee_ids(company)
+	return None, None
+
+
 def get_active_employees(company, start_date, end_date):
 	"""Active employees for company valid during payroll period."""
 	start_date, end_date = getdate(start_date), getdate(end_date)
@@ -154,6 +238,39 @@ def initialize_period_roster(company, start_date, end_date, force=0):
 		}
 
 	active = get_active_employees(company, start_date, end_date)
+	keep_only, leave_out = _roster_scope(company, start_date, end_date)
+	if keep_only is not None:
+		active = [e for e in active if e.name in keep_only]
+		# Anyone no longer on the 21–20 cycle (e.g. moved back to 26–25) leaves this sheet.
+		for name in frappe.get_all(
+			"Variable Components Roster",
+			filters={
+				"company": company,
+				"start_date": start_date,
+				"end_date": end_date,
+				"employee": ["not in", list(keep_only) or [""]],
+				"excluded": 0,
+				"manually_added": 0,
+			},
+			pluck="name",
+		):
+			frappe.db.set_value("Variable Components Roster", name, "excluded", 1)
+	if leave_out:
+		active = [e for e in active if e.name not in leave_out]
+		# Field officers on a main sheet (not added by hand) move to the 21–20 cycle.
+		for name in frappe.get_all(
+			"Variable Components Roster",
+			filters={
+				"company": company,
+				"start_date": start_date,
+				"end_date": end_date,
+				"employee": ["in", list(leave_out)],
+				"excluded": 0,
+				"manually_added": 0,
+			},
+			pluck="name",
+		):
+			frappe.db.set_value("Variable Components Roster", name, "excluded", 1)
 	created = updated = 0
 	for emp in active:
 		filters = {
@@ -878,7 +995,8 @@ def create_custom_period(company, start_date, end_date):
 		doc.reload()
 
 	end = getdate(end_date)
-	label = doc.period_label or f"{calendar.month_name[end.month]} {end.year} ({formatdate(start_date)} – {formatdate(end_date)})"
+	prefix = "Field Officers · " if is_field_officer_period(start_date, end_date) else ""
+	label = doc.period_label or f"{prefix}{calendar.month_name[end.month]} {end.year} ({formatdate(start_date)} – {formatdate(end_date)})"
 	return {
 		"name": doc.name,
 		"label": label,
