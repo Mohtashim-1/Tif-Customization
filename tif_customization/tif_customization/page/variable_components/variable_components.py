@@ -772,6 +772,42 @@ def _last_amounts_before(employee_ids, key_map, keys, before_date, company=None)
 	return out
 
 
+# Fixed monthly pay that is pro-rated for days outside employment (joining / exit).
+JOINING_PRORATE_KEYS = ("fuel", "mobile", "other_allowance")
+
+
+def employment_gap_days(start_date, end_date, date_of_joining=None, relieving_date=None):
+	"""Calendar days of the period before joining or after relieving."""
+	from frappe.utils import add_days
+
+	start, end = getdate(start_date), getdate(end_date)
+	period_days = (end - start).days + 1
+	gap = 0
+	if date_of_joining and getdate(date_of_joining) > start:
+		gap += (min(getdate(date_of_joining), add_days(end, 1)) - start).days
+	if relieving_date and getdate(relieving_date) < end:
+		gap += (end - max(getdate(relieving_date), add_days(start, -1))).days
+	return max(0, min(gap, period_days))
+
+
+def joining_exit_deduction(base_gross, amounts, gap_days):
+	"""
+	TIF rule (as on past sheets / slips): (gross + fixed allowances) / 30 x days not employed.
+	e.g. joined 12 Aug in 26 Jul–25 Aug: (35,000 + 5,000 fuel) / 30 x 17 = 22,667.
+	"""
+	if gap_days <= 0:
+		return 0.0
+	monthly = flt(base_gross) + sum(flt(amounts.get(k)) for k in JOINING_PRORATE_KEYS)
+	return round(monthly / 30 * gap_days, 2)
+
+
+# Amend-sheet key -> Employee master field (fallback when no last-month amount).
+EMPLOYEE_MASTER_ALLOWANCE_FIELDS = {
+	"fuel": "fuel_allowance",
+	"mobile": "mobile_allowance",
+}
+
+
 def compute_period_amounts(company=None, start_date=None, end_date=None, rows=None):
 	"""
 	Recompute the Amend Payroll sheet for the rows the user has on screen.
@@ -800,9 +836,17 @@ def compute_period_amounts(company=None, start_date=None, end_date=None, rows=No
 	if not employee_ids:
 		return {"rows": {}, "summary": {}}
 
-	emp_fields = ["name", "employee_name"]
+	emp_fields = ["name", "employee_name", "date_of_joining", "relieving_date"]
 	if frappe.db.has_column("Employee", "income_tax"):
 		emp_fields.append("income_tax")
+	# Fixed allowances on the Employee master: used when there is no last-month amount
+	# (new joiners), so HR only has to fill them once on the Employee record.
+	master_allowance_fields = {
+		key: field
+		for key, field in EMPLOYEE_MASTER_ALLOWANCE_FIELDS.items()
+		if key in key_map and frappe.db.has_column("Employee", field)
+	}
+	emp_fields.extend(master_allowance_fields.values())
 	employees = frappe.get_all("Employee", filters={"name": ["in", employee_ids]}, fields=emp_fields)
 	emp_by_name = {e.name: e for e in employees}
 
@@ -823,8 +867,13 @@ def compute_period_amounts(company=None, start_date=None, end_date=None, rows=No
 		changed = []
 
 		for key in CARRY_FORWARD_KEYS:
-			if key in key_map and amounts.get(key, 0) <= 0 and last.get(emp_name, {}).get(key):
-				amounts[key] = last[emp_name][key]
+			if key not in key_map or amounts.get(key, 0) > 0:
+				continue
+			value = flt(last.get(emp_name, {}).get(key))
+			if value <= 0 and key in master_allowance_fields:
+				value = flt(emp.get(master_allowance_fields[key]))
+			if value > 0:
+				amounts[key] = value
 				changed.append(key)
 				summary[f"{key}_filled"] += 1
 
@@ -861,6 +910,22 @@ def compute_period_amounts(company=None, start_date=None, end_date=None, rows=No
 				amounts["leave_ded"] = new_leave
 		else:
 			summary["no_attendance"] += 1
+
+		# Joined / left mid-cycle: deduct days outside employment (Leave / Joining).
+		gap_days = employment_gap_days(
+			start_date, end_date, emp.get("date_of_joining"), emp.get("relieving_date")
+		)
+		if gap_days > 0 and "leave_ded" in key_map:
+			absent_days = flt(att.get("deduction_days")) if att.get("has_attendance") else 0
+			new_leave = joining_exit_deduction(base_gross, amounts, gap_days)
+			if absent_days > 0 and base_gross:
+				new_leave += round(base_gross / 30 * absent_days, 2)
+			if abs(new_leave - amounts.get("leave_ded", 0)) >= 0.01:
+				if "leave_ded" not in changed:
+					changed.append("leave_ded")
+					summary["leave_ded_updated"] += 1
+			amounts["leave_ded"] = new_leave
+			summary["joining_exit"] += 1
 
 		gross_pay = base_gross + flt(amounts.get("arrear_2"))
 		amounts["pf"] = compute_pf_deduction_amount(emp_name, gross_pay, assigned_base=base_gross)
